@@ -672,40 +672,55 @@ def sign_off_drop(drop_id):
 
 # ============= WORKER APP ENDPOINTS =============
 
-PIN_TO_EMPLOYEE = {
-    '4271': {'employee_id': 'E-001', 'name': 'Juan Torres'},
-    '4272': {'employee_id': 'E-002', 'name': 'Maria Garcia'},
-    '4273': {'employee_id': 'E-003', 'name': 'Carlos Lopez'},
-}
-
 @app.route('/api/worker/login', methods=['POST'])
 def worker_login():
-    """Worker sign-in: PIN + geofence validation"""
+    """Worker sign-in: PIN + geofence validation.
+
+    DB-backed lookup replaces the hardcoded sample-data dict that previously
+    gated auth — that dict was migration scaffolding from before real workers
+    were imported. PINs now resolve against employees.pin, derived at import
+    time from the worker's phone last-4 (see import_workers.py)."""
     try:
-        data = request.get_json()
-        pin = data.get('phone_or_pin', '')
+        data = request.get_json(silent=True) or {}
+        pin = (data.get('phone_or_pin') or '').strip()
         latitude = float(data.get('latitude', 0))
         longitude = float(data.get('longitude', 0))
-        
-        # Validate PIN
-        if pin not in PIN_TO_EMPLOYEE:
-            return jsonify({"error": "Invalid PIN"}), 403
-        
-        emp = PIN_TO_EMPLOYEE[pin]
-        
-        # Validate geofence (Bronx project: 40.8083, -73.9162, radius 200m)
+
+        if len(pin) != 4 or not pin.isdigit():
+            return jsonify({"error": "Invalid PIN"}), 401
+
+        conn = db()
+        rows = conn.execute(
+            "SELECT employee_id, name FROM employees "
+            "WHERE pin = ? AND pin IS NOT NULL AND pin != ''",
+            (pin,)
+        ).fetchall()
+
+        if len(rows) == 0:
+            conn.close()
+            return jsonify({"error": "Invalid PIN"}), 401
+        if len(rows) > 1:
+            # import_workers.py blocks PIN collisions pre-flight, so this branch
+            # is defensive — never auth on ambiguity, log for investigation.
+            app.logger.error(
+                f"PIN collision in employees: {len(rows)} matches for given PIN"
+            )
+            conn.close()
+            return jsonify({"error": "Authentication failed"}), 500
+        emp = dict(rows[0])
+
+        # Validate geofence (Bronx project: 40.8083, -73.9162)
         PROJECT_LAT, PROJECT_LNG = 40.8083, -73.9162
         R = 6371000  # Earth radius meters
         dLat = (latitude - PROJECT_LAT) * 3.14159 / 180
         dLng = (longitude - PROJECT_LNG) * 3.14159 / 180
         a = (dLat/2)**2 + (dLng/2)**2
         distance = R * 2 * (a**0.5)
-        
+
         if distance > 160934:  # 100 miles in meters — TESTING ONLY, change back to 200 for production
+            conn.close()
             return jsonify({"error": "Not on site", "distance": round(distance)}), 403
-        
-        # Check certifications
-        conn = db()
+
         cert_rows = conn.execute(
             "SELECT c.*, ct.name as cert_name FROM certifications c "
             "LEFT JOIN cert_types ct ON c.cert_type_id = ct.cert_type_id "
@@ -713,14 +728,21 @@ def worker_login():
             (emp['employee_id'],)
         ).fetchall()
         conn.close()
-        
+
         certs = rows_to_dicts(cert_rows)
         today = date.today().isoformat()
-        expired = [c for c in certs if c.get('expiration_date', '') < today]
-        
-        if expired:
-            return jsonify({"error": "Certification expired", "cert": expired[0].get('cert_name')}), 403
-        
+
+        # Test-day workers have no certs imported yet — once Phase D lands, the
+        # existing expiration gate enforces real eligibility. A separate task
+        # tracks refactoring the gate to CoF-prereq-only semantics.
+        if certs:
+            expired = [c for c in certs if c.get('expiration_date', '') < today]
+            if expired:
+                return jsonify({
+                    "error": "Certification expired",
+                    "cert": expired[0].get('cert_name')
+                }), 403
+
         return response_wrapper({
             "employee_id": emp['employee_id'],
             "name": emp['name'],
