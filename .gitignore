@@ -140,6 +140,19 @@ data_room/**/*
 !data_room/**/README.md
 !data_room/**/INSTRUCTIONS.md
 
+# ===== INTAKE — scratch space for photos pending worker intake =====
+# Folder structure tracked via .gitkeep; all contents (raw photos, scans,
+# anything dropped here for OpenCV cropping or manual review) excluded.
+intake/*
+!intake/.gitkeep
+
+# ===== WORKER RECORDS — PII-bearing per-worker folders =====
+# Holds cropped cert photos, ID images, and headshots once real workers land.
+# Even on a private repo, real worker PII never gets git-tracked
+# (CLAUDE.md rule #2). Structure preserved via .gitkeep, all contents excluded.
+worker_records/*
+!worker_records/.gitkeep
+
 # ===== GENERATED HTML RENDERS WITH PROJECT-SPECIFIC DATA =====
 # These are output files (rendered with sample data), not source templates.
 # The templates themselves (no SC-2601 / dates in filename) ARE source — keep.
