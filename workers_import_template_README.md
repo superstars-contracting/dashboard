@@ -61,6 +61,25 @@ Any validation failure aborts before a single INSERT runs.
 
 Safe. The script dedups by `(name, phone-digits-only)`. Rows already present in the table are reported as already imported and skipped — nothing duplicates.
 
+## Local PII protection
+
+The template is tracked in git in its blank state. Once filled with the real roster, the file contains worker PII — phone numbers, emergency contacts — which per CLAUDE.md rule #2 must never leave the BitLocker-encrypted workstation. The risk: a future `git add .` or `git commit -am` would happily commit that PII to the private repo on GitHub.
+
+The mitigation is `git update-index --skip-worktree workers_import_template.csv`. Git stops noticing local edits to the file; the repo's tracked version stays the blank template; the operator can refill or edit the local copy freely without ever staging it. Verify with `git ls-files -v workers_import_template.csv` — an `S` prefix means skip-worktree is active.
+
+If the template structure needs to change for everyone (a new column, a different default), reverse the flag temporarily:
+
+```
+git update-index --no-skip-worktree workers_import_template.csv
+# edit the template — keep the data rows blank
+git add workers_import_template.csv
+git commit -m "..."
+git push
+git update-index --skip-worktree workers_import_template.csv
+```
+
+This pattern is preferred over `.gitignore` because the template itself must remain tracked so anyone cloning the repo gets the column structure and defaults. Only the local *contents* are hidden.
+
 ## CLAUDE.md rules that apply
 
 - Real PII lives in `superstars.db` on the BitLocker-encrypted workstation drive. **Never paste the filled CSV contents into chats.**
