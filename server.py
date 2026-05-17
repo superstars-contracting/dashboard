@@ -755,50 +755,75 @@ def worker_login():
 
 @app.route('/api/worker/session/start', methods=['POST'])
 def worker_session_start():
-    """Record shift start"""
+    """Record shift start in sign_in_log.
+
+    Mirrors the column set used by POST /api/sign-ins so the schema-mismatch
+    INSERT (latitude/longitude/start_time columns that don't exist) no longer
+    silently breaks the worker-app sign-in flow."""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         employee_id = data.get('employee_id')
-        latitude = float(data.get('latitude', 0))
-        longitude = float(data.get('longitude', 0))
-        
-        session_id = str(uuid.uuid4())
-        start_time = datetime.now().isoformat()
-        
+        project_code = data.get('project_code') or 'SC-2601'
+        now_iso = datetime.now().isoformat()
+        today = date.today().isoformat()
+
         conn = db()
-        conn.execute(
-            "INSERT INTO sign_in_log (employee_id, start_time, latitude, longitude, project_code, created_at) "
+        cursor = conn.execute(
+            "INSERT INTO sign_in_log (date, employee_id, project_code, time_in, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, ?, ?)",
-            (employee_id, start_time, latitude, longitude, 'SC-2601', start_time)
+            (today, employee_id, project_code, now_iso, now_iso, now_iso)
         )
+        sign_in_log_id = cursor.lastrowid
         conn.commit()
         conn.close()
-        
+
         return response_wrapper({
-            "session_id": session_id,
+            "sign_in_log_id": sign_in_log_id,
             "employee_id": employee_id,
-            "start_time": start_time
+            "project_code": project_code,
+            "time_in": now_iso
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
 @app.route('/api/worker/session/end', methods=['POST'])
 def worker_session_end():
-    """Record shift end"""
+    """Record shift end by closing the most recent open sign_in_log row for
+    this employee today.
+
+    The schema has no session_id column, so we identify the row via
+    (employee_id, today's date, time_out IS NULL) and close the most recent."""
     try:
-        data = request.get_json()
-        session_id = data.get('session_id')
-        end_time = datetime.now().isoformat()
-        
+        data = request.get_json(silent=True) or {}
+        employee_id = data.get('employee_id')
+        if not employee_id:
+            return jsonify({"error": "employee_id required"}), 400
+        now_iso = datetime.now().isoformat()
+
         conn = db()
+        row = conn.execute(
+            "SELECT id FROM sign_in_log "
+            "WHERE employee_id = ? AND date = DATE('now') AND time_out IS NULL "
+            "ORDER BY id DESC LIMIT 1",
+            (employee_id,)
+        ).fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"error": "No open session found for today"}), 404
+
+        sign_in_log_id = row['id']
         conn.execute(
-            "UPDATE sign_in_log SET end_time = ? WHERE session_id = ?",
-            (end_time, session_id)
+            "UPDATE sign_in_log SET time_out = ?, updated_at = ? WHERE id = ?",
+            (now_iso, now_iso, sign_in_log_id)
         )
         conn.commit()
         conn.close()
-        
-        return response_wrapper({"session_id": session_id, "end_time": end_time})
+
+        return response_wrapper({
+            "sign_in_log_id": sign_in_log_id,
+            "employee_id": employee_id,
+            "time_out": now_iso
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
