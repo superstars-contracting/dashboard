@@ -1,0 +1,21 @@
+{
+  "name": "Superstars Team",
+  "short_name": "Superstars",
+  "start_url": "/worker-app.html",
+  "display": "standalone",
+  "background_color": "#FAF7F1",
+  "theme_color": "#B11E2E",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%23B11E2E' width='192' height='192'/%3E%3Ctext x='50%' y='50%' font-size='120' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central'%3ES%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect fill='%23B11E2E' width='512' height='512'/%3E%3Ctext x='50%' y='50%' font-size='320' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central'%3ES%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

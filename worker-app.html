@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Superstars">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; media-src 'self' blob:;">
+  <title>Superstars Team</title>
+  <link rel="manifest" href="/worker-app-manifest.json">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%23B11E2E' width='192' height='192'/%3E%3Ctext x='50%' y='50%' font-size='80' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central'%3ES%3C/text%3E%3C/svg%3E">
+  <style>
+    :root {
+      --color-cream: #FAF7F1;
+      --color-red: #B11E2E;
+      --color-ink: #14161C;
+      --color-hairline: #E8E4DD;
+      --color-mute: #76777E;
+      --font-header: Georgia, serif;
+      --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      color-scheme: light;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: var(--color-cream);
+      color: var(--color-ink);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    #app {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      flex-direction: column;
+      background: var(--color-cream);
+    }
+
+    .screen.active {
+      display: flex;
+      z-index: 10;
+    }
+
+    .signin-screen {
+      padding: 0;
+      justify-content: flex-start;
+    }
+
+    .signin-scroll {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 14px 16px 8px;
+    }
+
+    .signin-header {
+      text-align: center;
+    }
+
+    .signin-logo {
+      font-family: var(--font-header);
+      font-size: 20px;
+      font-weight: bold;
+      color: var(--color-ink);
+      margin-bottom: 2px;
+      letter-spacing: -0.5px;
+    }
+
+    .signin-date {
+      font-size: 12px;
+      color: var(--color-mute);
+      margin-bottom: 10px;
+    }
+
+    .geofence-widget {
+      background: white;
+      border: 1px solid var(--color-hairline);
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 10px;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .geofence-svg {
+      width: 48px;
+      height: 48px;
+      flex-shrink: 0;
+    }
+
+    .geofence-text-block {
+      text-align: left;
+    }
+
+    .geofence-status {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .geofence-status.on-site {
+      color: #22c55e;
+    }
+
+    .geofence-status.off-site {
+      color: var(--color-red);
+    }
+
+    .geofence-distance {
+      font-size: 12px;
+      color: var(--color-mute);
+    }
+
+    .pin-section {
+      margin-bottom: 8px;
+    }
+
+    .pin-label {
+      font-size: 11px;
+      color: var(--color-mute);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .pin-input {
+      width: 100%;
+      padding: 8px;
+      font-size: 26px;
+      font-weight: bold;
+      text-align: center;
+      border: 2px solid var(--color-hairline);
+      border-radius: 8px;
+      background: white;
+      color: var(--color-ink);
+      letter-spacing: 10px;
+      margin-bottom: 8px;
+      font-family: monospace;
+      height: 48px;
+    }
+
+    .pin-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .pin-btn {
+      padding: 0;
+      font-size: 18px;
+      font-weight: bold;
+      border: 1px solid var(--color-hairline);
+      border-radius: 8px;
+      background: white;
+      color: var(--color-ink);
+      cursor: pointer;
+      height: 42px;
+      transition: all 0.1s;
+    }
+
+    .pin-btn:active {
+      background: var(--color-red);
+      color: white;
+      transform: scale(0.95);
+    }
+
+    .pin-btn.delete {
+      grid-column: 3;
+    }
+
+    .cert-status {
+      background: white;
+      border: 1px solid var(--color-hairline);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .cert-status.valid {
+      color: #22c55e;
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+    }
+
+    .cert-status.blocked {
+      color: var(--color-red);
+      border-color: #fecaca;
+      background: #fef2f2;
+    }
+
+    .signin-footer {
+      flex-shrink: 0;
+      padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+      background: var(--color-cream);
+      border-top: 1px solid var(--color-hairline);
+    }
+
+    .signin-btn {
+      width: 100%;
+      padding: 14px;
+      font-size: 17px;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      background: var(--color-red);
+      color: white;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 2px 8px rgba(177, 30, 46, 0.2);
+      min-height: 48px;
+    }
+
+    .signin-btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 4px rgba(177, 30, 46, 0.2);
+    }
+
+    .signin-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .lang-toggle-row {
+      display: flex;
+      justify-content: flex-end;
+      padding: 8px 12px 0;
+    }
+
+    .lang-toggle {
+      display: inline-flex;
+      background: white;
+      border: 1px solid #8B1623;
+      border-radius: 999px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(20, 22, 28, 0.08);
+    }
+
+    .lang-opt {
+      background: white;
+      border: none;
+      font-size: 12px;
+      font-weight: 700;
+      color: #8B1623;
+      cursor: pointer;
+      padding: 6px 14px;
+      letter-spacing: 0.5px;
+      transition: all 0.15s ease;
+      font-family: var(--font-body);
+      min-width: 38px;
+    }
+
+    .lang-opt.active {
+      background: #8B1623;
+      color: white;
+    }
+
+    .lang-opt:active {
+      background: #6E1019;
+    }
+
+    .working-screen {
+      padding: 0;
+      position: relative;
+    }
+
+    .working-topbar {
+      background: white;
+      border-bottom: 1px solid var(--color-hairline);
+      padding: 12px 16px;
+      font-size: 13px;
+      color: var(--color-mute);
+      text-align: center;
+    }
+
+    .working-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      padding: 24px;
+      overflow-y: auto;
+    }
+
+    .photo-btn {
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      background: var(--color-red);
+      color: white;
+      border: none;
+      font-size: 32px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      box-shadow: 0 4px 16px rgba(177, 30, 46, 0.3);
+      transition: all 0.2s;
+      font-family: var(--font-body);
+      margin-bottom: 24px;
+    }
+
+    .photo-btn:active {
+      transform: scale(0.95);
+      box-shadow: 0 2px 8px rgba(177, 30, 46, 0.3);
+    }
+
+    .photo-btn-text {
+      font-size: 11px;
+      margin-top: 8px;
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    .photo-counter {
+      font-size: 14px;
+      color: var(--color-mute);
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    .working-footer {
+      background: var(--color-cream);
+      padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+      text-align: center;
+    }
+
+    .signout-btn {
+      width: 100%;
+      padding: 16px;
+      font-size: 17px;
+      font-weight: bold;
+      border: 2px solid var(--color-ink);
+      border-radius: 10px;
+      background: white;
+      color: var(--color-ink);
+      cursor: pointer;
+      transition: all 0.2s;
+      min-height: 56px;
+      letter-spacing: 0.5px;
+    }
+
+    .signout-btn:active {
+      background: var(--color-ink);
+      color: white;
+      transform: translateY(1px);
+    }
+
+    .photo-banner {
+      background: #f9fafb;
+      border-top: 1px solid var(--color-hairline);
+      border-bottom: 1px solid var(--color-hairline);
+      padding: 14px 16px;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--color-ink);
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    .photo-screen {
+      padding: 0;
+      position: relative;
+      background: #000;
+    }
+
+    .video-container {
+      position: relative;
+      width: 100%;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      overflow: hidden;
+    }
+
+    #video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    #canvas {
+      display: none;
+    }
+
+    .photo-controls {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .shutter-btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: white;
+      border: 3px solid var(--color-red);
+      cursor: pointer;
+      transition: all 0.1s;
+      margin-bottom: 12px;
+    }
+
+    .shutter-btn:active {
+      transform: scale(0.9);
+    }
+
+    .photo-zone-display {
+      color: white;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .photo-cancel {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: white;
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+
+    .photo-review-screen {
+      padding: 0;
+      background: #000;
+      flex-direction: column;
+    }
+
+    .review-image-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: #000;
+    }
+
+    #review-image {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .review-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      flex-shrink: 0;
+      background: #000;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .review-retake,
+    .review-keep {
+      padding: 22px 0;
+      font-size: 18px;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      font-family: var(--font-body);
+      letter-spacing: 0.3px;
+      transition: opacity 0.15s;
+    }
+
+    .review-retake {
+      background: #2a2a2a;
+      color: white;
+      border-right: 1px solid #444;
+    }
+
+    .review-retake:active {
+      background: #444;
+    }
+
+    .review-keep {
+      background: var(--color-red);
+      color: white;
+    }
+
+    .review-keep:active {
+      background: #8B1623;
+    }
+
+    .photo-form-screen {
+      padding: 24px;
+      justify-content: flex-start;
+      overflow-y: auto;
+    }
+
+    .form-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    .form-group {
+      margin-bottom: 24px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--color-ink);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--color-hairline);
+      border-radius: 8px;
+      font-size: 14px;
+      background: white;
+      color: var(--color-ink);
+      font-family: var(--font-body);
+    }
+
+    .loc-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .loc-btn {
+      padding: 12px 4px;
+      border: 2px solid var(--color-hairline);
+      border-radius: 10px;
+      background: white;
+      color: var(--color-ink);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+      font-family: var(--font-body);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      min-height: 64px;
+    }
+
+    .loc-num {
+      font-size: 24px;
+      font-weight: bold;
+      line-height: 1;
+    }
+
+    .loc-icon {
+      font-size: 22px;
+      font-weight: bold;
+      line-height: 1;
+    }
+
+    .loc-sub {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--color-mute);
+    }
+
+    .loc-btn:active {
+      border-color: var(--color-red);
+      background: #fef2f2;
+    }
+
+    .loc-btn.selected {
+      border-color: var(--color-red);
+      background: var(--color-red);
+      color: white;
+    }
+
+    .loc-btn.selected .loc-sub {
+      color: white;
+    }
+
+    .scope-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .scope-btn {
+      padding: 16px;
+      border: 2px solid var(--color-hairline);
+      border-radius: 8px;
+      background: white;
+      color: var(--color-ink);
+      cursor: pointer;
+      font-size: 12px;
+      text-align: center;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+
+    .scope-btn:active {
+      border-color: var(--color-red);
+      background: #fef2f2;
+    }
+
+    .scope-btn.selected {
+      border-color: var(--color-red);
+      background: #fef2f2;
+      font-weight: bold;
+    }
+
+    .form-submit {
+      width: 100%;
+      padding: 16px;
+      font-size: 16px;
+      font-weight: bold;
+      background: var(--color-red);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 16px;
+    }
+
+    .form-submit:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 4px rgba(177, 30, 46, 0.2);
+    }
+
+    .signout-screen {
+      padding: 24px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .signout-dialog {
+      background: white;
+      border: 1px solid var(--color-hairline);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+      max-width: 320px;
+    }
+
+    .signout-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 16px;
+    }
+
+    .signout-stats {
+      background: #f9fafb;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      color: var(--color-mute);
+      line-height: 1.6;
+    }
+
+    .signout-confirm {
+      width: 100%;
+      padding: 16px;
+      background: var(--color-red);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-bottom: 8px;
+      transition: all 0.2s;
+    }
+
+    .signout-confirm:active {
+      transform: translateY(2px);
+    }
+
+    .signout-cancel {
+      width: 100%;
+      padding: 12px;
+      background: white;
+      color: var(--color-mute);
+      border: 1px solid var(--color-hairline);
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .signout-cancel:active {
+      background: #f9fafb;
+    }
+
+    .signout-goodbye {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: white;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      z-index: 100;
+    }
+
+    .signout-goodbye.active {
+      display: flex;
+    }
+
+    .goodbye-text {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 12px;
+    }
+
+    .goodbye-stats {
+      font-size: 14px;
+      color: var(--color-mute);
+      line-height: 1.6;
+    }
+
+    @media (max-height: 600px) {
+      .photo-btn {
+        width: 120px;
+        height: 120px;
+        font-size: 24px;
+      }
+
+      .signin-screen,
+      .photo-form-screen {
+        padding: 16px;
+      }
+    }
+
+    @media (min-width: 768px) {
+      #app {
+        max-width: 480px;
+        margin: 0 auto;
+        border: 1px solid var(--color-hairline);
+        height: 100vh;
+      }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="screen signin-screen active" id="screen-signin">
+    <div class="lang-toggle-row">
+      <div class="lang-toggle" id="lang-toggle" role="group" aria-label="Language">
+        <button type="button" class="lang-opt" id="lang-en" onclick="setLanguage('en')">EN</button>
+        <button type="button" class="lang-opt" id="lang-es" onclick="setLanguage('es')">ES</button>
+      </div>
+    </div>
+    <div class="signin-scroll">
+      <div class="signin-header">
+        <div class="signin-logo" id="logo-text">SUPERSTARS TEAM</div>
+        <div class="signin-date" id="date-text"></div>
+      </div>
+
+      <div class="geofence-widget" id="geofence-widget" onclick="requestLocation()" style="cursor:pointer;">
+        <svg class="geofence-svg" id="geofence-svg" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="#E8E4DD" stroke-width="1"/>
+          <circle cx="60" cy="60" r="2" fill="#999" stroke="none"/>
+          <circle id="worker-dot" cx="60" cy="80" r="4" fill="#3B82F6"/>
+        </svg>
+        <div class="geofence-text-block">
+          <div class="geofence-status" id="geofence-text">Tap to enable location</div>
+          <div class="geofence-distance" id="geofence-distance"></div>
+        </div>
+      </div>
+
+      <div class="pin-section">
+        <div class="pin-label" id="pin-label-text">PIN</div>
+        <input type="password" class="pin-input" id="pin-input" maxlength="4" inputmode="numeric" readonly>
+        <div class="pin-buttons">
+          <button class="pin-btn" onclick="addPin('1')">1</button>
+          <button class="pin-btn" onclick="addPin('2')">2</button>
+          <button class="pin-btn" onclick="addPin('3')">3</button>
+          <button class="pin-btn" onclick="addPin('4')">4</button>
+          <button class="pin-btn" onclick="addPin('5')">5</button>
+          <button class="pin-btn" onclick="addPin('6')">6</button>
+          <button class="pin-btn" onclick="addPin('7')">7</button>
+          <button class="pin-btn" onclick="addPin('8')">8</button>
+          <button class="pin-btn" onclick="addPin('9')">9</button>
+          <button class="pin-btn" onclick="addPin('0')">0</button>
+          <button class="pin-btn delete" onclick="deletePin()">←</button>
+        </div>
+        <div class="cert-status" id="cert-status"></div>
+      </div>
+    </div>
+
+    <div class="signin-footer">
+      <button class="signin-btn" id="signin-btn" onclick="signIn()" disabled>Sign In</button>
+    </div>
+  </div>
+
+  <div class="screen working-screen" id="screen-working">
+    <div class="working-topbar" id="working-topbar">Signed in</div>
+    <div class="working-content">
+      <button class="photo-btn" onclick="startPhotoCapture()">
+        <span style="font-size:48px;">📸</span>
+        <div class="photo-btn-text" id="photo-btn-text">Take Photo</div>
+      </button>
+    </div>
+    <div class="photo-banner" id="photo-banner">📷 Photos upload directly. Not saved to your phone.</div>
+    <div class="working-footer">
+      <button class="signout-btn" onclick="goToSignout()" id="signout-text">Sign Out</button>
+    </div>
+  </div>
+
+  <div class="screen photo-screen" id="screen-photo">
+    <button class="photo-cancel" onclick="cancelPhoto()">✕</button>
+    <div class="video-container">
+      <video id="video" autoplay playsinline></video>
+      <canvas id="canvas"></canvas>
+      <div class="photo-controls">
+        <button class="shutter-btn" onclick="capturePhoto()"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen photo-review-screen" id="screen-photo-review">
+    <div class="review-image-wrap">
+      <img id="review-image" alt="Captured photo">
+    </div>
+    <div class="review-actions">
+      <button class="review-retake" onclick="retakePhoto()" id="retake-btn">↺ Retake</button>
+      <button class="review-keep" onclick="keepPhoto()" id="keep-btn">✓ Use Photo</button>
+    </div>
+  </div>
+
+  <div class="screen photo-form-screen" id="screen-photo-form">
+    <div class="form-title" id="form-title">Confirm Photo</div>
+    <div class="form-group">
+      <label class="form-label" id="zone-label">Where</label>
+      <div class="loc-grid">
+        <button type="button" class="loc-btn" data-loc="S1" onclick="selectLocation('S1', this)"><span class="loc-num">1</span><span class="loc-sub" id="loc-sub-1">Scaffold</span></button>
+        <button type="button" class="loc-btn" data-loc="S2" onclick="selectLocation('S2', this)"><span class="loc-num">2</span><span class="loc-sub" id="loc-sub-2">Scaffold</span></button>
+        <button type="button" class="loc-btn" data-loc="S3" onclick="selectLocation('S3', this)"><span class="loc-num">3</span><span class="loc-sub" id="loc-sub-3">Scaffold</span></button>
+        <button type="button" class="loc-btn" data-loc="S4" onclick="selectLocation('S4', this)"><span class="loc-num">4</span><span class="loc-sub" id="loc-sub-4">Scaffold</span></button>
+        <button type="button" class="loc-btn" data-loc="S5" onclick="selectLocation('S5', this)"><span class="loc-num">5</span><span class="loc-sub" id="loc-sub-5">Scaffold</span></button>
+        <button type="button" class="loc-btn loc-special" data-loc="ROOF" onclick="selectLocation('ROOF', this)"><span class="loc-icon">⌂</span><span class="loc-sub" id="loc-roof">Roof</span></button>
+        <button type="button" class="loc-btn loc-special" data-loc="INT" onclick="selectLocation('INT', this)"><span class="loc-icon">⊞</span><span class="loc-sub" id="loc-int">Interior</span></button>
+        <button type="button" class="loc-btn loc-special" data-loc="OUT" onclick="selectLocation('OUT', this)"><span class="loc-icon">▬</span><span class="loc-sub" id="loc-out">Outside</span></button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" id="scope-label">Scope</label>
+      <div class="scope-grid">
+        <button class="scope-btn" onclick="selectScope('brick', this)">🧱 Brick</button>
+        <button class="scope-btn" onclick="selectScope('pointing', this)">✏️ Pointing</button>
+        <button class="scope-btn" onclick="selectScope('demo', this)">🔨 Demo</button>
+        <button class="scope-btn" onclick="selectScope('sealant', this)">💧 Sealant</button>
+        <button class="scope-btn" onclick="selectScope('cleanup', this)">🧹 Cleanup</button>
+        <button class="scope-btn" onclick="selectScope('other', this)">❓ Other</button>
+      </div>
+    </div>
+
+    <button class="form-submit" onclick="uploadPhoto()" id="submit-photo-text">Send</button>
+  </div>
+
+  <div class="screen signout-screen" id="screen-signout">
+    <div class="signout-dialog">
+      <div class="signout-title" id="signout-title">Sign out for the day?</div>
+      <div class="signout-stats" id="signout-stats">
+        Hours: 8.5<br>Photos: 24
+      </div>
+      <button class="signout-confirm" onclick="confirmSignout()" id="signout-confirm-text">Sign Out</button>
+      <button class="signout-cancel" onclick="cancelSignout()">Cancel</button>
+    </div>
+    <div class="signout-goodbye" id="goodbye-screen">
+      <div class="goodbye-text" id="goodbye-text">Goodbye</div>
+      <div class="goodbye-stats" id="goodbye-stats">8.5 hrs · 24 photos</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const i18n = {
+  en: {
+    sign_in: "Sign In",
+    take_photo: "Take Photo",
+    on_site: "On site",
+    not_on_site: "Not on site",
+    photos_today: "photos today",
+    sign_out: "Sign Out",
+    pin_label: "PIN",
+    confirm_photo: "Confirm Photo",
+    zone_label: "Where",
+    scope_label: "Scope",
+    send: "Send",
+    signed_in: "Signed in",
+    photos_upload: "📷 Photos upload directly. Not saved to your phone.",
+    photos_not_saved: "Not saved to your phone",
+    signout_confirm: "Sign out for the day?",
+    goodbye: "Goodbye",
+    cancel: "Cancel",
+    hours: "Hours",
+    photos: "Photos",
+    retake: "↺ Retake",
+    use_photo: "✓ Use Photo",
+    loc_scaffold: "Scaffold",
+    loc_roof: "Roof",
+    loc_interior: "Interior",
+    loc_outside: "Outside"
+  },
+  es: {
+    sign_in: "Iniciar Sesión",
+    take_photo: "Tomar Foto",
+    on_site: "En el sitio",
+    not_on_site: "No estás en el sitio",
+    photos_today: "fotos hoy",
+    sign_out: "Salir",
+    pin_label: "PIN",
+    confirm_photo: "Confirmar Foto",
+    zone_label: "Dónde",
+    scope_label: "Alcance",
+    send: "Enviar",
+    signed_in: "Sesión iniciada",
+    photos_upload: "📷 Las fotos se cargan directamente. No se guardan en tu teléfono.",
+    photos_not_saved: "No se guardan en tu teléfono",
+    signout_confirm: "¿Salir por hoy?",
+    goodbye: "Adiós",
+    cancel: "Cancelar",
+    hours: "Horas",
+    photos: "Fotos",
+    retake: "↺ Tomar de nuevo",
+    use_photo: "✓ Usar foto",
+    loc_scaffold: "Andamio",
+    loc_roof: "Techo",
+    loc_interior: "Interior",
+    loc_outside: "Afuera"
+  }
+};
+
+let lang = localStorage.getItem('lang') || 'es';
+function t(key) { return i18n[lang][key]; }
+function toggleLanguage() {
+  lang = lang === 'es' ? 'en' : 'es';
+  localStorage.setItem('lang', lang);
+  updateUI();
+}
+function setLanguage(newLang) {
+  if (newLang !== 'es' && newLang !== 'en') return;
+  lang = newLang;
+  localStorage.setItem('lang', lang);
+  updateUI();
+}
+
+let currentScreen = 'signin';
+let pinCode = '';
+let geofenceData = { onSite: false, distance: 0 };
+let sessionData = { employeeId: null, sessionId: null, startTime: null, photoCount: 0 };
+let currentZone = 'South L11';
+let selectedScope = null;
+let capturedPhoto = null;
+
+const PROJECT_LAT = 40.8083;
+const PROJECT_LNG = -73.9162;
+const GEOFENCE_RADIUS = 160934;  // 100 miles in meters — TESTING ONLY, change back to 200 for production
+
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+let geofenceError = null;
+let geofencePending = false;
+
+function updateGeofence() {
+  if (!('geolocation' in navigator)) {
+    geofenceError = 'no_api';
+    geofenceData.onSite = false;
+    geofenceData.distance = null;
+    renderGeofence();
+    updateSignInButton();
+    return;
+  }
+  geofencePending = true;
+  renderGeofence();
+  navigator.geolocation.getCurrentPosition((pos) => {
+    geofencePending = false;
+    geofenceError = null;
+    const dist = haversine(PROJECT_LAT, PROJECT_LNG, pos.coords.latitude, pos.coords.longitude);
+    geofenceData.distance = Math.round(dist);
+    geofenceData.onSite = dist <= GEOFENCE_RADIUS;
+    renderGeofence();
+    updateSignInButton();
+  }, (err) => {
+    geofencePending = false;
+    // err.code: 1=PERMISSION_DENIED, 2=POSITION_UNAVAILABLE, 3=TIMEOUT
+    if (err.code === 1) geofenceError = 'denied';
+    else if (err.code === 2) geofenceError = 'unavailable';
+    else if (err.code === 3) geofenceError = 'timeout';
+    else geofenceError = 'unknown';
+    geofenceData.onSite = false;
+    geofenceData.distance = null;
+    renderGeofence();
+    updateSignInButton();
+  }, {
+    enableHighAccuracy: true,
+    timeout: 15000,
+    maximumAge: 30000
+  });
+}
+
+// Tapped on the geofence widget — re-request location.
+// On iOS Safari, the permission prompt only appears in response to a user gesture,
+// so this gives the worker an explicit way to trigger it.
+let _tapCount = 0;
+let _tapTimer = null;
+function requestLocation() {
+  // 5 fast taps in a row = toggle testing bypass (admin gesture, not advertised)
+  _tapCount++;
+  clearTimeout(_tapTimer);
+  _tapTimer = setTimeout(() => { _tapCount = 0; }, 1500);
+  if (_tapCount >= 5) {
+    TESTING_BYPASS = !TESTING_BYPASS;
+    localStorage.setItem('testing_bypass', TESTING_BYPASS ? '1' : '0');
+    _tapCount = 0;
+    alert(TESTING_BYPASS
+      ? '⚠ TESTING MODE ON\nGeofence bypassed. Sign-in works without GPS.'
+      : '✓ Testing mode OFF\nNormal geofence enforced.');
+    renderGeofence();
+    updateSignInButton();
+    return;
+  }
+  updateGeofence();
+}
+
+function renderGeofence() {
+  const status = document.getElementById('geofence-text');
+  const distance = document.getElementById('geofence-distance');
+  const svg = document.getElementById('geofence-svg');
+
+  // Testing bypass takes priority — clear visual badge
+  if (TESTING_BYPASS) {
+    status.textContent = '⚙ TEST MODE';
+    status.classList.remove('off-site');
+    status.classList.add('on-site');
+    distance.textContent = lang === 'es' ? 'Geocerca desactivada' : 'Geofence bypassed';
+    svg.innerHTML = '<circle cx="60" cy="60" r="50" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4 3"/><text x="60" y="70" font-size="40" text-anchor="middle" fill="#f59e0b">⚙</text>';
+    return;
+  }
+
+  // Pending — actively asking for / waiting on GPS
+  if (geofencePending) {
+    status.textContent = lang === 'es' ? 'Buscando ubicación…' : 'Checking location…';
+    status.classList.remove('on-site', 'off-site');
+    distance.textContent = '';
+    svg.innerHTML = '<circle cx="60" cy="60" r="50" fill="none" stroke="#E8E4DD" stroke-width="1"/><circle cx="60" cy="60" r="2" fill="#999"/>';
+    return;
+  }
+
+  // Error states — surface what's actually wrong, prompt to fix
+  if (geofenceError) {
+    status.classList.remove('on-site');
+    status.classList.add('off-site');
+    if (geofenceError === 'denied') {
+      status.textContent = lang === 'es' ? '⚠ Ubicación bloqueada' : '⚠ Location blocked';
+      distance.textContent = lang === 'es'
+        ? 'Ajustes › Safari › Ubicación › Permitir'
+        : 'Settings › Safari › Location › Allow';
+    } else if (geofenceError === 'unavailable') {
+      status.textContent = lang === 'es' ? '⚠ GPS no disponible' : '⚠ GPS unavailable';
+      distance.textContent = lang === 'es' ? 'Toca para reintentar' : 'Tap to retry';
+    } else if (geofenceError === 'timeout') {
+      status.textContent = lang === 'es' ? '⚠ Tiempo agotado' : '⚠ Timed out';
+      distance.textContent = lang === 'es' ? 'Toca para reintentar' : 'Tap to retry';
+    } else if (geofenceError === 'no_api') {
+      status.textContent = lang === 'es' ? '⚠ Sin GPS en este navegador' : '⚠ GPS not supported';
+      distance.textContent = '';
+    } else {
+      status.textContent = lang === 'es' ? '⚠ Error de ubicación' : '⚠ Location error';
+      distance.textContent = lang === 'es' ? 'Toca para reintentar' : 'Tap to retry';
+    }
+    svg.innerHTML = '<circle cx="60" cy="60" r="50" fill="none" stroke="#E8E4DD" stroke-width="1"/><circle cx="60" cy="60" r="2" fill="#999"/><circle cx="60" cy="80" r="4" fill="#e74c3c"/>';
+    return;
+  }
+
+  // GPS read succeeded
+  if (geofenceData.onSite) {
+    status.textContent = '✓ ' + t('on_site');
+    status.classList.add('on-site');
+    status.classList.remove('off-site');
+    distance.textContent = '';
+    svg.innerHTML = '<circle cx="60" cy="60" r="50" fill="none" stroke="#22c55e" stroke-width="1"/><circle cx="60" cy="60" r="2" fill="#999"/><circle cx="60" cy="60" r="4" fill="#22c55e"/>';
+  } else {
+    status.textContent = '✗ ' + t('not_on_site');
+    status.classList.add('off-site');
+    status.classList.remove('on-site');
+    const km = (geofenceData.distance / 1000).toFixed(1);
+    distance.textContent = (geofenceData.distance >= 1000 ? km + ' km' : geofenceData.distance + ' m')
+      + (lang === 'es' ? ' del sitio' : ' from site');
+    svg.innerHTML = '<circle cx="60" cy="60" r="50" fill="none" stroke="#E8E4DD" stroke-width="1"/><circle cx="60" cy="60" r="2" fill="#999"/><circle cx="60" cy="80" r="4" fill="#e74c3c"/>';
+  }
+}
+
+function addPin(digit) {
+  if (pinCode.length < 4) {
+    pinCode += digit;
+    document.getElementById('pin-input').value = '•'.repeat(pinCode.length);
+    updateSignInButton();
+    checkCertStatus();
+  }
+}
+
+function deletePin() {
+  pinCode = pinCode.slice(0, -1);
+  document.getElementById('pin-input').value = '•'.repeat(pinCode.length);
+  updateSignInButton();
+}
+
+function checkCertStatus() {
+  const certDiv = document.getElementById('cert-status');
+  if (pinCode.length < 4) {
+    certDiv.textContent = '';
+    return;
+  }
+  const certMap = {
+    '4271': { valid: true, text: '3 certs valid · OSHA-30 expires in 45 days' },
+    '4272': { valid: false, text: 'BLOCKED · Asbestos Awareness expired' },
+    '4273': { valid: true, text: '5 certs valid · All active' }
+  };
+  const cert = certMap[pinCode] || { valid: true, text: '✓ Certificates valid' };
+  certDiv.textContent = cert.text;
+  certDiv.className = 'cert-status ' + (cert.valid ? 'valid' : 'blocked');
+}
+
+// TESTING ONLY — when true, allows sign-in even with no GPS / blocked GPS.
+// Toggled by tapping the geofence widget 5 times in a row. Off by default.
+let TESTING_BYPASS = localStorage.getItem('testing_bypass') === '1';
+
+function updateSignInButton() {
+  const btn = document.getElementById('signin-btn');
+  const gpsOk = geofenceData.onSite || TESTING_BYPASS;
+  btn.disabled = !(gpsOk && pinCode.length === 4);
+}
+
+function signIn() {
+  if ((!geofenceData.onSite && !TESTING_BYPASS) || pinCode.length !== 4) return;
+  sessionData.employeeId = 'E-' + pinCode;
+  sessionData.sessionId = 'SID-' + Date.now();
+  sessionData.startTime = new Date();
+  sessionData.photoCount = 0;
+  goToScreen('working');
+  updateWorkingScreen();
+  startWorkingTimer();
+}
+
+let workingTimer;
+function startWorkingTimer() {
+  workingTimer = setInterval(updateWorkingScreen, 1000);
+}
+
+function updateWorkingScreen() {
+  // Topbar shows just "Signed in" — no clock, no counter, no zone.
+  // Workers don't need to see how long they've been on; PMs do, on the dashboard.
+  document.getElementById('working-topbar').textContent = t('signed_in');
+}
+
+let stream;
+function startPhotoCapture() {
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(s => {
+    stream = s;
+    document.getElementById('video').srcObject = s;
+    goToScreen('photo');
+  }).catch(e => alert('Camera error: ' + e.message));
+}
+
+function capturePhoto() {
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0);
+  capturedPhoto = canvas.toDataURL('image/jpeg', 0.9);
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  // Show review screen first — let worker keep or retake
+  document.getElementById('review-image').src = capturedPhoto;
+  goToScreen('photo-review');
+}
+
+function retakePhoto() {
+  // Go back to live camera
+  capturedPhoto = null;
+  startPhotoCapture();
+}
+
+function keepPhoto() {
+  // Worker accepted — proceed to location/scope form
+  // Pre-highlight last picks so repeat photos at same spot are one-tap.
+  applyLastSelections();
+  goToScreen('photo-form');
+}
+
+function cancelPhoto() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  goToScreen('working');
+}
+
+function selectScope(scope, btn) {
+  document.querySelectorAll('.scope-btn').forEach(b => b.classList.remove('selected'));
+  selectedScope = scope;
+  btn.classList.add('selected');
+  localStorage.setItem('last_scope', scope);
+}
+
+let selectedLocation = null;
+function selectLocation(loc, btn) {
+  document.querySelectorAll('.loc-btn').forEach(b => b.classList.remove('selected'));
+  selectedLocation = loc;
+  btn.classList.add('selected');
+  localStorage.setItem('last_location', loc);
+}
+
+// Called when entering the photo-form screen — pre-highlights the worker's
+// last picks so a repeat photo at the same spot is just one tap (Send).
+function applyLastSelections() {
+  const lastLoc = localStorage.getItem('last_location');
+  const lastScope = localStorage.getItem('last_scope');
+  document.querySelectorAll('.loc-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.scope-btn').forEach(b => b.classList.remove('selected'));
+  selectedLocation = null;
+  selectedScope = null;
+  if (lastLoc) {
+    const btn = document.querySelector('.loc-btn[data-loc="' + lastLoc + '"]');
+    if (btn) {
+      btn.classList.add('selected');
+      selectedLocation = lastLoc;
+    }
+  }
+  if (lastScope) {
+    document.querySelectorAll('.scope-btn').forEach(b => {
+      if (b.getAttribute('onclick') && b.getAttribute('onclick').indexOf("'" + lastScope + "'") > -1) {
+        b.classList.add('selected');
+        selectedScope = lastScope;
+      }
+    });
+  }
+}
+
+function uploadPhoto() {
+  if (!selectedLocation) { alert(lang === 'es' ? 'Selecciona dónde estás' : 'Select where you are'); return; }
+  if (!selectedScope) { alert(lang === 'es' ? 'Selecciona el alcance' : 'Select a scope'); return; }
+  sessionData.photoCount++;
+  // Don't reset — keep last selections so the NEXT photo defaults to same spot.
+  // Just clear the photo itself.
+  capturedPhoto = null;
+  goToScreen('working');
+  updateWorkingScreen();
+}
+
+function goToSignout() {
+  document.getElementById('goodbye-screen').classList.remove('active');
+  goToScreen('signout');
+}
+
+function confirmSignout() {
+  clearInterval(workingTimer);
+  const elapsed = new Date() - sessionData.startTime;
+  const hours = (elapsed / 3600000).toFixed(1);
+  document.getElementById('goodbye-text').textContent = t('goodbye');
+  document.getElementById('goodbye-stats').textContent = hours + ' hrs · ' + sessionData.photoCount + ' ' + t('photos');
+  document.getElementById('goodbye-screen').classList.add('active');
+  setTimeout(() => {
+    pinCode = '';
+    sessionData = { employeeId: null, sessionId: null, startTime: null, photoCount: 0 };
+    goToScreen('signin');
+    updateUI();
+    updateGeofence();
+  }, 2000);
+}
+
+function cancelSignout() {
+  goToScreen('working');
+}
+
+function goToScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  currentScreen = name;
+  document.getElementById('screen-' + name).classList.add('active');
+}
+
+function updateUI() {
+  document.getElementById('date-text').textContent = new Date().toLocaleDateString(lang === 'es' ? 'es-MX' : 'en-US', { month: 'long', day: 'numeric' });
+  document.getElementById('pin-label-text').textContent = t('pin_label');
+  document.getElementById('signin-btn').textContent = t('sign_in');
+  document.getElementById('photo-btn-text').textContent = t('take_photo');
+  document.getElementById('form-title').textContent = t('confirm_photo');
+  document.getElementById('zone-label').textContent = t('zone_label');
+  document.getElementById('scope-label').textContent = t('scope_label');
+  document.getElementById('submit-photo-text').textContent = t('send');
+  document.getElementById('signout-title').textContent = t('signout_confirm');
+  document.getElementById('signout-confirm-text').textContent = t('sign_out');
+  // Worker screen
+  const banner = document.getElementById('photo-banner');
+  if (banner) banner.textContent = t('photos_upload');
+  const sgnOut = document.getElementById('signout-text');
+  if (sgnOut) sgnOut.textContent = t('sign_out');
+  // Photo review
+  const retakeBtn = document.getElementById('retake-btn');
+  if (retakeBtn) retakeBtn.textContent = t('retake');
+  const keepBtn = document.getElementById('keep-btn');
+  if (keepBtn) keepBtn.textContent = t('use_photo');
+  // Location button sub-labels (Scaffold / Roof / Interior / Outside)
+  ['loc-sub-1','loc-sub-2','loc-sub-3','loc-sub-4','loc-sub-5'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = t('loc_scaffold');
+  });
+  const roofEl = document.getElementById('loc-roof');
+  if (roofEl) roofEl.textContent = t('loc_roof');
+  const intEl = document.getElementById('loc-int');
+  if (intEl) intEl.textContent = t('loc_interior');
+  const outEl = document.getElementById('loc-out');
+  if (outEl) outEl.textContent = t('loc_outside');
+  const esBtn = document.getElementById('lang-es');
+  const enBtn = document.getElementById('lang-en');
+  if (esBtn && enBtn) {
+    esBtn.classList.toggle('active', lang === 'es');
+    enBtn.classList.toggle('active', lang === 'en');
+  }
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/worker-app-sw.js').catch(() => {});
+}
+
+window.addEventListener('load', () => {
+  updateUI();
+  updateGeofence();
+  setInterval(updateGeofence, 10000);
+});
+</script>
+</body>
+</html>

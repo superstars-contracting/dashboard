@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Superstars Contracting · Office Console</title>
+<style>
+  :root {
+    --brand-red: #B11E2E;
+    --brand-red-deep: #8B1623;
+    --ink: #14161C;
+    --cream: #FAF7F1;
+    --paper: #FFFFFF;
+    --hairline: #E8E4DD;
+    --mute: #76777E;
+    --gold-tint: #E8D9B5;
+    --ok: #2F7C57;
+    --warn: #B68838;
+    --bad: #B11E2E;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--cream); color: var(--ink); font-family: 'Calibri', 'Segoe UI', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+  body { min-height: 100vh; }
+
+  /* ==== HEADER ==== */
+  .topbar {
+    background: white;
+    border-bottom: 1px solid var(--hairline);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand-mark { width: 42px; height: 42px; }
+  .brand-text { line-height: 1.1; }
+  .brand-name { font-family: 'Playfair Display', 'Georgia', serif; font-size: 18px; font-weight: 700; letter-spacing: 0.5px; color: var(--ink); text-transform: uppercase; }
+  .brand-sub { font-size: 10px; color: var(--mute); letter-spacing: 1px; text-transform: uppercase; font-weight: 600; margin-top: 2px; }
+  .topbar-right { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--mute); }
+  .console-pill { background: var(--ink); color: white; font-size: 10px; padding: 6px 12px; border-radius: 99px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 700; }
+
+  /* EN/ES language toggle — segmented pill */
+  .lang-toggle {
+    display: inline-flex;
+    background: white;
+    border: 1px solid var(--brand-red-deep);
+    border-radius: 99px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(20,22,28,0.08);
+  }
+  .lang-opt {
+    background: white;
+    border: none;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--brand-red-deep);
+    cursor: pointer;
+    padding: 5px 12px;
+    min-width: 34px;
+    transition: all 0.15s ease;
+  }
+  .lang-opt.active {
+    background: var(--brand-red-deep);
+    color: white;
+  }
+  .lang-opt:active { background: #6E1019; color: white; }
+
+  /* ==== CONTAINER ==== */
+  .container { max-width: 1400px; margin: 0 auto; padding: 32px; }
+
+  .section { background: white; border-radius: 10px; padding: 24px 28px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(20,22,28,0.04), 0 0 0 1px var(--hairline); }
+  .section h2 { font-family: 'Playfair Display', 'Georgia', serif; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .section .h2-sub { font-size: 12px; color: var(--mute); margin-bottom: 18px; }
+
+  /* ==== TOP METRICS ROW ==== */
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .metric { background: white; border-radius: 10px; padding: 20px 22px; box-shadow: 0 1px 3px rgba(20,22,28,0.04), 0 0 0 1px var(--hairline); position: relative; overflow: hidden; }
+  .metric-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--mute); }
+  .metric-value { font-family: 'Playfair Display', 'Georgia', serif; font-size: 34px; font-weight: 700; margin-top: 8px; line-height: 1; color: var(--ink); }
+  .metric-value.ok { color: var(--ok); }
+  .metric-value.warn { color: var(--warn); }
+  .metric-value.bad { color: var(--bad); }
+  .metric-sub { font-size: 11px; color: var(--mute); margin-top: 6px; }
+
+  /* ==== PROJECT GRID ==== */
+  .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+  .project-card {
+    background: white;
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    padding: 18px 20px 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    text-decoration: none;
+    color: var(--ink);
+    display: block;
+  }
+  .project-card:hover { border-color: var(--brand-red); box-shadow: 0 4px 14px rgba(177,30,46,0.08); transform: translateY(-1px); }
+  .project-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .project-card-name { font-family: 'Playfair Display', 'Georgia', serif; font-size: 17px; font-weight: 700; line-height: 1.2; }
+  .project-card-code { font-family: 'Consolas', monospace; font-size: 10px; color: var(--mute); margin-top: 2px; }
+  .project-card-addr { font-size: 12px; color: var(--mute); margin-top: 6px; line-height: 1.4; }
+  .project-card-stats { display: flex; gap: 18px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hairline); font-size: 11px; color: var(--mute); }
+  .project-card-stats strong { color: var(--ink); font-weight: 700; }
+  .status-pill { font-size: 9px; padding: 3px 8px; border-radius: 99px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+  .status-active { background: var(--ok); color: white; }
+  .status-completed { background: var(--mute); color: white; }
+  .status-bidding { background: var(--warn); color: white; }
+
+  /* ==== TABS / NAV ==== */
+  .nav-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--hairline); margin-bottom: 24px; }
+  .nav-tab { padding: 12px 18px; font-size: 13px; font-weight: 600; color: var(--mute); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .nav-tab:hover { color: var(--ink); }
+  .nav-tab.active { color: var(--brand-red); border-bottom-color: var(--brand-red); }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* ==== BUTTONS ==== */
+  .btn { background: var(--brand-red); color: white; border: none; border-radius: 6px; padding: 10px 18px; font-weight: 600; cursor: pointer; font-size: 13px; letter-spacing: 0.3px; font-family: inherit; }
+  .btn:hover { background: var(--brand-red-deep); }
+  .btn-outline { background: white; color: var(--ink); border: 1px solid var(--hairline); }
+  .btn-outline:hover { background: var(--cream); }
+
+  /* ==== TABLE ==== */
+  table.roster { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.roster thead tr { border-bottom: 2px solid var(--hairline); text-align: left; }
+  table.roster th { padding: 10px 8px; font-weight: 700; font-size: 11px; color: var(--mute); text-transform: uppercase; letter-spacing: 0.5px; }
+  table.roster tbody tr { border-bottom: 1px solid #F1EEE8; cursor: pointer; transition: background 0.1s; }
+  table.roster tbody tr:hover { background: var(--cream); }
+  table.roster td { padding: 12px 8px; }
+
+  /* ==== INTAKE MODAL ==== */
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(20,22,28,0.6); z-index: 1000; align-items: flex-start; justify-content: center; padding: 40px 20px; overflow-y: auto; }
+  .modal-bg.active { display: flex; }
+  .modal { background: white; border-radius: 12px; max-width: 760px; width: 100%; padding: 24px 28px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .modal-close { background: none; border: none; font-size: 28px; color: var(--mute); cursor: pointer; line-height: 1; }
+  .form-section-label { font-size: 12px; font-weight: 700; color: var(--mute); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .form-grid { display: grid; gap: 12px; margin-bottom: 10px; }
+  .form-grid input, .form-grid select { padding: 10px; border: 1px solid var(--hairline); border-radius: 6px; font-size: 14px; font-family: inherit; }
+  .modal-footer { display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--hairline); padding-top: 16px; margin-top: 16px; }
+
+  /* ==== PLACEHOLDER ==== */
+  .placeholder { padding: 30px; text-align: center; color: var(--mute); font-style: italic; border: 1px dashed var(--hairline); border-radius: 8px; }
+
+  .badge-pill { display: inline-block; font-size: 9px; padding: 2px 8px; border-radius: 99px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: white; }
+  .badge-pill.ok { background: var(--ok); }
+  .badge-pill.warn { background: var(--warn); }
+  .badge-pill.bad { background: var(--bad); }
+  .badge-pill.mute { background: var(--mute); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="topRL" x1="0%" y1="0%" x2="70%" y2="100%"><stop offset="0%" stop-color="#E0394E"/><stop offset="100%" stop-color="#A01829"/></linearGradient>
+        <linearGradient id="topRD" x1="100%" y1="0%" x2="30%" y2="100%"><stop offset="0%" stop-color="#831321"/><stop offset="100%" stop-color="#4A0A12"/></linearGradient>
+      </defs>
+      <polygon fill="url(#topRL)" points="50,50 38.78,34.55 50,0"/>
+      <polygon fill="url(#topRD)" points="50,50 50,0 61.22,34.55"/>
+      <polygon fill="url(#topRL)" points="50,50 61.22,34.55 97.55,34.55"/>
+      <polygon fill="url(#topRD)" points="50,50 97.55,34.55 68.16,55.91"/>
+      <polygon fill="url(#topRL)" points="50,50 68.16,55.91 79.39,90.45"/>
+      <polygon fill="url(#topRD)" points="50,50 79.39,90.45 50,69.1"/>
+      <polygon fill="url(#topRL)" points="50,50 50,69.1 20.61,90.45"/>
+      <polygon fill="url(#topRD)" points="50,50 20.61,90.45 31.84,55.91"/>
+      <polygon fill="url(#topRL)" points="50,50 31.84,55.91 2.45,34.55"/>
+      <polygon fill="url(#topRD)" points="50,50 2.45,34.55 38.78,34.55"/>
+      <polygon fill="#FAF7F1" points="50,30 55.61,44.27 70.39,44.27 58.39,53.46 63,67.73 50,59.05 37,67.73 41.61,53.46 29.61,44.27 44.39,44.27"/>
+    </svg>
+    <div class="brand-text">
+      <div class="brand-name">Superstars Contracting</div>
+      <div class="brand-sub" data-i18n="office-console">Office Console</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="lang-toggle" role="group" aria-label="Language">
+      <button type="button" class="lang-opt" id="lang-en" onclick="setLanguage('en')">EN</button>
+      <button type="button" class="lang-opt" id="lang-es" onclick="setLanguage('es')">ES</button>
+    </div>
+    <span class="console-pill" data-i18n="console-pill">Company-Wide</span>
+    <span id="today-date">—</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Top metrics -->
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label" data-i18n="m-active-projects">Active Projects</div>
+      <div class="metric-value" id="m-projects">—</div>
+      <div class="metric-sub"><span id="m-projects-all">0</span> <span data-i18n="m-total-ever">total ever</span></div>
+    </div>
+    <div class="metric">
+      <div class="metric-label" data-i18n="m-workforce">Workforce</div>
+      <div class="metric-value" id="m-workers">—</div>
+      <div class="metric-sub" data-i18n="m-workers-sub">workers in the system</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label" data-i18n="m-valid-certs">Valid Certs</div>
+      <div class="metric-value ok" id="m-certs-valid">—</div>
+      <div class="metric-sub" id="m-certs-total"><span data-i18n="m-of">of</span> 0 <span data-i18n="m-total">total</span></div>
+    </div>
+    <div class="metric">
+      <div class="metric-label" data-i18n="m-cert-alerts">Cert Alerts</div>
+      <div class="metric-value warn" id="m-certs-expiring">—</div>
+      <div class="metric-sub"><span id="m-certs-expired">0</span> <span data-i18n="m-already-expired">already expired</span></div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="nav-tabs">
+    <div class="nav-tab active" data-panel="projects" data-i18n="tab-projects">Projects</div>
+    <div class="nav-tab" data-panel="workforce" data-i18n="tab-workforce">Workforce</div>
+    <div class="nav-tab" data-panel="cert-health" data-i18n="tab-cert-health">Cert Health</div>
+    <div class="nav-tab" data-panel="cert-library" data-i18n="tab-cert-library">Cert Library</div>
+    <div class="nav-tab" data-panel="compliance" data-i18n="tab-compliance">Compliance</div>
+    <div class="nav-tab" data-panel="bid" data-i18n="tab-bid">Bid Tracker</div>
+    <div class="nav-tab" data-panel="settings" data-i18n="tab-settings">Settings</div>
+  </div>
+
+  <!-- PROJECTS -->
+  <div class="panel active" data-panel="projects">
+    <div class="section">
+      <h2 data-i18n="p-active-projects-title">Active Projects</h2>
+      <div class="h2-sub" data-i18n="p-active-projects-sub">Click any project to drill into its dashboard.</div>
+      <div class="project-grid" id="project-grid">
+        <div class="placeholder" data-i18n="loading-projects">Loading projects…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORKFORCE -->
+  <div class="panel" data-panel="workforce">
+    <div class="section">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:18px;">
+        <div>
+          <h2 data-i18n="p-workforce-title">Workforce</h2>
+          <div class="h2-sub" data-i18n="p-workforce-sub">All workers in the company. Add new workers here — they join the master roster and can be assigned to any project.</div>
+        </div>
+        <button class="btn" id="add-worker-btn" data-i18n="btn-add-worker">+ Add Worker</button>
+      </div>
+
+      <table class="roster">
+        <thead>
+          <tr>
+            <th data-i18n="col-name">Name</th>
+            <th data-i18n="col-trade">Trade</th>
+            <th data-i18n="col-lang">Lang</th>
+            <th data-i18n="col-phone">Phone</th>
+            <th style="text-align:center;" data-i18n="col-docs">Docs</th>
+            <th style="text-align:center;" data-i18n="col-certs">Certs</th>
+            <th style="text-align:center;" data-i18n="col-health">Health</th>
+            <th data-i18n="col-intake">Intake</th>
+          </tr>
+        </thead>
+        <tbody id="workforce-tbody">
+          <tr><td colspan="8" style="padding:20px;text-align:center;color:#76777E;" data-i18n="loading-roster">Loading roster…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- CERT HEALTH -->
+  <div class="panel" data-panel="cert-health">
+    <div class="section">
+      <h2 data-i18n="p-cert-health-title">Certification Health</h2>
+      <div class="h2-sub" data-i18n="p-cert-health-sub">Company-wide cert status with per-project drill-down.</div>
+      <div class="placeholder" data-i18n="p-cert-health-placeholder">Detailed cert health view — coming with Phase B. The metrics at top of page already reflect company-wide cert health.</div>
+    </div>
+  </div>
+
+  <!-- CERT LIBRARY -->
+  <div class="panel" data-panel="cert-library">
+    <div class="section">
+      <h2 data-i18n="p-cert-lib-title">Certification Library</h2>
+      <div class="h2-sub" data-i18n="p-cert-lib-sub">Catalog of cert types the system recognizes. New ones get added automatically when workers bring in unfamiliar certs.</div>
+      <table class="roster">
+        <thead>
+          <tr><th data-i18n="col-code">Code</th><th data-i18n="col-name">Name</th><th data-i18n="col-validity">Validity</th><th data-i18n="col-cof-prereq">CoF Prereq</th></tr>
+        </thead>
+        <tbody id="cert-lib-tbody">
+          <tr><td colspan="4" style="padding:20px;text-align:center;color:#76777E;" data-i18n="loading-library">Loading library…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- COMPLIANCE -->
+  <div class="panel" data-panel="compliance">
+    <div class="section">
+      <h2 data-i18n="p-compliance-title">Compliance (Company-Wide)</h2>
+      <div class="h2-sub" data-i18n="p-compliance-sub">NYC DOB permits, violations, and complaints across all your active job sites.</div>
+      <div class="placeholder" data-i18n="p-compliance-placeholder">Company-wide compliance rollup — coming in Phase C. Per-project compliance lives inside each project dashboard.</div>
+    </div>
+  </div>
+
+  <!-- BID TRACKER -->
+  <div class="panel" data-panel="bid">
+    <div class="section">
+      <h2 data-i18n="p-bid-title">Bid Tracker</h2>
+      <div class="h2-sub" data-i18n="p-bid-sub">Opportunities, estimates, and proposals.</div>
+      <div class="placeholder" data-i18n="p-bid-placeholder">Bid pipeline — coming in Phase C.</div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="panel" data-panel="settings">
+    <div class="section">
+      <h2 data-i18n="p-settings-title">Settings</h2>
+      <div class="h2-sub" data-i18n="p-settings-sub">Company info, issuer signature, integrations.</div>
+      <div class="placeholder" data-i18n="p-settings-placeholder">Settings UI — coming next. Today, edit api-keys.txt directly.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- WORKER PROFILE PANEL (slide-in from right) -->
+<div id="profile-bg" style="display:none;position:fixed;inset:0;background:rgba(20,22,28,0.5);z-index:999;"></div>
+<div id="profile-panel" style="display:none;position:fixed;top:0;right:0;bottom:0;width:720px;max-width:100vw;background:white;z-index:1000;box-shadow:-8px 0 30px rgba(0,0,0,0.15);overflow-y:auto;">
+  <div style="padding:20px 28px;border-bottom:1px solid #E8E4DD;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:white;z-index:5;">
+    <div>
+      <div style="font-size:11px;color:#76777E;letter-spacing:1px;text-transform:uppercase;font-weight:700;" id="pp-id">—</div>
+      <h2 id="pp-name" style="font-family:'Playfair Display','Georgia',serif;font-size:24px;font-weight:700;margin-top:4px;">—</h2>
+    </div>
+    <button id="pp-close" style="background:none;border:none;font-size:30px;color:#76777E;cursor:pointer;line-height:1;">×</button>
+  </div>
+
+  <div style="padding:24px 28px;">
+
+    <!-- Info card -->
+    <div style="background:#FAF7F1;border-radius:8px;padding:14px 16px;margin-bottom:24px;font-size:13px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
+        <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Trade</span><strong id="pp-trade">—</strong></div>
+        <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Language</span><strong id="pp-lang">—</strong></div>
+        <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Phone</span><strong id="pp-phone">—</strong></div>
+        <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">DOB</span><strong id="pp-dob">—</strong></div>
+        <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Emergency</span><strong id="pp-ec">—</strong></div>
+        <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Hired</span><strong id="pp-hire">—</strong></div>
+      </div>
+    </div>
+
+    <!-- Documents Section -->
+    <div style="margin-bottom:24px;">
+      <h3 style="font-size:14px;font-weight:700;color:#14161C;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Documents</h3>
+
+      <!-- Upload zone -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+        <label style="background:white;border:2px dashed #E8E4DD;border-radius:8px;padding:14px;text-align:center;cursor:pointer;font-size:12px;color:#76777E;transition:border-color 0.15s;" onmouseover="this.style.borderColor='#B11E2E'" onmouseout="this.style.borderColor='#E8E4DD'">
+          <strong style="color:#14161C;display:block;margin-bottom:4px;">+ Upload ID</strong>
+          DL · Passport · IDNYC<br>
+          <input type="file" accept=".jpg,.jpeg,.png,.pdf,.heic,.webp" data-doc-type="id_front" style="display:none;" class="upload-input">
+        </label>
+        <label style="background:white;border:2px dashed #E8E4DD;border-radius:8px;padding:14px;text-align:center;cursor:pointer;font-size:12px;color:#76777E;transition:border-color 0.15s;" onmouseover="this.style.borderColor='#B11E2E'" onmouseout="this.style.borderColor='#E8E4DD'">
+          <strong style="color:#14161C;display:block;margin-bottom:4px;">+ Upload Cert Scan</strong>
+          SST · OSHA · Bulk scans<br>
+          <input type="file" accept=".jpg,.jpeg,.png,.pdf,.heic,.webp" data-doc-type="cert_combined" style="display:none;" class="upload-input">
+        </label>
+      </div>
+
+      <!-- Document list -->
+      <div id="pp-docs-list" style="font-size:12px;">
+        <div style="color:#76777E;font-style:italic;padding:8px 0;">No documents uploaded yet.</div>
+      </div>
+    </div>
+
+    <!-- Certifications Section -->
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="font-size:14px;font-weight:700;color:#14161C;text-transform:uppercase;letter-spacing:0.5px;">Certifications</h3>
+        <button id="pp-add-cert" class="btn" style="padding:6px 14px;font-size:12px;">+ Add Cert</button>
+      </div>
+
+      <!-- Add cert form (hidden) -->
+      <div id="pp-cert-form" style="display:none;background:#FAF7F1;border-radius:8px;padding:14px;margin-bottom:12px;border:1px solid #E8E4DD;">
+        <div style="display:grid;grid-template-columns:1fr;gap:8px;">
+          <div>
+            <label style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;display:block;margin-bottom:4px;">Cert Type</label>
+            <input id="pp-cert-type" type="text" list="cert-type-list" placeholder="Start typing... e.g. SST, OSHA-30, SPRAT" style="width:100%;padding:8px 10px;border:1px solid #E8E4DD;border-radius:6px;font-size:13px;">
+            <datalist id="cert-type-list"></datalist>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+            <div>
+              <label style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;display:block;margin-bottom:4px;">Card #</label>
+              <input id="pp-cert-num" type="text" placeholder="e.g. 12345678" style="width:100%;padding:8px 10px;border:1px solid #E8E4DD;border-radius:6px;font-size:13px;font-family:monospace;">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;display:block;margin-bottom:4px;">Issued</label>
+              <input id="pp-cert-issued" type="date" style="width:100%;padding:8px 10px;border:1px solid #E8E4DD;border-radius:6px;font-size:13px;">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;display:block;margin-bottom:4px;">Expires</label>
+              <input id="pp-cert-expires" type="date" style="width:100%;padding:8px 10px;border:1px solid #E8E4DD;border-radius:6px;font-size:13px;">
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;">
+          <button id="pp-cert-cancel" class="btn btn-outline" style="padding:6px 12px;font-size:12px;">Cancel</button>
+          <button id="pp-cert-save" class="btn" style="padding:6px 14px;font-size:12px;">Save Cert</button>
+        </div>
+      </div>
+
+      <!-- Certs table -->
+      <table class="roster" style="font-size:12px;">
+        <thead><tr><th>Type</th><th>Card #</th><th>Issued</th><th>Expires</th><th>Status</th><th></th></tr></thead>
+        <tbody id="pp-certs-list"><tr><td colspan="6" style="padding:14px;color:#76777E;font-style:italic;text-align:center;">No certifications recorded yet.</td></tr></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- INTAKE MODAL -->
+<div class="modal-bg" id="intake-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 style="font-family:'Playfair Display','Georgia',serif;" data-i18n="modal-title">New Worker Intake</h2>
+      <button class="modal-close" id="modal-close">×</button>
+    </div>
+
+    <div class="form-section-label" data-i18n="modal-step1">Step 1 · Worker Identity</div>
+    <div class="form-grid" style="grid-template-columns:2fr 1fr;">
+      <input id="in-name" type="text" data-i18n-ph="ph-name" placeholder="Full Legal Name *">
+      <input id="in-dob" type="date">
+    </div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
+      <input id="in-trade" type="text" data-i18n-ph="ph-trade" placeholder="Trade (e.g. Mason, Rigger)">
+      <select id="in-language">
+        <option value="" data-i18n="opt-language">Language</option>
+        <option value="en" data-i18n="opt-en">English</option>
+        <option value="es" data-i18n="opt-es">Spanish</option>
+        <option value="pl" data-i18n="opt-pl">Polish</option>
+        <option value="other" data-i18n="opt-other">Other</option>
+      </select>
+      <input id="in-phone" type="tel" data-i18n-ph="ph-phone" placeholder="Mobile Phone">
+    </div>
+    <div class="form-grid" style="grid-template-columns:2fr 1fr 1fr;">
+      <input id="in-ec-name" type="text" data-i18n-ph="ph-ec-name" placeholder="Emergency Contact Name">
+      <input id="in-ec-phone" type="tel" data-i18n-ph="ph-ec-phone" placeholder="Emergency Phone">
+      <input id="in-ec-relation" type="text" data-i18n-ph="ph-ec-relation" placeholder="Relation">
+    </div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
+      <input id="in-hire-date" type="date" data-i18n-ph="ph-hire-date" placeholder="Hire Date">
+      <input id="in-pin" type="text" data-i18n-ph="ph-pin" placeholder="App PIN (4 digits)" maxlength="4" style="font-family:monospace;">
+      <input id="in-email" type="email" data-i18n-ph="ph-email" placeholder="Email (optional)">
+    </div>
+
+    <div style="margin-top:18px;">
+      <div class="form-section-label" data-i18n="modal-step2">Step 2 · Project Assignment</div>
+      <div id="project-checks" style="background:#FAF7F1;padding:12px 14px;border-radius:6px;font-size:13px;color:#76777E;" data-i18n="loading-projects">
+        Loading projects…
+      </div>
+    </div>
+
+    <div style="margin-top:18px;">
+      <div class="form-section-label" data-i18n="modal-step3">Step 3 · After Save</div>
+      <div style="font-size:12px;color:#76777E;background:#FAF7F1;padding:10px 12px;border-radius:6px;line-height:1.5;" data-i18n="modal-step3-text">
+        <strong style="color:#14161C;">After Save</strong>, the worker's folder is created. You can then upload scans (DL, SST, cert cards) and add cert details from their profile view.
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="modal-cancel" data-i18n="btn-cancel">Cancel</button>
+      <button class="btn" id="modal-save" data-i18n="btn-save-worker">Save Worker</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// i18n — English / Spanish translation dictionary
+// =====================================================================
+const I18N = {
+  en: {
+    'office-console': 'Office Console',
+    'console-pill': 'Company-Wide',
+    'm-active-projects': 'Active Projects',
+    'm-total-ever': 'total ever',
+    'm-workforce': 'Workforce',
+    'm-workers-sub': 'workers in the system',
+    'm-valid-certs': 'Valid Certs',
+    'm-of': 'of',
+    'm-total': 'total',
+    'm-cert-alerts': 'Cert Alerts',
+    'm-already-expired': 'already expired',
+    'tab-projects': 'Projects',
+    'tab-workforce': 'Workforce',
+    'tab-cert-health': 'Cert Health',
+    'tab-cert-library': 'Cert Library',
+    'tab-compliance': 'Compliance',
+    'tab-bid': 'Bid Tracker',
+    'tab-settings': 'Settings',
+    'p-active-projects-title': 'Active Projects',
+    'p-active-projects-sub': 'Click any project to drill into its dashboard.',
+    'loading-projects': 'Loading projects…',
+    'p-workforce-title': 'Workforce',
+    'p-workforce-sub': 'All workers in the company. Add new workers here — they join the master roster and can be assigned to any project.',
+    'btn-add-worker': '+ Add Worker',
+    'col-name': 'Name',
+    'col-trade': 'Trade',
+    'col-lang': 'Lang',
+    'col-phone': 'Phone',
+    'col-docs': 'Docs',
+    'col-certs': 'Certs',
+    'col-health': 'Health',
+    'col-intake': 'Intake',
+    'col-code': 'Code',
+    'col-validity': 'Validity',
+    'col-cof-prereq': 'CoF Prereq',
+    'loading-roster': 'Loading roster…',
+    'loading-library': 'Loading library…',
+    'p-cert-health-title': 'Certification Health',
+    'p-cert-health-sub': 'Company-wide cert status with per-project drill-down.',
+    'p-cert-health-placeholder': 'Detailed cert health view — coming soon. The metrics at top of page already reflect company-wide cert health.',
+    'p-cert-lib-title': 'Certification Library',
+    'p-cert-lib-sub': 'Catalog of cert types the system recognizes. New ones get added automatically when workers bring in unfamiliar certs.',
+    'p-compliance-title': 'Compliance (Company-Wide)',
+    'p-compliance-sub': 'NYC DOB permits, violations, and complaints across all your active job sites.',
+    'p-compliance-placeholder': 'Company-wide compliance rollup — coming soon. Per-project compliance lives inside each project dashboard.',
+    'p-bid-title': 'Bid Tracker',
+    'p-bid-sub': 'Opportunities, estimates, and proposals.',
+    'p-bid-placeholder': 'Bid pipeline — coming soon.',
+    'p-settings-title': 'Settings',
+    'p-settings-sub': 'Company info, issuer signature, integrations.',
+    'p-settings-placeholder': 'Settings UI — coming next. Today, edit api-keys.txt directly.',
+    'modal-title': 'New Worker Intake',
+    'modal-step1': 'Step 1 · Worker Identity',
+    'modal-step2': 'Step 2 · Project Assignment',
+    'modal-step3': 'Step 3 · After Save',
+    'modal-step3-text': '<strong style="color:#14161C;">After Save</strong>, the worker folder is created. You can then upload scans (DL, SST, cert cards) and add cert details from their profile view.',
+    'opt-language': 'Language',
+    'opt-en': 'English',
+    'opt-es': 'Spanish',
+    'opt-pl': 'Polish',
+    'opt-other': 'Other',
+    'ph-name': 'Full Legal Name *',
+    'ph-trade': 'Trade (e.g. Mason, Rigger)',
+    'ph-phone': 'Mobile Phone',
+    'ph-ec-name': 'Emergency Contact Name',
+    'ph-ec-phone': 'Emergency Phone',
+    'ph-ec-relation': 'Relation',
+    'ph-hire-date': 'Hire Date',
+    'ph-pin': 'App PIN (4 digits)',
+    'ph-email': 'Email (optional)',
+    'btn-cancel': 'Cancel',
+    'btn-save-worker': 'Save Worker',
+  },
+  es: {
+    'office-console': 'Consola de Oficina',
+    'console-pill': 'Empresa',
+    'm-active-projects': 'Proyectos Activos',
+    'm-total-ever': 'totales',
+    'm-workforce': 'Personal',
+    'm-workers-sub': 'trabajadores en el sistema',
+    'm-valid-certs': 'Cert. Válidas',
+    'm-of': 'de',
+    'm-total': 'totales',
+    'm-cert-alerts': 'Alertas de Cert.',
+    'm-already-expired': 'ya vencidas',
+    'tab-projects': 'Proyectos',
+    'tab-workforce': 'Personal',
+    'tab-cert-health': 'Estado de Certificaciones',
+    'tab-cert-library': 'Catálogo de Cert.',
+    'tab-compliance': 'Cumplimiento',
+    'tab-bid': 'Seguimiento de Ofertas',
+    'tab-settings': 'Ajustes',
+    'p-active-projects-title': 'Proyectos Activos',
+    'p-active-projects-sub': 'Haz clic en cualquier proyecto para ver su tablero.',
+    'loading-projects': 'Cargando proyectos…',
+    'p-workforce-title': 'Personal',
+    'p-workforce-sub': 'Todos los trabajadores de la empresa. Agrega nuevos trabajadores aquí — se unirán al registro maestro y podrán ser asignados a cualquier proyecto.',
+    'btn-add-worker': '+ Agregar Trabajador',
+    'col-name': 'Nombre',
+    'col-trade': 'Oficio',
+    'col-lang': 'Idioma',
+    'col-phone': 'Teléfono',
+    'col-docs': 'Docs',
+    'col-certs': 'Cert.',
+    'col-health': 'Estado',
+    'col-intake': 'Registro',
+    'col-code': 'Código',
+    'col-validity': 'Validez',
+    'col-cof-prereq': 'Req. CoF',
+    'loading-roster': 'Cargando lista…',
+    'loading-library': 'Cargando catálogo…',
+    'p-cert-health-title': 'Estado de Certificaciones',
+    'p-cert-health-sub': 'Estado de certificaciones de toda la empresa con desglose por proyecto.',
+    'p-cert-health-placeholder': 'Vista detallada del estado de certificaciones — próximamente. Las métricas en la parte superior ya reflejan el estado de toda la empresa.',
+    'p-cert-lib-title': 'Catálogo de Certificaciones',
+    'p-cert-lib-sub': 'Catálogo de tipos de certificación que el sistema reconoce. Se agregan automáticamente cuando los trabajadores presentan certificaciones nuevas.',
+    'p-compliance-title': 'Cumplimiento (Toda la Empresa)',
+    'p-compliance-sub': 'Permisos, infracciones y quejas del NYC DOB para todos tus sitios activos.',
+    'p-compliance-placeholder': 'Resumen de cumplimiento de toda la empresa — próximamente. El cumplimiento por proyecto está dentro de cada tablero de proyecto.',
+    'p-bid-title': 'Seguimiento de Ofertas',
+    'p-bid-sub': 'Oportunidades, estimaciones y propuestas.',
+    'p-bid-placeholder': 'Cartera de ofertas — próximamente.',
+    'p-settings-title': 'Ajustes',
+    'p-settings-sub': 'Información de la empresa, firma del emisor, integraciones.',
+    'p-settings-placeholder': 'Interfaz de ajustes — próximamente. Por ahora, edita api-keys.txt directamente.',
+    'modal-title': 'Registro de Nuevo Trabajador',
+    'modal-step1': 'Paso 1 · Identidad del Trabajador',
+    'modal-step2': 'Paso 2 · Asignación a Proyecto',
+    'modal-step3': 'Paso 3 · Después de Guardar',
+    'modal-step3-text': '<strong style="color:#14161C;">Después de Guardar</strong>, se crea la carpeta del trabajador. Luego puedes subir escaneos (licencia, SST, tarjetas de cert.) y agregar detalles de certificación desde su perfil.',
+    'opt-language': 'Idioma',
+    'opt-en': 'Inglés',
+    'opt-es': 'Español',
+    'opt-pl': 'Polaco',
+    'opt-other': 'Otro',
+    'ph-name': 'Nombre Legal Completo *',
+    'ph-trade': 'Oficio (ej. Albañil, Rigger)',
+    'ph-phone': 'Teléfono Móvil',
+    'ph-ec-name': 'Contacto de Emergencia',
+    'ph-ec-phone': 'Tel. de Emergencia',
+    'ph-ec-relation': 'Relación',
+    'ph-hire-date': 'Fecha de Contratación',
+    'ph-pin': 'PIN (4 dígitos)',
+    'ph-email': 'Correo electrónico (opcional)',
+    'btn-cancel': 'Cancelar',
+    'btn-save-worker': 'Guardar Trabajador',
+  }
+};
+
+let currentLang = localStorage.getItem('dashboard_lang') || 'en';
+
+function applyLanguage() {
+  const dict = I18N[currentLang] || I18N.en;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (dict[key] !== undefined) {
+      // Strong-tag aware: if value contains HTML tags, use innerHTML
+      if (/<[a-z]/i.test(dict[key])) el.innerHTML = dict[key];
+      else el.textContent = dict[key];
+    }
+  });
+  // Placeholders
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+    const key = el.getAttribute('data-i18n-ph');
+    if (dict[key] !== undefined) el.placeholder = dict[key];
+  });
+  // Toggle button active state
+  const enBtn = document.getElementById('lang-en');
+  const esBtn = document.getElementById('lang-es');
+  if (enBtn && esBtn) {
+    enBtn.classList.toggle('active', currentLang === 'en');
+    esBtn.classList.toggle('active', currentLang === 'es');
+  }
+  // Date locale
+  const dateEl = document.getElementById('today-date');
+  if (dateEl) {
+    const locale = currentLang === 'es' ? 'es-MX' : 'en-US';
+    dateEl.textContent = new Date().toLocaleDateString(locale, {weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'});
+  }
+  // <html lang="">
+  document.documentElement.lang = currentLang;
+}
+
+function setLanguage(lang) {
+  if (lang !== 'en' && lang !== 'es') return;
+  currentLang = lang;
+  localStorage.setItem('dashboard_lang', lang);
+  applyLanguage();
+}
+window.setLanguage = setLanguage;
+
+// Apply chosen language as soon as DOM is parsed
+applyLanguage();
+
+(function() {
+  const $ = sel => document.querySelector(sel);
+  const $$ = sel => document.querySelectorAll(sel);
+
+  // ===== Security: escape user-provided strings before injecting into innerHTML =====
+  function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, ch => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+  }
+
+  $('#today-date').textContent = new Date().toLocaleDateString(currentLang === 'es' ? 'es-MX' : 'en-US', {weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'});
+
+  // Tabs
+  $$('.nav-tab').forEach(t => t.addEventListener('click', () => {
+    const target = t.getAttribute('data-panel');
+    $$('.nav-tab').forEach(x => x.classList.toggle('active', x === t));
+    $$('.panel').forEach(p => p.classList.toggle('active', p.getAttribute('data-panel') === target));
+    if (target === 'workforce') loadWorkforce();
+    if (target === 'cert-library') loadCertLibrary();
+  }));
+
+  // Load company summary metrics
+  async function loadMetrics() {
+    try {
+      const resp = await fetch('/api/company/summary').then(r => r.json());
+      const s = resp && resp.data;
+      if (!s) return;
+      $('#m-projects').textContent = s.active_projects;
+      $('#m-projects-all').textContent = s.all_projects;
+      $('#m-workers').textContent = s.total_workers;
+      $('#m-certs-valid').textContent = s.certs.valid;
+      $('#m-certs-total').textContent = 'of ' + s.certs.total + ' total';
+      $('#m-certs-expiring').textContent = s.certs.expiring_30d;
+      $('#m-certs-expired').textContent = s.certs.expired;
+    } catch (e) { console.warn(e); }
+  }
+
+  // Load projects
+  async function loadProjects() {
+    try {
+      const resp = await fetch('/api/projects').then(r => r.json());
+      const projects = (resp && resp.data) || [];
+      const grid = $('#project-grid');
+      if (!projects.length) {
+        grid.innerHTML = '<div class="placeholder">No projects yet. Add one in the Bid Tracker tab.</div>';
+        return;
+      }
+      grid.innerHTML = projects.map(p => {
+        const status = (p.status || 'active').toLowerCase();
+        const cls = status === 'completed' ? 'status-completed' : (status === 'bidding' ? 'status-bidding' : 'status-active');
+        return `<a class="project-card" href="/projects/${encodeURIComponent(p.project_code)}">
+          <div class="project-card-header">
+            <div>
+              <div class="project-card-name">${p.name || p.project_code}</div>
+              <div class="project-card-code">${p.project_code}</div>
+            </div>
+            <span class="status-pill ${cls}">${status}</span>
+          </div>
+          <div class="project-card-addr">${p.address || ''}${p.city_zip ? ', ' + p.city_zip : ''}</div>
+          <div class="project-card-stats">
+            <span><strong>${p.assigned_workers || 0}</strong> workers assigned</span>
+            <span>${p.start_date ? 'Started ' + p.start_date : ''}</span>
+          </div>
+        </a>`;
+      }).join('');
+
+      // Populate project checks in modal
+      const cks = projects.map(p => `<label style="display:block;margin-bottom:6px;color:#14161C;cursor:pointer;">
+        <input type="checkbox" class="project-check" value="${p.project_code}" ${p.status !== 'completed' ? 'checked' : ''}> ${p.name || p.project_code} <span style="color:#76777E;font-size:11px;">(${p.project_code})</span>
+      </label>`).join('');
+      $('#project-checks').innerHTML = cks || '<em>No projects defined. Worker will be added without a project assignment.</em>';
+    } catch (e) { console.warn(e); }
+  }
+
+  // Load workforce
+  async function loadWorkforce() {
+    try {
+      const resp = await fetch('/api/workers/intake-summary').then(r => r.json());
+      const rows = (resp && resp.data) || [];
+      const tbody = $('#workforce-tbody');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="padding:20px;text-align:center;color:#76777E;">No workers yet. Click <strong>+ Add Worker</strong> above.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => {
+        let health = '<span class="badge-pill ok">OK</span>';
+        if (r.certs_expired > 0) health = `<span class="badge-pill bad">${r.certs_expired} expired</span>`;
+        else if (r.certs_expiring_30d > 0) health = `<span class="badge-pill warn">${r.certs_expiring_30d} &lt;30d</span>`;
+        const status = (r.intake_status === 'complete') ? '<span class="badge-pill ok">Complete</span>' : '<span class="badge-pill mute">Pending</span>';
+        const safeId = esc(r.employee_id);
+        return `<tr data-emp="${safeId}">
+          <td style="font-weight:600;">${esc(r.name || '—')}</td>
+          <td>${esc(r.trade || '—')}</td>
+          <td style="font-size:11px;text-transform:uppercase;color:#76777E;">${esc((r.language || '—').toUpperCase().slice(0,2))}</td>
+          <td style="font-family:monospace;font-size:11px;">${esc(r.phone || '—')}</td>
+          <td style="text-align:center;">${r.doc_count}</td>
+          <td style="text-align:center;">${r.cert_count}</td>
+          <td style="text-align:center;">${health}</td>
+          <td>${status}</td>
+        </tr>`;
+      }).join('');
+      // wire click handlers
+      tbody.querySelectorAll('tr[data-emp]').forEach(tr => {
+        tr.addEventListener('click', () => openProfile(tr.getAttribute('data-emp')));
+      });
+    } catch (e) { console.warn(e); }
+  }
+
+  async function loadCertLibrary() {
+    try {
+      const resp = await fetch('/api/cert-types').then(r => r.json());
+      const rows = (resp && resp.data) || [];
+      const tbody = $('#cert-lib-tbody');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="padding:20px;text-align:center;color:#76777E;">No cert types. Run apply_worker_intake_schema.py to seed the library.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(c => `<tr>
+        <td style="font-family:monospace;font-size:11px;">${c.cert_type_id}</td>
+        <td style="font-weight:600;">${c.name}</td>
+        <td style="font-size:11px;color:#76777E;">${c.validity_months ? c.validity_months + ' mo' : '—'}</td>
+        <td>${c.is_cof_prerequisite ? '<span class="badge-pill ok">Yes</span>' : '<span style="color:#76777E;">—</span>'}</td>
+      </tr>`).join('');
+    } catch (e) { console.warn(e); }
+  }
+
+  // ============================================================
+  // Worker Profile Panel
+  // ============================================================
+  let currentEmployeeId = null;
+  const ppBg = $('#profile-bg');
+  const ppPanel = $('#profile-panel');
+
+  function closeProfile() {
+    ppBg.style.display = 'none';
+    ppPanel.style.display = 'none';
+    currentEmployeeId = null;
+  }
+  $('#pp-close').addEventListener('click', closeProfile);
+  ppBg.addEventListener('click', closeProfile);
+
+  async function openProfile(employeeId) {
+    currentEmployeeId = employeeId;
+    ppBg.style.display = 'block';
+    ppPanel.style.display = 'block';
+    ppPanel.scrollTop = 0;
+    await loadProfile();
+    await loadCertTypes();
+  }
+  window.openProfile = openProfile;
+
+  async function loadProfile() {
+    if (!currentEmployeeId) return;
+    try {
+      const resp = await fetch('/api/workers/' + encodeURIComponent(currentEmployeeId)).then(r => r.json());
+      const d = resp && resp.data;
+      if (!d) return;
+      const e = d.employee || {};
+      $('#pp-id').textContent = e.employee_id || '—';
+      $('#pp-name').textContent = e.name || '—';
+      $('#pp-trade').textContent = e.trade || '—';
+      $('#pp-lang').textContent = (e.language || '—').toUpperCase();
+      $('#pp-phone').textContent = e.phone || '—';
+      $('#pp-dob').textContent = e.dob || '—';
+      $('#pp-ec').textContent = (e.emergency_contact_name || '—') + (e.emergency_contact_phone ? ' · ' + e.emergency_contact_phone : '');
+      $('#pp-hire').textContent = e.hire_date || '—';
+
+      // Documents
+      const docs = d.documents || [];
+      const docList = $('#pp-docs-list');
+      if (!docs.length) {
+        docList.innerHTML = '<div style="color:#76777E;font-style:italic;padding:8px 0;">No documents uploaded yet.</div>';
+      } else {
+        docList.innerHTML = docs.map(doc => {
+          const isImage = doc.mime_type && doc.mime_type.startsWith('image/');
+          // Build a safe URL — file_path is absolute on the server, we serve via /worker-files/
+          const relativePath = (doc.file_path || '').split('worker_records')[1] || '';
+          const url = '/worker-files' + relativePath.replace(/\\/g, '/');
+          const thumb = isImage
+            ? `<img src="${esc(url)}" style="width:80px;height:80px;object-fit:cover;border-radius:4px;border:1px solid #E8E4DD;">`
+            : `<div style="width:80px;height:80px;background:#FAF7F1;border-radius:4px;border:1px solid #E8E4DD;display:flex;align-items:center;justify-content:center;font-size:11px;color:#76777E;">${esc((doc.mime_type || '').split('/')[1] || 'doc').toUpperCase()}</div>`;
+          return `<div style="display:flex;gap:12px;align-items:center;padding:8px;border:1px solid #E8E4DD;border-radius:6px;margin-bottom:6px;">
+            <a href="${esc(url)}" target="_blank">${thumb}</a>
+            <div style="flex:1;">
+              <div style="font-weight:600;font-size:12px;">${esc(doc.doc_type)}</div>
+              <div style="color:#76777E;font-size:11px;">${esc(doc.original_filename || '')}</div>
+              <div style="color:#76777E;font-size:10px;">${(doc.file_size_bytes/1024).toFixed(1)} KB · ${esc(doc.uploaded_at || '')}</div>
+            </div>
+            <button onclick="window.deleteDoc(${doc.id})" style="background:none;border:1px solid #E8E4DD;color:#B11E2E;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;">Delete</button>
+          </div>`;
+        }).join('');
+      }
+
+      // Certs
+      const certs = d.certifications || [];
+      const certList = $('#pp-certs-list');
+      const today = new Date().toISOString().slice(0,10);
+      if (!certs.length) {
+        certList.innerHTML = '<tr><td colspan="6" style="padding:14px;color:#76777E;font-style:italic;text-align:center;">No certifications recorded yet.</td></tr>';
+      } else {
+        certList.innerHTML = certs.map(c => {
+          let status = '<span class="badge-pill ok">Valid</span>';
+          if (c.expiration_date && c.expiration_date < today) status = '<span class="badge-pill bad">Expired</span>';
+          else if (c.expiration_date) {
+            const days = Math.round((new Date(c.expiration_date) - new Date()) / 86400000);
+            if (days <= 30) status = `<span class="badge-pill warn">${days}d left</span>`;
+          }
+          return `<tr>
+            <td style="font-weight:600;">${esc(c.cert_name || c.cert_type_id)}${c.is_cof_prerequisite ? '<br><span style="font-size:9px;color:#76777E;">CoF prereq</span>' : ''}</td>
+            <td style="font-family:monospace;font-size:11px;">${esc(c.card_number || '—')}</td>
+            <td>${esc(c.date_obtained || '—')}</td>
+            <td>${esc(c.expiration_date || '—')}</td>
+            <td>${status}</td>
+            <td><button onclick="window.deleteCert(${c.id})" style="background:none;border:none;color:#B11E2E;font-size:11px;cursor:pointer;">×</button></td>
+          </tr>`;
+        }).join('');
+      }
+    } catch (e) {
+      console.warn('[Profile] load failed:', e);
+    }
+  }
+
+  async function loadCertTypes() {
+    try {
+      const resp = await fetch('/api/cert-types').then(r => r.json());
+      const types = (resp && resp.data) || [];
+      $('#cert-type-list').innerHTML = types.map(t =>
+        `<option value="${esc(t.name)}" data-id="${esc(t.cert_type_id)}">`
+      ).join('');
+      window._certTypes = types;   // cache for save lookup
+    } catch (e) { console.warn(e); }
+  }
+
+  // Upload handler — wired to both ID and cert upload inputs
+  document.querySelectorAll('.upload-input').forEach(inp => {
+    inp.addEventListener('change', async (e) => {
+      if (!currentEmployeeId) return;
+      const file = e.target.files[0];
+      if (!file) return;
+      const docType = e.target.getAttribute('data-doc-type');
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('doc_type', docType);
+      fd.append('doc_label', file.name);
+      try {
+        const resp = await fetch('/api/workers/' + encodeURIComponent(currentEmployeeId) + '/upload', {
+          method: 'POST', body: fd
+        }).then(r => r.json());
+        if (resp.error) {
+          alert('Upload failed: ' + resp.error);
+        } else {
+          await loadProfile();
+        }
+      } catch (err) {
+        alert('Network error: ' + err.message);
+      }
+      e.target.value = '';   // reset so same file can be re-uploaded
+    });
+  });
+
+  // Cert form
+  $('#pp-add-cert').addEventListener('click', () => {
+    $('#pp-cert-form').style.display = 'block';
+  });
+  $('#pp-cert-cancel').addEventListener('click', () => {
+    $('#pp-cert-form').style.display = 'none';
+    ['pp-cert-type','pp-cert-num','pp-cert-issued','pp-cert-expires'].forEach(id => $('#'+id).value = '');
+  });
+  $('#pp-cert-save').addEventListener('click', async () => {
+    if (!currentEmployeeId) return;
+    const typedName = $('#pp-cert-type').value.trim();
+    if (!typedName) { alert('Cert type is required'); return; }
+    // Look up cert_type_id from name
+    const match = (window._certTypes || []).find(t => t.name.toLowerCase() === typedName.toLowerCase());
+    const cert_type_id = match ? match.cert_type_id : 'CUSTOM-' + typedName.replace(/[^A-Za-z0-9]/g, '').substring(0, 24).toUpperCase();
+    const payload = {
+      cert_type_id,
+      cert_type_name: typedName,
+      card_number: $('#pp-cert-num').value || null,
+      date_obtained: $('#pp-cert-issued').value || null,
+      expiration_date: $('#pp-cert-expires').value || null,
+    };
+    try {
+      const resp = await fetch('/api/workers/' + encodeURIComponent(currentEmployeeId) + '/certs', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      }).then(r => r.json());
+      if (resp.error) { alert('Save failed: ' + resp.error); return; }
+      $('#pp-cert-form').style.display = 'none';
+      ['pp-cert-type','pp-cert-num','pp-cert-issued','pp-cert-expires'].forEach(id => $('#'+id).value = '');
+      await loadProfile();
+      await loadMetrics();
+    } catch (e) { alert('Network error: ' + e.message); }
+  });
+
+  window.deleteDoc = async function(docId) {
+    if (!confirm('Delete this document?')) return;
+    await fetch(`/api/workers/${encodeURIComponent(currentEmployeeId)}/documents/${docId}`, {method: 'DELETE'});
+    await loadProfile();
+  };
+  window.deleteCert = async function(certId) {
+    if (!confirm('Delete this certification?')) return;
+    await fetch(`/api/workers/${encodeURIComponent(currentEmployeeId)}/certs/${certId}`, {method: 'DELETE'});
+    await loadProfile();
+    await loadMetrics();
+  };
+
+  // Modal
+  const modal = $('#intake-modal');
+  $('#add-worker-btn').addEventListener('click', () => modal.classList.add('active'));
+  $('#modal-close').addEventListener('click', () => modal.classList.remove('active'));
+  $('#modal-cancel').addEventListener('click', () => modal.classList.remove('active'));
+  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('active'); });
+
+  $('#modal-save').addEventListener('click', async () => {
+    const name = $('#in-name').value.trim();
+    if (!name) { alert('Name is required'); return; }
+    const project_codes = Array.from($$('.project-check:checked')).map(c => c.value);
+    const payload = {
+      name,
+      dob: $('#in-dob').value || null,
+      trade: $('#in-trade').value || null,
+      language: $('#in-language').value || null,
+      phone: $('#in-phone').value || null,
+      email: $('#in-email').value || null,
+      emergency_contact_name: $('#in-ec-name').value || null,
+      emergency_contact_phone: $('#in-ec-phone').value || null,
+      emergency_contact_relation: $('#in-ec-relation').value || null,
+      hire_date: $('#in-hire-date').value || null,
+      pin: $('#in-pin').value || null,
+      project_codes,
+    };
+    try {
+      const resp = await fetch('/api/workers/create', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      }).then(r => r.json());
+      if (resp.error) { alert('Save failed: ' + resp.error); return; }
+      modal.classList.remove('active');
+      ['in-name','in-dob','in-trade','in-language','in-phone','in-ec-name','in-ec-phone','in-ec-relation','in-hire-date','in-pin','in-email'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+      await Promise.all([loadMetrics(), loadProjects(), loadWorkforce()]);
+      alert(`✓ Worker created: ${name}\nID: ${resp.data.employee_id}\nAssigned to: ${resp.data.assigned_to.join(', ') || '(no projects)'}\nFolder: ${resp.data.folder_path}`);
+    } catch (e) { alert('Network error: ' + e.message); }
+  });
+
+  // Init
+  Promise.all([loadMetrics(), loadProjects()]);
+  setInterval(loadMetrics, 60000);
+})();
+</script>
+</body>
+</html>

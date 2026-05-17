@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Superstars CoF — Print Sheet (4-up · 2 pages · Letter)</title>
+<style>
+  /* =====================================================================
+     4-UP CoF PRINT SHEET
+     • Letter paper (215.9 × 279.4 mm)
+     • 2 pages: Page 1 = 4 card fronts, Page 2 = 4 card backs
+     • Each card is exact ID-1 (CR80) size: 85.60 × 53.98 mm
+     • 2×2 grid, ~6mm gap between cards, crop marks at every corner
+     • Card positions match front-to-back, so when printed duplex
+       (flip on long edge) card 1's front and back land on the same
+       physical card.
+
+     PRINTING: 100% scale, no fit-to-page. For double-sided cards:
+       a) duplex printer with long-edge flip, OR
+       b) print page 1, flip stack 180° around vertical axis, reprint with page 2
+     ===================================================================== */
+
+  @page { size: letter; margin: 0; }
+
+  :root {
+    --brand-red: #B11E2E;
+    --brand-red-deep: #8B1623;
+    --ink: #14161C;
+    --cream: #FAF7F1;
+    --paper: #FFFFFF;
+    --hairline: #E8E4DD;
+    --mute: #76777E;
+    --gold-tint: #E8D9B5;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: white;
+    font-family: 'Calibri', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: var(--ink);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Letter page, 2x2 grid of cards */
+  .sheet {
+    width: 215.9mm;
+    height: 279.4mm;
+    padding: 22mm 19mm;       /* (215.9 - 2*85.6 - 6) / 2 ≈ 19.5mm side */
+    display: grid;
+    grid-template-columns: 85.6mm 85.6mm;
+    grid-template-rows: 53.98mm 53.98mm;
+    column-gap: 8mm;
+    row-gap: 20mm;            /* big row gap so crop marks have breathing room */
+    justify-content: center;
+    align-content: center;
+    background: white;
+    page-break-after: always;
+    position: relative;
+  }
+  .sheet:last-child { page-break-after: auto; }
+
+  /* Page label (screen only, hidden on print) */
+  .page-label {
+    position: absolute;
+    top: 8mm;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 3mm;
+    color: var(--mute);
+    letter-spacing: 0.4mm;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  @media print { .page-label { display: none; } }
+
+  /* Card — exact ID-1 with rounded corners */
+  .card {
+    width: 85.6mm;
+    height: 53.98mm;
+    background: var(--cream);
+    position: relative;
+    overflow: hidden;
+    color: var(--ink);
+    border-radius: 3mm;
+    box-shadow: 0 0 0 0.1mm var(--hairline);
+  }
+
+  /* Crop marks at all four corners */
+  .card .cm {
+    position: absolute;
+    background: var(--ink);
+  }
+  .card .cm.tl-h { top: -3mm; left: 0; width: 3.5mm; height: 0.2mm; }
+  .card .cm.tl-v { top: 0; left: -3mm; width: 0.2mm; height: 3.5mm; }
+  .card .cm.tr-h { top: -3mm; right: 0; width: 3.5mm; height: 0.2mm; }
+  .card .cm.tr-v { top: 0; right: -3mm; width: 0.2mm; height: 3.5mm; }
+  .card .cm.bl-h { bottom: -3mm; left: 0; width: 3.5mm; height: 0.2mm; }
+  .card .cm.bl-v { bottom: 0; left: -3mm; width: 0.2mm; height: 3.5mm; }
+  .card .cm.br-h { bottom: -3mm; right: 0; width: 3.5mm; height: 0.2mm; }
+  .card .cm.br-v { bottom: 0; right: -3mm; width: 0.2mm; height: 3.5mm; }
+
+  /* ============== FRONT ============== */
+  .banner {
+    background: linear-gradient(135deg, var(--brand-red), var(--brand-red-deep));
+    color: white;
+    padding: 1.6mm 4mm 1.4mm;
+    text-align: center;
+  }
+  .banner-title {
+    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+    font-size: 5mm;
+    font-weight: 700;
+    letter-spacing: 0.2mm;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+  .banner-sub {
+    font-size: 2mm;
+    font-weight: 600;
+    letter-spacing: 0.3mm;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.92);
+    margin-top: 0.8mm;
+  }
+  .body {
+    display: grid;
+    grid-template-columns: 26mm 1fr;
+    gap: 3mm;
+    padding: 2.5mm 3.5mm 1.5mm;
+    align-items: start;
+  }
+  .photo-box {
+    width: 26mm; height: 26mm;
+    background: var(--paper);
+    border: 0.2mm solid var(--hairline);
+    border-radius: 0.8mm;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.2mm; color: var(--mute); letter-spacing: 0.4mm; font-weight: 600;
+  }
+  .info { display: flex; flex-direction: column; }
+  .field { margin-bottom: 2.6mm; }
+  .field-label {
+    font-size: 1.7mm; font-weight: 700; letter-spacing: 0.3mm;
+    text-transform: uppercase; color: var(--mute); margin-bottom: 0.5mm;
+  }
+  .field-value {
+    font-size: 3mm; font-weight: 600; color: var(--ink);
+    border-bottom: 0.25mm solid var(--ink); padding-bottom: 0.5mm;
+    line-height: 1.1; min-height: 3.4mm;
+  }
+  .field-value.mono {
+    font-family: 'Consolas', 'Menlo', monospace;
+    font-size: 2.4mm; letter-spacing: 0.2mm;
+  }
+  .field-value.expires {
+    color: var(--brand-red); border-bottom-color: var(--brand-red);
+  }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm; }
+  .front-footer {
+    border-top: 0.2mm solid var(--hairline);
+    padding: 1mm 3.5mm 1.6mm;
+    text-align: center;
+    position: absolute; bottom: 0; left: 0; right: 0;
+  }
+  .lockup-svg { height: 9mm; display: inline-block; }
+  .company-addr {
+    font-size: 1.9mm; color: var(--ink); font-weight: 700;
+    letter-spacing: 0.05mm; margin-top: 0.6mm;
+  }
+
+  /* ============== BACK ============== */
+  .back-strip {
+    background: var(--ink); color: white;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.4mm 3.5mm;
+  }
+  .back-title {
+    font-family: 'Playfair Display', 'Georgia', serif;
+    font-size: 2.6mm; font-weight: 700; letter-spacing: 0.4mm; text-transform: uppercase;
+  }
+  .back-cite {
+    font-size: 1.9mm; color: var(--gold-tint);
+    letter-spacing: 0.2mm; font-weight: 600; font-style: italic;
+  }
+  .back-body { padding: 3.5mm 5mm 1.6mm; display: flex; flex-direction: column; }
+  .attest-text {
+    font-size: 3.1mm; line-height: 1.45; color: var(--ink); font-weight: 500;
+    margin-bottom: 4mm;
+    text-align: justify; text-justify: inter-word; hyphens: auto;
+  }
+  .attest-text strong { font-weight: 700; }
+  /* Inline fill-in blanks for issuer name + license number */
+  .fillin {
+    display: inline-block;
+    border-bottom: 0.35mm solid var(--ink);
+    height: 4mm;
+    vertical-align: baseline;
+    margin: 0 1mm;
+  }
+  .fillin.name { width: 30mm; }
+  .fillin.license { width: 18mm; text-align: left; padding-left: 0.5mm; font-weight: 600; }
+  /* Issuer signature + date block — prominent, clearly labeled */
+  .sig-block {
+    background: #FAF7F1;
+    border: 0.25mm solid var(--hairline);
+    border-radius: 1mm;
+    padding: 2.4mm 3mm;
+    margin-bottom: 1.5mm;
+  }
+  .sig-block-label {
+    font-size: 1.5mm; font-weight: 700; letter-spacing: 0.5mm;
+    text-transform: uppercase; color: var(--mute);
+    margin-bottom: 2mm;
+  }
+  .sig-row { display: grid; grid-template-columns: 1.8fr 1fr; gap: 5mm; }
+  .sig-line { border-bottom: 0.35mm solid var(--ink); height: 6mm; }
+  .sig-label {
+    font-size: 1.7mm; font-weight: 700; letter-spacing: 0.3mm;
+    text-transform: uppercase; color: var(--ink); margin-top: 0.6mm;
+  }
+  .back-footer {
+    border-top: 0.2mm solid var(--hairline);
+    padding: 1.4mm 3.5mm;
+    background: var(--cream);
+    position: absolute; bottom: 0; left: 0; right: 0;
+  }
+  .carry-with {
+    font-size: 1.7mm; line-height: 1.4; color: var(--mute);
+    font-style: italic; text-align: center;
+  }
+  .carry-with strong { color: var(--ink); font-style: normal; font-weight: 700; }
+
+  @media screen {
+    body { background: #ECE9E2; padding: 12mm 0; }
+    .sheet { box-shadow: 0 4px 20px rgba(0,0,0,0.15); margin: 0 auto 20mm; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- PAGE 1 — FOUR CARD FRONTS (2x2 grid)                         -->
+<!-- ============================================================ -->
+<div class="sheet">
+  <div class="page-label">Page 1 — Fronts (4 cards)</div>
+
+  <!-- ===== Card Front Template (repeated 4 times) ===== -->
+  <!-- Front 1 -->
+  <div class="card">
+    <span class="cm tl-h"></span><span class="cm tl-v"></span>
+    <span class="cm tr-h"></span><span class="cm tr-v"></span>
+    <span class="cm bl-h"></span><span class="cm bl-v"></span>
+    <span class="cm br-h"></span><span class="cm br-v"></span>
+    <div class="banner">
+      <div class="banner-title">Certificate of Fitness</div>
+      <div class="banner-sub">Suspended Scaffold User &nbsp;·&nbsp; 1 RCNY §104-20(k)</div>
+    </div>
+    <div class="body">
+      <div class="photo-box">PHOTO</div>
+      <div class="info">
+        <div class="field"><div class="field-label">Name of Holder</div><div class="field-value">&nbsp;</div></div>
+        <div class="field"><div class="field-label">Card Number</div><div class="field-value mono">SSC-COF-________</div></div>
+        <div class="field-row">
+          <div class="field"><div class="field-label">Issued</div><div class="field-value mono">__ / __ / ____</div></div>
+          <div class="field"><div class="field-label">Expires</div><div class="field-value mono expires">__ / __ / ____</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="front-footer">
+      <svg class="lockup-svg" viewBox="0 0 240 80" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="rL1" x1="0%" y1="0%" x2="70%" y2="100%"><stop offset="0%" stop-color="#E0394E"/><stop offset="100%" stop-color="#A01829"/></linearGradient>
+          <linearGradient id="rD1" x1="100%" y1="0%" x2="30%" y2="100%"><stop offset="0%" stop-color="#831321"/><stop offset="100%" stop-color="#4A0A12"/></linearGradient>
+        </defs>
+        <g transform="translate(102, 0)">
+          <polygon fill="url(#rL1)" points="18,18 13.96,12.44 18,0"/><polygon fill="url(#rD1)" points="18,18 18,0 22.04,12.44"/>
+          <polygon fill="url(#rL1)" points="18,18 22.04,12.44 35.12,12.44"/><polygon fill="url(#rD1)" points="18,18 35.12,12.44 24.54,20.13"/>
+          <polygon fill="url(#rL1)" points="18,18 24.54,20.13 28.58,32.56"/><polygon fill="url(#rD1)" points="18,18 28.58,32.56 18,24.88"/>
+          <polygon fill="url(#rL1)" points="18,18 18,24.88 7.42,32.56"/><polygon fill="url(#rD1)" points="18,18 7.42,32.56 11.46,20.13"/>
+          <polygon fill="url(#rL1)" points="18,18 11.46,20.13 0.88,12.44"/><polygon fill="url(#rD1)" points="18,18 0.88,12.44 13.96,12.44"/>
+          <polygon fill="#FAF7F1" points="18,10.8 20.02,15.94 25.34,15.94 21.02,19.25 22.68,24.39 18,21.26 13.32,24.39 14.98,19.25 10.66,15.94 15.98,15.94"/>
+        </g>
+        <text x="120" y="58" font-family="'Playfair Display','Georgia','Times New Roman',serif" font-size="24" font-weight="700" fill="#14161C" text-anchor="middle" letter-spacing="2.2">SUPERSTARS</text>
+        <text x="120" y="76" font-family="'Playfair Display','Georgia','Times New Roman',serif" font-size="13" font-weight="700" fill="#14161C" text-anchor="middle" letter-spacing="3.2">CONTRACTING INC</text>
+      </svg>
+      <div class="company-addr">40-27 24th Street, Long Island City, NY 11101 &nbsp;·&nbsp; P 917 498 0002 &nbsp;·&nbsp; F 718 709 4223</div>
+    </div>
+  </div>
+
+  <!-- Front 2 (same template, separate gradient ids) -->
+  <div class="card">
+    <span class="cm tl-h"></span><span class="cm tl-v"></span>
+    <span class="cm tr-h"></span><span class="cm tr-v"></span>
+    <span class="cm bl-h"></span><span class="cm bl-v"></span>
+    <span class="cm br-h"></span><span class="cm br-v"></span>
+    <div class="banner">
+      <div class="banner-title">Certificate of Fitness</div>
+      <div class="banner-sub">Suspended Scaffold User &nbsp;·&nbsp; 1 RCNY §104-20(k)</div>
+    </div>
+    <div class="body">
+      <div class="photo-box">PHOTO</div>
+      <div class="info">
+        <div class="field"><div class="field-label">Name of Holder</div><div class="field-value">&nbsp;</div></div>
+        <div class="field"><div class="field-label">Card Number</div><div class="field-value mono">SSC-COF-________</div></div>
+        <div class="field-row">
+          <div class="field"><div class="field-label">Issued</div><div class="field-value mono">__ / __ / ____</div></div>
+          <div class="field"><div class="field-label">Expires</div><div class="field-value mono expires">__ / __ / ____</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="front-footer">
+      <svg class="lockup-svg" viewBox="0 0 240 80" xmlns="http://www.w3.org/2000/svg">
+        <g transform="translate(102, 0)">
+          <polygon fill="url(#rL1)" points="18,18 13.96,12.44 18,0"/><polygon fill="url(#rD1)" points="18,18 18,0 22.04,12.44"/>
+          <polygon fill="url(#rL1)" points="18,18 22.04,12.44 35.12,12.44"/><polygon fill="url(#rD1)" points="18,18 35.12,12.44 24.54,20.13"/>
+          <polygon fill="url(#rL1)" points="18,18 24.54,20.13 28.58,32.56"/><polygon fill="url(#rD1)" points="18,18 28.58,32.56 18,24.88"/>
+          <polygon fill="url(#rL1)" points="18,18 18,24.88 7.42,32.56"/><polygon fill="url(#rD1)" points="18,18 7.42,32.56 11.46,20.13"/>
+          <polygon fill="url(#rL1)" points="18,18 11.46,20.13 0.88,12.44"/><polygon fill="url(#rD1)" points="18,18 0.88,12.44 13.96,12.44"/>
+          <polygon fill="#FAF7F1" points="18,10.8 20.02,15.94 25.34,15.94 21.02,19.25 22.68,24.39 18,21.26 13.32,24.39 14.98,19.25 10.66,15.94 15.98,15.94"/>
+        </g>
+        <text x="120" y="58" font-family="'Playfair Display','Georgia','Times New Roman',serif" font-size="24" font-weight="700" fill="#14161C" text-anchor="middle" letter-spacing="2.2">SUPERSTARS</text>
+        <text x="120" y="76" font-family="'Playfair Display','Georgia','Times New Roman',serif" font-size="13" font-weight="700" fill="#14161C" text-anchor="middle" letter-spacing="3.2">CONTRACTING INC</text>
+      </svg>
+      <div class="company-addr">40-27 24th Street, Long Island City, NY 11101 &nbsp;·&nbsp; P 917 498 0002 &nbsp;·&nbsp; F 718 709 4223</div>
+    </div>
+  </div>
+
+  <!-- Front 3 -->
+  <div class="card">
+    <span class="cm tl-h"></span><span class="cm tl-v"></span>
+    <span class="cm tr-h"></span><span class="cm tr-v"></span>
+    <span class="cm bl-h"></span><span class="cm bl-v"></span>
+    <span class="cm br-h"></span><span class="cm br-v"></span>
+    <div class="banner">
+      <div class="banner-title">Certificate of Fitness</div>
+      <div class="banner-sub">Suspended Scaffold User &nbsp;·&nbsp; 1 RCNY §104-20(k)</div>
+    </div>
+    <div class="body">
+      <div class="photo-box">PHOTO</div>
+      <div class="info">
+        <div class="field"><div class="field-label">Name of Holder</div><div class="field-value">&nbsp;</div></div>
+        <div class="field"><div class="field-label">Card Number</div><div class="field-value mono">SSC-COF-________</div></div>
+        <div class="field-row">
+          <div class="field"><div class="field-label">Issued</div><div class="field-value mono">__ / __ / ____</div></div>
+          <div class="field"><div class="field-label">Expires</div><div class="field-value mono expires">__ / __ / ____</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="front-footer">
+      <svg class="lockup-svg" viewBox="0 0 240 80" xmlns="http://www.w3.org/2000/svg">
+        <g transform="translate(102, 0)">
+          <polygon fill="url(#rL1)" points="18,18 13.96,12.44 18,0"/><polygon fill="url(#rD1)" points="18,18 18,0 22.04,12.44"/>
+          <polygon fill="url(#rL1)" points="18,18 22.04,12.44 35.12,12.44"/><polygon fill="url(#rD1)" points="18,18 35.12,12.44 24.54,20.13"/>
+          <polygon fill="url(#rL1)" points="18,18 24.54,20.13 28.58,32.56"/><polygon fill="url(#rD1)" points="18,18 28.58,32.56 18,24.88"/>
+          <polygon fill="url(#rL1)" points="18,18 18,24.88 7.42,32.56"/><polygon fill="url(#rD1)" points="18,18 7.42,32.56 11.46,20.13"/>
+          <polygon fill="url(#rL1)" points="18,18 11.46,20.13 0.88,12.44"/><polygon fill="url(#rD1)" points="18,18 0.88,12.44 13.96,12.44"/>
+          <polygon fill="#FAF7F1" points="18,10.8 20.02,15.94 25.34,15.94 21.02,19.25 22.68,24.39 18,21.26 13.32,24.39 14.98,19.25 10.66,15.94 15.98,15.94"/>
+        </g>
+        <text x="120" y="58" font-family="'Playfair Display','Georgia','Times New Roman',serif" font-size="24" font-weight="700" fill="#14161C" text-anchor="middle" letter-spacing="2.2">SUPERSTARS</text>
+        <text x="120" y="76" font-family="'Playfair Display','Georgia','Times New Roman',serif" font-size="13" font-weight="700" fill="#14161C" text-anchor="middle" letter-spacing="3.2">CONTRACTING INC</text>
+      </svg>
+      <div class="company-addr">40-27 24th Street, Long Island City, NY 11101 &nbsp;·&nbsp; P 917 498 0002 &nbsp;·&nbsp; F 718 709 4223</div>
+    </div>
+  </div>
+
+  <!-- Front 4 -->
+  <div class="card">
+    <span class="cm tl-h"></span><span class="cm tl-v"></span>
+    <span class="cm tr-h"></span><span class="cm tr-v"></span>
+    <span class="cm bl-h"></span><span class="cm bl-v"></span>
+    <span class="cm br-h"></span><span class="cm br-v"></span>
+    <div class="banner">
+      <div class="banner-title">Certificate of Fitness</div>
+      <div class="banner-sub">Suspended Scaffold User &nbsp;·&nbsp; 1 RCNY §104-20(k)</div>
+    </div>
+    <div class="body">
+      <div class="photo-box">PHOTO</div>
+      <div class="info">
+        <div class="field"><div class="field-label">Name of Holder</div><div class="field-value">&nbsp;</div></div>
+        <div class="field"><div class="field-label">Card Number</div><div class="field-value mono">SSC-COF-________</div></div>
+        <div class="field-row">
+          <div class="field"><div class="field-label">Issued</div><div class="field-value mono">__ / __ / ____</div></div>
+          <div class="field"><div class="field-label">Expires</div><div class="field-value mono expires">__ / __ / ____</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="front-footer">
+      <svg class="lockup-svg" viewBox="0 0 240 80" xmlns="http://www.w3.org/2000/svg">
+        <g transform="translate(102, 0)">
+          <polygon fill="url(#rL1)" points="18,18 13.96,12.44 18,0"/><polygon fill="url(#rD1)" points="18,18 18,0 22.04,12.44"/>
+          <polygon fill="url(#rL1)" points="18,18 22.04,12.44 35.12,12.44"/><polygon fill="url(#rD1)" points="18,18 35.12,12.44 24.54,20.13"/>
+          <polygon fill="url(#rL1)" points="18,18 24.54,20.13 28.58,32.56"/><polygon fill="url(#rD1)" points="18,18 28.58,32.56 18,24.88"/>
+          <polygon fill="url(#rL1)" points="18,18 18,24.88 7.42,32.56"/><polygon fill="url(#rD1)" points="18,18 7.42,32.56 11.46,20.13"/>
+          <polygon fill="url(#rL1)" points="18,18 11.46,20.13 0.88,12.44"/><polygon fill="url(#rD1)" points="18,18 0.88,12.44 13.96,12.44"/>
+          <polygon fill="#FAF7F1" points="18,10.8 20.02,15.94 25.34,15.94 21.02,19.25 22.68,24.39 18,21.26 13.32,24.39 14.98,19.25 10.66,15.94 15.98,15.94"/>
+        </g>
+        <text x="120" y="58" font-family="'Playfair Display','Georgia','Times New Roman',serif" font-size="24" font-weight="700" fill="#14161C" text-anchor="middle" letter-spacing="2.2">SUPERSTARS</text>
+        <text x="120" y="76" font-family="'Playfair Display','Georgia','Times New Roman',serif" font-size="13" font-weight="700" fill="#14161C" text-anchor="middle" letter-spacing="3.2">CONTRACTING INC</text>
+      </svg>
+      <div class="company-addr">40-27 24th Street, Long Island City, NY 11101 &nbsp;·&nbsp; P 917 498 0002 &nbsp;·&nbsp; F 718 709 4223</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- PAGE 2 — FOUR CARD BACKS (2x2 grid)                          -->
+<!-- ============================================================ -->
+<div class="sheet">
+  <div class="page-label">Page 2 — Backs (4 cards)</div>
+
+  <!-- Back 1 -->
+  <div class="card">
+    <span class="cm tl-h"></span><span class="cm tl-v"></span>
+    <span class="cm tr-h"></span><span class="cm tr-v"></span>
+    <span class="cm bl-h"></span><span class="cm bl-v"></span>
+    <span class="cm br-h"></span><span class="cm br-v"></span>
+    <div class="back-strip">
+      <div class="back-title">Issuer Attestation</div>
+      <div class="back-cite">1 RCNY §104-20(k)</div>
+    </div>
+    <div class="back-body">
+      <div class="attest-text">
+        I, <span class="fillin name"></span>, NYC DOB Special Rigger <span class="fillin license">#</span>, having found the named holder capable of performing scaffold work in a safe and responsible manner and confirmed training per <strong>NYC Building Code §3314.4</strong>, hereby issue this Certificate of Fitness for use of a two-point suspension scaffold under the supervision of my designated Rigging Foreman.
+      </div>
+      <div class="sig-block">
+        <div class="sig-block-label">Signature & Date of Issue</div>
+        <div class="sig-row">
+          <div><div class="sig-line"></div><div class="sig-label">Issuer Signature</div></div>
+          <div><div class="sig-line"></div><div class="sig-label">Date</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="back-footer">
+      <div class="carry-with">
+        <strong>CARRY WITH:</strong> 16-hr Suspended Scaffold cert &nbsp;·&nbsp; SST card &nbsp;·&nbsp; photo ID. Subject to rescission at issuer's discretion.
+      </div>
+    </div>
+  </div>
+
+  <!-- Back 2 -->
+  <div class="card">
+    <span class="cm tl-h"></span><span class="cm tl-v"></span>
+    <span class="cm tr-h"></span><span class="cm tr-v"></span>
+    <span class="cm bl-h"></span><span class="cm bl-v"></span>
+    <span class="cm br-h"></span><span class="cm br-v"></span>
+    <div class="back-strip">
+      <div class="back-title">Issuer Attestation</div>
+      <div class="back-cite">1 RCNY §104-20(k)</div>
+    </div>
+    <div class="back-body">
+      <div class="attest-text">
+        I, <span class="fillin name"></span>, NYC DOB Special Rigger <span class="fillin license">#</span>, having found the named holder capable of performing scaffold work in a safe and responsible manner and confirmed training per <strong>NYC Building Code §3314.4</strong>, hereby issue this Certificate of Fitness for use of a two-point suspension scaffold under the supervision of my designated Rigging Foreman.
+      </div>
+      <div class="sig-block">
+        <div class="sig-block-label">Signature & Date of Issue</div>
+        <div class="sig-row">
+          <div><div class="sig-line"></div><div class="sig-label">Issuer Signature</div></div>
+          <div><div class="sig-line"></div><div class="sig-label">Date</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="back-footer">
+      <div class="carry-with">
+        <strong>CARRY WITH:</strong> 16-hr Suspended Scaffold cert &nbsp;·&nbsp; SST card &nbsp;·&nbsp; photo ID. Subject to rescission at issuer's discretion.
+      </div>
+    </div>
+  </div>
+
+  <!-- Back 3 -->
+  <div class="card">
+    <span class="cm tl-h"></span><span class="cm tl-v"></span>
+    <span class="cm tr-h"></span><span class="cm tr-v"></span>
+    <span class="cm bl-h"></span><span class="cm bl-v"></span>
+    <span class="cm br-h"></span><span class="cm br-v"></span>
+    <div class="back-strip">
+      <div class="back-title">Issuer Attestation</div>
+      <div class="back-cite">1 RCNY §104-20(k)</div>
+    </div>
+    <div class="back-body">
+      <div class="attest-text">
+        I, <span class="fillin name"></span>, NYC DOB Special Rigger <span class="fillin license">#</span>, having found the named holder capable of performing scaffold work in a safe and responsible manner and confirmed training per <strong>NYC Building Code §3314.4</strong>, hereby issue this Certificate of Fitness for use of a two-point suspension scaffold under the supervision of my designated Rigging Foreman.
+      </div>
+      <div class="sig-block">
+        <div class="sig-block-label">Signature & Date of Issue</div>
+        <div class="sig-row">
+          <div><div class="sig-line"></div><div class="sig-label">Issuer Signature</div></div>
+          <div><div class="sig-line"></div><div class="sig-label">Date</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="back-footer">
+      <div class="carry-with">
+        <strong>CARRY WITH:</strong> 16-hr Suspended Scaffold cert &nbsp;·&nbsp; SST card &nbsp;·&nbsp; photo ID. Subject to rescission at issuer's discretion.
+      </div>
+    </div>
+  </div>
+
+  <!-- Back 4 -->
+  <div class="card">
+    <span class="cm tl-h"></span><span class="cm tl-v"></span>
+    <span class="cm tr-h"></span><span class="cm tr-v"></span>
+    <span class="cm bl-h"></span><span class="cm bl-v"></span>
+    <span class="cm br-h"></span><span class="cm br-v"></span>
+    <div class="back-strip">
+      <div class="back-title">Issuer Attestation</div>
+      <div class="back-cite">1 RCNY §104-20(k)</div>
+    </div>
+    <div class="back-body">
+      <div class="attest-text">
+        I, <span class="fillin name"></span>, NYC DOB Special Rigger <span class="fillin license">#</span>, having found the named holder capable of performing scaffold work in a safe and responsible manner and confirmed training per <strong>NYC Building Code §3314.4</strong>, hereby issue this Certificate of Fitness for use of a two-point suspension scaffold under the supervision of my designated Rigging Foreman.
+      </div>
+      <div class="sig-block">
+        <div class="sig-block-label">Signature & Date of Issue</div>
+        <div class="sig-row">
+          <div><div class="sig-line"></div><div class="sig-label">Issuer Signature</div></div>
+          <div><div class="sig-line"></div><div class="sig-label">Date</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="back-footer">
+      <div class="carry-with">
+        <strong>CARRY WITH:</strong> 16-hr Suspended Scaffold cert &nbsp;·&nbsp; SST card &nbsp;·&nbsp; photo ID. Subject to rescission at issuer's discretion.
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

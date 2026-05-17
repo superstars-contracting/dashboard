@@ -1,0 +1,1901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Superstars Contracting - Project Console</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { font-size: 16px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #FAF7F1;
+      color: #14161C;
+      line-height: 1.6;
+    }
+
+    /* App Shell */
+    .app-shell { display: flex; min-height: 100vh; }
+
+    /* Sidebar */
+    .sidebar {
+      width: 256px;
+      background: #FFF;
+      border-right: 1px solid #E8E4DD;
+      padding: 24px 12px;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 8px 16px;
+      border-bottom: 1px solid #E8E4DD;
+      margin-bottom: 8px;
+    }
+    .sidebar-header svg { width: 24px; height: 24px; }
+    .brand-name {
+      font-family: Georgia, serif;
+      font-weight: 700;
+      color: #14161C;
+      font-size: 16px;
+      letter-spacing: -0.01em;
+    }
+    .brand-sub {
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: #76777E;
+      font-weight: 600;
+    }
+
+    /* Navigation */
+    .nav { }
+    .nav-group { margin-top: 14px; }
+    .nav-group-label {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #9CA0AA;
+      padding: 0 12px 6px;
+    }
+    .nav-link {
+      display: block;
+      padding: 7px 12px;
+      font-size: 13.5px;
+      color: #5A5C66;
+      cursor: pointer;
+      border-radius: 4px;
+      text-decoration: none;
+      position: relative;
+      margin: 1px 0;
+      transition: all 150ms;
+    }
+    .nav-link:hover { background: #FAF7F1; color: #14161C; }
+    .nav-link.active {
+      color: #14161C;
+      font-weight: 600;
+    }
+    .nav-link.active::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 6px;
+      bottom: 6px;
+      width: 2px;
+      background: #B11E2E;
+      border-radius: 2px;
+    }
+
+    /* Main Content */
+    .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(250, 247, 241, 0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #E8E4DD;
+      padding: 14px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .eyebrow {
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #76777E;
+      margin-bottom: 8px;
+    }
+    .topbar-title {
+      font-family: Georgia, serif;
+      font-weight: 600;
+      font-size: 17px;
+      color: #14161C;
+    }
+    .topbar-meta {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      font-size: 11px;
+      color: #76777E;
+    }
+    .live-indicator { color: #2F7C57; font-weight: 600; }
+
+    /* Views Container */
+    .views-container { flex: 1; overflow-y: auto; }
+    .view { display: none; padding: 32px; }
+    .view.active { display: block; }
+
+    /* Common Styles */
+    .hero {
+      background-color: #FAF7F1;
+      padding: 24px 0 0 0;
+      border-bottom: 1px solid #E8E4DD;
+      margin-bottom: 24px;
+    }
+    .hero h1 {
+      font-family: Georgia, serif;
+      font-size: 44px;
+      font-weight: bold;
+      color: #14161C;
+      margin-bottom: 4px;
+    }
+    .hero-subtitle {
+      font-family: Georgia, serif;
+      font-style: italic;
+      color: #B11E2E;
+      font-size: 18px;
+      margin-bottom: 24px;
+    }
+    .hero-meta {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-bottom: 32px;
+      font-size: 14px;
+      padding: 24px 0;
+      border-top: 1px solid #E8E4DD;
+      border-bottom: 1px solid #E8E4DD;
+    }
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-top: 24px;
+    }
+    .stat-item { text-align: center; }
+    .stat-number {
+      font-family: Georgia, serif;
+      font-size: 36px;
+      font-weight: bold;
+      color: #14161C;
+    }
+    .stat-label {
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      color: #76777E;
+      margin-top: 8px;
+    }
+
+    /* Section */
+    .section { margin-bottom: 32px; }
+    .section h2 {
+      font-family: Georgia, serif;
+      font-size: 28px;
+      color: #14161C;
+      margin-bottom: 24px;
+    }
+
+    /* KPI Strip */
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .kpi-card {
+      background: white;
+      border: 1px solid #E8E4DD;
+      border-radius: 4px;
+      padding: 0;
+      overflow: hidden;
+    }
+    .kpi-header {
+      background-color: #14161C;
+      color: white;
+      padding: 8px 12px;
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    .kpi-content { padding: 12px; text-align: center; }
+    .kpi-stat {
+      font-family: Georgia, serif;
+      font-size: 24px;
+      font-weight: bold;
+      color: #14161C;
+      margin-bottom: 4px;
+    }
+    .kpi-sublabel { font-size: 11px; color: #76777E; }
+
+    /* Phase Progress */
+    .phase-list { display: grid; gap: 16px; }
+    .phase-item {
+      display: grid;
+      grid-template-columns: 140px 1fr 50px;
+      gap: 12px;
+      align-items: center;
+    }
+    .phase-name { font-size: 13px; font-weight: 600; color: #14161C; }
+    .progress-bar {
+      height: 8px;
+      background-color: #E8E4DD;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background-color: #2F7C57;
+      border-radius: 4px;
+    }
+    .progress-fill.warn { background-color: #B68838; }
+    .progress-fill.gray { background-color: #D0CECC; }
+    .phase-pct { text-align: right; font-size: 12px; color: #76777E; }
+
+    /* Site Card */
+    .site-card {
+      background: white;
+      border: 1px solid #E8E4DD;
+      border-radius: 4px;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+    .site-item {
+      border-right: 1px solid #E8E4DD;
+      padding-right: 24px;
+    }
+    .site-item:last-child { border-right: none; padding-right: 0; }
+    .site-label {
+      font-size: 11px;
+      color: #76777E;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .site-value {
+      font-family: Georgia, serif;
+      font-size: 18px;
+      font-weight: bold;
+      color: #14161C;
+    }
+
+    /* Tables */
+    .table-wrapper {
+      overflow-x: auto;
+      margin-bottom: 24px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      font-size: 13px;
+    }
+    th {
+      background-color: #14161C;
+      color: white;
+      padding: 12px;
+      text-align: left;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 2px solid #E8E4DD;
+    }
+    td {
+      padding: 12px;
+      border-bottom: 1px solid #E8E4DD;
+    }
+    tr:last-child td { border-bottom: none; }
+
+    /* Cards Grid */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: white;
+      border: 1px solid #E8E4DD;
+      border-radius: 4px;
+      padding: 20px;
+    }
+    .card-title { font-size: 14px; font-weight: 600; color: #14161C; margin-bottom: 8px; }
+    .card-status { font-size: 11px; color: #76777E; }
+
+    /* Document Grid */
+    .doc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .doc-card {
+      background: white;
+      border: 1px solid #E8E4DD;
+      border-radius: 4px;
+      padding: 16px;
+      text-align: center;
+    }
+    .doc-icon { font-size: 32px; margin-bottom: 12px; }
+    .doc-name { font-size: 12px; font-weight: 600; color: #14161C; margin-bottom: 4px; }
+
+    /* Category Breakdown */
+    .category-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .category-item {
+      background: white;
+      border: 1px solid #E8E4DD;
+      border-radius: 4px;
+      padding: 16px;
+      text-align: center;
+    }
+    .category-name { font-size: 12px; font-weight: 600; color: #14161C; }
+    .category-count {
+      font-family: Georgia, serif;
+      font-size: 28px;
+      color: #B11E2E;
+      margin-top: 8px;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-ok { background-color: #2F7C57; color: white; }
+    .badge-warn { background-color: #B68838; color: white; }
+    .badge-bad { background-color: #B11E2E; color: white; }
+
+    /* Buttons */
+    .hero-btn {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 150ms;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .hero-btn-primary {
+      background-color: #B11E2E;
+      color: white;
+    }
+    .hero-btn-primary:hover {
+      background-color: #8B1621;
+      box-shadow: 0 4px 12px rgba(177, 30, 46, 0.2);
+    }
+
+    /* Placeholder Card */
+    .placeholder-card {
+      background: white;
+      border: 1px solid #E8E4DD;
+      border-radius: 4px;
+      padding: 48px 24px;
+      text-align: center;
+      color: #76777E;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .kpi-strip { grid-template-columns: repeat(4, 1fr); }
+      .hero-stats { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 768px) {
+      .app-shell { flex-direction: column; }
+      .sidebar { width: 100%; height: auto; position: static; }
+      .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+      .hero-stats { grid-template-columns: 1fr; }
+      .hero-meta { grid-template-columns: 1fr; }
+      .site-card { grid-template-columns: 1fr; }
+      .site-item { border-right: none; border-bottom: 1px solid #E8E4DD; padding-right: 0; padding-bottom: 16px; }
+      .site-item:last-child { border-bottom: none; }
+    }
+
+    /* Data Link Hover */
+    [data-link] { cursor: pointer; transition: background 150ms; }
+    [data-link]:hover { background: rgba(177, 30, 46, 0.04); }
+  </style>
+</head>
+<body>
+
+<div class="app-shell">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2L15.09 10.26H24L17.55 15.7L20.64 24L12 18.56L3.36 24L6.45 15.7L0 10.26H8.91L12 2Z"
+              fill="none" stroke="#B11E2E" stroke-width="1.5"/>
+      </svg>
+      <div>
+        <div class="brand-name">SUPERSTARS</div>
+        <div class="brand-sub">CONTRACTING · INC</div>
+      </div>
+    </div>
+    <a href="/" style="display:flex;align-items:center;gap:8px;padding:10px 18px;color:#76777E;font-size:12px;text-decoration:none;border-bottom:1px solid #E8E4DD;letter-spacing:0.5px;text-transform:uppercase;font-weight:600;transition:color 0.15s;" onmouseover="this.style.color='#B11E2E'" onmouseout="this.style.color='#76777E'">
+      ← Back to Company
+    </a>
+    <nav class="nav">
+      <div class="nav-group">
+        <div class="nav-group-label">Overview</div>
+        <a class="nav-link active" data-view="dashboard">Project Health</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">People</div>
+        <a class="nav-link" data-view="employees">Employees & Certs</a>
+        <a class="nav-link" data-view="subs">Subcontractors & COIs</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">Field</div>
+        <a class="nav-link" data-view="drawings">Drawing Markup</a>
+        <a class="nav-link" data-view="documents">Project Documents</a>
+        <a class="nav-link" data-view="drop-plans">Drop Plans</a>
+        <a class="nav-link" data-view="schedule">Schedule</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">Daily Ops</div>
+        <a class="nav-link" data-view="daily-report">Daily Report</a>
+        <a class="nav-link" data-view="site-closure">Site Closure</a>
+        <a class="nav-link" data-view="materials">Materials & Deliveries</a>
+        <a class="nav-link" data-view="meetings">Meeting Minutes</a>
+        <a class="nav-link" data-view="equipment">Equipment Log</a>
+        <a class="nav-link" data-view="toolbox-talks">Toolbox Talks</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">Tracking</div>
+        <a class="nav-link" data-view="rfis">RFI Log</a>
+        <a class="nav-link" data-view="inspections">Inspection Log</a>
+        <a class="nav-link" data-view="violations">Violations</a>
+        <a class="nav-link" data-view="punch">Punch List</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">Financial & Compliance</div>
+        <a class="nav-link" data-view="sov">Schedule of Values</a>
+        <a class="nav-link" data-view="compliance">Compliance & Permits</a>
+        <a class="nav-link" data-view="closeout">Warranty & Closeout</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">Setup</div>
+        <a class="nav-link" data-view="portal">Client Portal</a>
+        <a class="nav-link" data-view="templates">Templates</a>
+        <a class="nav-link" data-view="settings">Settings</a>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow" id="topbar-breadcrumb">Overview</div>
+        <div class="topbar-title">890 E 135th St · SC-2601</div>
+      </div>
+      <div class="topbar-meta">
+        <span>Tue · May 6, 2026</span>
+        <span class="live-indicator">● Live</span>
+      </div>
+    </header>
+
+    <div class="views-container">
+      <!-- PROJECT HEALTH / DASHBOARD -->
+      <section class="view active" data-view="dashboard">
+        <div class="hero">
+          <div class="eyebrow">Project Health · Week 13</div>
+          <h1>890 East 135th Street</h1>
+          <div class="hero-subtitle">Mott Haven Restoration</div>
+          <div class="hero-meta">
+            <div>
+              <div class="eyebrow" style="margin-bottom: 4px;">Project Manager</div>
+              <div style="font-weight: 600;">Susan Park</div>
+            </div>
+            <div>
+              <div class="eyebrow" style="margin-bottom: 4px;">Foreman</div>
+              <div style="font-weight: 600;">John Doe</div>
+            </div>
+            <div>
+              <div class="eyebrow" style="margin-bottom: 4px;">Superintendent</div>
+              <div style="font-weight: 600;">Robert Caldwell</div>
+            </div>
+          </div>
+          <div class="hero-stats">
+            <div class="stat-item">
+              <div class="stat-number">42%</div>
+              <div class="stat-label">Complete</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number">$1.71M</div>
+              <div class="stat-label">Earned</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number" data-stat="workers-today">10 of 12</div>
+              <div class="stat-label">On Site</div>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 32px;">
+            <button class="hero-btn hero-btn-primary" data-link="/DCR-SC-2601-2026-05-05-internal.html">View Today's DCR</button>
+            <button class="hero-btn hero-btn-primary" data-link="/WPS-SC-2601-2026-05-01-internal.html">Weekly Summary</button>
+            <button class="hero-btn hero-btn-primary" data-link="/LA-SC-2601-2026-05-07.html">2-Week Lookahead</button>
+            <button class="hero-btn hero-btn-primary" data-link="/rfi_submission_form.html">Submit RFI</button>
+          </div>
+        </div>
+
+        <div class="kpi-strip">
+          <div class="kpi-card">
+            <div class="kpi-header">Workers Today</div>
+            <div class="kpi-content">
+              <div class="kpi-stat" data-stat="workers-today">10/12</div>
+              <div class="kpi-sublabel"><span data-stat="total-hours">82.25</span> hours</div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-header">Today's Report</div>
+            <div class="kpi-content">
+              <div class="kpi-stat">DCR-0001</div>
+              <div class="kpi-sublabel"><span class="badge badge-ok">Ready</span></div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-header">Weather</div>
+            <div class="kpi-content" style="position:relative;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div id="wx-icon" style="width:42px;height:42px;flex-shrink:0;color:#B11E2E;">
+                  <!-- icon injected by JS based on condition -->
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <div class="kpi-stat" id="wx-temp" style="font-size:28px;line-height:1;">—°</div>
+                  <div class="kpi-sublabel" id="wx-cond" style="margin-top:4px;font-size:11px;color:#76777E;">Loading…</div>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid #F1EEE8;font-size:11px;color:#76777E;">
+                <span><strong style="color:#14161C;font-weight:700;" id="wx-hilo">—°/—°</strong> hi/lo</span>
+                <span>💨 <strong style="color:#14161C;font-weight:700;" id="wx-wind">— mph</strong> <span id="wx-wind-dir">—</span></span>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-header">Cert Alerts</div>
+            <div class="kpi-content">
+              <div class="kpi-stat" data-stat="cert-alerts">2</div>
+              <div class="kpi-sublabel">Expiring &lt;30d</div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-header">Schedule</div>
+            <div class="kpi-content">
+              <div class="kpi-stat" data-stat="schedule">42%</div>
+              <div class="kpi-sublabel"><span class="badge badge-warn">vs 47% plan</span></div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-header">Budget</div>
+            <div class="kpi-content">
+              <div class="kpi-stat" data-stat="budget">$1.71M</div>
+              <div class="kpi-sublabel"><span class="badge badge-ok">On track</span></div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-header">Operations</div>
+            <div class="kpi-content">
+              <div class="kpi-stat">Open</div>
+              <div class="kpi-sublabel"><span class="badge badge-warn">Closure pending</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Phase Progress</h2>
+          <div class="phase-list">
+            <div class="phase-item">
+              <div class="phase-name">Mobilization</div>
+              <div class="progress-bar"><div class="progress-fill" style="width: 100%;"></div></div>
+              <div class="phase-pct">100%</div>
+            </div>
+            <div class="phase-item">
+              <div class="phase-name">Inspection</div>
+              <div class="progress-bar"><div class="progress-fill" style="width: 100%;"></div></div>
+              <div class="phase-pct">100%</div>
+            </div>
+            <div class="phase-item">
+              <div class="phase-name">Demo</div>
+              <div class="progress-bar"><div class="progress-fill" style="width: 78%;"></div></div>
+              <div class="phase-pct">78%</div>
+            </div>
+            <div class="phase-item">
+              <div class="phase-name">Masonry Repair</div>
+              <div class="progress-bar"><div class="progress-fill warn" style="width: 32%;"></div></div>
+              <div class="phase-pct">32%</div>
+            </div>
+            <div class="phase-item">
+              <div class="phase-name">Waterproofing</div>
+              <div class="progress-bar"><div class="progress-fill gray" style="width: 0%;"></div></div>
+              <div class="phase-pct">0%</div>
+            </div>
+            <div class="phase-item">
+              <div class="phase-name">Coatings</div>
+              <div class="progress-bar"><div class="progress-fill gray" style="width: 0%;"></div></div>
+              <div class="phase-pct">0%</div>
+            </div>
+            <div class="phase-item">
+              <div class="phase-name">Punch</div>
+              <div class="progress-bar"><div class="progress-fill gray" style="width: 0%;"></div></div>
+              <div class="phase-pct">0%</div>
+            </div>
+            <div class="phase-item">
+              <div class="phase-name">Demob</div>
+              <div class="progress-bar"><div class="progress-fill gray" style="width: 0%;"></div></div>
+              <div class="phase-pct">0%</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Today on Site</h2>
+          <div class="site-card">
+            <div class="site-item">
+              <div class="site-label">Foreman</div>
+              <div class="site-value">John Doe</div>
+              <div style="font-size: 12px; color: #76777E; margin-top: 4px;">E-001</div>
+            </div>
+            <div class="site-item">
+              <div class="site-label">Workers Signed In</div>
+              <div class="site-value">10 of 12</div>
+              <div style="font-size: 12px; color: #76777E; margin-top: 4px;">25.5 hrs</div>
+            </div>
+            <div class="site-item">
+              <div class="site-label">Working Zone</div>
+              <div class="site-value">South Elevation</div>
+              <div style="font-size: 12px; color: #76777E; margin-top: 4px;">Weather: 58°/68° · 12mph NW</div>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px;">
+            <div style="background: white; border: 1px solid #E8E4DD; border-radius: 4px; padding: 20px;">
+              <div class="eyebrow">Today's Report</div>
+              <div style="font-size: 16px; font-weight: 600; color: #14161C; margin: 8px 0;">DCR-0001</div>
+              <span class="badge badge-ok">Ready</span>
+            </div>
+            <div style="background: white; border: 1px solid #E8E4DD; border-radius: 4px; padding: 20px;">
+              <div class="eyebrow">Closure Status</div>
+              <div style="font-size: 16px; font-weight: 600; color: #14161C; margin: 8px 0;">Pending</div>
+              <span class="badge badge-warn">Cutoff 5 PM</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Daily Sign-In</h2>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Emp #</th>
+                  <th>Worker</th>
+                  <th>Trade</th>
+                  <th>Time In</th>
+                  <th>Time Out</th>
+                  <th>Hours</th>
+                  <th>Area</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>E-001</td>
+                  <td>John Doe</td>
+                  <td>Foreman</td>
+                  <td>07:00</td>
+                  <td>15:30</td>
+                  <td>8.5</td>
+                  <td>South Elev</td>
+                </tr>
+                <tr>
+                  <td>E-002</td>
+                  <td>Maria Garcia</td>
+                  <td>Bricklayer</td>
+                  <td>07:30</td>
+                  <td>16:00</td>
+                  <td>8.5</td>
+                  <td>South Elev</td>
+                </tr>
+                <tr>
+                  <td>E-003</td>
+                  <td>James Wilson</td>
+                  <td>Laborer</td>
+                  <td>08:00</td>
+                  <td>16:30</td>
+                  <td>8.5</td>
+                  <td>North Face</td>
+                </tr>
+                <tr>
+                  <td>E-004</td>
+                  <td>Ahmed Hassan</td>
+                  <td>Mason</td>
+                  <td>07:30</td>
+                  <td>15:45</td>
+                  <td>8.25</td>
+                  <td>South Elev</td>
+                </tr>
+                <tr>
+                  <td>E-005</td>
+                  <td>Sarah Chen</td>
+                  <td>Safety Officer</td>
+                  <td>07:00</td>
+                  <td>15:30</td>
+                  <td>8.5</td>
+                  <td>Site Wide</td>
+                </tr>
+                <tr>
+                  <td>E-006</td>
+                  <td>Michael Torres</td>
+                  <td>Scaffold Tech</td>
+                  <td>07:00</td>
+                  <td>15:30</td>
+                  <td>8.5</td>
+                  <td>West Side</td>
+                </tr>
+                <tr>
+                  <td>E-007</td>
+                  <td>Lisa Anderson</td>
+                  <td>QA Inspector</td>
+                  <td>08:00</td>
+                  <td>16:30</td>
+                  <td>8.5</td>
+                  <td>Demo Area</td>
+                </tr>
+                <tr>
+                  <td>E-008</td>
+                  <td>David Kim</td>
+                  <td>Laborer</td>
+                  <td>07:30</td>
+                  <td>16:00</td>
+                  <td>8.5</td>
+                  <td>North Face</td>
+                </tr>
+                <tr>
+                  <td>E-009</td>
+                  <td>Patricia Lopez</td>
+                  <td>Carpenter</td>
+                  <td>08:00</td>
+                  <td>16:30</td>
+                  <td>8.5</td>
+                  <td>Demo Area</td>
+                </tr>
+                <tr>
+                  <td>E-010</td>
+                  <td>Robert Brown</td>
+                  <td>Electrician</td>
+                  <td>07:00</td>
+                  <td>15:30</td>
+                  <td>8.5</td>
+                  <td>Site Wide</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- EMPLOYEES & CERTS — live intake + cert health -->
+      <section class="view" data-view="employees">
+
+        <!-- Cert Health Banner -->
+        <div class="section">
+          <div style="background:#FAF7F1;border-left:3px solid #B68838;padding:10px 14px;border-radius:4px;font-size:12px;color:#76777E;line-height:1.5;margin-bottom:14px;">
+            <strong style="color:#14161C;">📋 Office-managed:</strong> New workers, cert intake, and renewals happen in the <a href="/" style="color:#B11E2E;font-weight:600;text-decoration:none;">Company Console →</a>. This view shows only workers assigned to <em>this</em> project, read-only.
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:12px;">
+            <div>
+              <h2 style="margin-bottom:4px;">Project Crew &amp; Certifications</h2>
+              <div style="font-size:12px;color:#76777E;">Workers assigned to this project · live cert-health tracking</div>
+            </div>
+            <a href="/" style="background:white;color:#14161C;border:1px solid #E8E4DD;border-radius:6px;padding:10px 18px;font-weight:600;cursor:pointer;font-size:13px;letter-spacing:0.3px;text-decoration:none;">Manage Workers →</a>
+          </div>
+
+          <div class="card-grid" id="cert-health-cards">
+            <div class="card">
+              <div class="card-status" style="text-transform:uppercase;letter-spacing:0.5px;">Valid Certs</div>
+              <div class="card-title" id="ch-valid" style="font-size:32px;margin-top:8px;color:#2F7C57;">—</div>
+              <div style="font-size:11px;color:#76777E;margin-top:4px;">across all workers</div>
+            </div>
+            <div class="card">
+              <div class="card-status" style="text-transform:uppercase;letter-spacing:0.5px;">Expiring &lt; 30d</div>
+              <div class="card-title" id="ch-expiring" style="font-size:32px;margin-top:8px;color:#B68838;">—</div>
+              <div style="font-size:11px;color:#76777E;margin-top:4px;">action needed</div>
+            </div>
+            <div class="card">
+              <div class="card-status" style="text-transform:uppercase;letter-spacing:0.5px;">Expired</div>
+              <div class="card-title" id="ch-expired" style="font-size:32px;margin-top:8px;color:#B11E2E;">—</div>
+              <div style="font-size:11px;color:#76777E;margin-top:4px;">must replace</div>
+            </div>
+            <div class="card">
+              <div class="card-status" style="text-transform:uppercase;letter-spacing:0.5px;">Workers</div>
+              <div class="card-title" id="ch-workers" style="font-size:32px;margin-top:8px;color:#14161C;">—</div>
+              <div style="font-size:11px;color:#76777E;margin-top:4px;"><span id="ch-pending">0</span> pending intake</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Worker Roster -->
+        <div class="section">
+          <h2 style="margin-bottom:8px;">Roster</h2>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <thead>
+                <tr style="border-bottom:2px solid #E8E4DD;text-align:left;">
+                  <th style="padding:10px 8px;">Name</th>
+                  <th style="padding:10px 8px;">Trade</th>
+                  <th style="padding:10px 8px;">Lang</th>
+                  <th style="padding:10px 8px;">Phone</th>
+                  <th style="padding:10px 8px;text-align:center;">Docs</th>
+                  <th style="padding:10px 8px;text-align:center;">Certs</th>
+                  <th style="padding:10px 8px;text-align:center;">Health</th>
+                  <th style="padding:10px 8px;">Status</th>
+                </tr>
+              </thead>
+              <tbody id="emp-roster-tbody">
+                <tr><td colspan="8" style="padding:20px;text-align:center;color:#76777E;">Loading roster…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- INTAKE MODAL — removed from project dashboard. Lives in Company Console (/) -->
+
+      <!-- SUBCONTRACTORS & COIs -->
+      <section class="view" data-view="subs">
+        <div class="section">
+          <h2>Subcontractors & COIs</h2>
+          <div class="placeholder-card">Subcontractor management & insurance tracking · Coming with Phase 2B</div>
+        </div>
+      </section>
+
+      <!-- DRAWING MARKUP -->
+      <section class="view" data-view="drawings">
+        <div class="section">
+          <h2>Drawing Markup</h2>
+          <div class="placeholder-card">Drawing markup integration with Fieldwire · Pending</div>
+        </div>
+      </section>
+
+      <!-- DOCUMENTS -->
+      <section class="view" data-view="documents">
+        <div class="section">
+          <h2>Project Documents</h2>
+          <div class="doc-grid">
+            <div class="doc-card">
+              <div class="doc-icon">📋</div>
+              <div class="doc-name">Drawing Set A1</div>
+              <div style="font-size: 11px; color: #76777E;">Foundations</div>
+            </div>
+            <div class="doc-card">
+              <div class="doc-icon">📋</div>
+              <div class="doc-name">Drawing Set A2</div>
+              <div style="font-size: 11px; color: #76777E;">Elevations</div>
+            </div>
+            <div class="doc-card">
+              <div class="doc-icon">📋</div>
+              <div class="doc-name">Specifications</div>
+              <div style="font-size: 11px; color: #76777E;">Division 7-9</div>
+            </div>
+            <div class="doc-card">
+              <div class="doc-icon">✅</div>
+              <div class="doc-name">CD-5 Approval</div>
+              <div style="font-size: 11px; color: #76777E;">Signed May 1</div>
+            </div>
+            <div class="doc-card">
+              <div class="doc-icon">✅</div>
+              <div class="doc-name">CD-8 Approval</div>
+              <div style="font-size: 11px; color: #76777E;">Signed May 3</div>
+            </div>
+            <div class="doc-card">
+              <div class="doc-icon">📄</div>
+              <div class="doc-name">Safety Plan</div>
+              <div style="font-size: 11px; color: #76777E;">Site-Specific</div>
+            </div>
+            <div class="doc-card">
+              <div class="doc-icon">📄</div>
+              <div class="doc-name">Waste Management</div>
+              <div style="font-size: 11px; color: #76777E;">Plan & Reports</div>
+            </div>
+            <div class="doc-card">
+              <div class="doc-icon">📄</div>
+              <div class="doc-name">Community Board</div>
+              <div style="font-size: 11px; color: #76777E;">Notices</div>
+            </div>
+            <div class="doc-card">
+              <div class="doc-icon">📦</div>
+              <div class="doc-name">Schedule of Values</div>
+              <div style="font-size: 11px; color: #76777E;">Updated May 5</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DROP PLANS -->
+      <section class="view" data-view="drop-plans">
+        <div class="section">
+          <h2>Drop Plans</h2>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Drop ID</th>
+                  <th>Elevation</th>
+                  <th>Bay</th>
+                  <th>Floors</th>
+                  <th>Status</th>
+                  <th>Crew</th>
+                  <th>Planned Start</th>
+                  <th>Planned End</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr data-link="/drop_plans/DP-001.html">
+                  <td>DP-001</td>
+                  <td>South</td>
+                  <td>A</td>
+                  <td>1-5</td>
+                  <td><span class="badge badge-ok">Complete</span></td>
+                  <td>Team A</td>
+                  <td>May 1</td>
+                  <td>May 3</td>
+                </tr>
+                <tr data-link="/drop_plans/DP-002.html">
+                  <td>DP-002</td>
+                  <td>North</td>
+                  <td>B</td>
+                  <td>1-5</td>
+                  <td><span class="badge badge-ok">Complete</span></td>
+                  <td>Team B</td>
+                  <td>May 4</td>
+                  <td>May 6</td>
+                </tr>
+                <tr data-link="/drop_plans/DP-003.html">
+                  <td>DP-003</td>
+                  <td>East</td>
+                  <td>C</td>
+                  <td>2-6</td>
+                  <td><span class="badge badge-warn">In Progress</span></td>
+                  <td>Team C</td>
+                  <td>May 6</td>
+                  <td>May 10</td>
+                </tr>
+                <tr data-link="/drop_plans/DP-004.html">
+                  <td>DP-004</td>
+                  <td>West</td>
+                  <td>D</td>
+                  <td>1-4</td>
+                  <td><span class="badge badge-warn">Scheduled</span></td>
+                  <td>Team A</td>
+                  <td>May 11</td>
+                  <td>May 14</td>
+                </tr>
+                <tr data-link="/drop_plans/DP-005.html">
+                  <td>DP-005</td>
+                  <td>South</td>
+                  <td>E</td>
+                  <td>3-7</td>
+                  <td><span class="badge badge-warn">Scheduled</span></td>
+                  <td>Team D</td>
+                  <td>May 15</td>
+                  <td>May 18</td>
+                </tr>
+                <tr data-link="/drop_plans/DP-006.html">
+                  <td>DP-006</td>
+                  <td>North</td>
+                  <td>F</td>
+                  <td>1-5</td>
+                  <td><span class="badge badge-warn">Pending</span></td>
+                  <td>TBD</td>
+                  <td>May 19</td>
+                  <td>May 22</td>
+                </tr>
+                <tr data-link="/drop_plans/DP-007.html">
+                  <td>DP-007</td>
+                  <td>East</td>
+                  <td>G</td>
+                  <td>2-4</td>
+                  <td><span class="badge badge-warn">Pending</span></td>
+                  <td>TBD</td>
+                  <td>May 23</td>
+                  <td>May 25</td>
+                </tr>
+                <tr data-link="/drop_plans/DP-008.html">
+                  <td>DP-008</td>
+                  <td>West</td>
+                  <td>H</td>
+                  <td>1-3</td>
+                  <td><span class="badge badge-bad">On Hold</span></td>
+                  <td>TBD</td>
+                  <td>Jun 1</td>
+                  <td>Jun 3</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCHEDULE -->
+      <section class="view" data-view="schedule">
+        <div class="section">
+          <h2>Schedule</h2>
+          <div class="placeholder-card">2-week lookahead Gantt chart & scheduling tools · Coming with Phase 2B</div>
+        </div>
+      </section>
+
+      <!-- DAILY REPORT -->
+      <section class="view" data-view="daily-report">
+        <div class="section">
+          <h2>Daily Report</h2>
+          <div class="placeholder-card">Today's daily construction report · Coming with Phase 2B</div>
+        </div>
+      </section>
+
+      <!-- SITE CLOSURE -->
+      <section class="view" data-view="site-closure">
+        <div class="section">
+          <h2>Site Closure</h2>
+          <div class="placeholder-card">Daily site closure checklist · Coming with Phase 2B</div>
+        </div>
+      </section>
+
+      <!-- MATERIALS & DELIVERIES -->
+      <section class="view" data-view="materials">
+        <div class="section">
+          <h2>Materials & Deliveries</h2>
+          <div class="placeholder-card">Materials log & delivery tracking · Coming with Phase 2B</div>
+        </div>
+      </section>
+
+      <!-- MEETING MINUTES -->
+      <section class="view" data-view="meetings">
+        <div class="section">
+          <h2>Meeting Minutes</h2>
+          <div class="placeholder-card">Project meeting notes & action items · Coming with Phase 2B</div>
+        </div>
+      </section>
+
+      <!-- EQUIPMENT LOG -->
+      <section class="view" data-view="equipment">
+        <div class="section">
+          <h2>Equipment Log</h2>
+          <div class="placeholder-card">Equipment checkout & maintenance tracking · Coming with Phase 2B</div>
+        </div>
+      </section>
+
+      <!-- TOOLBOX TALKS -->
+      <section class="view" data-view="toolbox-talks">
+        <div class="section">
+          <h2>Toolbox Talk Library</h2>
+          <div style="background: white; border: 1px solid #E8E4DD; border-radius: 4px; padding: 24px; margin-bottom: 24px;">
+            <div class="eyebrow">Prepared Topics</div>
+            <div style="font-size: 16px; color: #14161C; font-weight: 600; margin: 12px 0;">25 DOB + OSHA-aligned topics ready to generate</div>
+          </div>
+          <div class="category-list">
+            <div class="category-item">
+              <div class="category-name">Fall Protection</div>
+              <div class="category-count">4</div>
+            </div>
+            <div class="category-item">
+              <div class="category-name">Scaffold Safety</div>
+              <div class="category-count">3</div>
+            </div>
+            <div class="category-item">
+              <div class="category-name">PPE Requirements</div>
+              <div class="category-count">2</div>
+            </div>
+            <div class="category-item">
+              <div class="category-name">Hot Work Permits</div>
+              <div class="category-count">2</div>
+            </div>
+            <div class="category-item">
+              <div class="category-name">Hazard Communication</div>
+              <div class="category-count">3</div>
+            </div>
+            <div class="category-item">
+              <div class="category-name">Material Handling</div>
+              <div class="category-count">2</div>
+            </div>
+            <div class="category-item">
+              <div class="category-name">Equipment Operation</div>
+              <div class="category-count">2</div>
+            </div>
+            <div class="category-item">
+              <div class="category-name">Site Conditions</div>
+              <div class="category-count">3</div>
+            </div>
+            <div class="category-item">
+              <div class="category-name">Emergency Response</div>
+              <div class="category-count">2</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RFI LOG -->
+      <section class="view" data-view="rfis">
+        <div class="section">
+          <h2>RFI Log</h2>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Date</th>
+                  <th>Subject</th>
+                  <th>Priority</th>
+                  <th>Due</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr data-link="/RFI-001.html">
+                  <td>RFI-001</td>
+                  <td>May 1</td>
+                  <td>Spandrel Waterproofing Detail</td>
+                  <td><span class="badge badge-bad">High</span></td>
+                  <td>May 4</td>
+                  <td><span class="badge badge-bad">Overdue</span></td>
+                </tr>
+                <tr data-link="/RFI-002.html">
+                  <td>RFI-002</td>
+                  <td>May 3</td>
+                  <td>Coating Specification Clarification</td>
+                  <td><span class="badge badge-warn">Medium</span></td>
+                  <td>May 10</td>
+                  <td><span class="badge badge-ok">Submitted</span></td>
+                </tr>
+                <tr data-link="/RFI-003.html">
+                  <td>RFI-003</td>
+                  <td>May 5</td>
+                  <td>Lintel Extents & Connection Details</td>
+                  <td><span class="badge badge-bad">Urgent</span></td>
+                  <td>May 7</td>
+                  <td><span class="badge badge-bad">Pending</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- INSPECTIONS -->
+      <section class="view" data-view="inspections">
+        <div class="section">
+          <h2>Inspection Log</h2>
+          <div class="placeholder-card">Inspection scheduling & findings tracking · Coming with Phase 2B</div>
+        </div>
+      </section>
+
+      <!-- VIOLATIONS — redirects to Compliance & Permits view -->
+      <section class="view" data-view="violations">
+        <div class="section">
+          <h2>Violations</h2>
+          <div class="placeholder-card">
+            DOB and ECB violations are tracked live in the
+            <a href="#" onclick="document.querySelector('[data-view=compliance]').click(); return false;" style="color:#B11E2E;font-weight:600;">Compliance & Permits</a>
+            module — pulled directly from NYC OpenData.
+          </div>
+        </div>
+      </section>
+
+      <!-- PUNCH LIST -->
+      <section class="view" data-view="punch">
+        <div class="section">
+          <h2>Punch List</h2>
+          <div class="placeholder-card">Outstanding punch list items · Coming with Phase 2B</div>
+        </div>
+      </section>
+
+      <!-- SCHEDULE OF VALUES -->
+      <section class="view" data-view="sov">
+        <div class="section">
+          <h2>Schedule of Values</h2>
+          <div class="placeholder-card">SOV line items & payment tracking · Coming with Phase 2B</div>
+        </div>
+      </section>
+
+      <!-- COMPLIANCE & PERMITS — live from NYC OpenData -->
+      <section class="view" data-view="compliance">
+        <div class="section">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:8px;">
+            <div>
+              <h2 style="margin-bottom:4px;">NYC Compliance Watch</h2>
+              <div style="font-size:12px;color:#76777E;">
+                Live data from NYC OpenData & DOB BIS · BIN <span id="cw-bin">—</span> · Last refresh: <span id="cw-last-refresh">never</span>
+              </div>
+            </div>
+            <button id="cw-refresh-btn"
+                    style="background:#B11E2E;color:white;border:none;border-radius:6px;padding:10px 18px;font-weight:600;cursor:pointer;font-size:13px;letter-spacing:0.3px;">
+              ↻ Refresh from NYC
+            </button>
+          </div>
+
+          <!-- Status pills row -->
+          <div class="card-grid" id="cw-status-cards">
+            <div class="card">
+              <div class="card-status" style="text-transform:uppercase;letter-spacing:0.5px;">Overall</div>
+              <div class="card-title" id="cw-overall-light" style="font-size:24px;margin-top:8px;">—</div>
+            </div>
+            <div class="card" style="cursor:pointer;" onclick="cwScrollTo('cw-permits')">
+              <div class="card-status" style="text-transform:uppercase;letter-spacing:0.5px;">Open Permits</div>
+              <div class="card-title" id="cw-permits-open" style="font-size:32px;margin-top:8px;color:#14161C;">—</div>
+              <div style="font-size:11px;color:#B68838;margin-top:4px;"><span id="cw-permits-expiring">0</span> expiring in 30 days</div>
+            </div>
+            <div class="card" style="cursor:pointer;" onclick="cwScrollTo('cw-violations')">
+              <div class="card-status" style="text-transform:uppercase;letter-spacing:0.5px;">Active Violations</div>
+              <div class="card-title" id="cw-viol-active" style="font-size:32px;margin-top:8px;color:#14161C;">—</div>
+              <div style="font-size:11px;color:#76777E;margin-top:4px;"><span id="cw-viol-recent">0</span> issued in last 90 days</div>
+            </div>
+            <div class="card" style="cursor:pointer;" onclick="cwScrollTo('cw-complaints')">
+              <div class="card-status" style="text-transform:uppercase;letter-spacing:0.5px;">Active Complaints</div>
+              <div class="card-title" id="cw-comp-active" style="font-size:32px;margin-top:8px;color:#14161C;">—</div>
+              <div style="font-size:11px;color:#76777E;margin-top:4px;"><span id="cw-comp-recent">0</span> filed in last 30 days</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Permits drill-down -->
+        <div class="section" id="cw-permits">
+          <h2>Permits</h2>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead>
+                <tr style="border-bottom:2px solid #E8E4DD;text-align:left;">
+                  <th style="padding:10px 8px;">Work Permit</th>
+                  <th style="padding:10px 8px;">Type</th>
+                  <th style="padding:10px 8px;">Status</th>
+                  <th style="padding:10px 8px;">Issued</th>
+                  <th style="padding:10px 8px;">Expires</th>
+                  <th style="padding:10px 8px;">Permittee</th>
+                </tr>
+              </thead>
+              <tbody id="cw-permits-tbody">
+                <tr><td colspan="6" style="padding:20px;text-align:center;color:#76777E;">No data — click "Refresh from NYC" above.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Violations drill-down -->
+        <div class="section" id="cw-violations">
+          <h2>Violations</h2>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead>
+                <tr style="border-bottom:2px solid #E8E4DD;text-align:left;">
+                  <th style="padding:10px 8px;">Source</th>
+                  <th style="padding:10px 8px;">Number</th>
+                  <th style="padding:10px 8px;">Type</th>
+                  <th style="padding:10px 8px;">Issued</th>
+                  <th style="padding:10px 8px;">Status</th>
+                  <th style="padding:10px 8px;">Penalty</th>
+                  <th style="padding:10px 8px;">Description</th>
+                </tr>
+              </thead>
+              <tbody id="cw-violations-tbody">
+                <tr><td colspan="7" style="padding:20px;text-align:center;color:#76777E;">No data yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Complaints drill-down -->
+        <div class="section" id="cw-complaints">
+          <h2>Complaints</h2>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead>
+                <tr style="border-bottom:2px solid #E8E4DD;text-align:left;">
+                  <th style="padding:10px 8px;">Complaint #</th>
+                  <th style="padding:10px 8px;">Category</th>
+                  <th style="padding:10px 8px;">Status</th>
+                  <th style="padding:10px 8px;">Entered</th>
+                  <th style="padding:10px 8px;">Disposition</th>
+                  <th style="padding:10px 8px;">Inspected</th>
+                </tr>
+              </thead>
+              <tbody id="cw-complaints-tbody">
+                <tr><td colspan="6" style="padding:20px;text-align:center;color:#76777E;">No data yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section" style="font-size:11px;color:#76777E;line-height:1.5;">
+          <strong>Data sources:</strong> DOB Permit Issuance (ipu4-2q9a), DOB Violations (3h2n-5cm9),
+          ECB Violations (6bgk-3dad), DOB Complaints Received (eabe-havv).
+          All public NYC datasets pulled via Socrata API. BIN resolved via NYC Planning Geosearch.
+          External link: <a href="https://a810-bisweb.nyc.gov/bisweb/bsqpm01.jsp" target="_blank" style="color:#B11E2E;">DOB BISweb ↗</a>
+        </div>
+      </section>
+
+      <!-- CLOSEOUT & WARRANTY -->
+      <section class="view" data-view="closeout">
+        <div class="section">
+          <h2>Warranty & Closeout</h2>
+          <div class="placeholder-card">Project closeout checklist & warranty documentation · Coming with Phase 2B</div>
+        </div>
+      </section>
+
+      <!-- CLIENT PORTAL -->
+      <section class="view" data-view="portal">
+        <div class="section">
+          <h2>Client Portal</h2>
+          <div class="placeholder-card">Client-facing project portal & document sharing · Coming with Phase 2B</div>
+        </div>
+      </section>
+
+      <!-- TEMPLATES -->
+      <section class="view" data-view="templates">
+        <div class="section">
+          <h2>Templates</h2>
+          <div class="placeholder-card">Project templates & document standards · Coming with Phase 2B</div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="view" data-view="settings">
+        <div class="section">
+          <h2>Project Settings</h2>
+          <div class="card">
+            <div class="card-title">Project Code</div>
+            <div class="card-status">SC-2601</div>
+          </div>
+          <div class="card" style="margin-top: 16px;">
+            <div class="card-title">Project Name</div>
+            <div class="card-status">890 East 135th Street · Mott Haven Restoration</div>
+          </div>
+          <div class="card" style="margin-top: 16px;">
+            <div class="card-title">Status</div>
+            <div class="card-status"><span class="badge badge-ok">Active</span></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<script>
+// Sidebar navigation - view switching
+document.querySelectorAll('.nav-link').forEach(link => {
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    const targetView = link.getAttribute('data-view');
+
+    // Update sidebar active state
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    link.classList.add('active');
+
+    // Update breadcrumb
+    const groupLabel = link.closest('.nav-group').querySelector('.nav-group-label')?.textContent || 'Overview';
+    document.getElementById('topbar-breadcrumb').textContent = groupLabel;
+
+    // Switch views
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    const targetSection = document.querySelector(`.view[data-view="${targetView}"]`);
+    if (targetSection) {
+      targetSection.classList.add('active');
+      document.querySelector('.views-container').scrollTo({top: 0, behavior: 'smooth'});
+    }
+  });
+});
+
+// =====================================================================
+// Project Crew (filtered by project_code from URL) + Cert Health
+// =====================================================================
+(function() {
+  // Read project_code from /projects/<code> URL, fallback to SC-2601
+  function getProjectCode() {
+    const m = window.location.pathname.match(/\/projects\/([^\/]+)/);
+    return m ? decodeURIComponent(m[1]) : 'SC-2601';
+  }
+  const PROJECT_CODE = getProjectCode();
+
+  function statusBadge(text, color) {
+    return `<span style="background:${color};color:white;font-size:10px;padding:2px 8px;border-radius:99px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">${text}</span>`;
+  }
+
+  async function loadRoster() {
+    try {
+      const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/workers').then(r => r.json());
+      const rows = (resp && resp.data) || [];
+      const tbody = document.getElementById('emp-roster-tbody');
+
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="padding:20px;text-align:center;color:#76777E;">No workers yet. Click <strong>+ Add Worker</strong> to start the intake.</td></tr>';
+      } else {
+        tbody.innerHTML = rows.map(r => {
+          let health = statusBadge('OK', '#2F7C57');
+          if (r.certs_expired > 0) health = statusBadge(`${r.certs_expired} expired`, '#B11E2E');
+          else if (r.certs_expiring_30d > 0) health = statusBadge(`${r.certs_expiring_30d} <30d`, '#B68838');
+
+          const status = r.intake_status === 'complete'
+            ? statusBadge('Complete', '#2F7C57')
+            : statusBadge('Pending', '#76777E');
+
+          return `<tr style="border-bottom:1px solid #F1EEE8;cursor:pointer;" onclick="window.openWorker('${r.employee_id}')">
+            <td style="padding:10px 8px;font-weight:600;">${r.name || '—'}</td>
+            <td style="padding:10px 8px;">${r.trade || '—'}</td>
+            <td style="padding:10px 8px;font-size:11px;text-transform:uppercase;color:#76777E;">${(r.language || '—').toUpperCase().slice(0,2)}</td>
+            <td style="padding:10px 8px;font-family:monospace;font-size:11px;">${r.phone || '—'}</td>
+            <td style="padding:10px 8px;text-align:center;">${r.doc_count}</td>
+            <td style="padding:10px 8px;text-align:center;">${r.cert_count}</td>
+            <td style="padding:10px 8px;text-align:center;">${health}</td>
+            <td style="padding:10px 8px;">${status}</td>
+          </tr>`;
+        }).join('');
+      }
+
+      // Update cert-health summary cards
+      const totals = rows.reduce((acc, r) => {
+        acc.workers++;
+        acc.expiring += r.certs_expiring_30d || 0;
+        acc.expired += r.certs_expired || 0;
+        acc.valid += Math.max(0, (r.cert_count || 0) - (r.certs_expiring_30d || 0) - (r.certs_expired || 0));
+        if (r.intake_status !== 'complete') acc.pending++;
+        return acc;
+      }, {workers: 0, valid: 0, expiring: 0, expired: 0, pending: 0});
+
+      document.getElementById('ch-valid').textContent = totals.valid;
+      document.getElementById('ch-expiring').textContent = totals.expiring;
+      document.getElementById('ch-expired').textContent = totals.expired;
+      document.getElementById('ch-workers').textContent = totals.workers;
+      document.getElementById('ch-pending').textContent = totals.pending;
+    } catch (e) {
+      console.warn('[Intake] roster load failed:', e);
+    }
+  }
+
+  // Modal open/close
+  const modal = document.getElementById('intake-modal');
+  const openModal = () => { modal.style.display = 'flex'; };
+  const closeModal = () => {
+    modal.style.display = 'none';
+    ['in-name','in-dob','in-trade','in-language','in-phone','in-ec-name',
+     'in-ec-phone','in-ec-relation','in-hire-date','in-pin','in-email'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+  };
+  // Intake button + modal removed from project dashboard — intake lives in Company Console now.
+  // Guarded so JS doesn't error if any of these elements are missing.
+  const addBtn = document.getElementById('emp-add-btn');
+  if (addBtn) addBtn.addEventListener('click', openModal);
+  const closeBtn = document.getElementById('intake-close');
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  const cancelBtn = document.getElementById('intake-cancel');
+  if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+  if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+  // Save worker
+  document.getElementById('intake-save').addEventListener('click', async () => {
+    const name = document.getElementById('in-name').value.trim();
+    if (!name) { alert('Name is required'); return; }
+    const payload = {
+      name,
+      dob: document.getElementById('in-dob').value || null,
+      trade: document.getElementById('in-trade').value || null,
+      language: document.getElementById('in-language').value || null,
+      phone: document.getElementById('in-phone').value || null,
+      email: document.getElementById('in-email').value || null,
+      emergency_contact_name: document.getElementById('in-ec-name').value || null,
+      emergency_contact_phone: document.getElementById('in-ec-phone').value || null,
+      emergency_contact_relation: document.getElementById('in-ec-relation').value || null,
+      hire_date: document.getElementById('in-hire-date').value || null,
+      pin: document.getElementById('in-pin').value || null,
+    };
+    try {
+      const resp = await fetch('/api/workers/create', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      }).then(r => r.json());
+      if (resp.error) {
+        alert('Save failed: ' + resp.error);
+        return;
+      }
+      closeModal();
+      await loadRoster();
+      alert(`✓ Worker ${name} created (${resp.data.employee_id}).\n\nFolder: ${resp.data.folder_path}\n\nClick their row in the roster to upload scans + add certs.`);
+    } catch (e) {
+      alert('Network error: ' + e.message);
+    }
+  });
+
+  // Click row → open worker profile (Phase 4 will flesh this out; for now alert with employee_id)
+  window.openWorker = function(employeeId) {
+    // Placeholder for full profile view — Phase 4 builds this
+    fetch('/api/workers/' + encodeURIComponent(employeeId))
+      .then(r => r.json())
+      .then(resp => {
+        const e = resp.data;
+        if (!e) { alert('Worker not found'); return; }
+        const certList = (e.certifications || [])
+          .map(c => `  • ${c.cert_name} — exp ${c.expiration_date || '—'} ${c.is_cof_prerequisite ? '[CoF prereq]' : ''}`)
+          .join('\n') || '  (none yet)';
+        const docList = (e.documents || [])
+          .map(d => `  • ${d.doc_type}: ${d.original_filename}`)
+          .join('\n') || '  (none uploaded yet)';
+        alert(`${e.employee.name} (${e.employee.employee_id})\n\n` +
+              `Folder: ${e.employee.folder_path}\n\n` +
+              `CERTIFICATIONS:\n${certList}\n\n` +
+              `DOCUMENTS:\n${docList}\n\n` +
+              `[Profile view with upload + cert form coming next]`);
+      });
+  };
+
+  // Wire load to view activation
+  let rosterLoaded = false;
+  document.querySelector('[data-view="employees"]').addEventListener('click', () => {
+    if (rosterLoaded) loadRoster();
+    else { rosterLoaded = true; loadRoster(); }
+  });
+
+  if (document.querySelector('section[data-view="employees"].active')) {
+    rosterLoaded = true;
+    loadRoster();
+  }
+})();
+
+
+// =====================================================================
+// Live Weather Widget — Open-Meteo via /api/weather
+// =====================================================================
+(function() {
+  // SVG icons — single-color, scale to fill parent
+  const ICONS = {
+    sun: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="32" cy="32" r="10" fill="currentColor" stroke="none"/><path d="M32 6v8M32 50v8M6 32h8M50 32h8M14 14l5.5 5.5M44.5 44.5L50 50M14 50l5.5-5.5M44.5 19.5L50 14"/></svg>',
+    partly: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="22" cy="22" r="7" fill="currentColor" stroke="none"/><path d="M22 8v4M22 32v4M8 22h4M32 22h4M12 12l3 3M29 29l3 3M12 32l3-3M29 15l3-3"/><path d="M48 50H22a10 10 0 0 1 0-20 13 13 0 0 1 25 4h1a8 8 0 0 1 0 16Z" fill="currentColor" stroke="none" opacity=".85"/></svg>',
+    cloud: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M48 52H18a12 12 0 0 1 0-24 14 14 0 0 1 27 4h3a10 10 0 0 1 0 20Z"/></svg>',
+    rain: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M48 38H18a12 12 0 0 1 0-24 14 14 0 0 1 27 4h3a10 10 0 0 1 0 20Z" fill="currentColor"/><path d="M22 46l-3 8M32 46l-3 8M42 46l-3 8" stroke-width="3.5"/></svg>',
+    snow: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M48 38H18a12 12 0 0 1 0-24 14 14 0 0 1 27 4h3a10 10 0 0 1 0 20Z" fill="currentColor"/><g stroke-width="2.5"><path d="M22 46v8M19 50h6M32 46v8M29 50h6M42 46v8M39 50h6"/></g></svg>',
+    storm: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M48 38H18a12 12 0 0 1 0-24 14 14 0 0 1 27 4h3a10 10 0 0 1 0 20Z" fill="currentColor"/><path d="M30 42l-6 10h7l-2 8 9-12h-7l3-6z" fill="#F5C518" stroke="#F5C518"/></svg>',
+    fog: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M8 28h48M8 36h48M8 44h48M14 52h36"/></svg>',
+    wind: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 24h38a8 8 0 1 0-8-8M6 36h44M6 48h26a8 8 0 1 1-8 8"/></svg>'
+  };
+
+  function iconFor(code) {
+    if (code == null) return ICONS.cloud;
+    if (code === 0) return ICONS.sun;
+    if ([1, 2].includes(code)) return ICONS.partly;
+    if (code === 3) return ICONS.cloud;
+    if ([45, 48].includes(code)) return ICONS.fog;
+    if ([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)) return ICONS.rain;
+    if ([71,73,75,77,85,86].includes(code)) return ICONS.snow;
+    if ([95,96,99].includes(code)) return ICONS.storm;
+    return ICONS.cloud;
+  }
+
+  function fmtTemp(n) { return n == null ? '—°' : Math.round(n) + '°'; }
+  function fmtWind(n) { return n == null ? '— mph' : Math.round(n) + ' mph'; }
+
+  async function loadWeather() {
+    try {
+      const resp = await fetch('/api/weather').then(r => r.json());
+      const w = resp && resp.data;
+      if (!w) return;
+
+      const iconEl = document.getElementById('wx-icon');
+      if (iconEl) iconEl.innerHTML = iconFor(w.condition_code);
+
+      const tempEl = document.getElementById('wx-temp');
+      if (tempEl) tempEl.textContent = fmtTemp(w.temp_now);
+
+      const condEl = document.getElementById('wx-cond');
+      if (condEl) condEl.textContent = w.condition_label || '—';
+
+      const hiloEl = document.getElementById('wx-hilo');
+      if (hiloEl) hiloEl.textContent = `${fmtTemp(w.temp_max)}/${fmtTemp(w.temp_min)}`;
+
+      const windEl = document.getElementById('wx-wind');
+      if (windEl) windEl.textContent = fmtWind(w.wind_mph);
+
+      const dirEl = document.getElementById('wx-wind-dir');
+      if (dirEl) dirEl.textContent = w.wind_dir || '—';
+    } catch (e) {
+      console.warn('[Weather] load failed:', e);
+    }
+  }
+
+  loadWeather();
+  setInterval(loadWeather, 10 * 60 * 1000); // refresh every 10 min
+})();
+
+
+// =====================================================================
+// NYC Compliance Watch — live data loader
+// =====================================================================
+(function() {
+  const PROJECT = 'SC-2601';
+
+  // Used by inline onclick="cwScrollTo(...)"
+  window.cwScrollTo = function(id) {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'});
+  };
+
+  function fmtDate(s) {
+    if (!s) return '—';
+    const d = (s || '').slice(0, 10);
+    return d || '—';
+  }
+
+  function fmtMoney(n) {
+    if (n == null || n === '') return '—';
+    return '$' + Number(n).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2});
+  }
+
+  function statusBadge(text, light) {
+    const cls = light === 'red' ? 'badge-bad' : light === 'yellow' ? 'badge-warn' : 'badge-ok';
+    return `<span class="badge ${cls}" style="font-size:10px;">${text || '—'}</span>`;
+  }
+
+  async function loadSummary() {
+    try {
+      const resp = await fetch('/api/compliance/summary').then(r => r.json());
+      const list = (resp && resp.data) || [];
+      const proj = list.find(p => p.project_code === PROJECT) || list[0];
+      if (!proj) return;
+
+      document.getElementById('cw-bin').textContent = proj.bin || '—';
+      document.getElementById('cw-permits-open').textContent = proj.permits.open;
+      document.getElementById('cw-permits-expiring').textContent = proj.permits.expiring_30d;
+      document.getElementById('cw-viol-active').textContent = proj.violations.active;
+      document.getElementById('cw-viol-recent').textContent = proj.violations.issued_90d;
+      document.getElementById('cw-comp-active').textContent = proj.complaints.active;
+      document.getElementById('cw-comp-recent').textContent = proj.complaints.filed_30d;
+
+      const overall = document.getElementById('cw-overall-light');
+      if (proj.light === 'green') {
+        overall.innerHTML = '<span style="color:#2F7C57;">✓ All Clear</span>';
+      } else if (proj.light === 'yellow') {
+        overall.innerHTML = '<span style="color:#B68838;">⚠ Watch</span>';
+      } else {
+        overall.innerHTML = '<span style="color:#B11E2E;">✗ Action Needed</span>';
+      }
+
+      if (proj.last_refresh) {
+        const dt = new Date(proj.last_refresh + 'Z');
+        document.getElementById('cw-last-refresh').textContent =
+          isNaN(dt.getTime()) ? proj.last_refresh : dt.toLocaleString();
+      }
+    } catch (e) {
+      console.warn('[Compliance] summary load failed:', e);
+    }
+  }
+
+  async function loadPermits() {
+    try {
+      const resp = await fetch('/api/compliance/permits?project_code=' + PROJECT).then(r => r.json());
+      const rows = (resp && resp.data) || [];
+      const tbody = document.getElementById('cw-permits-tbody');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:#76777E;">No permits on file.</td></tr>';
+        return;
+      }
+      // Sort by issuance date, most recent first; show last 50
+      rows.sort((a, b) => (b.issuance_date || '').localeCompare(a.issuance_date || ''));
+      tbody.innerHTML = rows.slice(0, 50).map(r => {
+        const today = new Date().toISOString().slice(0,10);
+        let status = r.filing_status || '—';
+        let badge = '';
+        if (r.expiration_date && r.expiration_date < today) {
+          badge = statusBadge('Expired', 'red');
+        } else if (r.expiration_date && r.expiration_date < new Date(Date.now() + 30*86400000).toISOString().slice(0,10)) {
+          badge = statusBadge('Expires <30d', 'yellow');
+        } else if (status && status.toUpperCase().indexOf('ISSUED') >= 0) {
+          badge = statusBadge('Active', 'green');
+        } else {
+          badge = `<span style="font-size:10px;color:#76777E;">${status}</span>`;
+        }
+        return `<tr style="border-bottom:1px solid #F1EEE8;">
+          <td style="padding:8px;font-family:monospace;font-size:11px;">${r.work_permit || '—'}</td>
+          <td style="padding:8px;">${r.permit_type || '—'} ${r.work_type ? '· ' + r.work_type : ''}</td>
+          <td style="padding:8px;">${badge}</td>
+          <td style="padding:8px;">${fmtDate(r.issuance_date)}</td>
+          <td style="padding:8px;">${fmtDate(r.expiration_date)}</td>
+          <td style="padding:8px;font-size:11px;">${(r.permittee_business_name || '—').substring(0, 40)}</td>
+        </tr>`;
+      }).join('');
+    } catch (e) {
+      console.warn('[Compliance] permits load failed:', e);
+    }
+  }
+
+  async function loadViolations() {
+    try {
+      const resp = await fetch('/api/compliance/violations?project_code=' + PROJECT).then(r => r.json());
+      const rows = (resp && resp.data) || [];
+      const tbody = document.getElementById('cw-violations-tbody');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;text-align:center;color:#76777E;">No violations.</td></tr>';
+        return;
+      }
+      // Top 50 most recent
+      rows.sort((a, b) => (b.issue_date || '').localeCompare(a.issue_date || ''));
+      tbody.innerHTML = rows.slice(0, 50).map(r => {
+        const closed = ['RESOLVED','DISPOSED','DISMISSED','CLOSED'].some(s => (r.status || '').toUpperCase().includes(s));
+        const badge = closed
+          ? statusBadge(r.status || 'Closed', 'green')
+          : statusBadge(r.status || 'Active', 'red');
+        return `<tr style="border-bottom:1px solid #F1EEE8;">
+          <td style="padding:8px;"><strong>${r.source || '—'}</strong></td>
+          <td style="padding:8px;font-family:monospace;font-size:11px;">${r.violation_number || '—'}</td>
+          <td style="padding:8px;">${r.violation_type || '—'}</td>
+          <td style="padding:8px;">${fmtDate(r.issue_date)}</td>
+          <td style="padding:8px;">${badge}</td>
+          <td style="padding:8px;">${fmtMoney(r.penalty_imposed)}</td>
+          <td style="padding:8px;font-size:11px;">${(r.description || '—').substring(0, 80)}</td>
+        </tr>`;
+      }).join('');
+    } catch (e) {
+      console.warn('[Compliance] violations load failed:', e);
+    }
+  }
+
+  async function loadComplaints() {
+    try {
+      const resp = await fetch('/api/compliance/complaints?project_code=' + PROJECT).then(r => r.json());
+      const rows = (resp && resp.data) || [];
+      const tbody = document.getElementById('cw-complaints-tbody');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:#76777E;">No complaints.</td></tr>';
+        return;
+      }
+      rows.sort((a, b) => (b.date_entered || '').localeCompare(a.date_entered || ''));
+      tbody.innerHTML = rows.slice(0, 50).map(r => {
+        const closed = ['CLOSED', 'RESOLVED'].some(s => (r.status || '').toUpperCase().includes(s));
+        const badge = closed
+          ? statusBadge(r.status || 'Closed', 'green')
+          : statusBadge(r.status || 'Active', 'red');
+        return `<tr style="border-bottom:1px solid #F1EEE8;">
+          <td style="padding:8px;font-family:monospace;font-size:11px;">${r.complaint_number || '—'}</td>
+          <td style="padding:8px;">${r.complaint_category || '—'}</td>
+          <td style="padding:8px;">${badge}</td>
+          <td style="padding:8px;">${fmtDate(r.date_entered)}</td>
+          <td style="padding:8px;font-size:11px;">${r.disposition_code || '—'} ${r.disposition_date ? '(' + fmtDate(r.disposition_date) + ')' : ''}</td>
+          <td style="padding:8px;">${fmtDate(r.inspection_date)}</td>
+        </tr>`;
+      }).join('');
+    } catch (e) {
+      console.warn('[Compliance] complaints load failed:', e);
+    }
+  }
+
+  async function loadAll() {
+    await Promise.all([loadSummary(), loadPermits(), loadViolations(), loadComplaints()]);
+  }
+
+  // Refresh button — calls server-side which calls Socrata
+  document.getElementById('cw-refresh-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('cw-refresh-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Pulling from NYC…';
+    try {
+      const resp = await fetch('/api/compliance/refresh', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({project_code: PROJECT})
+      }).then(r => r.json());
+      if (resp.error) {
+        alert('Refresh failed: ' + resp.error);
+      } else {
+        await loadAll();
+      }
+    } catch (e) {
+      alert('Refresh error: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '↻ Refresh from NYC';
+    }
+  });
+
+  // Load when the Compliance view is first opened (lazy)
+  let loaded = false;
+  document.querySelector('[data-view="compliance"]').addEventListener('click', () => {
+    if (loaded) return;
+    loaded = true;
+    loadAll();
+  });
+
+  // Also load if the user lands directly on this view (page reloaded with hash, etc.)
+  if (document.querySelector('section[data-view="compliance"].active')) {
+    loaded = true;
+    loadAll();
+  }
+})();
+
+// Live data sync - fetches every 30 seconds
+(async function() {
+  const API = '';
+
+  const updateText = (selector, value) => {
+    const el = document.querySelector(selector);
+    if (el && value != null) el.textContent = value;
+  };
+
+  async function refresh() {
+    try {
+      const health = await fetch(API + '/api/health').then(r => r.json()).catch(() => null);
+      if (!health) return;
+
+      const [proj, signins, rfis, drops, permits] = await Promise.all([
+        fetch(API + '/api/projects/SC-2601').then(r => r.json()).catch(() => null),
+        fetch(API + '/api/sign-ins?project=SC-2601&date=' + new Date().toISOString().split('T')[0]).then(r => r.json()).catch(() => null),
+        fetch(API + '/api/rfis').then(r => r.json()).catch(() => null),
+        fetch(API + '/api/drops').then(r => r.json()).catch(() => null),
+        fetch(API + '/api/permits').then(r => r.json()).catch(() => null),
+      ]);
+
+      if (signins?.data) {
+        const headcount = signins.data.length;
+        const totalHours = signins.data.reduce((sum, s) => sum + (parseFloat(s.hours) || 0), 0);
+        updateText('[data-stat="workers-today"]', headcount > 0 ? headcount + ' / 12' : '10 / 12');
+        updateText('[data-stat="total-hours"]', totalHours > 0 ? totalHours.toFixed(2) : '82.25');
+      }
+
+      console.log('[Dashboard] Live data refreshed at', new Date().toISOString());
+    } catch (e) {
+      console.warn('[Dashboard] API not reachable, using static data');
+    }
+  }
+
+  refresh();
+  setInterval(refresh, 30000);
+})();
+
+// Make rows/cards with data-link clickable
+document.addEventListener('click', (e) => {
+  const target = e.target.closest('[data-link]');
+  if (target && target.tagName !== 'BUTTON') {
+    const link = target.getAttribute('data-link');
+    if (link && link !== '#') {
+      window.open(link, '_blank');
+    }
+  }
+});
+
+// Button click handlers
+document.querySelectorAll('button[data-link]').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    const link = btn.getAttribute('data-link');
+    if (link && link !== '#') {
+      window.open(link, '_blank');
+    }
+  });
+});
+</script>
+
+</body>
+</html>

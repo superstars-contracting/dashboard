@@ -1,0 +1,171 @@
+# =====================================================================
+# .gitignore — Superstars Contracting dashboard
+# Excludes secrets, data, and noise from the git repository.
+# Anything matched here NEVER gets pushed to GitHub.
+# =====================================================================
+
+# ===== SECRETS — NEVER COMMIT =====
+.env
+.env.*
+!.env.example
+!.env.template
+*.key
+*.pem
+secrets/
+credentials.json
+service-account*.json
+# Critical: api-keys.txt is the actual SendGrid (and possibly other) key file
+# loaded by send_rfi_emails.py. NEVER commit.
+api-keys.txt
+api_keys.txt
+api-keys.*.txt
+
+# ===== DATABASE — starts fresh on workstation =====
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+superstars.db*
+
+# ===== UPLOADED USER FILES — never travel via git =====
+uploads/
+worker_intake_inbox/
+worker_files/
+field_photos/
+
+# ===== GENERATED OUTPUT (PDFs, reports, etc) =====
+# These are generated from the templates — no need to ship them.
+# Comment out specific ones if you DO want to ship sample renders.
+DCR-*-internal.pdf
+DCR-*-client.pdf
+WPS-*-internal.pdf
+WPS-*-client.pdf
+LA-*.pdf
+RFI-*.pdf
+Closure-*.pdf
+M-*.pdf
+TBT-*.pdf
+DP-*.pdf
+cof_card_final*.pdf
+rfi_workflow_run/
+meeting_workflow_run/
+
+# Keep the HTML templates — those ARE part of the source.
+
+# ===== PYTHON =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environment — reinstall on workstation from requirements.txt
+venv/
+env/
+ENV/
+.venv/
+
+# ===== IDE / EDITOR =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== OS =====
+$RECYCLE.BIN/
+*.lnk
+ehthumbs.db
+
+# ===== LOGS =====
+*.log
+server.log
+logs/
+
+# ===== CLAUDE / AI WORK ARTIFACTS =====
+.claude/
+.cursor/
+
+# ===== TEMP =====
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+*.orig
+
+# ===== NODE / JAVASCRIPT DEPENDENCIES =====
+# Massive folders, never committed. Reinstall via npm if needed.
+node_modules/
+package-lock.json
+yarn.lock
+npm-debug.log*
+
+# ===== EXCEL / OFFICE FILES WITH POTENTIAL REAL DATA =====
+# These workbooks may contain real worker / project data.
+# Excluded by default — uncomment with `!` to whitelist specific templates.
+*.xlsx
+*.xlsm
+*.xls
+*.docx
+*.pptx
+# Specific templates to ship (uncomment if needed):
+# !template-*.xlsx
+
+# ===== DATA ROOM — project documents =====
+# data_room/ holds DOB filings, drawings, permits, specs.
+# Gitignore everything inside EXCEPT folder structure markers.
+data_room/**/*
+!data_room/**/.placeholder
+!data_room/**/README.md
+!data_room/**/INSTRUCTIONS.md
+
+# ===== GENERATED HTML RENDERS WITH PROJECT-SPECIFIC DATA =====
+# These are output files (rendered with sample data), not source templates.
+# The templates themselves (no SC-2601 / dates in filename) ARE source — keep.
+DCR-SC-*.html
+DCR-SC-*.json
+WPS-SC-*.html
+WPS-SC-*.json
+LA-SC-*.html
+LA-SC-*.json
+RFI-001.html
+RFI-002.html
+RFI-003.html
+RFI-001.json
+RFI-002.json
+RFI-003.json
+site_closures/Closure-*
+meetings/M-*
+toolbox_talks/TBT-*
+drop_plans/DP-*
+
+# ===== MISC NOISE =====
+MIGRATION_REPORT.txt
+*.placeholder
+
+# ===== CSV LEDGERS — DECIDE PER FILE =====
+# Subscription ledger has business-sensitive info but no secrets.
+# Keep it in the repo for visibility but be aware it's there.
+# Uncomment to exclude if it gets sensitive enough:
+# subscriptions_ledger.csv

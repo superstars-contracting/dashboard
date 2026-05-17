@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RFI Submission Form</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background-color: #FAF7F1;
+      color: #14161C;
+      line-height: 1.6;
+    }
+
+    .letterhead {
+      background-color: #14161C;
+      color: white;
+      padding: 20px 16px;
+      text-align: center;
+      border-bottom: 2px solid #B11E2E;
+    }
+    .letterhead-brand {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 24px;
+      margin-bottom: 4px;
+    }
+    .letterhead-star { color: #B11E2E; margin-right: 8px; }
+    .letterhead-address {
+      font-size: 11px;
+      color: #ccc;
+      letter-spacing: 0.05em;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    .form-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 28px;
+      font-weight: 700;
+      margin: 24px 0 8px 0;
+      color: #14161C;
+    }
+
+    .form-subtitle {
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #76777E;
+      margin-bottom: 24px;
+    }
+
+    .section {
+      background: white;
+      border: 1px solid #E8E4DD;
+      margin-bottom: 12px;
+      border-radius: 2px;
+    }
+
+    .section-header {
+      padding: 12px 16px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #FAFAFA;
+      border-bottom: 1px solid #E8E4DD;
+    }
+
+    .section-header.expanded { background: white; }
+
+    .section-header h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .section-header .eyebrow {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #76777E;
+      margin-bottom: 4px;
+    }
+
+    .section-header .chevron {
+      font-size: 18px;
+      color: #76777E;
+      transition: transform 0.2s;
+    }
+
+    .section-header.expanded .chevron { transform: rotate(180deg); }
+
+    .section-content {
+      padding: 16px;
+      display: none;
+    }
+
+    .section-content.expanded { display: block; }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group:last-child { margin-bottom: 0; }
+
+    label {
+      display: block;
+      font-weight: 500;
+      font-size: 13px;
+      margin-bottom: 6px;
+      color: #14161C;
+    }
+
+    .required::after { content: ' *'; color: #B11E2E; }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="date"],
+    input[type="file"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 10px 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      border: 1px solid #E8E4DD;
+      border-radius: 2px;
+      color: #14161C;
+      min-height: 40px;
+    }
+
+    input[type="text"]:focus,
+    input[type="email"]:focus,
+    input[type="date"]:focus,
+    textarea:focus,
+    select:focus {
+      outline: none;
+      border: 2px solid #B11E2E;
+      padding: 9px 7px;
+    }
+
+    input[type="text"].readonly-display {
+      background-color: #F5F5F5;
+      color: #76777E;
+      cursor: default;
+    }
+
+    input[type="text"].readonly-display:focus {
+      border: 1px solid #E8E4DD;
+      padding: 10px 8px;
+    }
+
+    textarea { resize: vertical; min-height: 80px; }
+
+    .input-error {
+      border: 2px solid #B11E2E !important;
+    }
+
+    .error-text {
+      font-size: 11px;
+      color: #B11E2E;
+      margin-top: 4px;
+    }
+
+    .radio-group,
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .radio-item,
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    input[type="radio"],
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      min-width: 18px;
+      cursor: pointer;
+    }
+
+    .radio-item label,
+    .checkbox-item label {
+      margin: 0;
+      cursor: pointer;
+      font-weight: 400;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #76777E;
+      padding: 8px 0;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .submit-button {
+      width: 100%;
+      padding: 12px 16px;
+      background-color: #B11E2E;
+      color: white;
+      font-family: 'Playfair Display', serif;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      border-radius: 2px;
+      margin-top: 24px;
+      min-height: 44px;
+    }
+
+    .submit-button:hover { background-color: #8B1724; }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.active { display: flex; }
+
+    .modal-content {
+      background: white;
+      padding: 24px;
+      border-radius: 4px;
+      max-width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      text-align: center;
+    }
+
+    .modal-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .modal-text {
+      font-size: 14px;
+      margin-bottom: 20px;
+      color: #76777E;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .modal-button {
+      padding: 10px 20px;
+      font-family: 'Playfair Display', serif;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      border-radius: 2px;
+      min-height: 44px;
+      min-width: 120px;
+    }
+
+    .modal-button.primary {
+      background-color: #B11E2E;
+      color: white;
+    }
+
+    .modal-button.secondary {
+      background-color: #E8E4DD;
+      color: #14161C;
+    }
+
+    .json-display {
+      background: #F5F5F5;
+      padding: 12px;
+      border-radius: 2px;
+      font-family: monospace;
+      font-size: 11px;
+      max-height: 300px;
+      overflow-y: auto;
+      text-align: left;
+      margin: 12px 0;
+    }
+
+    .section-summary {
+      background: #F5F5F5;
+      padding: 8px 12px;
+      border-radius: 2px;
+      font-size: 12px;
+      color: #76777E;
+    }
+  </style>
+</head>
+<body>
+  <div class="letterhead">
+    <div class="letterhead-brand"><span class="letterhead-star">★</span>SUPERSTARS</div>
+    <div class="letterhead-address">890 EAST 135TH STREET, BRONX, NY 10454</div>
+  </div>
+
+  <div class="container">
+    <h1 class="form-title">Request for Information</h1>
+    <p class="form-subtitle">RFI Submission</p>
+
+    <form id="rfiForm">
+      <div class="section">
+        <div class="section-header expanded" data-section="project">
+          <div>
+            <span class="eyebrow">Section 1</span>
+            <h3>Project Information</h3>
+          </div>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="section-content expanded">
+          <div class="form-group">
+            <label>RFI Number</label>
+            <input type="text" id="rfiNumber" value="RFI-004" readonly class="readonly-display">
+          </div>
+          <div class="form-group">
+            <label>Date Submitted</label>
+            <input type="date" id="dateSubmitted" readonly class="readonly-display">
+          </div>
+          <div class="form-group">
+            <label class="required">Submitted By</label>
+            <select id="submittedBy" required>
+              <option value="">Select employee...</option>
+              <option value="E-001|John Doe">John Doe (E-001)</option>
+              <option value="E-005|Susan Park">Susan Park (E-005)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header" data-section="details">
+          <div>
+            <span class="eyebrow">Section 2</span>
+            <h3>RFI Details</h3>
+          </div>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="section-content">
+          <div class="form-group">
+            <label class="required">Title</label>
+            <input type="text" id="title" maxlength="100" placeholder="Short title" required>
+          </div>
+          <div class="form-group">
+            <label class="required">Description</label>
+            <textarea id="description" placeholder="Describe the issue..." required></textarea>
+          </div>
+          <div class="form-group">
+            <label class="required">Category</label>
+            <select id="category" required>
+              <option value="">Select...</option>
+              <option value="Architectural">Architectural</option>
+              <option value="Structural">Structural</option>
+              <option value="MEP">MEP</option>
+              <option value="Facade">Facade</option>
+              <option value="Site Condition">Site Condition</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="required">Location on Site</label>
+            <input type="text" id="location" placeholder="e.g. South elev L7-L8" required>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header" data-section="question">
+          <div>
+            <span class="eyebrow">Section 3</span>
+            <h3>The Question</h3>
+          </div>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="section-content">
+          <div class="form-group">
+            <label class="required">Primary Question</label>
+            <textarea id="primaryQuestion" placeholder="What are you asking?" required></textarea>
+          </div>
+          <div class="form-group">
+            <label>Impact</label>
+            <div class="checkbox-group">
+              <div class="checkbox-item">
+                <input type="checkbox" id="impact-schedule" name="impact" value="Schedule delay">
+                <label for="impact-schedule">Schedule delay</label>
+              </div>
+              <div class="checkbox-item">
+                <input type="checkbox" id="impact-cost" name="impact" value="Cost impact">
+                <label for="impact-cost">Cost impact</label>
+              </div>
+              <div class="checkbox-item">
+                <input type="checkbox" id="impact-quality" name="impact" value="Quality risk">
+                <label for="impact-quality">Quality risk</label>
+              </div>
+              <div class="checkbox-item">
+                <input type="checkbox" id="impact-safety" name="impact" value="Safety issue">
+                <label for="impact-safety">Safety issue</label>
+              </div>
+              <div class="checkbox-item">
+                <input type="checkbox" id="impact-stoppage" name="impact" value="Work stoppage">
+                <label for="impact-stoppage">Work stoppage</label>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="required">Priority</label>
+            <select id="priority" required>
+              <option value="">Select...</option>
+              <option value="Low">Low</option>
+              <option value="Medium" selected>Medium</option>
+              <option value="High">High</option>
+              <option value="Urgent">Urgent</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header" data-section="distribution">
+          <div>
+            <span class="eyebrow">Section 5</span>
+            <h3>Distribution</h3>
+          </div>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="section-content">
+          <div class="checkbox-group">
+            <div class="checkbox-item">
+              <input type="checkbox" id="dist-architect" name="distribution" value="Architect" checked>
+              <label for="dist-architect">Architect</label>
+            </div>
+            <div class="checkbox-item">
+              <input type="checkbox" id="dist-engineer" name="distribution" value="Engineer" checked>
+              <label for="dist-engineer">Engineer</label>
+            </div>
+            <div class="checkbox-item">
+              <input type="checkbox" id="dist-pm" name="distribution" value="Project Manager" checked>
+              <label for="dist-pm">Project Manager</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="submit-button">Submit RFI</button>
+    </form>
+  </div>
+
+  <div id="confirmModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-title" id="modalTitle">RFI Submitted</div>
+      <div class="modal-text" id="modalText"></div>
+      <div class="json-display" id="jsonDisplay"></div>
+      <div class="modal-buttons">
+        <button class="modal-button secondary" id="submitAnotherBtn">Submit Another</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('rfiForm');
+    const modal = document.getElementById('confirmModal');
+    const dateInput = document.getElementById('dateSubmitted');
+    const submittedBySelect = document.getElementById('submittedBy');
+
+    dateInput.value = new Date().toISOString().split('T')[0];
+
+    document.querySelectorAll('.section-header').forEach(header => {
+      header.addEventListener('click', () => {
+        const section = header.closest('.section');
+        const content = section.querySelector('.section-content');
+        header.classList.toggle('expanded');
+        content.classList.toggle('expanded');
+      });
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = document.querySelector('.submit-button');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+
+      try {
+        const distribution = Array.from(document.querySelectorAll('input[name="distribution"]:checked'))
+          .map(cb => cb.value);
+
+        const payload = {
+          project_code: "BR-2024",
+          submitted_by: submittedBySelect.value.split('|')[1],
+          discipline: document.getElementById('category').value,
+          description: document.getElementById('description').value,
+          priority: document.getElementById('priority').value
+        };
+
+        const response = await fetch('http://localhost:5000/api/rfis', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const rfiNum = result.data?.rfi_number || 'RFI-NEW';
+          document.getElementById('modalTitle').textContent = rfiNum + ' submitted';
+          document.getElementById('modalText').innerHTML = `
+            <strong>Success!</strong><br>
+            RFI Number: <strong>${rfiNum}</strong><br>
+            Distribution: ${distribution.join(', ')}<br>
+            <em>Status: Submitted</em>
+          `;
+          document.getElementById('jsonDisplay').textContent = '';
+        } else {
+          const error = await response.json();
+          document.getElementById('modalTitle').textContent = 'Submission Failed';
+          document.getElementById('modalText').innerHTML = '<strong>Error:</strong> ' + (error.error || 'Server error');
+        }
+      } catch (err) {
+        document.getElementById('modalTitle').textContent = 'Connection Error';
+        document.getElementById('modalText').innerHTML = '<strong>Error:</strong> Unable to reach server at localhost:5000';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit RFI';
+        modal.classList.add('active');
+      }
+    });
+
+    document.getElementById('submitAnotherBtn').addEventListener('click', () => {
+      form.reset();
+      document.getElementById('dateSubmitted').value = new Date().toISOString().split('T')[0];
+      modal.classList.remove('active');
+    });
+  </script>
+</body>
+</html>
