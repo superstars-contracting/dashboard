@@ -2557,8 +2557,8 @@ document.querySelectorAll('.nav-link').forEach(link => {
     const cardMeta = document.getElementById('ph-today-dcr-card-meta');
 
     if (d && d.html_url) {
-      if (tileId) { tileId.textContent = d.audience || 'issued'; tileId.title = d.report_id || ''; }
-      if (tileStatus) tileStatus.innerHTML = '<span class="badge badge-ok">✓ Issued</span>';
+      if (tileId) { tileId.textContent = 'Issued'; tileId.title = d.report_id || ''; }
+      if (tileStatus) tileStatus.innerHTML = '<span style="color:#2F7C57;font-weight:600;">' + (d.report_date || '') + '</span>';
       if (btn) btn.textContent = "View Today's DCR";
       if (cardId) cardId.textContent = d.report_id || '—';
       const dayLabel = d.days_ago === 0 ? 'today' : (d.days_ago + 'd ago');
