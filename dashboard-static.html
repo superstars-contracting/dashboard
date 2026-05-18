@@ -1132,7 +1132,12 @@
           </div>
 
           <div style="margin-bottom:24px;">
-            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">10. Photos</h3>
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;display:flex;align-items:center;justify-content:space-between;">10. Visitors<button type="button" data-dcr-add="visitors" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 12px;border:none;border-radius:4px;background:#14161C;color:white;cursor:pointer;">+ Add row</button></h3>
+            <div id="dcr-rows-visitors" data-dcr-rows="visitors"></div>
+          </div>
+
+          <div style="margin-bottom:24px;">
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">11. Photos</h3>
             <div style="background:white;border:1px solid #E8E4DD;border-radius:4px;padding:14px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
               <input type="file" id="dcr-photo-input" accept="image/*" multiple style="display:none;">
               <button type="button" id="dcr-photo-trigger" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:6px 14px;border:none;border-radius:4px;background:#B11E2E;color:white;cursor:pointer;">+ Upload photo(s)</button>
@@ -1335,6 +1340,19 @@
                 {name:'agency', placeholder:'Agency', width:'md'},
                 {name:'area', placeholder:'Area', width:'md'},
                 {name:'result', placeholder:'Result', width:'sm'},
+                {name:'notes', placeholder:'Notes', width:'lg'},
+              ],
+            },
+            visitors: {
+              endpoint: '/api/visitors',
+              fields: [
+                {name:'name', placeholder:'Name', width:'md'},
+                {name:'company', placeholder:'Company', width:'md'},
+                {name:'role', placeholder:'Role / title', width:'md'},
+                {name:'time_in', placeholder:'Time in', width:'sm'},
+                {name:'time_out', placeholder:'Time out', width:'sm'},
+                {name:'purpose', placeholder:'Purpose of visit', width:'lg'},
+                {name:'accompanied_by', placeholder:'Accompanied by', width:'md'},
                 {name:'notes', placeholder:'Notes', width:'lg'},
               ],
             },
