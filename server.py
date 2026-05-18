@@ -796,6 +796,76 @@ def issue_dcr(project_code, report_date):
         return jsonify({"error": str(e)}), 500
 
 
+# ============= DCR REPORT ARCHIVE =============
+
+@app.route('/api/projects/<project_code>/reports', methods=['GET'])
+def list_reports(project_code):
+    """List report_index rows for a project with optional filters.
+
+    Query params:
+      report_type (optional) — exact match, e.g. 'DCR'
+      audience (optional)    — 'internal' or 'client'; applied via the
+                               report_id suffix since report_index has
+                               no audience column
+      from_date (optional)   — inclusive YYYY-MM-DD
+      to_date (optional)     — inclusive YYYY-MM-DD
+
+    Returns {data: [{<row>, audience, html_url}, ...], meta: {count}}
+    ordered by report_date DESC, id DESC. html_url is synthesized from
+    the disk layout for issued DCR rows; NULL for rows where we can't
+    derive a path."""
+    audience = request.args.get('audience')
+    if audience and audience not in ('internal', 'client'):
+        return jsonify({"error": "audience must be 'internal' or 'client'"}), 400
+    for k in ('from_date', 'to_date'):
+        v = request.args.get(k)
+        if v:
+            try:
+                datetime.strptime(v, '%Y-%m-%d')
+            except ValueError:
+                return jsonify({"error": f"{k} must be YYYY-MM-DD"}), 400
+    conn = db()
+    if not validate_project_exists(conn, project_code):
+        conn.close()
+        return jsonify({"error": "Project not found"}), 404
+    where = ["project_code = ?"]
+    params = [project_code]
+    rt = request.args.get('report_type')
+    if rt:
+        where.append("report_type = ?")
+        params.append(rt)
+    if audience:
+        where.append("report_id LIKE ?")
+        params.append(f"%-{audience}")
+    fd = request.args.get('from_date')
+    if fd:
+        where.append("report_date >= ?")
+        params.append(fd)
+    td = request.args.get('to_date')
+    if td:
+        where.append("report_date <= ?")
+        params.append(td)
+    sql = f"SELECT * FROM report_index WHERE {' AND '.join(where)} ORDER BY report_date DESC, id DESC"
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+    out = []
+    for r in rows:
+        d = dict(r)
+        rid = d.get('report_id') or ''
+        if rid.endswith('-internal'):
+            d['audience'] = 'internal'
+        elif rid.endswith('-client'):
+            d['audience'] = 'client'
+        else:
+            d['audience'] = None
+        if d['audience'] and d.get('report_date') and d.get('report_type') == 'DCR':
+            d['html_url'] = f"/files/data_room/reports/dcr/{project_code}/{d['report_date']}/{d['audience']}.html"
+        else:
+            d['html_url'] = None
+        out.append(d)
+    return response_wrapper(out, count=len(out))
+
+
 # ============= DROP PLAN ENDPOINTS =============
 
 @app.route('/api/drops/<drop_id>/status', methods=['PATCH'])
