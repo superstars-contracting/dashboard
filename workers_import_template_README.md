@@ -63,7 +63,7 @@ Safe. The script dedups by `(name, phone-digits-only)`. Rows already present in 
 
 ## Local PII protection
 
-The template is tracked in git in its blank state. Once filled with the real roster, the file contains worker PII — phone numbers, emergency contacts — which per CLAUDE.md rule #2 must never leave the BitLocker-encrypted workstation. The risk: a future `git add .` or `git commit -am` would happily commit that PII to the private repo on GitHub.
+The template is tracked in git in its blank state. Once filled with the real roster, the file contains worker PII — phone numbers, emergency contacts — which per CLAUDE.md PII rule must never leave the BitLocker-encrypted workstation. The risk: a future `git add .` or `git commit -am` would happily commit that PII to the private repo on GitHub.
 
 The mitigation is `git update-index --skip-worktree workers_import_template.csv`. Git stops noticing local edits to the file; the repo's tracked version stays the blank template; the operator can refill or edit the local copy freely without ever staging it. Verify with `git ls-files -v workers_import_template.csv` — an `S` prefix means skip-worktree is active.
 
