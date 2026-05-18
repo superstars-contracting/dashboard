@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Superstars Contracting · Company ID Card</title>
+<style>
+  /* =====================================================================
+     Superstars Contracting — Company ID (employee credential)
+     Sibling to the Certificate of Fitness card. Same Calibri/cream/red
+     design language. ID-1 (CR80) size, shown at 2× on screen.
+     Issued to workers who are not CoF-eligible — generic employment
+     credential, no scaffold/rigger attestation.
+     ===================================================================== */
+  :root {
+    --brand-red: #B11E2E;
+    --brand-red-deep: #8B1623;
+    --brand-red-darker: #5E0E15;
+    --brand-red-light: #D9354A;
+    --ink: #14161C;
+    --cream: #FAF7F1;
+    --paper: #FFFFFF;
+    --hairline: #E8E4DD;
+    --mute: #76777E;
+    --gold-tint: #E8D9B5;
+  }
+
+  @page { size: letter; margin: 0.5in; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #ECE9E2;
+    font-family: 'Calibri', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  body { padding: 40px 20px; min-height: 100vh; }
+  .stage { max-width: 760px; margin: 0 auto; }
+
+  .preview-label {
+    font-family: 'Calibri', 'Segoe UI', sans-serif;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 2px;
+    color: var(--mute); margin-bottom: 8px; text-align: center; font-weight: 600;
+  }
+
+  .stage-row {
+    display: flex; flex-wrap: wrap; gap: 32px;
+    justify-content: center; margin-bottom: 40px;
+  }
+
+  /* ID-1 size, shown at 2× on screen for readability */
+  .card {
+    width: 638px; height: 402px;
+    border-radius: 14px;
+    background: var(--cream);
+    box-shadow: 0 6px 20px rgba(20, 22, 28, 0.18), 0 1px 2px rgba(20, 22, 28, 0.08);
+    overflow: hidden; position: relative;
+    color: var(--ink);
+    font-family: 'Calibri', 'Segoe UI', system-ui, sans-serif;
+  }
+
+  /* ============================ FRONT ============================ */
+
+  .card-front { display: flex; flex-direction: column; }
+
+  .banner {
+    background: linear-gradient(135deg, var(--brand-red) 0%, var(--brand-red-deep) 100%);
+    color: white; padding: 14px 24px 12px;
+    text-align: center; position: relative; overflow: hidden;
+  }
+  .banner::after {
+    content: ''; position: absolute; top: -50%; right: -20%;
+    width: 60%; height: 200%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0));
+    transform: rotate(20deg); pointer-events: none;
+  }
+  .banner-title {
+    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+    font-size: 30px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; line-height: 1;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.15);
+  }
+  .banner-sub {
+    font-size: 11.5px; font-weight: 600; letter-spacing: 2.2px;
+    text-transform: uppercase; color: rgba(255, 255, 255, 0.92);
+    margin-top: 5px;
+  }
+
+  .body {
+    flex: 1;
+    display: grid; grid-template-columns: 200px 1fr;
+    gap: 22px; padding: 14px 22px 10px;
+    position: relative; align-items: start;
+  }
+
+  .photo-box {
+    width: 200px; height: 200px;
+    background: var(--paper);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5);
+  }
+  .photo-box:empty::after {
+    content: 'PHOTO';
+    font-size: 12px; color: var(--mute);
+    letter-spacing: 3px; font-weight: 600;
+  }
+  .photo-box img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .info { display: flex; flex-direction: column; min-width: 0; padding-top: 2px; }
+
+  .field { margin-bottom: 10px; }
+  .field-label {
+    font-size: 9px; font-weight: 700; letter-spacing: 1.6px;
+    text-transform: uppercase; color: var(--mute); margin-bottom: 3px;
+  }
+  .field-value {
+    font-size: 17px; font-weight: 600; color: var(--ink);
+    letter-spacing: 0.2px; line-height: 1.1;
+    border-bottom: 1.5px solid var(--ink);
+    padding-bottom: 2px; min-height: 22px;
+  }
+  .field-value.mono {
+    font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+    font-size: 15px; letter-spacing: 1.3px;
+  }
+
+  .field-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  }
+  .field-row .field-value { font-size: 14px; }
+  .field-row .field-value.mono { font-size: 13px; letter-spacing: 1px; }
+
+  .front-footer {
+    border-top: 1px solid var(--hairline);
+    padding: 8px 26px 10px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .logo-lockup { display: block; height: 60px; }
+  .logo-lockup svg { height: 100%; width: auto; display: block; }
+  .company-addr {
+    font-size: 10.5px; color: var(--ink);
+    font-weight: 700; letter-spacing: 0.2px; text-align: center;
+  }
+
+  /* ============================ BACK ============================ */
+
+  .card-back { display: flex; flex-direction: column; }
+
+  .back-strip {
+    background: var(--ink); color: white;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 24px;
+  }
+  .back-title {
+    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+    font-size: 14px; font-weight: 700; letter-spacing: 2.2px;
+    text-transform: uppercase;
+  }
+  .back-cite {
+    font-size: 10.5px; color: var(--gold-tint);
+    letter-spacing: 1.3px; font-weight: 600; font-style: italic;
+  }
+
+  .back-body {
+    flex: 1;
+    padding: 36px 36px 14px;
+    display: flex; flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .return-text {
+    font-size: 16px; line-height: 1.55;
+    color: var(--ink); font-weight: 500;
+    margin-bottom: 18px; max-width: 460px;
+  }
+  .return-text strong { font-weight: 700; }
+
+  .return-block {
+    font-size: 14px; line-height: 1.7;
+    color: var(--ink);
+  }
+  .return-block .company-name {
+    font-family: 'Playfair Display', 'Georgia', serif;
+    font-weight: 700; font-size: 16px;
+    letter-spacing: 0.4px;
+  }
+  .return-block .email {
+    color: var(--brand-red); font-weight: 700;
+  }
+
+  .back-footer {
+    border-top: 1px solid var(--hairline);
+    padding: 10px 28px;
+    background: var(--cream);
+  }
+  .disclaim {
+    font-size: 10px; line-height: 1.45;
+    color: var(--mute); font-style: italic; text-align: center;
+  }
+  .disclaim strong {
+    color: var(--ink); font-style: normal;
+    font-weight: 700; letter-spacing: 0.3px;
+  }
+
+  @media print {
+    body { background: white; padding: 0; }
+    .preview-label { display: none; }
+    .stage-row { gap: 20px; margin-bottom: 24px; page-break-inside: avoid; }
+    .card { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <!-- =================== FRONT =================== -->
+  <div class="preview-label">Front</div>
+  <div class="stage-row">
+    <div class="card card-front">
+
+      <div class="banner">
+        <div class="banner-title">Company ID</div>
+        <div class="banner-sub">Authorized Employee Credential</div>
+      </div>
+
+      <div class="body">
+        <div class="photo-box" id="photo-slot">{{PHOTO_HTML}}</div>
+
+        <div class="info">
+          <div class="field">
+            <div class="field-label">Name of Holder</div>
+            <div class="field-value" id="card-name">{{NAME}}</div>
+          </div>
+
+          <div class="field">
+            <div class="field-label">Card Number</div>
+            <div class="field-value mono" id="card-no">{{CARD_NO}}</div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <div class="field-label">Employee ID</div>
+              <div class="field-value mono" id="emp-id">{{EMP_ID}}</div>
+            </div>
+            <div class="field">
+              <div class="field-label">Trade</div>
+              <div class="field-value" id="trade">{{TRADE}}</div>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <div class="field-label">Issued</div>
+              <div class="field-value mono" id="card-issued">{{ISSUED}}</div>
+            </div>
+            <div class="field">
+              <div class="field-label">Authorized By</div>
+              <div class="field-value" id="auth-by">{{ISSUED_BY}}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="front-footer">
+        <div class="logo-lockup">
+          <!-- Combined Superstars Contracting Inc. brand mark — identical to cof_card.html -->
+          <svg viewBox="0 0 240 80" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="redLight2" x1="0%" y1="0%" x2="70%" y2="100%">
+                <stop offset="0%" stop-color="#E0394E"/>
+                <stop offset="100%" stop-color="#A01829"/>
+              </linearGradient>
+              <linearGradient id="redDark2" x1="100%" y1="0%" x2="30%" y2="100%">
+                <stop offset="0%" stop-color="#831321"/>
+                <stop offset="100%" stop-color="#4A0A12"/>
+              </linearGradient>
+            </defs>
+            <g transform="translate(102, 0)">
+              <polygon fill="url(#redLight2)" points="18,18 13.96,12.44 18,0"/>
+              <polygon fill="url(#redDark2)" points="18,18 18,0 22.04,12.44"/>
+              <polygon fill="url(#redLight2)" points="18,18 22.04,12.44 35.12,12.44"/>
+              <polygon fill="url(#redDark2)" points="18,18 35.12,12.44 24.54,20.13"/>
+              <polygon fill="url(#redLight2)" points="18,18 24.54,20.13 28.58,32.56"/>
+              <polygon fill="url(#redDark2)" points="18,18 28.58,32.56 18,24.88"/>
+              <polygon fill="url(#redLight2)" points="18,18 18,24.88 7.42,32.56"/>
+              <polygon fill="url(#redDark2)" points="18,18 7.42,32.56 11.46,20.13"/>
+              <polygon fill="url(#redLight2)" points="18,18 11.46,20.13 0.88,12.44"/>
+              <polygon fill="url(#redDark2)" points="18,18 0.88,12.44 13.96,12.44"/>
+              <polygon fill="#FAF7F1" points="18,10.8 20.02,15.94 25.34,15.94 21.02,19.25 22.68,24.39 18,21.26 13.32,24.39 14.98,19.25 10.66,15.94 15.98,15.94"/>
+            </g>
+            <text x="120" y="58"
+                  font-family="'Playfair Display', 'Georgia', 'Times New Roman', serif"
+                  font-size="20" font-weight="700" fill="#14161C"
+                  text-anchor="middle" letter-spacing="2.2">SUPERSTARS</text>
+            <text x="120" y="74"
+                  font-family="'Playfair Display', 'Georgia', 'Times New Roman', serif"
+                  font-size="10.5" font-weight="700" fill="#14161C"
+                  text-anchor="middle" letter-spacing="3.2">CONTRACTING INC</text>
+          </svg>
+        </div>
+        <div class="company-addr">
+          40-27 24th Street, Long Island City, NY 11101 &nbsp;·&nbsp; P 917 498 0002 &nbsp;·&nbsp; F 718 709 4223
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================== BACK =================== -->
+  <div class="preview-label">Back</div>
+  <div class="stage-row">
+    <div class="card card-back">
+
+      <div class="back-strip">
+        <div class="back-title">If Found</div>
+        <div class="back-cite">Please Return</div>
+      </div>
+
+      <div class="back-body">
+        <div class="return-text">
+          This card identifies an authorized employee of <strong>Superstars Contracting Inc.</strong>
+          If found, please return to:
+        </div>
+
+        <div class="return-block">
+          <div class="company-name">Superstars Contracting Inc.</div>
+          <div>40-27 24th Street &nbsp;·&nbsp; Long Island City, NY 11101</div>
+          <div class="email">admin@superstarscontracting.com</div>
+          <div>P 917 498 0002</div>
+        </div>
+      </div>
+
+      <div class="back-footer">
+        <div class="disclaim">
+          <strong>NOT FOR DOB FITNESS PURPOSES.</strong> This card identifies employment only;
+          it does not grant authority to perform scaffold or rigging work.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="preview-label" style="margin-top:24px;">Print at 100% scale (no fit-to-page) for true ID-1 size &middot; 13 mil PVC card stock recommended</div>
+</div>
+</body>
+</html>

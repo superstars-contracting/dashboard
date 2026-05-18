@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Superstars Company ID — Single Card (Front + Back · 2 pages)</title>
+<style>
+  /* =================================================================
+     Pure TABLE-based layout — bulletproof in any PDF renderer.
+     Sibling to cof_card_print.html. Same Calibri/cream/red palette.
+     ID-1 (CR80) 85.60 × 53.98 mm card on letter page, 2 pages
+     (front + back). Tighter row spacing than CoF because the front
+     carries one more field-row (Authorized By / Employee ID).
+     ================================================================= */
+  @page { size: letter; margin: 0; }
+
+  :root {
+    --brand-red: #B11E2E;
+    --brand-red-deep: #8B1623;
+    --ink: #14161C;
+    --cream: #FAF7F1;
+    --paper: #FFFFFF;
+    --hairline: #E8E4DD;
+    --mute: #76777E;
+    --gold-tint: #E8D9B5;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: white;
+    font-family: 'Calibri', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: var(--ink);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .sheet {
+    width: 215.9mm; height: 279.4mm;
+    background: white;
+    page-break-after: always;
+    text-align: center;
+    padding-top: 60mm;
+  }
+  .sheet:last-child { page-break-after: auto; }
+
+  table.card {
+    width: 85.6mm; height: 53.98mm;
+    background: var(--cream);
+    color: var(--ink);
+    border-radius: 3mm;
+    border-collapse: collapse;
+    margin: 0 auto;
+    table-layout: fixed;
+    box-shadow: 0 0 0 0.1mm var(--hairline);
+  }
+  table.card td { vertical-align: top; padding: 0; }
+
+  /* ============== FRONT ============== */
+
+  td.banner {
+    height: 11mm;
+    background: linear-gradient(135deg, var(--brand-red), var(--brand-red-deep));
+    color: white; text-align: center;
+    padding: 1.6mm 4mm 1.4mm;
+  }
+  .banner-title {
+    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+    font-size: 5mm; font-weight: 700; letter-spacing: 0.2mm;
+    text-transform: uppercase; line-height: 1;
+  }
+  .banner-sub {
+    font-size: 2mm; font-weight: 600; letter-spacing: 0.3mm;
+    text-transform: uppercase; color: rgba(255,255,255,0.92);
+    margin-top: 0.8mm;
+  }
+
+  td.body {
+    height: 32mm;
+    padding: 1.8mm 3.5mm 1mm;
+  }
+  table.body-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  table.body-grid td { vertical-align: top; padding: 0; }
+  td.photo-cell { width: 28mm; padding-right: 3mm; }
+  .photo-box {
+    width: 26mm; height: 26mm;
+    background: var(--paper);
+    border: 0.2mm solid var(--hairline);
+    border-radius: 0.8mm;
+    text-align: center;
+    line-height: 26mm;
+    font-size: 2.2mm; color: var(--mute);
+    letter-spacing: 0.4mm; font-weight: 600;
+    overflow: hidden;
+  }
+  .photo-box img {
+    width: 100%; height: 100%;
+    object-fit: cover; display: block;
+  }
+
+  /* Tighter spacing — Company ID has 4 visual rows vs CoF's 3 */
+  .field { margin-bottom: 1.5mm; }
+  .field:last-child { margin-bottom: 0; }
+  .field-label {
+    font-size: 1.6mm; font-weight: 700; letter-spacing: 0.3mm;
+    text-transform: uppercase; color: var(--mute); margin-bottom: 0.3mm;
+  }
+  .field-value {
+    font-size: 2.8mm; font-weight: 600; color: var(--ink);
+    border-bottom: 0.25mm solid var(--ink); padding-bottom: 0.3mm;
+    line-height: 1.1; min-height: 3.2mm;
+  }
+  .field-value.mono {
+    font-family: 'Consolas', 'Menlo', monospace;
+    font-size: 2.3mm; letter-spacing: 0.2mm;
+  }
+  table.field-row { width: 100%; border-collapse: collapse; }
+  table.field-row td { padding: 0; }
+  table.field-row td:first-child { padding-right: 2mm; width: 50%; }
+  table.field-row .field-value { font-size: 2.4mm; }
+  table.field-row .field-value.mono { font-size: 2.1mm; letter-spacing: 0.15mm; }
+
+  td.front-footer {
+    height: 11mm;
+    border-top: 0.2mm solid var(--hairline);
+    padding: 1mm 3mm 1.2mm;
+    text-align: center;
+    background: var(--cream);
+  }
+  table.lockup { margin: 0 auto; border-collapse: collapse; }
+  table.lockup td { padding: 0; vertical-align: middle; }
+  .lockup-star { width: 5.5mm; height: 5.5mm; display: block; }
+  td.lockup-text-cell { padding-left: 1.6mm !important; text-align: left; }
+  .lockup-name {
+    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+    font-size: 3mm; font-weight: 700; letter-spacing: 0.25mm;
+    color: var(--ink); line-height: 1;
+  }
+  .lockup-sub {
+    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+    font-size: 1.6mm; font-weight: 700; letter-spacing: 0.5mm;
+    color: var(--ink); line-height: 1; margin-top: 0.4mm;
+  }
+  .company-addr {
+    font-size: 1.55mm; color: var(--ink); font-weight: 700;
+    letter-spacing: 0; margin-top: 0.4mm;
+    white-space: nowrap;
+  }
+
+  /* ============== BACK ============== */
+
+  td.back-strip {
+    height: 6mm;
+    background: var(--ink); color: white;
+    padding: 1.4mm 3.5mm;
+  }
+  table.back-strip-inner { width: 100%; border-collapse: collapse; }
+  table.back-strip-inner td { padding: 0; }
+  .back-title {
+    font-family: 'Playfair Display', 'Georgia', serif;
+    font-size: 2.6mm; font-weight: 700; letter-spacing: 0.4mm;
+    text-transform: uppercase;
+  }
+  .back-cite {
+    font-size: 1.9mm; color: var(--gold-tint);
+    letter-spacing: 0.2mm; font-weight: 600; font-style: italic;
+    text-align: right;
+  }
+
+  td.back-body {
+    height: 38mm;
+    padding: 4mm 5mm 1mm;
+    vertical-align: top;
+    text-align: center;
+  }
+  .return-text {
+    font-size: 2.4mm; line-height: 1.35;
+    color: var(--ink); font-weight: 500;
+    margin-bottom: 3mm;
+  }
+  .return-text strong { font-weight: 700; }
+  .return-block {
+    font-size: 2.3mm; line-height: 1.55;
+    color: var(--ink);
+  }
+  .return-block .company-name {
+    font-family: 'Playfair Display', 'Georgia', serif;
+    font-weight: 700; font-size: 2.7mm;
+    letter-spacing: 0.2mm;
+  }
+  .return-block .email {
+    color: var(--brand-red); font-weight: 700;
+  }
+
+  td.back-footer {
+    height: 9mm;
+    border-top: 0.2mm solid var(--hairline);
+    padding: 1.5mm 3.5mm;
+    background: var(--cream);
+    text-align: center;
+    vertical-align: middle;
+  }
+  .disclaim {
+    font-size: 1.9mm; line-height: 1.2; color: var(--ink);
+    font-style: italic;
+  }
+  .disclaim strong { color: var(--ink); font-style: normal; font-weight: 700; }
+
+  @media screen {
+    body { background: #ECE9E2; padding: 12mm 0; }
+    .sheet { box-shadow: 0 4px 20px rgba(0,0,0,0.15); margin: 0 auto 20mm; padding-top: 30mm; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================ PAGE 1 — FRONT ============================ -->
+<div class="sheet">
+  <table class="card">
+    <tr>
+      <td class="banner">
+        <div class="banner-title">Company ID</div>
+        <div class="banner-sub">Authorized Employee Credential</div>
+      </td>
+    </tr>
+    <tr>
+      <td class="body">
+        <table class="body-grid">
+          <tr>
+            <td class="photo-cell">
+              <div class="photo-box">{{PHOTO_HTML}}</div>
+            </td>
+            <td>
+              <div class="field">
+                <div class="field-label">Name of Holder</div>
+                <div class="field-value">{{NAME}}</div>
+              </div>
+              <div class="field">
+                <div class="field-label">Card Number</div>
+                <div class="field-value mono">{{CARD_NO}}</div>
+              </div>
+              <table class="field-row">
+                <tr>
+                  <td>
+                    <div class="field">
+                      <div class="field-label">Employee ID</div>
+                      <div class="field-value mono">{{EMP_ID}}</div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="field">
+                      <div class="field-label">Trade</div>
+                      <div class="field-value">{{TRADE}}</div>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+              <table class="field-row">
+                <tr>
+                  <td>
+                    <div class="field">
+                      <div class="field-label">Issued</div>
+                      <div class="field-value mono">{{ISSUED}}</div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="field">
+                      <div class="field-label">Authorized By</div>
+                      <div class="field-value">{{ISSUED_BY}}</div>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td class="front-footer">
+        <table class="lockup"><tr><td>
+          <svg class="lockup-star" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="rL" x1="0%" y1="0%" x2="70%" y2="100%"><stop offset="0%" stop-color="#E0394E"/><stop offset="100%" stop-color="#A01829"/></linearGradient>
+              <linearGradient id="rD" x1="100%" y1="0%" x2="30%" y2="100%"><stop offset="0%" stop-color="#831321"/><stop offset="100%" stop-color="#4A0A12"/></linearGradient>
+            </defs>
+            <polygon fill="url(#rL)" points="18,18 13.96,12.44 18,0"/>
+            <polygon fill="url(#rD)" points="18,18 18,0 22.04,12.44"/>
+            <polygon fill="url(#rL)" points="18,18 22.04,12.44 35.12,12.44"/>
+            <polygon fill="url(#rD)" points="18,18 35.12,12.44 24.54,20.13"/>
+            <polygon fill="url(#rL)" points="18,18 24.54,20.13 28.58,32.56"/>
+            <polygon fill="url(#rD)" points="18,18 28.58,32.56 18,24.88"/>
+            <polygon fill="url(#rL)" points="18,18 18,24.88 7.42,32.56"/>
+            <polygon fill="url(#rD)" points="18,18 7.42,32.56 11.46,20.13"/>
+            <polygon fill="url(#rL)" points="18,18 11.46,20.13 0.88,12.44"/>
+            <polygon fill="url(#rD)" points="18,18 0.88,12.44 13.96,12.44"/>
+            <polygon fill="#FAF7F1" points="18,10.8 20.02,15.94 25.34,15.94 21.02,19.25 22.68,24.39 18,21.26 13.32,24.39 14.98,19.25 10.66,15.94 15.98,15.94"/>
+          </svg>
+        </td><td class="lockup-text-cell">
+          <div class="lockup-name">SUPERSTARS</div>
+          <div class="lockup-sub">CONTRACTING INC</div>
+        </td></tr></table>
+        <div class="company-addr">
+          40-27 24th Street, Long Island City, NY 11101 &nbsp;·&nbsp; P 917 498 0002 &nbsp;·&nbsp; F 718 709 4223
+        </div>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<!-- ============================ PAGE 2 — BACK ============================ -->
+<div class="sheet">
+  <table class="card">
+    <tr>
+      <td class="back-strip">
+        <table class="back-strip-inner"><tr>
+          <td><div class="back-title">If Found</div></td>
+          <td><div class="back-cite">Please Return</div></td>
+        </tr></table>
+      </td>
+    </tr>
+    <tr>
+      <td class="back-body">
+        <div class="return-text">
+          This card identifies an authorized employee of <strong>Superstars Contracting Inc.</strong>
+          If found, please return to:
+        </div>
+        <div class="return-block">
+          <div class="company-name">Superstars Contracting Inc.</div>
+          <div>40-27 24th Street &nbsp;&middot;&nbsp; Long Island City, NY 11101</div>
+          <div class="email">admin@superstarscontracting.com</div>
+          <div>P 917 498 0002</div>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td class="back-footer">
+        <span class="disclaim">
+          <strong>NOT FOR DOB FITNESS PURPOSES.</strong> This card identifies employment only;
+          it does not grant authority to perform scaffold or rigging work.
+        </span>
+      </td>
+    </tr>
+  </table>
+</div>
+
+</body>
+</html>
