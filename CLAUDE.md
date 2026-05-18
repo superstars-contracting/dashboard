@@ -5,6 +5,15 @@ Pin only rules that have already cost us hours.
 
 ---
 
+## Convention: reference rules by what they say, not by number
+
+Never reference hard rules by number in code comments. Rules can be inserted,
+moved, or removed — numbered cross-references become wrong silently. Reference
+rules by what they say (e.g., `per CLAUDE.md loopback policy`,
+`per CLAUDE.md PII rule`) so the cross-reference survives reordering.
+
+---
+
 ## 1. Design rule: HTML-first, PDF-last
 
 **Always design in HTML. Iterate in the browser. Convert to PDF only at the moment of delivery.**
