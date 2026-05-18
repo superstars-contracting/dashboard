@@ -1498,8 +1498,10 @@ document.querySelectorAll('.nav-link').forEach(link => {
   if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
   if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
-  // Save worker
-  document.getElementById('intake-save').addEventListener('click', async () => {
+  // Save worker — guarded like the other intake elements above; the project
+  // dashboard no longer renders the intake modal, so this element may be null.
+  const saveBtn = document.getElementById('intake-save');
+  if (saveBtn) saveBtn.addEventListener('click', async () => {
     const name = document.getElementById('in-name').value.trim();
     if (!name) { alert('Name is required'); return; }
     const payload = {
