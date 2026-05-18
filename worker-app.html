@@ -1009,8 +1009,12 @@ function setLanguage(newLang) {
 
 let currentScreen = 'signin';
 let pinCode = '';
-let geofenceData = { onSite: false, distance: 0 };
-let sessionData = { employeeId: null, sessionId: null, startTime: null, photoCount: 0 };
+let geofenceData = { onSite: false, distance: 0, latitude: null, longitude: null };
+let sessionData = {
+  employeeId: null, name: null, sessionToken: null,
+  signInLogId: null, projectCode: null, certifications: [],
+  startTime: null, photoCount: 0
+};
 let currentZone = 'South L11';
 let selectedScope = null;
 let capturedPhoto = null;
@@ -1048,6 +1052,8 @@ function updateGeofence() {
     const dist = haversine(PROJECT_LAT, PROJECT_LNG, pos.coords.latitude, pos.coords.longitude);
     geofenceData.distance = Math.round(dist);
     geofenceData.onSite = dist <= GEOFENCE_RADIUS;
+    geofenceData.latitude = pos.coords.latitude;
+    geofenceData.longitude = pos.coords.longitude;
     renderGeofence();
     updateSignInButton();
   }, (err) => {
@@ -1059,6 +1065,8 @@ function updateGeofence() {
     else geofenceError = 'unknown';
     geofenceData.onSite = false;
     geofenceData.distance = null;
+    geofenceData.latitude = null;
+    geofenceData.longitude = null;
     renderGeofence();
     updateSignInButton();
   }, {
@@ -1176,19 +1184,12 @@ function deletePin() {
 }
 
 function checkCertStatus() {
+  // Cert status comes from the server on successful login (see signIn).
+  // Pre-login the client has no way to know certs for an arbitrary PIN, so
+  // this is just a clearer for stale error messages from a prior attempt.
   const certDiv = document.getElementById('cert-status');
-  if (pinCode.length < 4) {
-    certDiv.textContent = '';
-    return;
-  }
-  const certMap = {
-    '4271': { valid: true, text: '3 certs valid · OSHA-30 expires in 45 days' },
-    '4272': { valid: false, text: 'BLOCKED · Asbestos Awareness expired' },
-    '4273': { valid: true, text: '5 certs valid · All active' }
-  };
-  const cert = certMap[pinCode] || { valid: true, text: '✓ Certificates valid' };
-  certDiv.textContent = cert.text;
-  certDiv.className = 'cert-status ' + (cert.valid ? 'valid' : 'blocked');
+  certDiv.textContent = '';
+  certDiv.className = 'cert-status';
 }
 
 // TESTING ONLY — when true, allows sign-in even with no GPS / blocked GPS.
@@ -1201,15 +1202,67 @@ function updateSignInButton() {
   btn.disabled = !(gpsOk && pinCode.length === 4);
 }
 
-function signIn() {
+async function signIn() {
   if ((!geofenceData.onSite && !TESTING_BYPASS) || pinCode.length !== 4) return;
-  sessionData.employeeId = 'E-' + pinCode;
-  sessionData.sessionId = 'SID-' + Date.now();
-  sessionData.startTime = new Date();
-  sessionData.photoCount = 0;
-  goToScreen('working');
-  updateWorkingScreen();
-  startWorkingTimer();
+
+  const certDiv = document.getElementById('cert-status');
+  const btn = document.getElementById('signin-btn');
+  btn.disabled = true;
+  certDiv.textContent = lang === 'es' ? 'Iniciando sesión…' : 'Signing in…';
+  certDiv.className = 'cert-status';
+
+  try {
+    const loginResp = await fetch('/api/worker/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        phone_or_pin: pinCode,
+        latitude: geofenceData.latitude || 0,
+        longitude: geofenceData.longitude || 0
+      })
+    });
+    const loginJson = await loginResp.json();
+    if (!loginResp.ok) {
+      certDiv.textContent = '✗ ' + (loginJson.error || (lang === 'es' ? 'Inicio de sesión falló' : 'Sign-in failed'));
+      certDiv.className = 'cert-status blocked';
+      btn.disabled = false;
+      return;
+    }
+    const emp = loginJson.data || loginJson;
+    sessionData.employeeId = emp.employee_id;
+    sessionData.name = emp.name;
+    sessionData.sessionToken = emp.session_token;
+    sessionData.projectCode = emp.project_code || 'SC-2601';
+    sessionData.certifications = emp.certifications || [];
+
+    const startResp = await fetch('/api/worker/session/start', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        employee_id: sessionData.employeeId,
+        project_code: sessionData.projectCode
+      })
+    });
+    const startJson = await startResp.json();
+    if (!startResp.ok) {
+      certDiv.textContent = '✗ ' + (startJson.error || (lang === 'es' ? 'Error al iniciar turno' : 'Failed to start session'));
+      certDiv.className = 'cert-status blocked';
+      btn.disabled = false;
+      return;
+    }
+    const session = startJson.data || startJson;
+    sessionData.signInLogId = session.sign_in_log_id;
+    sessionData.startTime = new Date(session.time_in || Date.now());
+    sessionData.photoCount = 0;
+
+    goToScreen('working');
+    updateWorkingScreen();
+    startWorkingTimer();
+  } catch (e) {
+    certDiv.textContent = '✗ ' + (lang === 'es' ? 'Error de red' : 'Network error');
+    certDiv.className = 'cert-status blocked';
+    btn.disabled = false;
+  }
 }
 
 let workingTimer;
@@ -1321,8 +1374,24 @@ function goToSignout() {
   goToScreen('signout');
 }
 
-function confirmSignout() {
+async function confirmSignout() {
   clearInterval(workingTimer);
+
+  // Best-effort: tell the server to close the open sign_in_log row before we
+  // wipe local state. A network failure here doesn't block the worker from
+  // physically leaving — log it and continue with the UI transition.
+  if (sessionData.employeeId) {
+    try {
+      await fetch('/api/worker/session/end', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({employee_id: sessionData.employeeId})
+      });
+    } catch (e) {
+      console.warn('session/end failed:', e);
+    }
+  }
+
   const elapsed = new Date() - sessionData.startTime;
   const hours = (elapsed / 3600000).toFixed(1);
   document.getElementById('goodbye-text').textContent = t('goodbye');
@@ -1330,7 +1399,11 @@ function confirmSignout() {
   document.getElementById('goodbye-screen').classList.add('active');
   setTimeout(() => {
     pinCode = '';
-    sessionData = { employeeId: null, sessionId: null, startTime: null, photoCount: 0 };
+    sessionData = {
+      employeeId: null, name: null, sessionToken: null,
+      signInLogId: null, projectCode: null, certifications: [],
+      startTime: null, photoCount: 0
+    };
     goToScreen('signin');
     updateUI();
     updateGeofence();
