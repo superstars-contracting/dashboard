@@ -2612,6 +2612,246 @@ def api_workers_intake_summary():
         return jsonify({"error": str(e)}), 400
 
 
+# ============= UNIFIED CREDENTIAL ENDPOINTS =============
+
+@app.route('/api/employees/<emp_id>/credential', methods=['GET'])
+def get_employee_credential(emp_id):
+    """Return the worker's current credential state + eligibility +
+    photo-readiness. Used by the workforce list (per-row context) and
+    any per-worker detail view."""
+    try:
+        from cof_issuer import has_valid_prerequisite
+        conn = db()
+        emp = conn.execute(
+            "SELECT employee_id, face_image_path FROM employees WHERE employee_id = ?",
+            (emp_id,)
+        ).fetchone()
+        if not emp:
+            conn.close()
+            return jsonify({"error": "Employee not found"}), 404
+        eligible, _ = has_valid_prerequisite(emp_id)
+        eligibility = 'cof' if eligible else 'company_id'
+        face_present = bool(emp["face_image_path"])
+
+        current_type = card_number_display_v = issued_date_v = expires_v = status_v = pdf_export_path = None
+        cof_row = conn.execute(
+            """SELECT card_id, issued_date, expires_date, status, pdf_export_path
+               FROM cof_cards WHERE employee_id = ? AND status = 'issued'
+               ORDER BY issued_date DESC LIMIT 1""",
+            (emp_id,)
+        ).fetchone()
+        if cof_row:
+            current_type = 'cof'
+            card_number_display_v = cof_row["card_id"]
+            issued_date_v = cof_row["issued_date"]
+            expires_v = cof_row["expires_date"]
+            status_v = cof_row["status"]
+            pdf_export_path = cof_row["pdf_export_path"]
+        else:
+            cid_row = conn.execute(
+                """SELECT card_id, card_number_display, issued_date, status, pdf_export_path
+                   FROM company_id_cards WHERE employee_id = ? AND status = 'active'
+                   ORDER BY issued_date DESC, created_at DESC LIMIT 1""",
+                (emp_id,)
+            ).fetchone()
+            if cid_row:
+                current_type = 'company_id'
+                card_number_display_v = cid_row["card_number_display"]
+                issued_date_v = cid_row["issued_date"]
+                status_v = cid_row["status"]
+                pdf_export_path = cid_row["pdf_export_path"]
+        conn.close()
+
+        pdf_url = None
+        if pdf_export_path:
+            full = SCRIPT_DIR / pdf_export_path.lstrip("/")
+            if full.exists():
+                pdf_url = "/files/" + pdf_export_path
+
+        payload = {
+            "type": current_type,
+            "card_number_display": card_number_display_v,
+            "issued_date": issued_date_v,
+            "status": status_v,
+            "pdf_url": pdf_url,
+            "eligibility": eligibility,
+            "face_image_path_present": face_present,
+        }
+        if current_type == 'cof':
+            payload["expires_date"] = expires_v
+        return response_wrapper(payload)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/employees/<emp_id>/credential/issue', methods=['POST'])
+def issue_employee_credential(emp_id):
+    """Unified credential issuance — dispatches CoF vs Company ID based on
+    eligibility. Hard-gates on face_image_path. 409 if there's already an
+    active credential of the chosen type unless override_active=true.
+    Renders the PDF, updates pdf_export_path on the new row, returns the
+    full credential info including pdf_url."""
+    import subprocess
+    import sys as sysmod
+    import tempfile
+    import html as htmlmod
+    try:
+        data = request.get_json() or {}
+        issued_by = data.get('issued_by')
+        if not issued_by:
+            return jsonify({"error": "issued_by required"}), 400
+        override_active = bool(data.get('override_active', False))
+        rigger_id = data.get('rigger_id')
+
+        conn = db()
+        emp = conn.execute(
+            "SELECT employee_id, name, trade, face_image_path FROM employees WHERE employee_id = ?",
+            (emp_id,)
+        ).fetchone()
+        if not emp:
+            conn.close()
+            return jsonify({"error": "Employee not found"}), 404
+        if not emp["face_image_path"]:
+            conn.close()
+            return jsonify({"error": "Worker has no face photo on file. Take an ID photo before issuing a credential."}), 400
+
+        from cof_issuer import has_valid_prerequisite, issue_cof, get_default_rigger_for_project
+        from company_id_issuer import issue_company_id
+
+        eligible, _ = has_valid_prerequisite(emp_id)
+        cred_type = 'cof' if eligible else 'company_id'
+
+        if cred_type == 'cof':
+            existing = conn.execute(
+                "SELECT card_id, issued_date, expires_date, status FROM cof_cards "
+                "WHERE employee_id = ? AND status = 'issued' LIMIT 1",
+                (emp_id,)
+            ).fetchone()
+        else:
+            existing = conn.execute(
+                "SELECT card_id, card_number_display, issued_date, status FROM company_id_cards "
+                "WHERE employee_id = ? AND status = 'active' LIMIT 1",
+                (emp_id,)
+            ).fetchone()
+
+        if existing and not override_active:
+            current_cred = {
+                "type": cred_type,
+                "card_number_display": existing["card_id"] if cred_type == 'cof' else existing["card_number_display"],
+                "issued_date": existing["issued_date"],
+                "status": existing["status"],
+            }
+            if cred_type == 'cof':
+                current_cred["expires_date"] = existing["expires_date"]
+            conn.close()
+            return jsonify({
+                "error": f"Worker already has an active {cred_type}",
+                "current_credential": current_cred,
+                "hint": "Pass override_active=true to supersede"
+            }), 409
+        conn.close()
+
+        # Issue the card row
+        try:
+            if cred_type == 'cof':
+                rigger_id_param = rigger_id
+                if not rigger_id_param:
+                    rigger = get_default_rigger_for_project('SC-2601')
+                    rigger_id_param = rigger['id'] if rigger else None
+                card = issue_cof(emp_id, rigger_id=rigger_id_param, project_code='SC-2601')
+            else:
+                card = issue_company_id(emp_id, issued_by)
+        except Exception as ex:
+            logging.error(f"POST .../credential/issue ({emp_id}) issuer-step: {ex}")
+            return jsonify({"error": f"Issuance failed: {ex}"}), 500
+
+        # Render PDF (non-fatal on this workstation — WeasyPrint requires
+        # GTK runtime libs that aren't installed on Windows here. If render
+        # fails the credential is still issued; the operator falls back to
+        # browser print-to-PDF per CLAUDE.md HTML-first rule).
+        if cred_type == 'cof':
+            template_name = 'cof_card_print.html'
+            pdf_subdir = 'cof'
+            cnd = card['card_id']
+            expires_str = card.get('expires_date') or ''
+        else:
+            template_name = 'company_id_card_print.html'
+            pdf_subdir = 'company_id'
+            cnd = card['card_number_display']
+            expires_str = ''
+        pdf_url = None
+        pdf_warning = None
+        try:
+            pdf_dir = SCRIPT_DIR / "data_room" / "credentials" / pdf_subdir
+            pdf_dir.mkdir(parents=True, exist_ok=True)
+            pdf_file = pdf_dir / f"{emp_id}.pdf"
+            tpl = (SCRIPT_DIR / template_name).read_text(encoding='utf-8')
+            replacements = {
+                '{{NAME}}': htmlmod.escape(emp['name'] or ''),
+                '{{CARD_NO}}': htmlmod.escape(cnd or ''),
+                '{{EMP_ID}}': htmlmod.escape(emp_id),
+                '{{TRADE}}': htmlmod.escape(emp['trade'] or ''),
+                '{{ISSUED}}': htmlmod.escape(card['issued_date'] or ''),
+                '{{ISSUED_BY}}': htmlmod.escape(card.get('issued_by') or issued_by),
+                '{{EXPIRES}}': htmlmod.escape(expires_str),
+                '{{PHOTO_HTML}}': '',
+                '{{SIGNATURE_HTML}}': '',
+                '{{ISSUE_DATE_HTML}}': htmlmod.escape(card['issued_date'] or ''),
+            }
+            for k, v in replacements.items():
+                tpl = tpl.replace(k, v)
+            # Temp HTML in SCRIPT_DIR so WeasyPrint resolves relative
+            # asset paths against the same base_url the templates expect.
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False,
+                                              encoding='utf-8', dir=str(SCRIPT_DIR)) as tmpf:
+                tmpf.write(tpl)
+                tmp_path = Path(tmpf.name)
+            try:
+                result = subprocess.run(
+                    [sysmod.executable, 'render_pdf.py', tmp_path.name, str(pdf_file)],
+                    cwd=str(SCRIPT_DIR), capture_output=True, text=True, timeout=60
+                )
+                if result.returncode != 0:
+                    raise RuntimeError(f"render_pdf.py exit {result.returncode}")
+            finally:
+                tmp_path.unlink(missing_ok=True)
+            pdf_rel = pdf_file.relative_to(SCRIPT_DIR).as_posix()
+            conn = db()
+            if cred_type == 'cof':
+                conn.execute(
+                    "UPDATE cof_cards SET pdf_export_path = ?, updated_at = CURRENT_TIMESTAMP WHERE card_id = ?",
+                    (pdf_rel, card['card_id'])
+                )
+            else:
+                conn.execute(
+                    "UPDATE company_id_cards SET pdf_export_path = ?, updated_at = CURRENT_TIMESTAMP WHERE card_id = ?",
+                    (pdf_rel, card['card_id'])
+                )
+            conn.commit()
+            conn.close()
+            pdf_url = "/files/" + pdf_rel
+        except Exception as ex:
+            logging.warning(f"POST .../credential/issue ({emp_id}) pdf-step failed (non-fatal): {ex}")
+            pdf_warning = f"PDF render failed: {ex}. Card issued in DB; use browser print-to-PDF as fallback."
+
+        response_body = {
+            "type": cred_type,
+            "card_number_display": cnd,
+            "card_id": card['card_id'],
+            "issued_date": card['issued_date'],
+            "status": card['status'],
+            "pdf_url": pdf_url,
+        }
+        if cred_type == 'cof':
+            response_body["expires_date"] = card.get('expires_date')
+        if pdf_warning:
+            response_body["pdf_warning"] = pdf_warning
+        return response_wrapper(response_body), 201
+    except Exception as e:
+        logging.error(f"POST .../credential/issue ({emp_id}): {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/worker-files/<path:filepath>', methods=['GET'])
 def serve_worker_file(filepath):
     """Serve scanned documents back to the dashboard (image preview etc.)."""
