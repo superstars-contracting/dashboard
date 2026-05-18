@@ -1056,8 +1056,201 @@
       <section class="view" data-view="daily-report">
         <div class="section">
           <h2>Daily Report</h2>
-          <div class="placeholder-card">Today's daily construction report · Coming with Phase 2B</div>
+
+          <!-- Controls bar: date picker + refresh + status -->
+          <div style="display:flex;gap:16px;align-items:center;background:white;border:1px solid #E8E4DD;border-radius:4px;padding:14px 16px;margin-bottom:24px;">
+            <label for="dcr-date" style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Date</label>
+            <input type="date" id="dcr-date" style="padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
+            <button id="dcr-refresh" type="button" style="padding:6px 14px;border:none;border-radius:4px;background:#14161C;color:white;font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;">Refresh from data</button>
+            <div id="dcr-status" style="margin-left:auto;font-size:11px;color:#76777E;">Loading…</div>
+          </div>
+
+          <!-- 1. PROJECT INFO -->
+          <div style="margin-bottom:24px;">
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">1. Project Info</h3>
+            <div id="dcr-project-info" class="site-card" style="grid-template-columns:repeat(4, 1fr);margin-bottom:0;"></div>
+          </div>
+
+          <!-- 2. WEATHER -->
+          <div style="margin-bottom:24px;">
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">2. Weather</h3>
+            <div id="dcr-weather" style="background:white;border:1px solid #E8E4DD;border-radius:4px;padding:20px;"></div>
+          </div>
+
+          <!-- 3. LABOR (auto from sign_in_log) -->
+          <div style="margin-bottom:24px;">
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">3. Labor (Sign-Ins)</h3>
+            <div id="dcr-labor-summary" style="margin-bottom:8px;font-size:13px;color:#76777E;"></div>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr><th>#</th><th>Worker</th><th>Trade</th><th>Time In</th><th>Time Out</th><th>Hours</th></tr>
+                </thead>
+                <tbody id="dcr-labor-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 4-10. OPERATOR ENTRY (placeholders, wired in next commit) -->
+          <div style="margin-bottom:24px;">
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">4. Work Performed</h3>
+            <div id="dcr-section-work" class="placeholder-card" style="padding:24px;">Operator-entry — coming in next commit</div>
+          </div>
+          <div style="margin-bottom:24px;">
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">5. Materials &amp; Deliveries</h3>
+            <div id="dcr-section-deliveries" class="placeholder-card" style="padding:24px;">Operator-entry — coming in next commit</div>
+          </div>
+          <div style="margin-bottom:24px;">
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">6. Equipment On Site</h3>
+            <div id="dcr-section-equipment" class="placeholder-card" style="padding:24px;">Operator-entry — coming in next commit</div>
+          </div>
+          <div style="margin-bottom:24px;">
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">7. Safety (Toolbox Talk + Events)</h3>
+            <div id="dcr-section-safety" class="placeholder-card" style="padding:24px;">Operator-entry — coming in next commit</div>
+          </div>
+          <div style="margin-bottom:24px;">
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">8. Issues / Delays</h3>
+            <div id="dcr-section-issues" class="placeholder-card" style="padding:24px;">Operator-entry — coming in next commit</div>
+          </div>
+          <div style="margin-bottom:24px;">
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">9. Inspections</h3>
+            <div id="dcr-section-inspections" class="placeholder-card" style="padding:24px;">Operator-entry — coming in next commit</div>
+          </div>
+          <div style="margin-bottom:24px;">
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">10. Photos</h3>
+            <div id="dcr-section-photos" class="placeholder-card" style="padding:24px;">Photo upload — coming in next commit</div>
+          </div>
         </div>
+
+        <script>
+        (function() {
+          function getProjectCode() {
+            const m = window.location.pathname.match(/\/projects\/([^\/]+)/);
+            return m ? decodeURIComponent(m[1]) : 'SC-2601';
+          }
+          const PROJECT_CODE = getProjectCode();
+
+          function esc(s) {
+            if (s == null) return '';
+            return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+          }
+
+          function setStatus(text, color) {
+            const el = document.getElementById('dcr-status');
+            if (!el) return;
+            el.textContent = text;
+            el.style.color = color || '#76777E';
+          }
+
+          function renderProjectInfo(p) {
+            const el = document.getElementById('dcr-project-info');
+            if (!el) return;
+            if (!p) { el.innerHTML = '<div style="color:#76777E;padding:16px;text-align:center;">No project data</div>'; return; }
+            el.innerHTML =
+              '<div class="site-item"><div class="site-label">Code</div><div class="site-value">' + esc(p.code) + '</div><div style="font-size:11px;color:#76777E;margin-top:4px;">' + esc(p.day_of_week || '') + '</div></div>' +
+              '<div class="site-item"><div class="site-label">Project</div><div class="site-value" style="font-size:14px;">' + (esc(p.name) || '—') + '</div></div>' +
+              '<div class="site-item"><div class="site-label">Superintendent</div><div class="site-value" style="font-size:14px;">' + (esc(p.superintendent) || '—') + '</div></div>' +
+              '<div class="site-item"><div class="site-label">Owner / Client</div><div class="site-value" style="font-size:14px;">' + (esc(p.owner_client) || '—') + '</div></div>';
+          }
+
+          function renderWeather(w) {
+            const el = document.getElementById('dcr-weather');
+            if (!el) return;
+            if (!w || (!w.am && !w.pm && !w.wind)) {
+              el.innerHTML = '<div style="color:#76777E;text-align:center;padding:8px;">Weather data unavailable for this date</div>';
+              return;
+            }
+            const sourceLabels = {
+              'weather_log': 'operator-entered (weather_log)',
+              'open-meteo-forecast': 'live forecast (Open-Meteo)',
+              'open-meteo-archive': 'historical archive (Open-Meteo)',
+              'unavailable': 'unavailable'
+            };
+            const sourceLabel = sourceLabels[w.source] || w.source || '—';
+            const fmtT = (t) => (t == null) ? '—°' : Math.round(t) + '°';
+            el.innerHTML =
+              '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;align-items:center;">' +
+                '<div><div class="site-label" style="margin-bottom:4px;">AM</div>' +
+                '<div style="font-family:Georgia,serif;font-size:24px;color:#14161C;">' + fmtT(w.am && w.am.temp_f) + '</div>' +
+                '<div style="font-size:11px;color:#76777E;">' + (esc(w.am && w.am.conditions) || '—') + '</div></div>' +
+                '<div><div class="site-label" style="margin-bottom:4px;">PM</div>' +
+                '<div style="font-family:Georgia,serif;font-size:24px;color:#14161C;">' + fmtT(w.pm && w.pm.temp_f) + '</div>' +
+                '<div style="font-size:11px;color:#76777E;">' + (esc(w.pm && w.pm.conditions) || '—') + '</div></div>' +
+                '<div><div class="site-label" style="margin-bottom:4px;">Wind</div>' +
+                '<div style="font-family:Georgia,serif;font-size:18px;color:#14161C;">' + (esc(w.wind) || '—') + '</div></div>' +
+              '</div>' +
+              '<div style="margin-top:12px;padding-top:8px;border-top:1px solid #F1EEE8;font-size:10px;color:#76777E;text-align:right;">' + esc(sourceLabel) + '</div>';
+          }
+
+          function renderLabor(labor) {
+            const summary = document.getElementById('dcr-labor-summary');
+            const tbody = document.getElementById('dcr-labor-tbody');
+            if (!summary || !tbody) return;
+            if (!labor || !labor.rows || !labor.rows.length) {
+              summary.textContent = '';
+              tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:#76777E;">No sign-ins recorded for this date. Workers must sign in via the worker app for their hours to land here.</td></tr>';
+              return;
+            }
+            summary.innerHTML = '<strong style="color:#14161C;">' + labor.headcount + '</strong> worker(s) · <strong style="color:#14161C;">' + labor.total_hours + '</strong> total hours';
+            tbody.innerHTML = labor.rows.map(r =>
+              '<tr>' +
+                '<td>' + r.n + '</td>' +
+                '<td>' + (esc(r.name) || '—') + ' <span style="color:#76777E;font-size:11px;">' + (esc(r.employee_id) || '') + '</span></td>' +
+                '<td>' + (esc(r.trade) || '—') + '</td>' +
+                '<td>' + (esc(r.time_in) || '—') + '</td>' +
+                '<td>' + (esc(r.time_out) || '—') + '</td>' +
+                '<td>' + (r.hours != null ? r.hours : '—') + '</td>' +
+              '</tr>'
+            ).join('');
+          }
+
+          async function loadDcr(dateStr) {
+            setStatus('Loading…', '#76777E');
+            try {
+              const url = '/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/daily/' + encodeURIComponent(dateStr) + '?audience=internal';
+              const resp = await fetch(url).then(r => r.json());
+              if (resp && resp.error) {
+                setStatus('Error: ' + resp.error, '#B11E2E');
+                return;
+              }
+              const dcr = resp && resp.data;
+              if (!dcr) {
+                setStatus('No data', '#B11E2E');
+                return;
+              }
+              renderProjectInfo(dcr.project);
+              renderWeather(dcr.weather);
+              renderLabor(dcr.labor);
+              const warns = (dcr.metadata && dcr.metadata.warnings) || [];
+              if (warns.length) {
+                setStatus('Loaded · ' + warns.length + ' warning(s)', '#B68838');
+              } else {
+                setStatus('Loaded', '#2F7C57');
+              }
+            } catch (e) {
+              console.warn('[DCR] load failed:', e);
+              setStatus('Network error', '#B11E2E');
+            }
+          }
+
+          function initDcrForm() {
+            const dateInput = document.getElementById('dcr-date');
+            if (!dateInput) return;
+            const today = new Date().toISOString().slice(0, 10);
+            if (!dateInput.value) dateInput.value = today;
+            dateInput.addEventListener('change', () => loadDcr(dateInput.value));
+            const refreshBtn = document.getElementById('dcr-refresh');
+            if (refreshBtn) refreshBtn.addEventListener('click', () => loadDcr(dateInput.value));
+            loadDcr(dateInput.value);
+          }
+
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initDcrForm);
+          } else {
+            initDcrForm();
+          }
+        })();
+        </script>
       </section>
 
       <!-- SITE CLOSURE -->
