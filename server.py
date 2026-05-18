@@ -2301,61 +2301,111 @@ def serve_worker_file(filepath):
 
 # ============= WEATHER (Open-Meteo, no API key) =============
 
+_WMO_LABELS = {
+    0: "Clear", 1: "Mostly clear", 2: "Partly cloudy", 3: "Overcast",
+    45: "Fog", 48: "Freezing fog",
+    51: "Light drizzle", 53: "Drizzle", 55: "Heavy drizzle",
+    56: "Freezing drizzle", 57: "Freezing drizzle",
+    61: "Light rain", 63: "Rain", 65: "Heavy rain",
+    66: "Freezing rain", 67: "Freezing rain",
+    71: "Light snow", 73: "Snow", 75: "Heavy snow",
+    77: "Snow grains",
+    80: "Rain showers", 81: "Rain showers", 82: "Heavy showers",
+    85: "Snow showers", 86: "Snow showers",
+    95: "Thunderstorm", 96: "Thunderstorm w/ hail", 99: "Severe thunderstorm",
+}
+
+
+def fetch_open_meteo_weather(lat, lng, date_str=None):
+    """Fetch weather for a date (YYYY-MM-DD). For today/future, uses the
+    forecast endpoint (with current + daily). For dates >5 days back, uses
+    the archive endpoint. For 1-5 days back, uses forecast with date filter.
+    Returns the same dict shape regardless of source so callers don't care
+    which Open-Meteo endpoint was hit. Raises ValueError on bad date_str."""
+    import urllib.request, urllib.parse
+
+    target_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else date.today()
+    today = date.today()
+    days_back = (today - target_date).days
+    is_archive = days_back > 5
+    is_today = target_date == today
+
+    endpoint = "https://archive-api.open-meteo.com/v1/archive" if is_archive \
+        else "https://api.open-meteo.com/v1/forecast"
+
+    params = {
+        "latitude": lat, "longitude": lng,
+        "start_date": target_date.isoformat(),
+        "end_date": target_date.isoformat(),
+        "daily": "temperature_2m_max,temperature_2m_min,weather_code",
+        "hourly": "temperature_2m,wind_speed_10m,wind_direction_10m,weather_code",
+        "temperature_unit": "fahrenheit",
+        "wind_speed_unit": "mph",
+        "timezone": "America/New_York",
+    }
+    if is_today:
+        params["current"] = "temperature_2m,wind_speed_10m,wind_direction_10m,weather_code"
+
+    url = endpoint + "?" + urllib.parse.urlencode(params)
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+
+    cur = data.get("current", {}) or {}
+    daily = data.get("daily", {}) or {}
+    hourly = data.get("hourly", {}) or {}
+
+    if is_today and cur:
+        temp_now = cur.get("temperature_2m")
+        wind_mph = cur.get("wind_speed_10m")
+        wind_dir_deg = cur.get("wind_direction_10m")
+        condition_code = cur.get("weather_code")
+    else:
+        # Past/future day: pick noon (or midpoint) as the representative reading.
+        temps = hourly.get("temperature_2m", []) or []
+        winds = hourly.get("wind_speed_10m", []) or []
+        wdirs = hourly.get("wind_direction_10m", []) or []
+        codes = hourly.get("weather_code", []) or []
+        idx = 12 if len(temps) > 12 else (len(temps) // 2 if temps else 0)
+        temp_now = temps[idx] if temps else None
+        wind_mph = winds[idx] if winds else None
+        wind_dir_deg = wdirs[idx] if wdirs else None
+        condition_code = codes[idx] if codes else None
+
+    out = {
+        "temp_now": temp_now,
+        "wind_mph": wind_mph,
+        "wind_dir_deg": wind_dir_deg,
+        "condition_code": condition_code,
+        "temp_max": (daily.get("temperature_2m_max") or [None])[0],
+        "temp_min": (daily.get("temperature_2m_min") or [None])[0],
+        "fetched_at": datetime.utcnow().isoformat() + "Z",
+        "date": target_date.isoformat(),
+        "source": "open-meteo-archive" if is_archive else "open-meteo-forecast",
+    }
+    deg = out.get("wind_dir_deg")
+    if deg is not None:
+        compass = ["N","NE","E","SE","S","SW","W","NW","N"]
+        out["wind_dir"] = compass[int((deg + 22.5) // 45)]
+    out["condition_label"] = _WMO_LABELS.get(out.get("condition_code"), "—")
+    return out
+
+
 @app.route('/api/weather', methods=['GET'])
 def api_weather():
-    """Live current + today's hi/lo for the active project, from Open-Meteo.
-    Project coords default to the Bronx (Mott Haven) site.
-    Returns: temp_now, temp_max, temp_min, wind_mph, wind_dir, condition_code, condition_label."""
-    import urllib.request, urllib.parse
+    """Live weather for a project's coords + a given date. Default lat/lng
+    is the Bronx (Mott Haven) site. ?date=YYYY-MM-DD selects the day —
+    today by default; past dates >5 days back pull from Open-Meteo's archive
+    endpoint. Same response shape regardless of which endpoint was hit."""
     try:
         lat = float(request.args.get("lat", 40.8083))
         lng = float(request.args.get("lng", -73.9162))
-        params = {
-            "latitude": lat, "longitude": lng,
-            "current": "temperature_2m,wind_speed_10m,wind_direction_10m,weather_code",
-            "daily": "temperature_2m_max,temperature_2m_min,weather_code",
-            "temperature_unit": "fahrenheit",
-            "wind_speed_unit": "mph",
-            "timezone": "America/New_York",
-            "forecast_days": 1,
-        }
-        url = "https://api.open-meteo.com/v1/forecast?" + urllib.parse.urlencode(params)
-        with urllib.request.urlopen(url, timeout=10) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-
-        cur = data.get("current", {}) or {}
-        daily = data.get("daily", {}) or {}
-        out = {
-            "temp_now": cur.get("temperature_2m"),
-            "wind_mph": cur.get("wind_speed_10m"),
-            "wind_dir_deg": cur.get("wind_direction_10m"),
-            "condition_code": cur.get("weather_code"),
-            "temp_max": (daily.get("temperature_2m_max") or [None])[0],
-            "temp_min": (daily.get("temperature_2m_min") or [None])[0],
-            "fetched_at": datetime.utcnow().isoformat() + "Z",
-        }
-        # Compass direction
-        deg = out.get("wind_dir_deg")
-        if deg is not None:
-            compass = ["N","NE","E","SE","S","SW","W","NW","N"]
-            out["wind_dir"] = compass[int((deg + 22.5) // 45)]
-
-        # Plain-language condition (WMO weather codes)
-        code = out.get("condition_code")
-        labels = {
-            0: "Clear", 1: "Mostly clear", 2: "Partly cloudy", 3: "Overcast",
-            45: "Fog", 48: "Freezing fog",
-            51: "Light drizzle", 53: "Drizzle", 55: "Heavy drizzle",
-            56: "Freezing drizzle", 57: "Freezing drizzle",
-            61: "Light rain", 63: "Rain", 65: "Heavy rain",
-            66: "Freezing rain", 67: "Freezing rain",
-            71: "Light snow", 73: "Snow", 75: "Heavy snow",
-            77: "Snow grains",
-            80: "Rain showers", 81: "Rain showers", 82: "Heavy showers",
-            85: "Snow showers", 86: "Snow showers",
-            95: "Thunderstorm", 96: "Thunderstorm w/ hail", 99: "Severe thunderstorm",
-        }
-        out["condition_label"] = labels.get(code, "—")
+        date_str = request.args.get("date")
+        if date_str:
+            try:
+                datetime.strptime(date_str, '%Y-%m-%d')
+            except ValueError:
+                return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+        out = fetch_open_meteo_weather(lat, lng, date_str)
         return response_wrapper(out)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
