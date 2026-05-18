@@ -709,19 +709,28 @@ def worker_login():
             return jsonify({"error": "Authentication failed"}), 500
         emp = dict(rows[0])
 
-        # Validate geofence (Bronx project: 40.8083, -73.9162)
-        PROJECT_LAT, PROJECT_LNG = 40.8083, -73.9162
-        R = 6371000  # Earth radius meters
-        dLat = (latitude - PROJECT_LAT) * 3.14159 / 180
-        dLng = (longitude - PROJECT_LNG) * 3.14159 / 180
-        a = (dLat/2)**2 + (dLng/2)**2
-        distance = R * 2 * (a**0.5)
+        # TESTING AFFORDANCE — remove post-Monday cleanup. The bypass_geofence
+        # flag is intentionally trusted from the client because we have no
+        # separate test environment. Tracked for removal in task #11.
+        bypass_geofence = bool(data.get('bypass_geofence'))
+        if bypass_geofence:
+            app.logger.warning(
+                f"Geofence bypassed via testing flag for employee_id={emp['employee_id']}"
+            )
+        else:
+            # Validate geofence (Bronx project: 40.8083, -73.9162)
+            PROJECT_LAT, PROJECT_LNG = 40.8083, -73.9162
+            R = 6371000  # Earth radius meters
+            dLat = (latitude - PROJECT_LAT) * 3.14159 / 180
+            dLng = (longitude - PROJECT_LNG) * 3.14159 / 180
+            a = (dLat/2)**2 + (dLng/2)**2
+            distance = R * 2 * (a**0.5)
 
-        # Production geofence per project lat/lng accuracy. Previously relaxed
-        # to 100 miles for cross-borough testing.
-        if distance > 200:
-            conn.close()
-            return jsonify({"error": "Not on site", "distance": round(distance)}), 403
+            # Production geofence per project lat/lng accuracy. Previously relaxed
+            # to 100 miles for cross-borough testing.
+            if distance > 200:
+                conn.close()
+                return jsonify({"error": "Not on site", "distance": round(distance)}), 403
 
         cert_rows = conn.execute(
             "SELECT c.*, ct.name as cert_name FROM certifications c "

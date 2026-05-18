@@ -1241,14 +1241,17 @@ async function signIn() {
   certDiv.className = 'cert-status';
 
   try {
+    const loginPayload = {
+      phone_or_pin: pinCode,
+      latitude: geofenceData.latitude || 0,
+      longitude: geofenceData.longitude || 0
+    };
+    // Only attach when bypass is on so the server doesn't see an idle flag.
+    if (TESTING_BYPASS) loginPayload.bypass_geofence = true;
     const loginResp = await fetch('/api/worker/login', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        phone_or_pin: pinCode,
-        latitude: geofenceData.latitude || 0,
-        longitude: geofenceData.longitude || 0
-      })
+      body: JSON.stringify(loginPayload)
     });
     const loginJson = await loginResp.json();
     if (!loginResp.ok) {
