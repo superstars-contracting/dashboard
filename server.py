@@ -643,6 +643,42 @@ def create_inspection():
         return jsonify({"error": str(e)}), 500
 
 
+# ============= DCR VISITORS =============
+
+@app.route('/api/visitors', methods=['POST'])
+def create_visitor():
+    """Log a site visitor. Powers the DCR visitors section."""
+    try:
+        data = request.get_json() or {}
+        project_code = data.get('project_code')
+        if not project_code:
+            return jsonify({"error": "project_code required"}), 400
+        try:
+            date_str = _parse_dcr_date(data.get('date'))
+        except ValueError:
+            return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+        conn = db()
+        if not validate_project_exists(conn, project_code):
+            conn.close()
+            return jsonify({"error": "Project not found"}), 400
+        conn.execute(
+            "INSERT INTO visitors (date, project_code, name, company, role, "
+            "time_in, time_out, purpose, accompanied_by, notes) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (date_str, project_code, data.get('name'), data.get('company'),
+             data.get('role'), data.get('time_in'), data.get('time_out'),
+             data.get('purpose'), data.get('accompanied_by'), data.get('notes'))
+        )
+        conn.commit()
+        new_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()['id']
+        row = conn.execute("SELECT * FROM visitors WHERE id = ?", (new_id,)).fetchone()
+        conn.close()
+        return response_wrapper(dict(row)), 201
+    except Exception as e:
+        logging.error(f"POST /api/visitors: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ============= DCR AGGREGATOR =============
 
 @app.route('/api/projects/<project_code>/daily/<report_date>', methods=['GET'])
