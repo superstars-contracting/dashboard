@@ -2568,34 +2568,40 @@ def api_workers_intake_summary():
             eligible, _ = has_valid_prerequisite(emp_id)
             eligibility = 'cof' if eligible else 'company_id'
             # Current credential — CoF (status='issued') takes precedence; fall back to Company ID (status='active').
+            # html_url is derived from html_export_path so the workforce-list View button
+            # has a direct link without a follow-up GET /credential round-trip.
             current_credential = None
             cof_row = conn.execute(
-                """SELECT card_id, issued_date, expires_date, status FROM cof_cards
+                """SELECT card_id, issued_date, expires_date, status, html_export_path FROM cof_cards
                    WHERE employee_id = ? AND status = 'issued'
                    ORDER BY issued_date DESC LIMIT 1""",
                 (emp_id,)
             ).fetchone()
             if cof_row:
+                cof_html = cof_row["html_export_path"]
                 current_credential = {
                     "type": "cof",
                     "card_number_display": cof_row["card_id"],
                     "issued_date": cof_row["issued_date"],
                     "expires_date": cof_row["expires_date"],
                     "status": cof_row["status"],
+                    "html_url": ("/files/" + cof_html) if cof_html else None,
                 }
             else:
                 cid_row = conn.execute(
-                    """SELECT card_id, card_number_display, issued_date, status FROM company_id_cards
+                    """SELECT card_id, card_number_display, issued_date, status, html_export_path FROM company_id_cards
                        WHERE employee_id = ? AND status = 'active'
                        ORDER BY issued_date DESC, created_at DESC LIMIT 1""",
                     (emp_id,)
                 ).fetchone()
                 if cid_row:
+                    cid_html = cid_row["html_export_path"]
                     current_credential = {
                         "type": "company_id",
                         "card_number_display": cid_row["card_number_display"],
                         "issued_date": cid_row["issued_date"],
                         "status": cid_row["status"],
+                        "html_url": ("/files/" + cid_html) if cid_html else None,
                     }
             out.append({
                 **dict(e),
