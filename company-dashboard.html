@@ -1510,10 +1510,39 @@ applyLanguage();
   // Wire Scan Cert button.
   $('#pp-scan-cert').addEventListener('click', () => { runCertIntake(); });
 
-  // Take ID Photo — wired in commit B3.
-  $('#pp-take-face').addEventListener('click', () => {
-    alert('Take ID Photo: wired in next commit.');
-  });
+  // End-to-end face photo: camera → upload → refresh.
+  // No AI step, no review form — face photo is pure capture-and-save.
+  // No manual fallback either: a face photo must be a photo.
+  async function runFaceIntake() {
+    if (!currentEmployeeId) return;
+    const blob = await openCameraModal({title: 'Take ID Photo', allowManualFallback: false});
+    if (!blob || !(blob instanceof Blob)) return;
+
+    const loader = showLoader('Saving face photo…');
+    try {
+      const fd = new FormData();
+      fd.append('file', blob, 'face.jpeg');
+      const resp = await fetch('/api/employees/' + encodeURIComponent(currentEmployeeId) + '/face-photo', {
+        method: 'POST', body: fd,
+      });
+      const body = await resp.json().catch(() => ({}));
+      loader.remove();
+      if (resp.ok) {
+        const d = body.data || body;
+        // Re-render the face photo section from the path the server returned.
+        renderFacePhoto(d.face_image_path);
+        showToast('✓ Face photo saved', 3000);
+      } else {
+        const msg = (body && body.error) || `Upload failed (${resp.status})`;
+        alert('Face photo save failed: ' + msg);
+      }
+    } catch (e) {
+      try { loader.remove(); } catch (_) {}
+      alert('Network error saving face photo: ' + (e.message || String(e)));
+    }
+  }
+
+  $('#pp-take-face').addEventListener('click', () => { runFaceIntake(); });
 
   window.deleteDoc = async function(docId) {
     if (!confirm('Delete this document?')) return;
