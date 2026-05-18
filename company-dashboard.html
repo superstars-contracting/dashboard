@@ -373,6 +373,23 @@
       </div>
     </div>
 
+    <!-- Face Photo Section -->
+    <div style="margin-bottom:24px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="font-size:14px;font-weight:700;color:#14161C;text-transform:uppercase;letter-spacing:0.5px;">Face Photo</h3>
+        <button id="pp-take-face" style="background:#B11E2E;color:white;border:none;padding:8px 16px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <span style="font-size:14px;">📷</span> Take ID Photo
+        </button>
+      </div>
+      <div style="background:#FAF7F1;border-radius:8px;padding:14px;display:flex;align-items:center;gap:14px;">
+        <div id="pp-face-placeholder" style="width:96px;height:96px;border:2px dashed #E8E4DD;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#76777E;font-size:11px;text-align:center;flex-shrink:0;">No face photo</div>
+        <img id="pp-face-img" src="" style="width:96px;height:96px;object-fit:cover;border-radius:8px;display:none;cursor:zoom-in;flex-shrink:0;" alt="Face photo">
+        <div style="font-size:12px;color:#76777E;">
+          Used for verification on the project dashboard roster and the CoF card.
+        </div>
+      </div>
+    </div>
+
     <!-- Documents Section -->
     <div style="margin-bottom:24px;">
       <h3 style="font-size:14px;font-weight:700;color:#14161C;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Documents</h3>
@@ -401,46 +418,27 @@
     <div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="font-size:14px;font-weight:700;color:#14161C;text-transform:uppercase;letter-spacing:0.5px;">Certifications</h3>
-        <button id="pp-add-cert" class="btn" style="padding:6px 14px;font-size:12px;">+ Add Cert</button>
+        <button id="pp-scan-cert" style="background:#B11E2E;color:white;border:none;padding:8px 16px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <span style="font-size:14px;">📸</span> Scan Cert
+        </button>
       </div>
 
-      <!-- Add cert form (hidden) -->
-      <div id="pp-cert-form" style="display:none;background:#FAF7F1;border-radius:8px;padding:14px;margin-bottom:12px;border:1px solid #E8E4DD;">
-        <div style="display:grid;grid-template-columns:1fr;gap:8px;">
-          <div>
-            <label style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;display:block;margin-bottom:4px;">Cert Type</label>
-            <input id="pp-cert-type" type="text" list="cert-type-list" placeholder="Start typing... e.g. SST, OSHA-30, SPRAT" style="width:100%;padding:8px 10px;border:1px solid #E8E4DD;border-radius:6px;font-size:13px;">
-            <datalist id="cert-type-list"></datalist>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-            <div>
-              <label style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;display:block;margin-bottom:4px;">Card #</label>
-              <input id="pp-cert-num" type="text" placeholder="e.g. 12345678" style="width:100%;padding:8px 10px;border:1px solid #E8E4DD;border-radius:6px;font-size:13px;font-family:monospace;">
-            </div>
-            <div>
-              <label style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;display:block;margin-bottom:4px;">Issued</label>
-              <input id="pp-cert-issued" type="date" style="width:100%;padding:8px 10px;border:1px solid #E8E4DD;border-radius:6px;font-size:13px;">
-            </div>
-            <div>
-              <label style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;display:block;margin-bottom:4px;">Expires</label>
-              <input id="pp-cert-expires" type="date" style="width:100%;padding:8px 10px;border:1px solid #E8E4DD;border-radius:6px;font-size:13px;">
-            </div>
-          </div>
-        </div>
-        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;">
-          <button id="pp-cert-cancel" class="btn btn-outline" style="padding:6px 12px;font-size:12px;">Cancel</button>
-          <button id="pp-cert-save" class="btn" style="padding:6px 14px;font-size:12px;">Save Cert</button>
-        </div>
-      </div>
+      <!-- Hidden datalist for the cert-type override dropdown (populated by loadCertTypes,
+           used by the camera-capture modal in Part B) -->
+      <datalist id="cert-type-list"></datalist>
 
-      <!-- Certs table -->
-      <table class="roster" style="font-size:12px;">
-        <thead><tr><th>Type</th><th>Card #</th><th>Issued</th><th>Expires</th><th>Status</th><th></th></tr></thead>
-        <tbody id="pp-certs-list"><tr><td colspan="6" style="padding:14px;color:#76777E;font-style:italic;text-align:center;">No certifications recorded yet.</td></tr></tbody>
-      </table>
+      <!-- Cert cards container -->
+      <div id="pp-certs-list" style="display:grid;gap:8px;">
+        <div style="color:#76777E;font-style:italic;padding:14px 0;text-align:center;">No certifications recorded yet. Click <strong>Scan Cert</strong> to add one.</div>
+      </div>
     </div>
 
   </div>
+</div>
+
+<!-- Image lightbox — click any cert thumbnail or face photo to enlarge -->
+<div id="img-lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;align-items:center;justify-content:center;cursor:zoom-out;" onclick="window.closeLightbox()">
+  <img id="img-lightbox-content" src="" style="max-width:90vw;max-height:90vh;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.5);" alt="">
 </div>
 
 <!-- INTAKE MODAL -->
@@ -1022,34 +1020,110 @@ applyLanguage();
         }).join('');
       }
 
-      // Certs
-      const certs = d.certifications || [];
-      const certList = $('#pp-certs-list');
-      const today = new Date().toISOString().slice(0,10);
-      if (!certs.length) {
-        certList.innerHTML = '<tr><td colspan="6" style="padding:14px;color:#76777E;font-style:italic;text-align:center;">No certifications recorded yet.</td></tr>';
-      } else {
-        certList.innerHTML = certs.map(c => {
-          let status = '<span class="badge-pill ok">Valid</span>';
-          if (c.expiration_date && c.expiration_date < today) status = '<span class="badge-pill bad">Expired</span>';
-          else if (c.expiration_date) {
-            const days = Math.round((new Date(c.expiration_date) - new Date()) / 86400000);
-            if (days <= 30) status = `<span class="badge-pill warn">${days}d left</span>`;
-          }
-          return `<tr>
-            <td style="font-weight:600;">${esc(c.cert_name || c.cert_type_id)}${c.is_cof_prerequisite ? '<br><span style="font-size:9px;color:#76777E;">CoF prereq</span>' : ''}</td>
-            <td style="font-family:monospace;font-size:11px;">${esc(c.card_number || '—')}</td>
-            <td>${esc(c.date_obtained || '—')}</td>
-            <td>${esc(c.expiration_date || '—')}</td>
-            <td>${status}</td>
-            <td><button onclick="window.deleteCert(${c.id})" style="background:none;border:none;color:#B11E2E;font-size:11px;cursor:pointer;">×</button></td>
-          </tr>`;
-        }).join('');
-      }
+      // Certs — fetch from the dedicated endpoint (joins cert_types, adds
+      // status_derived + scan_url) instead of pulling from the embedded
+      // d.certifications array.
+      await renderCertsForCurrentWorker();
+
+      // Face photo — derive from face_image_path on the employee row.
+      renderFacePhoto(e.face_image_path);
     } catch (e) {
       console.warn('[Profile] load failed:', e);
     }
   }
+
+  async function renderCertsForCurrentWorker() {
+    if (!currentEmployeeId) return;
+    const container = $('#pp-certs-list');
+    try {
+      const resp = await fetch('/api/employees/' + encodeURIComponent(currentEmployeeId) + '/certifications').then(r => r.json());
+      const certs = (resp && resp.data) || [];
+      if (!certs.length) {
+        container.innerHTML = '<div style="color:#76777E;font-style:italic;padding:14px 0;text-align:center;">No certifications recorded yet. Click <strong>Scan Cert</strong> to add one.</div>';
+        return;
+      }
+      container.innerHTML = certs.map(certCardHtml).join('');
+    } catch (err) {
+      console.warn('[Profile] certs load failed:', err);
+      container.innerHTML = '<div style="color:#B11E2E;font-style:italic;padding:14px 0;text-align:center;">Failed to load certifications.</div>';
+    }
+  }
+
+  function certCardHtml(c) {
+    const statusColors = {
+      valid: '#2F7C57',
+      expiring: '#B68838',
+      expired: '#B11E2E',
+      unknown: '#76777E',
+    };
+    const statusLabels = {
+      valid: 'Valid',
+      expiring: 'Expiring',
+      expired: 'Expired',
+      unknown: 'No dates',
+    };
+    const sd = c.status_derived || 'unknown';
+    const statusColor = statusColors[sd] || statusColors.unknown;
+    const statusLabel = statusLabels[sd] || statusLabels.unknown;
+
+    const datesLine = (c.date_obtained || c.expiration_date)
+      ? `${esc(c.date_obtained || '—')} → ${esc(c.expiration_date || 'no exp')}`
+      : 'no dates recorded';
+
+    const thumb = c.scan_url
+      ? `<img src="${esc(c.scan_url)}" onclick="event.stopPropagation();window.showLightbox('${esc(c.scan_url)}')" style="width:60px;height:60px;object-fit:cover;border-radius:4px;border:1px solid #E8E4DD;cursor:zoom-in;flex-shrink:0;" alt="">`
+      : `<div style="width:60px;height:60px;background:#F1EEE8;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#76777E;flex-shrink:0;">No scan</div>`;
+
+    return `<div data-cert-id="${c.cert_id}" style="display:flex;gap:12px;align-items:center;padding:12px;border:1px solid #E8E4DD;border-radius:6px;background:white;">
+      ${thumb}
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:baseline;gap:10px;justify-content:space-between;">
+          <div style="font-weight:700;font-size:13px;color:#14161C;">${esc(c.cert_name || c.cert_type_id)}</div>
+          <span style="background:${statusColor};color:white;font-size:10px;padding:2px 8px;border-radius:99px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0;white-space:nowrap;">${esc(statusLabel)}</span>
+        </div>
+        <div style="font-size:11px;color:#76777E;margin-top:4px;">
+          ${c.card_number ? `Card # <span style="font-family:monospace;">${esc(c.card_number)}</span> · ` : ''}${datesLine}${c.issuing_body ? ' · ' + esc(c.issuing_body) : ''}${c.is_cof_prerequisite ? ' · <strong>CoF prereq</strong>' : ''}
+        </div>
+      </div>
+      <button onclick="event.stopPropagation();window.deleteCert(${c.cert_id})" title="Delete cert" style="background:none;border:none;color:#B11E2E;font-size:18px;cursor:pointer;flex-shrink:0;padding:0 4px;">×</button>
+    </div>`;
+  }
+
+  function renderFacePhoto(facePath) {
+    const img = $('#pp-face-img');
+    const ph = $('#pp-face-placeholder');
+    if (!facePath) {
+      img.style.display = 'none';
+      img.src = '';
+      ph.style.display = 'flex';
+      return;
+    }
+    // Server stores an absolute path; turn it into a /worker-files/ URL.
+    const m = facePath.match(/[\/\\]worker_records[\/\\](.+)$/);
+    if (!m) {
+      img.style.display = 'none';
+      img.src = '';
+      ph.style.display = 'flex';
+      return;
+    }
+    const url = '/worker-files/' + m[1].replace(/\\/g, '/');
+    img.src = url;
+    img.style.display = 'block';
+    img.onclick = () => window.showLightbox(url);
+    ph.style.display = 'none';
+  }
+
+  window.showLightbox = function(url) {
+    const lb = document.getElementById('img-lightbox');
+    const img = document.getElementById('img-lightbox-content');
+    img.src = url;
+    lb.style.display = 'flex';
+  };
+  window.closeLightbox = function() {
+    const lb = document.getElementById('img-lightbox');
+    lb.style.display = 'none';
+    document.getElementById('img-lightbox-content').src = '';
+  };
 
   async function loadCertTypes() {
     try {
@@ -1089,39 +1163,13 @@ applyLanguage();
     });
   });
 
-  // Cert form
-  $('#pp-add-cert').addEventListener('click', () => {
-    $('#pp-cert-form').style.display = 'block';
+  // Scan Cert / Take ID Photo — no-op for now. Part B wires both to the
+  // camera-capture modal (getUserMedia → upload → AI extract → review form).
+  $('#pp-scan-cert').addEventListener('click', () => {
+    alert('Scan Cert: camera-based capture coming in Part B.');
   });
-  $('#pp-cert-cancel').addEventListener('click', () => {
-    $('#pp-cert-form').style.display = 'none';
-    ['pp-cert-type','pp-cert-num','pp-cert-issued','pp-cert-expires'].forEach(id => $('#'+id).value = '');
-  });
-  $('#pp-cert-save').addEventListener('click', async () => {
-    if (!currentEmployeeId) return;
-    const typedName = $('#pp-cert-type').value.trim();
-    if (!typedName) { alert('Cert type is required'); return; }
-    // Look up cert_type_id from name
-    const match = (window._certTypes || []).find(t => t.name.toLowerCase() === typedName.toLowerCase());
-    const cert_type_id = match ? match.cert_type_id : 'CUSTOM-' + typedName.replace(/[^A-Za-z0-9]/g, '').substring(0, 24).toUpperCase();
-    const payload = {
-      cert_type_id,
-      cert_type_name: typedName,
-      card_number: $('#pp-cert-num').value || null,
-      date_obtained: $('#pp-cert-issued').value || null,
-      expiration_date: $('#pp-cert-expires').value || null,
-    };
-    try {
-      const resp = await fetch('/api/workers/' + encodeURIComponent(currentEmployeeId) + '/certs', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify(payload)
-      }).then(r => r.json());
-      if (resp.error) { alert('Save failed: ' + resp.error); return; }
-      $('#pp-cert-form').style.display = 'none';
-      ['pp-cert-type','pp-cert-num','pp-cert-issued','pp-cert-expires'].forEach(id => $('#'+id).value = '');
-      await loadProfile();
-      await loadMetrics();
-    } catch (e) { alert('Network error: ' + e.message); }
+  $('#pp-take-face').addEventListener('click', () => {
+    alert('Take ID Photo: camera-based capture coming in Part B.');
   });
 
   window.deleteDoc = async function(docId) {
