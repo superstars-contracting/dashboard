@@ -241,29 +241,29 @@
         <table class="body-grid">
           <tr>
             <td class="photo-cell">
-              <div class="photo-box">PHOTO</div>
+              <div class="photo-box">{% if PHOTO_URL_OR_BLANK %}<img src="{{ PHOTO_URL_OR_BLANK }}" style="width:100%;height:100%;object-fit:cover;display:block;">{% else %}PHOTO{% endif %}</div>
             </td>
             <td>
               <div class="field">
                 <div class="field-label">Name of Holder</div>
-                <div class="field-value">&nbsp;</div>
+                <div class="field-value">{{ NAME }}</div>
               </div>
               <div class="field">
                 <div class="field-label">Card Number</div>
-                <div class="field-value mono">SSC-COF-________</div>
+                <div class="field-value mono">{{ CARD_NUMBER_DISPLAY }}</div>
               </div>
               <table class="field-row">
                 <tr>
                   <td>
                     <div class="field">
                       <div class="field-label">Issued</div>
-                      <div class="field-value mono">__ / __ / ____</div>
+                      <div class="field-value mono">{{ ISSUED_DATE }}</div>
                     </div>
                   </td>
                   <td>
                     <div class="field">
                       <div class="field-label">Expires</div>
-                      <div class="field-value mono expires">__ / __ / ____</div>
+                      <div class="field-value mono expires">{{ EXPIRES_DATE }}</div>
                     </div>
                   </td>
                 </tr>
@@ -319,15 +319,15 @@
     <tr>
       <td class="back-body">
         <div class="attest-text">
-          I, <span class="fillin name"></span>, NYC DOB Special Rigger <span class="fillin license">#</span>, having found the named holder capable of performing scaffold work in a safe and responsible manner and confirmed training per <strong>NYC Building Code §3314.4</strong>, hereby issue this Certificate of Fitness for use of a two-point suspension scaffold under the supervision of my designated Rigging Foreman.
+          I, <span class="fillin name">{{ RIGGER_NAME }}</span>, NYC DOB Special Rigger <span class="fillin license">#{{ RIGGER_LICENSE }}</span>, having found the named holder capable of performing scaffold work in a safe and responsible manner and confirmed training per <strong>NYC Building Code §3314.4</strong>, hereby issue this Certificate of Fitness for use of a two-point suspension scaffold under the supervision of my designated Rigging Foreman.
         </div>
         <table class="sig-row"><tr>
           <td class="sig-cell-name">
-            <div class="sig-line"></div>
+            <div class="sig-line">{% if SIGNATURE_URL %}<img src="{{ SIGNATURE_URL }}" style="max-height:5mm;max-width:90%;">{% endif %}</div>
             <div class="sig-label">Issuer Signature</div>
           </td>
           <td class="sig-cell-date">
-            <div class="sig-line"></div>
+            <div class="sig-line" style="text-align:center;font-family:'Consolas','Menlo',monospace;font-size:2.4mm;padding-top:1.5mm;">{{ ISSUED_DATE }}</div>
             <div class="sig-label">Date</div>
           </td>
         </tr></table>
