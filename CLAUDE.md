@@ -59,6 +59,23 @@ Use the `split_statements` pattern (see `apply_riggers_schema.py`) so re-running
 a migration is safe. Duplicate column errors are caught and counted as skipped.
 Never write a migration that fails on second run.
 
+## 6. Secrets rule: vault all authenticating API keys, never plaintext on disk
+
+All API keys that authenticate as the company, are billed against the company's
+accounts, or grant access to non-public data live in 1Password Business under
+the "Dashboard Secrets" vault. Never store such keys in plaintext anywhere on
+disk — not in `.env`, not in source code, not in config, not in scripts. Code
+accesses them via 1Password CLI references (`op://Vault/Item/field`) injected
+at runtime by `op run`, or via explicit `op read` within an authenticated
+1Password session. No agent, script, or process gets unfiltered access — every
+fetch goes through the Windows Hello / master password / YubiKey-gated
+1Password session and is audit-logged. This rule does NOT apply to: (a) no-key
+public APIs like Open-Meteo, (b) intentionally-public client-side keys like
+Stripe publishable keys or domain-restricted Maps keys. For operational
+hygiene, every external service the dashboard depends on still gets a
+1Password vault item even with no credential — the vault doubles as the
+service inventory.
+
 ---
 
 ## File layout
