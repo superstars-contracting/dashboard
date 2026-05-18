@@ -83,9 +83,10 @@ def response_wrapper(data, count=None):
         }
     })
 
-# CLAUDE.md rule #2: PINs are derived from phone last-4, so plaintext phones
-# and PINs in server.log violate the same PII discipline as pasting them into
-# chats. Redact at the logging boundary so the file accumulates only safe data.
+# Per CLAUDE.md PII rule: PINs are derived from phone last-4, so plaintext
+# phones and PINs in server.log violate the same PII discipline as pasting
+# them into chats. Redact at the logging boundary so the file accumulates
+# only safe data.
 _PIN_BEARING_FIELDS = {'phone_or_pin', 'pin', 'phone', 'emergency_contact_phone'}
 
 def _redact_pii(body):
