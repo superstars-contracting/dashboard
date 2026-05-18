@@ -261,10 +261,11 @@
             <th style="text-align:center;" data-i18n="col-certs">Certs</th>
             <th style="text-align:center;" data-i18n="col-health">Health</th>
             <th data-i18n="col-intake">Intake</th>
+            <th style="text-align:center;" data-i18n="col-action">Action</th>
           </tr>
         </thead>
         <tbody id="workforce-tbody">
-          <tr><td colspan="8" style="padding:20px;text-align:center;color:#76777E;" data-i18n="loading-roster">Loading roster…</td></tr>
+          <tr><td colspan="9" style="padding:20px;text-align:center;color:#76777E;" data-i18n="loading-roster">Loading roster…</td></tr>
         </tbody>
       </table>
     </div>
@@ -535,6 +536,11 @@ const I18N = {
     'col-certs': 'Certs',
     'col-health': 'Health',
     'col-intake': 'Intake',
+    'col-action': 'Action',
+    'issue-cof': 'Issue CoF',
+    'issue-company-id': 'Issue Company ID',
+    'view-cof': 'View CoF',
+    'view-company-id': 'View Company ID',
     'col-code': 'Code',
     'col-validity': 'Validity',
     'col-cof-prereq': 'CoF Prereq',
@@ -609,6 +615,11 @@ const I18N = {
     'col-certs': 'Cert.',
     'col-health': 'Estado',
     'col-intake': 'Registro',
+    'col-action': 'Acción',
+    'issue-cof': 'Emitir CoF',
+    'issue-company-id': 'Emitir ID de Compañía',
+    'view-cof': 'Ver CoF',
+    'view-company-id': 'Ver ID de Compañía',
     'col-code': 'Código',
     'col-validity': 'Validez',
     'col-cof-prereq': 'Req. CoF',
@@ -773,6 +784,76 @@ applyLanguage();
     } catch (e) { console.warn(e); }
   }
 
+  // ---- Credential Action column helpers (E3) ----
+  function credLabel(t) {
+    return t === 'cof' ? 'CoF' : (t === 'company_id' ? 'Company ID' : '?');
+  }
+
+  function actionButtonHTML(r) {
+    const elig = r.eligibility;
+    const cur = r.current_credential;
+    const baseStyle = 'background:none;border:1px solid #E8E4DD;color:#B11E2E;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;font-weight:600;';
+    if (!elig) {
+      // Defensive: missing eligibility (older data / schema lag)
+      return `<button class="cred-btn" data-action="unknown" style="background:none;border:1px solid #E8E4DD;color:#76777E;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;font-weight:600;">—</button>`;
+    }
+    const eligLabel = credLabel(elig);
+    const safeEmp = esc(r.employee_id);
+    if (!cur) {
+      return `<button class="cred-btn" data-action="issue" data-emp="${safeEmp}" data-elig="${elig}" data-supersede="false" style="${baseStyle}">Issue ${eligLabel}</button>`;
+    }
+    if (cur.type === elig) {
+      const urlEsc = esc(cur.html_url || '');
+      return `<button class="cred-btn" data-action="view" data-html-url="${urlEsc}" style="${baseStyle}">View ${eligLabel}</button>`;
+    }
+    // Cross-type: eligibility changed since last issuance
+    const oldLabel = credLabel(cur.type);
+    return `<button class="cred-btn" data-action="issue" data-emp="${safeEmp}" data-elig="${elig}" data-supersede="true" data-old-type="${cur.type}" style="${baseStyle}">Issue ${eligLabel} (supersedes ${oldLabel})</button>`;
+  }
+
+  async function postIssueCredential(empId, workerName, elig, override) {
+    try {
+      const resp = await fetch(`/api/employees/${encodeURIComponent(empId)}/credential/issue`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ issued_by: 'admin', override_active: !!override })
+      });
+      const json = await resp.json();
+      if (resp.status === 201) {
+        const data = json.data || {};
+        const typeLabel = credLabel(data.type || elig);
+        if (data.html_url) window.open(data.html_url, '_blank');
+        alert(`✓ ${typeLabel} issued for ${workerName}`);
+        loadWorkforce();
+      } else if (resp.status === 409) {
+        const cur = json.current_credential || {};
+        const msg = `${workerName} already has an active ${credLabel(cur.type)}. Issue a new credential and supersede the old one?`;
+        if (confirm(msg)) {
+          await postIssueCredential(empId, workerName, elig, true);
+        }
+      } else if (resp.status === 400 && json.error && json.error.toLowerCase().indexOf('face photo') !== -1) {
+        alert('Take an ID photo first. Click the worker row to open their profile, then click Take ID Photo.');
+      } else {
+        alert('Issue failed: ' + (json.error || `HTTP ${resp.status}`));
+      }
+    } catch (e) {
+      console.warn('[credential issue]', e);
+      alert('Network error issuing credential: ' + e.message);
+    }
+  }
+
+  function issueCredentialClick(empId, workerName, elig, supersede, oldType) {
+    const eligLabel = credLabel(elig);
+    let confirmMsg;
+    if (supersede) {
+      confirmMsg = `Issue ${eligLabel} for ${workerName}? This will supersede the current ${credLabel(oldType)}.`;
+    } else {
+      confirmMsg = `Issue ${eligLabel} for ${workerName}?`;
+    }
+    if (!confirm(confirmMsg)) return;
+    postIssueCredential(empId, workerName, elig, !!supersede);
+  }
+
   // Load workforce
   async function loadWorkforce() {
     try {
@@ -780,7 +861,7 @@ applyLanguage();
       const rows = (resp && resp.data) || [];
       const tbody = $('#workforce-tbody');
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="8" style="padding:20px;text-align:center;color:#76777E;">No workers yet. Click <strong>+ Add Worker</strong> above.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="padding:20px;text-align:center;color:#76777E;">No workers yet. Click <strong>+ Add Worker</strong> above.</td></tr>';
         return;
       }
       tbody.innerHTML = rows.map(r => {
@@ -789,7 +870,7 @@ applyLanguage();
         else if (r.certs_expiring_30d > 0) health = `<span class="badge-pill warn">${r.certs_expiring_30d} &lt;30d</span>`;
         const status = (r.intake_status === 'complete') ? '<span class="badge-pill ok">Complete</span>' : '<span class="badge-pill mute">Pending</span>';
         const safeId = esc(r.employee_id);
-        return `<tr data-emp="${safeId}">
+        return `<tr data-emp="${safeId}" data-name="${esc(r.name || '')}">
           <td style="font-weight:600;">${esc(r.name || '—')}</td>
           <td>${esc(r.trade || '—')}</td>
           <td style="font-size:11px;text-transform:uppercase;color:#76777E;">${esc((r.language || '—').toUpperCase().slice(0,2))}</td>
@@ -798,11 +879,34 @@ applyLanguage();
           <td style="text-align:center;">${r.cert_count}</td>
           <td style="text-align:center;">${health}</td>
           <td>${status}</td>
+          <td style="text-align:center;">${actionButtonHTML(r)}</td>
         </tr>`;
       }).join('');
-      // wire click handlers
+      // wire row click to open profile
       tbody.querySelectorAll('tr[data-emp]').forEach(tr => {
         tr.addEventListener('click', () => openProfile(tr.getAttribute('data-emp')));
+      });
+      // wire credential action buttons — stopPropagation so they don't trigger the row click
+      tbody.querySelectorAll('.cred-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const action = btn.dataset.action;
+          if (action === 'unknown') { alert('Reload page to refresh credential state'); return; }
+          if (action === 'view') {
+            const url = btn.dataset.htmlUrl;
+            if (url) window.open(url, '_blank');
+            else alert('No rendered credential available yet — re-issue to regenerate the HTML.');
+            return;
+          }
+          // action === 'issue'
+          const tr = btn.closest('tr');
+          const emp = btn.dataset.emp;
+          const name = tr ? (tr.getAttribute('data-name') || emp) : emp;
+          const elig = btn.dataset.elig;
+          const supersede = btn.dataset.supersede === 'true';
+          const oldType = btn.dataset.oldType || '';
+          issueCredentialClick(emp, name, elig, supersede, oldType);
+        });
       });
     } catch (e) { console.warn(e); }
   }

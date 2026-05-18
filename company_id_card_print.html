@@ -207,9 +207,23 @@
     body { background: #ECE9E2; padding: 12mm 0; }
     .sheet { box-shadow: 0 4px 20px rgba(0,0,0,0.15); margin: 0 auto 20mm; padding-top: 30mm; }
   }
+
+  /* On-screen hint that disappears in print */
+  .screen-only-note {
+    font-size: 11px;
+    color: #76777E;
+    text-align: center;
+    padding: 8mm 0 4mm;
+    letter-spacing: 0.5px;
+    font-family: 'Calibri', 'Segoe UI', sans-serif;
+  }
+  @media print {
+    .screen-only-note { display: none; }
+  }
 </style>
 </head>
 <body>
+<div class="screen-only-note">Press Ctrl+P (Cmd+P on Mac) to print this credential.</div>
 
 <!-- ============================ PAGE 1 — FRONT ============================ -->
 <div class="sheet">
