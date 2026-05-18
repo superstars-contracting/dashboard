@@ -1282,50 +1282,78 @@ def get_worker_session(session_id):
 
 @app.route('/api/photos/upload', methods=['POST'])
 def upload_photo():
-    """Upload worker photo"""
+    """Upload a site photo to disk + record metadata in the photos table.
+
+    Disk layout: data_room/photos/<project_code>/<date>/<location>/<ts>_<uuid8>.<ext>
+    On DB INSERT failure, the on-disk file is rolled back (deleted) so disk
+    state and DB state never diverge. Replaces the prior contract (session_id,
+    zone, scope, latitude, longitude) which had no live callers."""
     try:
-        session_id = request.form.get('session_id')
-        zone = request.form.get('zone', 'Unknown')
-        scope = request.form.get('scope', 'other')
-        
         if 'photo' not in request.files:
             return jsonify({"error": "No photo file"}), 400
-        
+        project_code = request.form.get('project_code')
+        if not project_code:
+            return jsonify({"error": "project_code required"}), 400
+        try:
+            date_str = _parse_dcr_date(request.form.get('date'))
+        except ValueError:
+            return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+
+        conn = db()
+        if not validate_project_exists(conn, project_code):
+            conn.close()
+            return jsonify({"error": "Project not found"}), 400
+        conn.close()
+
+        location = (request.form.get('location') or 'Unknown').strip() or 'Unknown'
+        description = request.form.get('description')
+        uploaded_by = request.form.get('uploaded_by')
+
         photo_file = request.files['photo']
+        orig_name = photo_file.filename or ""
+        ext = Path(orig_name).suffix.lower()
+        if ext not in {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif'}:
+            ext = ".jpg"
+
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        photo_id = f"PHOTO-{uuid.uuid4().hex[:8]}"
-        
-        # Save to data_room/photos/SC-2601/{date}/{zone}/
-        today = date.today().isoformat()
-        photo_dir = SCRIPT_DIR / "data_room" / "photos" / "SC-2601" / today / zone
+        photo_uuid = uuid.uuid4().hex[:8]
+        filename = f"{timestamp}_{photo_uuid}{ext}"
+
+        photos_base = (SCRIPT_DIR / "data_room" / "photos").resolve()
+        photo_dir = SCRIPT_DIR / "data_room" / "photos" / project_code / date_str / location
+        if not photo_dir.resolve().is_relative_to(photos_base):
+            return jsonify({"error": "Invalid location path"}), 400
         photo_dir.mkdir(parents=True, exist_ok=True)
-        
-        filename = f"{session_id}_{timestamp}.jpg"
-        filepath = photo_dir / filename
-        photo_file.save(str(filepath))
-        
-        # Log metadata
+
+        file_path = photo_dir / filename
+        photo_file.save(str(file_path))
+
+        rel = file_path.relative_to(SCRIPT_DIR).as_posix()
+        url = f"/files/{rel}"
+
         conn = db()
         try:
             conn.execute(
-                "INSERT INTO photos (photo_id, session_id, zone, scope, filepath, latitude, longitude, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (photo_id, session_id, zone, scope, str(filepath), 
-                 request.form.get('latitude', 0), request.form.get('longitude', 0),
-                 datetime.now().isoformat())
+                "INSERT INTO photos (date, project_code, file_path, filename, url, "
+                "location, description, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (date_str, project_code, str(file_path), filename, url,
+                 location, description, uploaded_by)
             )
             conn.commit()
-        except:
-            pass  # Table may not exist yet
-        conn.close()
-        
-        return response_wrapper({
-            "photo_id": photo_id,
-            "filepath": str(filepath),
-            "zone": zone,
-            "scope": scope
-        })
+            new_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()['id']
+            row = conn.execute("SELECT * FROM photos WHERE id = ?", (new_id,)).fetchone()
+            conn.close()
+            return response_wrapper(dict(row)), 201
+        except Exception as db_err:
+            conn.close()
+            try:
+                file_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            logging.error(f"POST /api/photos/upload DB insert failed, rolled back file {file_path}: {db_err}")
+            return jsonify({"error": f"DB insert failed: {db_err}"}), 500
     except Exception as e:
+        logging.error(f"POST /api/photos/upload: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/photos', methods=['GET'])
