@@ -332,13 +332,16 @@
       <div style="font-size:11px;color:#76777E;letter-spacing:1px;text-transform:uppercase;font-weight:700;" id="pp-id">—</div>
       <h2 id="pp-name" style="font-family:'Playfair Display','Georgia',serif;font-size:24px;font-weight:700;margin-top:4px;">—</h2>
     </div>
-    <button id="pp-close" style="background:none;border:none;font-size:30px;color:#76777E;cursor:pointer;line-height:1;">×</button>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button id="pp-edit-btn" style="background:#B11E2E;color:white;border:none;padding:6px 14px;border-radius:4px;font-size:12px;cursor:pointer;font-weight:600;letter-spacing:0.5px;">Edit</button>
+      <button id="pp-close" style="background:none;border:none;font-size:30px;color:#76777E;cursor:pointer;line-height:1;">×</button>
+    </div>
   </div>
 
   <div style="padding:24px 28px;">
 
-    <!-- Info card -->
-    <div style="background:#FAF7F1;border-radius:8px;padding:14px 16px;margin-bottom:24px;font-size:13px;">
+    <!-- Info card (read-only view) -->
+    <div id="pp-info-card" style="background:#FAF7F1;border-radius:8px;padding:14px 16px;margin-bottom:24px;font-size:13px;">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
         <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Trade</span><strong id="pp-trade">—</strong></div>
         <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Language</span><strong id="pp-lang">—</strong></div>
@@ -346,6 +349,27 @@
         <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">DOB</span><strong id="pp-dob">—</strong></div>
         <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Emergency</span><strong id="pp-ec">—</strong></div>
         <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Hired</span><strong id="pp-hire">—</strong></div>
+      </div>
+    </div>
+
+    <!-- Edit form (hidden until Edit button clicked) -->
+    <div id="pp-edit-form" style="background:#FAF7F1;border-radius:8px;padding:14px 16px;margin-bottom:24px;font-size:13px;display:none;border:2px solid #B11E2E;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;">
+        <div style="grid-column:1 / span 2;"><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Name *</label><input id="pp-edit-name" type="text" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Trade</label><input id="pp-edit-trade" type="text" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Language</label><select id="pp-edit-lang" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;background:white;"><option value="EN">EN</option><option value="ES">ES</option></select></div>
+        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Phone (any format)</label><input id="pp-edit-phone" type="tel" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">DOB</label><input id="pp-edit-dob" type="date" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Hired</label><input id="pp-edit-hire" type="date" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
+        <div style="grid-column:1 / span 2;"><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Email</label><input id="pp-edit-email" type="email" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Emergency Name</label><input id="pp-edit-ec-name" type="text" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Emergency Phone</label><input id="pp-edit-ec-phone" type="tel" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
+        <div style="grid-column:1 / span 2;"><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Emergency Relation</label><input id="pp-edit-ec-relation" type="text" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
+      </div>
+      <div id="pp-edit-error" style="color:#B11E2E;font-size:12px;margin-top:12px;display:none;font-weight:600;"></div>
+      <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;">
+        <button id="pp-edit-cancel" style="background:none;border:1px solid #E8E4DD;color:#76777E;padding:7px 16px;border-radius:4px;font-size:12px;cursor:pointer;font-weight:600;">Cancel</button>
+        <button id="pp-edit-save" style="background:#B11E2E;color:white;border:none;padding:7px 16px;border-radius:4px;font-size:12px;cursor:pointer;font-weight:600;">Save</button>
       </div>
     </div>
 
@@ -807,6 +831,7 @@ applyLanguage();
   // Worker Profile Panel
   // ============================================================
   let currentEmployeeId = null;
+  let currentProfile = null;  // Cached employee row — used by the Edit form to detect changed fields
   const ppBg = $('#profile-bg');
   const ppPanel = $('#profile-panel');
 
@@ -814,6 +839,8 @@ applyLanguage();
     ppBg.style.display = 'none';
     ppPanel.style.display = 'none';
     currentEmployeeId = null;
+    currentProfile = null;
+    exitEditMode();  // Defensive — make sure the next open doesn't inherit edit state
   }
   $('#pp-close').addEventListener('click', closeProfile);
   ppBg.addEventListener('click', closeProfile);
@@ -828,6 +855,125 @@ applyLanguage();
   }
   window.openProfile = openProfile;
 
+  // ----- Edit-mode helpers -----
+  // Maps each form input id to the schema column it edits. Used both to populate
+  // the form on Edit and to diff against currentProfile on Save (only changed
+  // fields go in the PATCH payload, so a no-op save sends nothing).
+  const EDIT_FIELD_MAP = {
+    'pp-edit-name': 'name',
+    'pp-edit-trade': 'trade',
+    'pp-edit-lang': 'language',
+    'pp-edit-phone': 'phone',
+    'pp-edit-dob': 'dob',
+    'pp-edit-hire': 'hire_date',
+    'pp-edit-email': 'email',
+    'pp-edit-ec-name': 'emergency_contact_name',
+    'pp-edit-ec-phone': 'emergency_contact_phone',
+    'pp-edit-ec-relation': 'emergency_contact_relation',
+  };
+
+  function enterEditMode() {
+    if (!currentProfile) return;
+    for (const [domId, field] of Object.entries(EDIT_FIELD_MAP)) {
+      const el = document.getElementById(domId);
+      if (!el) continue;
+      const val = currentProfile[field];
+      if (field === 'language') {
+        el.value = (val || 'EN').toUpperCase() === 'ES' ? 'ES' : 'EN';
+      } else {
+        el.value = val == null ? '' : val;
+      }
+    }
+    $('#pp-info-card').style.display = 'none';
+    $('#pp-edit-form').style.display = 'block';
+    $('#pp-edit-btn').style.display = 'none';
+    $('#pp-edit-error').style.display = 'none';
+    $('#pp-edit-error').textContent = '';
+    $('#pp-edit-save').disabled = false;
+  }
+
+  function exitEditMode() {
+    const card = document.getElementById('pp-info-card');
+    const form = document.getElementById('pp-edit-form');
+    const btn = document.getElementById('pp-edit-btn');
+    if (card) card.style.display = 'block';
+    if (form) form.style.display = 'none';
+    if (btn) btn.style.display = 'inline-block';
+    const errEl = document.getElementById('pp-edit-error');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    const saveBtn = document.getElementById('pp-edit-save');
+    if (saveBtn) saveBtn.disabled = false;
+  }
+
+  async function saveEdit() {
+    if (!currentEmployeeId || !currentProfile) return;
+    const errEl = $('#pp-edit-error');
+    errEl.style.display = 'none';
+    errEl.textContent = '';
+
+    // Diff: only changed fields go in the payload.
+    const payload = {};
+    for (const [domId, field] of Object.entries(EDIT_FIELD_MAP)) {
+      const el = document.getElementById(domId);
+      if (!el) continue;
+      const newVal = (el.value || '').trim();
+      const origVal = currentProfile[field] == null ? '' : String(currentProfile[field]).trim();
+      if (newVal !== origVal) payload[field] = newVal;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      // No diff — just exit edit mode silently.
+      exitEditMode();
+      return;
+    }
+
+    $('#pp-edit-save').disabled = true;
+    try {
+      const resp = await fetch('/api/employees/' + encodeURIComponent(currentEmployeeId), {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+      });
+      const respData = await resp.json();
+      if (!resp.ok) {
+        errEl.textContent = (respData && respData.error) || ('Save failed (' + resp.status + ')');
+        errEl.style.display = 'block';
+        $('#pp-edit-save').disabled = false;
+        return;
+      }
+      const d = (respData && respData.data) || respData;
+      if (d.pin_changed && d.new_pin) {
+        showToast('✓ Saved. New PIN: ' + d.new_pin + ' — share with worker', 8000);
+      } else {
+        showToast('✓ Saved', 3000);
+      }
+      exitEditMode();
+      await loadProfile();
+    } catch (e) {
+      errEl.textContent = 'Network error: ' + (e && e.message ? e.message : e);
+      errEl.style.display = 'block';
+      $('#pp-edit-save').disabled = false;
+    }
+  }
+
+  function showToast(msg, durationMs) {
+    let toast = document.getElementById('pp-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'pp-toast';
+      toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#14161C;color:white;padding:12px 22px;border-radius:6px;font-size:13px;z-index:9999;box-shadow:0 4px 14px rgba(0,0,0,0.3);font-weight:600;letter-spacing:0.3px;';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.style.display = 'block';
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => { toast.style.display = 'none'; }, durationMs || 4000);
+  }
+
+  $('#pp-edit-btn').addEventListener('click', enterEditMode);
+  $('#pp-edit-cancel').addEventListener('click', exitEditMode);
+  $('#pp-edit-save').addEventListener('click', saveEdit);
+
   async function loadProfile() {
     if (!currentEmployeeId) return;
     try {
@@ -835,6 +981,7 @@ applyLanguage();
       const d = resp && resp.data;
       if (!d) return;
       const e = d.employee || {};
+      currentProfile = e;  // Snapshot for the Edit form's change-detection
       $('#pp-id').textContent = e.employee_id || '—';
       $('#pp-name').textContent = e.name || '—';
       $('#pp-trade').textContent = e.trade || '—';
