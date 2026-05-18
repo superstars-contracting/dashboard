@@ -83,9 +83,20 @@ def response_wrapper(data, count=None):
         }
     })
 
+# CLAUDE.md rule #2: PINs are derived from phone last-4, so plaintext phones
+# and PINs in server.log violate the same PII discipline as pasting them into
+# chats. Redact at the logging boundary so the file accumulates only safe data.
+_PIN_BEARING_FIELDS = {'phone_or_pin', 'pin', 'phone', 'emergency_contact_phone'}
+
+def _redact_pii(body):
+    if not isinstance(body, dict):
+        return body
+    return {k: ('XXXX' if (k in _PIN_BEARING_FIELDS and v) else v) for k, v in body.items()}
+
 @app.before_request
 def log_request():
-    logging.info(f"{request.method} {request.path} | body: {request.get_json() if request.is_json else request.data}")
+    body = request.get_json(silent=True) if request.is_json else request.data
+    logging.info(f"{request.method} {request.path} | body: {_redact_pii(body)}")
 
 @app.after_request
 def log_response(response):
