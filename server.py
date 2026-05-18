@@ -672,17 +672,52 @@ def get_dcr_daily(project_code, report_date):
         return jsonify({"error": str(e)}), 500
 
 
+def _issue_one_dcr(conn, project_code, report_date, audience):
+    """Aggregate + render + write + upsert for one audience. Returns
+    {report_id, audience, html_url}. Caller owns the connection and the
+    commit/close lifecycle so 'both' can run as a single transaction."""
+    from dcr_aggregator import aggregate_dcr
+    from render_dcr_html import DCRHTMLRenderer
+    dcr = aggregate_dcr(project_code, report_date, audience)
+    report_id = f"DCR-{project_code}-{report_date}-{audience}"
+    dcr['report_id'] = report_id
+    html = DCRHTMLRenderer(dcr).render()
+    out_dir = SCRIPT_DIR / "data_room" / "reports" / "dcr" / project_code / report_date
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_file = out_dir / f"{audience}.html"
+    out_file.write_text(html, encoding='utf-8')
+    rel = out_file.relative_to(SCRIPT_DIR).as_posix()
+    html_url = f"/files/{rel}"
+    existing = conn.execute(
+        "SELECT id FROM report_index WHERE project_code = ? AND report_date = ? AND report_type = ? AND report_id = ?",
+        (project_code, report_date, 'DCR', report_id)
+    ).fetchone()
+    if existing:
+        conn.execute(
+            "UPDATE report_index SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            ('issued', existing['id'])
+        )
+    else:
+        conn.execute(
+            "INSERT INTO report_index (report_date, project_code, report_type, report_id, status) VALUES (?, ?, ?, ?, ?)",
+            (report_date, project_code, 'DCR', report_id, 'issued')
+        )
+    return {"report_id": report_id, "audience": audience, "html_url": html_url}
+
+
 @app.route('/api/projects/<project_code>/daily/<report_date>/issue', methods=['POST'])
 def issue_dcr(project_code, report_date):
-    """Aggregate the DCR, render HTML, write the file under
-    data_room/reports/dcr/<code>/<date>/<audience>.html, and upsert a
-    row in report_index. report_id encodes audience so internal and
-    client are tracked independently. Re-issuing the same (project,
-    date, audience) overwrites the file and bumps updated_at."""
+    """Issue a DCR for (project_code, report_date) at the given audience.
+    audience='internal' or 'client' returns the legacy single-row shape
+    ({report_id, audience, html_url, generated_at}). audience='both'
+    runs the issuance once per audience inside a single transaction and
+    returns {internal_url, client_url, internal_report_id, client_report_id,
+    audience:'both', generated_at}. Re-issuing the same (project, date,
+    audience) overwrites the file and bumps updated_at."""
     data = request.get_json() or {}
     audience = data.get('audience', 'internal')
-    if audience not in ('internal', 'client'):
-        return jsonify({"error": "audience must be 'internal' or 'client'"}), 400
+    if audience not in ('internal', 'client', 'both'):
+        return jsonify({"error": "audience must be 'internal', 'client', or 'both'"}), 400
     try:
         datetime.strptime(report_date, '%Y-%m-%d')
     except ValueError:
@@ -692,41 +727,30 @@ def issue_dcr(project_code, report_date):
         conn.close()
         return jsonify({"error": "Project not found"}), 400
     try:
-        from dcr_aggregator import aggregate_dcr
-        from render_dcr_html import DCRHTMLRenderer
-        dcr = aggregate_dcr(project_code, report_date, audience)
-        report_id = f"DCR-{project_code}-{report_date}-{audience}"
-        dcr['report_id'] = report_id
-        renderer = DCRHTMLRenderer(dcr)
-        html = renderer.render()
-        out_dir = SCRIPT_DIR / "data_room" / "reports" / "dcr" / project_code / report_date
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out_file = out_dir / f"{audience}.html"
-        out_file.write_text(html, encoding='utf-8')
-        rel = out_file.relative_to(SCRIPT_DIR).as_posix()
-        html_url = f"/files/{rel}"
-        existing = conn.execute(
-            "SELECT id FROM report_index WHERE project_code = ? AND report_date = ? AND report_type = ? AND report_id = ?",
-            (project_code, report_date, 'DCR', report_id)
-        ).fetchone()
-        if existing:
-            conn.execute(
-                "UPDATE report_index SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                ('issued', existing['id'])
-            )
+        generated_at = datetime.utcnow().isoformat() + 'Z'
+        if audience == 'both':
+            internal = _issue_one_dcr(conn, project_code, report_date, 'internal')
+            client = _issue_one_dcr(conn, project_code, report_date, 'client')
+            conn.commit()
+            conn.close()
+            return response_wrapper({
+                "audience": "both",
+                "generated_at": generated_at,
+                "internal_url": internal["html_url"],
+                "client_url": client["html_url"],
+                "internal_report_id": internal["report_id"],
+                "client_report_id": client["report_id"],
+            }), 201
         else:
-            conn.execute(
-                "INSERT INTO report_index (report_date, project_code, report_type, report_id, status) VALUES (?, ?, ?, ?, ?)",
-                (report_date, project_code, 'DCR', report_id, 'issued')
-            )
-        conn.commit()
-        conn.close()
-        return response_wrapper({
-            "report_id": report_id,
-            "audience": audience,
-            "html_url": html_url,
-            "generated_at": datetime.utcnow().isoformat() + 'Z',
-        }), 201
+            result = _issue_one_dcr(conn, project_code, report_date, audience)
+            conn.commit()
+            conn.close()
+            return response_wrapper({
+                "report_id": result["report_id"],
+                "audience": result["audience"],
+                "html_url": result["html_url"],
+                "generated_at": generated_at,
+            }), 201
     except (KeyError, ValueError) as e:
         conn.close()
         return jsonify({"error": str(e)}), 400
