@@ -1754,6 +1754,81 @@ def api_certification_save(employee_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/employees/<employee_id>/certifications', methods=['GET'])
+def api_certifications_list(employee_id):
+    """List one worker's certifications, joined with cert_types for the
+    human-readable cert name and CoF-prereq flag. Adds a derived status field
+    so the frontend can color-code at render time without re-computing.
+
+    status_derived values:
+      - 'valid'    — no expiration, or expires more than 30 days out
+      - 'expiring' — expires within 30 days
+      - 'expired'  — expiration date is in the past
+      - 'unknown'  — no expiration_date AND no date_obtained
+    """
+    try:
+        conn = db()
+        emp = conn.execute(
+            "SELECT employee_id FROM employees WHERE employee_id = ?",
+            (employee_id,)
+        ).fetchone()
+        if not emp:
+            conn.close()
+            return jsonify({"error": "employee not found"}), 404
+
+        rows = conn.execute(
+            """SELECT c.id AS cert_id, c.cert_type_id, ct.name AS cert_name,
+                      ct.is_cof_prerequisite, c.card_number, c.date_obtained,
+                      c.expiration_date, c.issuing_body, c.scan_path, c.status,
+                      c.notes, c.created_at, c.updated_at
+               FROM certifications c
+               LEFT JOIN cert_types ct ON ct.cert_type_id = c.cert_type_id
+               WHERE c.employee_id = ?
+               ORDER BY
+                 CASE WHEN c.expiration_date IS NULL THEN 1 ELSE 0 END,
+                 c.expiration_date ASC,
+                 c.id DESC""",
+            (employee_id,)
+        ).fetchall()
+        conn.close()
+
+        today = date.today()
+        d30 = today + timedelta(days=30)
+        today_iso = today.isoformat()
+        d30_iso = d30.isoformat()
+
+        out = []
+        for r in rows:
+            row = dict(r)
+            exp = row.get("expiration_date")
+            if not exp and not row.get("date_obtained"):
+                row["status_derived"] = "unknown"
+            elif not exp:
+                row["status_derived"] = "valid"
+            elif exp < today_iso:
+                row["status_derived"] = "expired"
+            elif exp <= d30_iso:
+                row["status_derived"] = "expiring"
+            else:
+                row["status_derived"] = "valid"
+            # Compact a browser-friendly URL for the scan, alongside the raw path.
+            sp = row.get("scan_path")
+            if sp:
+                try:
+                    rel = Path(sp).resolve().relative_to(WORKER_RECORDS_DIR.resolve())
+                    row["scan_url"] = "/worker-files/" + str(rel).replace("\\", "/")
+                except (ValueError, OSError):
+                    row["scan_url"] = None
+            else:
+                row["scan_url"] = None
+            out.append(row)
+
+        return response_wrapper(out, count=len(out))
+    except Exception as e:
+        app.logger.error(f"GET /api/employees/{employee_id}/certifications failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/employees/<employee_id>/face-photo', methods=['POST'])
 def api_employee_face_photo(employee_id):
     """Upload a face photo for the worker. Overwrites any existing face image
