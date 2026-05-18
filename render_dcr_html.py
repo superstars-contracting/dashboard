@@ -232,11 +232,11 @@ def main():
     parser.add_argument('output_html', help='Output HTML file')
     args = parser.parse_args()
     try:
-        with open(args.input_json, 'r') as f:
+        with open(args.input_json, 'r', encoding='utf-8') as f:
             dcr = json.load(f)
         renderer = DCRHTMLRenderer(dcr)
         html = renderer.render()
-        with open(args.output_html, 'w') as f:
+        with open(args.output_html, 'w', encoding='utf-8') as f:
             f.write(html)
         print(f"HTML rendered: {args.output_html}", file=sys.stderr)
     except Exception as e:
