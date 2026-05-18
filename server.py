@@ -866,6 +866,50 @@ def list_reports(project_code):
     return response_wrapper(out, count=len(out))
 
 
+@app.route('/api/projects/<project_code>/reports/latest', methods=['GET'])
+def latest_report(project_code):
+    """Return the most recent report_index row matching report_type +
+    audience (plus optional on_date filter). 200 + {data: null} when
+    no row found — per the design call, callers prefer a consistent
+    envelope shape over a 404 branch."""
+    report_type = request.args.get('report_type', 'DCR')
+    audience = request.args.get('audience', 'internal')
+    if audience not in ('internal', 'client'):
+        return jsonify({"error": "audience must be 'internal' or 'client'"}), 400
+    on_date = request.args.get('on_date')
+    if on_date:
+        try:
+            datetime.strptime(on_date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({"error": "on_date must be YYYY-MM-DD"}), 400
+    conn = db()
+    if not validate_project_exists(conn, project_code):
+        conn.close()
+        return jsonify({"error": "Project not found"}), 404
+    where = ["project_code = ?", "report_type = ?", "report_id LIKE ?"]
+    params = [project_code, report_type, f"%-{audience}"]
+    if on_date:
+        where.append("report_date = ?")
+        params.append(on_date)
+    sql = f"SELECT * FROM report_index WHERE {' AND '.join(where)} ORDER BY report_date DESC, id DESC LIMIT 1"
+    row = conn.execute(sql, params).fetchone()
+    conn.close()
+    if not row:
+        return response_wrapper(None)
+    d = dict(row)
+    d['audience'] = audience
+    if d.get('report_date') and d.get('report_type') == 'DCR':
+        d['html_url'] = f"/files/data_room/reports/dcr/{project_code}/{d['report_date']}/{audience}.html"
+    else:
+        d['html_url'] = None
+    try:
+        rd = datetime.strptime(d['report_date'], '%Y-%m-%d').date()
+        d['days_ago'] = (date.today() - rd).days
+    except (ValueError, TypeError):
+        d['days_ago'] = None
+    return response_wrapper(d)
+
+
 # ============= DROP PLAN ENDPOINTS =============
 
 @app.route('/api/drops/<drop_id>/status', methods=['PATCH'])
