@@ -333,6 +333,7 @@ class DCRGenerator:
         return dcr
 
 def main():
+    print("[DEPRECATED] generate_dcr.py reads from Daily_Construction_Report.xlsx, which is not present on this workstation. The live path is dcr_from_db.py (SQLite-driven). This script is kept for historical reference only.", file=sys.stderr)
     parser = argparse.ArgumentParser(description='Generate Daily Construction Report from Excel')
     parser.add_argument('--workbook', required=True, help='Path to Daily_Construction_Report.xlsx')
     parser.add_argument('--project_code', required=True, help='Project code (e.g., SC-2601)')
