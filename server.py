@@ -801,13 +801,17 @@ def worker_session_end():
         if not employee_id:
             return jsonify({"error": "employee_id required"}), 400
         now_iso = datetime.now().isoformat()
+        # SQLite DATE('now') is UTC; worker_session_start stores Python's local
+        # date.today(). Mismatch means a session opened locally before midnight
+        # UTC can't be found by DATE('now') — pass the local date explicitly.
+        today = date.today().isoformat()
 
         conn = db()
         row = conn.execute(
             "SELECT id FROM sign_in_log "
-            "WHERE employee_id = ? AND date = DATE('now') AND time_out IS NULL "
+            "WHERE employee_id = ? AND date = ? AND time_out IS NULL "
             "ORDER BY id DESC LIMIT 1",
-            (employee_id,)
+            (employee_id, today)
         ).fetchone()
         if not row:
             conn.close()
