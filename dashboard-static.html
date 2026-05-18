@@ -1553,10 +1553,25 @@
                 body: JSON.stringify({audience: 'both'})
               });
               const json = await resp.json();
-              if (resp.status === 201 && json && json.data && json.data.internal_url && json.data.client_url) {
-                setIssueStatus('✓ Issued — opened internal + client', '#2F7C57');
+              if (resp.status === 201 && json && json.data && json.data.internal_url) {
+                const statusEl = document.getElementById('dcr-issue-status');
+                if (statusEl) {
+                  statusEl.style.color = '#2F7C57';
+                  statusEl.innerHTML =
+                    '✓ Issued — internal opened. ' +
+                    '<a href="#" id="dcr-view-client-link" style="color:#B11E2E;font-weight:600;text-decoration:underline;cursor:pointer;">[View client version]</a>';
+                  const link = document.getElementById('dcr-view-client-link');
+                  if (link && json.data.client_url) {
+                    link.addEventListener('click', (e) => {
+                      e.preventDefault();
+                      window.open(json.data.client_url, '_blank');
+                    });
+                  }
+                }
+                // Only the internal tab auto-opens. The client tab opens
+                // on a separate user gesture (clicking the link above)
+                // so popup blockers don't suppress the second window.open().
                 window.open(json.data.internal_url, '_blank');
-                window.open(json.data.client_url, '_blank');
               } else {
                 setIssueStatus('Failed: ' + ((json && json.error) || ('HTTP ' + resp.status)), '#B11E2E');
               }
