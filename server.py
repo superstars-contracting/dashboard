@@ -798,6 +798,19 @@ def issue_dcr(project_code, report_date):
 
 # ============= DCR REPORT ARCHIVE =============
 
+def _display_id(report_id):
+    """Strip the trailing -internal / -client suffix from a report_id for
+    operator-facing display. Returns the input unchanged if no suffix
+    matches. report_id stays in the response as the canonical DB key;
+    display_id rides alongside for UI rendering."""
+    if not report_id:
+        return report_id
+    for suffix in ('-internal', '-client'):
+        if report_id.endswith(suffix):
+            return report_id[:-len(suffix)]
+    return report_id
+
+
 @app.route('/api/projects/<project_code>/reports', methods=['GET'])
 def list_reports(project_code):
     """List report_index rows for a project with optional filters.
@@ -866,6 +879,7 @@ def list_reports(project_code):
             d['html_url'] = f"/files/data_room/reports/dcr/{project_code}/{d['report_date']}/{d['audience']}.html"
         else:
             d['html_url'] = None
+        d['display_id'] = _display_id(rid)
         out.append(d)
     return response_wrapper(out, count=len(out))
 
@@ -906,6 +920,7 @@ def latest_report(project_code):
         d['html_url'] = f"/files/data_room/reports/dcr/{project_code}/{d['report_date']}/{audience}.html"
     else:
         d['html_url'] = None
+    d['display_id'] = _display_id(d.get('report_id'))
     try:
         rd = datetime.strptime(d['report_date'], '%Y-%m-%d').date()
         d['days_ago'] = (date.today() - rd).days

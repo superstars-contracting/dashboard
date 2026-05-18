@@ -1612,7 +1612,7 @@
               ? '<a href="' + esc(r.html_url) + '" target="_blank" style="color:#B11E2E;font-weight:600;text-decoration:none;">View →</a>'
               : '<span style="color:#76777E;">—</span>';
             return '<tr>' +
-              '<td style="font-family:Georgia,serif;font-size:13px;font-weight:600;">' + esc(r.report_id || '—') + '</td>' +
+              '<td style="font-family:Georgia,serif;font-size:13px;font-weight:600;">' + esc(r.display_id || r.report_id || '—') + '</td>' +
               '<td>' + esc(r.report_date || '—') + '</td>' +
               '<td><span style="padding:3px 8px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;background:' + statusColor + ';color:white;">' + esc(r.status || '—') + '</span></td>' +
               '<td style="font-size:12px;color:#76777E;">' + esc(r.updated_at || r.created_at || '—') + '</td>' +
@@ -2545,10 +2545,10 @@ document.querySelectorAll('.nav-link').forEach(link => {
     const cardMeta = document.getElementById('ph-today-dcr-card-meta');
 
     if (d && d.html_url) {
-      if (tileId) { tileId.textContent = 'Issued'; tileId.title = d.report_id || ''; }
+      if (tileId) { tileId.textContent = 'Issued'; tileId.title = d.display_id || d.report_id || ''; }
       if (tileStatus) tileStatus.innerHTML = '<span style="color:#2F7C57;font-weight:600;">' + (d.report_date || '') + '</span>';
       if (btn) btn.textContent = "View Today's DCR";
-      if (cardId) cardId.textContent = d.report_id || '—';
+      if (cardId) cardId.textContent = d.display_id || d.report_id || '—';
       const dayLabel = d.days_ago === 0 ? 'today' : (d.days_ago + 'd ago');
       if (cardMeta) cardMeta.textContent = dayLabel + ' · click to open';
       const openHtml = () => window.open(d.html_url, '_blank');
