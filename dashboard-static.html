@@ -1091,34 +1091,55 @@
             </div>
           </div>
 
-          <!-- 4-10. OPERATOR ENTRY (placeholders, wired in next commit) -->
+          <!-- 4-10. OPERATOR ENTRY -->
           <div style="margin-bottom:24px;">
-            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">4. Work Performed</h3>
-            <div id="dcr-section-work" class="placeholder-card" style="padding:24px;">Operator-entry — coming in next commit</div>
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;display:flex;align-items:center;justify-content:space-between;">4. Work Performed<button type="button" data-dcr-add="work" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 12px;border:none;border-radius:4px;background:#14161C;color:white;cursor:pointer;">+ Add row</button></h3>
+            <div id="dcr-rows-work" data-dcr-rows="work"></div>
           </div>
+
           <div style="margin-bottom:24px;">
-            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">5. Materials &amp; Deliveries</h3>
-            <div id="dcr-section-deliveries" class="placeholder-card" style="padding:24px;">Operator-entry — coming in next commit</div>
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;display:flex;align-items:center;justify-content:space-between;">5. Materials &amp; Deliveries<button type="button" data-dcr-add="deliveries" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 12px;border:none;border-radius:4px;background:#14161C;color:white;cursor:pointer;">+ Add row</button></h3>
+            <div id="dcr-rows-deliveries" data-dcr-rows="deliveries"></div>
           </div>
+
           <div style="margin-bottom:24px;">
-            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">6. Equipment On Site</h3>
-            <div id="dcr-section-equipment" class="placeholder-card" style="padding:24px;">Operator-entry — coming in next commit</div>
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;display:flex;align-items:center;justify-content:space-between;">6. Equipment On Site<button type="button" data-dcr-add="equipment" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 12px;border:none;border-radius:4px;background:#14161C;color:white;cursor:pointer;">+ Add row</button></h3>
+            <div id="dcr-rows-equipment" data-dcr-rows="equipment"></div>
           </div>
+
           <div style="margin-bottom:24px;">
-            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">7. Safety (Toolbox Talk + Events)</h3>
-            <div id="dcr-section-safety" class="placeholder-card" style="padding:24px;">Operator-entry — coming in next commit</div>
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">7. Safety</h3>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <h4 style="font-size:12px;font-weight:600;color:#76777E;text-transform:uppercase;letter-spacing:0.05em;">7a. Toolbox Talk</h4>
+              <button type="button" data-dcr-add="toolbox" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 12px;border:none;border-radius:4px;background:#14161C;color:white;cursor:pointer;">+ Add row</button>
+            </div>
+            <div id="dcr-rows-toolbox" data-dcr-rows="toolbox" style="margin-bottom:18px;"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <h4 style="font-size:12px;font-weight:600;color:#76777E;text-transform:uppercase;letter-spacing:0.05em;">7b. Safety Events</h4>
+              <button type="button" data-dcr-add="safety" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 12px;border:none;border-radius:4px;background:#14161C;color:white;cursor:pointer;">+ Add row</button>
+            </div>
+            <div id="dcr-rows-safety" data-dcr-rows="safety"></div>
           </div>
+
           <div style="margin-bottom:24px;">
-            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">8. Issues / Delays</h3>
-            <div id="dcr-section-issues" class="placeholder-card" style="padding:24px;">Operator-entry — coming in next commit</div>
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;display:flex;align-items:center;justify-content:space-between;">8. Issues / Delays<button type="button" data-dcr-add="issues" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 12px;border:none;border-radius:4px;background:#14161C;color:white;cursor:pointer;">+ Add row</button></h3>
+            <div id="dcr-rows-issues" data-dcr-rows="issues"></div>
           </div>
+
           <div style="margin-bottom:24px;">
-            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">9. Inspections</h3>
-            <div id="dcr-section-inspections" class="placeholder-card" style="padding:24px;">Operator-entry — coming in next commit</div>
+            <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;display:flex;align-items:center;justify-content:space-between;">9. Inspections<button type="button" data-dcr-add="inspections" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 12px;border:none;border-radius:4px;background:#14161C;color:white;cursor:pointer;">+ Add row</button></h3>
+            <div id="dcr-rows-inspections" data-dcr-rows="inspections"></div>
           </div>
+
           <div style="margin-bottom:24px;">
             <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">10. Photos</h3>
-            <div id="dcr-section-photos" class="placeholder-card" style="padding:24px;">Photo upload — coming in next commit</div>
+            <div style="background:white;border:1px solid #E8E4DD;border-radius:4px;padding:14px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+              <input type="file" id="dcr-photo-input" accept="image/*" multiple style="display:none;">
+              <button type="button" id="dcr-photo-trigger" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:6px 14px;border:none;border-radius:4px;background:#B11E2E;color:white;cursor:pointer;">+ Upload photo(s)</button>
+              <input type="text" id="dcr-photo-location" placeholder="Location (e.g., South elevation L7)" style="flex:1;min-width:200px;padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
+              <input type="text" id="dcr-photo-description" placeholder="Caption (optional)" style="flex:1;min-width:200px;padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
+            </div>
+            <div id="dcr-photo-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:12px;"></div>
           </div>
         </div>
 
@@ -1233,6 +1254,261 @@
             }
           }
 
+          // ---- Operator-entry sections ----
+
+          // Field configs. type: text (default) | number | date | select | textarea.
+          // width: 'sm' (110px) | 'md' (160px default) | 'lg' (260px) | 'full' (full row).
+          // options: array of strings, OR 'toolbox_library' to populate from talks library.
+          const SECTIONS = {
+            work: {
+              endpoint: '/api/work-log',
+              fields: [
+                {name:'trade_area', placeholder:'Trade / Area', width:'md'},
+                {name:'location_elevation', placeholder:'Location / Elevation', width:'md'},
+                {name:'description', placeholder:'Description of work performed', width:'lg'},
+              ],
+            },
+            deliveries: {
+              endpoint: '/api/deliveries',
+              fields: [
+                {name:'time', placeholder:'Time (09:30)', width:'sm'},
+                {name:'material', placeholder:'Material', width:'md'},
+                {name:'qty', placeholder:'Qty', type:'number', step:'0.01', width:'sm'},
+                {name:'unit', placeholder:'Unit', width:'sm'},
+                {name:'supplier', placeholder:'Supplier', width:'md'},
+                {name:'notes', placeholder:'Notes', width:'lg'},
+              ],
+            },
+            equipment: {
+              endpoint: '/api/equipment-log',
+              fields: [
+                {name:'equipment', placeholder:'Equipment', width:'md'},
+                {name:'equipment_id', placeholder:'ID', width:'sm'},
+                {name:'owner', placeholder:'Owner', width:'md'},
+                {name:'hours_used', placeholder:'Hours', type:'number', step:'0.01', width:'sm'},
+                {name:'issues', placeholder:'Issues / notes', width:'lg'},
+              ],
+            },
+            toolbox: {
+              endpoint: '/api/toolbox-talks/records',
+              fields: [
+                {name:'talk_id', placeholder:'Talk', type:'select', options:'toolbox_library', width:'lg'},
+                {name:'facilitator', placeholder:'Facilitator', width:'md'},
+                {name:'attendees', placeholder:'Attendees (E-00001, E-00002, …)', width:'lg'},
+                {name:'duration_minutes', placeholder:'Min', type:'number', step:'1', width:'sm'},
+              ],
+            },
+            safety: {
+              endpoint: '/api/safety-events',
+              fields: [
+                {name:'event_type', placeholder:'Type', type:'select', options:['Near-miss','Incident','Observation','First-aid'], width:'md'},
+                {name:'severity', placeholder:'Severity', type:'select', options:['low','medium','high','critical'], width:'sm'},
+                {name:'time', placeholder:'Time', width:'sm'},
+                {name:'person', placeholder:'Person (E-id or name)', width:'md'},
+                {name:'description', placeholder:'Description', width:'lg'},
+                {name:'action', placeholder:'Action taken', width:'lg'},
+              ],
+            },
+            issues: {
+              endpoint: '/api/issues',
+              fields: [
+                {name:'category', placeholder:'Category', width:'md'},
+                {name:'description', placeholder:'Description', width:'lg'},
+                {name:'time_lost_hrs', placeholder:'Hrs lost', type:'number', step:'0.25', width:'sm'},
+                {name:'action', placeholder:'Action', width:'lg'},
+                {name:'owner', placeholder:'Owner', width:'md'},
+                {name:'status', placeholder:'Status', type:'select', options:['open','in-progress','resolved'], width:'sm'},
+                {name:'due_date', placeholder:'Due date', type:'date', width:'sm'},
+              ],
+            },
+            inspections: {
+              endpoint: '/api/inspections',
+              fields: [
+                {name:'type', placeholder:'Type (DOB / 3rd-party / Internal)', width:'md'},
+                {name:'inspector_name', placeholder:'Inspector', width:'md'},
+                {name:'agency', placeholder:'Agency', width:'md'},
+                {name:'area', placeholder:'Area', width:'md'},
+                {name:'result', placeholder:'Result', width:'sm'},
+                {name:'notes', placeholder:'Notes', width:'lg'},
+              ],
+            },
+          };
+
+          const WIDTHS = {sm:'110px', md:'160px', lg:'260px', full:'100%'};
+          let toolboxLibrary = null;
+
+          async function loadToolboxLibrary() {
+            try {
+              const resp = await fetch('/api/toolbox-talks').then(r => r.json());
+              toolboxLibrary = (resp && resp.data) || [];
+            } catch (e) {
+              console.warn('[DCR] toolbox library load failed:', e);
+              toolboxLibrary = [];
+            }
+          }
+
+          function getCurrentDate() {
+            const el = document.getElementById('dcr-date');
+            return (el && el.value) || new Date().toISOString().slice(0, 10);
+          }
+
+          function buildFieldHTML(f) {
+            const width = WIDTHS[f.width || 'md'];
+            const baseStyle = 'flex:1 1 ' + width + ';min-width:' + width + ';padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;';
+            if (f.type === 'select') {
+              let opts = '<option value="">' + esc(f.placeholder || '—') + '</option>';
+              if (f.options === 'toolbox_library') {
+                const lib = toolboxLibrary || [];
+                opts += lib.map(t => '<option value="' + esc(t.talk_id) + '">' + esc(t.talk_id) + ' — ' + esc(t.title || '') + '</option>').join('');
+              } else if (Array.isArray(f.options)) {
+                opts += f.options.map(o => '<option value="' + esc(o) + '">' + esc(o) + '</option>').join('');
+              }
+              return '<select name="' + esc(f.name) + '" style="' + baseStyle + '">' + opts + '</select>';
+            }
+            const typeAttr = f.type === 'number' ? 'number' : (f.type === 'date' ? 'date' : 'text');
+            const stepAttr = (f.type === 'number' && f.step) ? ' step="' + esc(f.step) + '"' : '';
+            return '<input type="' + typeAttr + '" name="' + esc(f.name) + '" placeholder="' + esc(f.placeholder || '') + '"' + stepAttr + ' style="' + baseStyle + '">';
+          }
+
+          function addRow(sectionKey) {
+            const cfg = SECTIONS[sectionKey];
+            const container = document.querySelector('[data-dcr-rows="' + sectionKey + '"]');
+            if (!cfg || !container) return;
+            const fieldsHTML = cfg.fields.map(buildFieldHTML).join('');
+            const row = document.createElement('div');
+            row.className = 'dcr-row';
+            row.dataset.saved = '0';
+            row.style.cssText = 'background:white;border:1px solid #E8E4DD;border-radius:4px;padding:10px 12px;margin-bottom:6px;';
+            row.innerHTML =
+              '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' +
+                fieldsHTML +
+                '<div style="margin-left:auto;display:flex;gap:6px;">' +
+                  '<button type="button" data-row-save style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:6px 14px;border:none;border-radius:4px;background:#2F7C57;color:white;cursor:pointer;">Save</button>' +
+                  '<button type="button" data-row-remove title="Remove" style="font-size:14px;font-weight:bold;padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;background:white;color:#76777E;cursor:pointer;line-height:1;">×</button>' +
+                '</div>' +
+              '</div>' +
+              '<div data-row-err style="color:#B11E2E;font-size:11px;margin-top:6px;display:none;"></div>';
+            container.appendChild(row);
+            const firstInput = row.querySelector('input, select, textarea');
+            if (firstInput) firstInput.focus();
+            row.querySelector('[data-row-save]').addEventListener('click', () => saveRow(row, sectionKey));
+            row.querySelector('[data-row-remove]').addEventListener('click', () => {
+              if (row.dataset.saved === '1') return;
+              row.remove();
+            });
+          }
+
+          async function saveRow(row, sectionKey) {
+            const cfg = SECTIONS[sectionKey];
+            if (!cfg) return;
+            const body = {project_code: PROJECT_CODE, date: getCurrentDate()};
+            for (const f of cfg.fields) {
+              const input = row.querySelector('[name="' + f.name + '"]');
+              if (!input) continue;
+              let v = input.value;
+              if (typeof v === 'string') v = v.trim();
+              if (v === '' || v == null) continue;
+              if (f.type === 'number') {
+                const num = parseFloat(v);
+                if (!isNaN(num)) body[f.name] = num;
+              } else {
+                body[f.name] = v;
+              }
+            }
+            const errEl = row.querySelector('[data-row-err]');
+            errEl.style.display = 'none';
+            const saveBtn = row.querySelector('[data-row-save]');
+            saveBtn.disabled = true;
+            saveBtn.textContent = '…';
+            try {
+              const resp = await fetch(cfg.endpoint, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body)
+              });
+              const json = await resp.json();
+              if (resp.status === 201) {
+                row.dataset.saved = '1';
+                row.style.background = '#FAF7F1';
+                row.style.borderColor = '#2F7C57';
+                row.querySelectorAll('input, select, textarea').forEach(el => { el.readOnly = true; el.disabled = true; });
+                saveBtn.textContent = '✓ Saved';
+                saveBtn.style.background = '#76777E';
+                saveBtn.style.cursor = 'default';
+                const removeBtn = row.querySelector('[data-row-remove]');
+                if (removeBtn) { removeBtn.disabled = true; removeBtn.style.opacity = '0.3'; removeBtn.style.cursor = 'not-allowed'; }
+              } else {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save';
+                errEl.textContent = (json && json.error) || ('Save failed (HTTP ' + resp.status + ')');
+                errEl.style.display = 'block';
+              }
+            } catch (e) {
+              console.warn('[DCR] save failed:', e);
+              saveBtn.disabled = false;
+              saveBtn.textContent = 'Save';
+              errEl.textContent = 'Network error';
+              errEl.style.display = 'block';
+            }
+          }
+
+          function setupOperatorSections() {
+            document.querySelectorAll('[data-dcr-add]').forEach(btn => {
+              btn.addEventListener('click', () => addRow(btn.dataset.dcrAdd));
+            });
+          }
+
+          // ---- Photos widget ----
+
+          function setupPhotos() {
+            const trigger = document.getElementById('dcr-photo-trigger');
+            const input = document.getElementById('dcr-photo-input');
+            const grid = document.getElementById('dcr-photo-grid');
+            if (!trigger || !input || !grid) return;
+            trigger.addEventListener('click', () => input.click());
+            input.addEventListener('change', async () => {
+              const locInput = document.getElementById('dcr-photo-location');
+              const descInput = document.getElementById('dcr-photo-description');
+              for (const file of input.files) {
+                const tile = document.createElement('div');
+                tile.style.cssText = 'background:white;border:1px solid #E8E4DD;border-radius:4px;overflow:hidden;';
+                tile.innerHTML =
+                  '<div data-tile-thumb style="aspect-ratio:1;background:#F1EEE8;display:flex;align-items:center;justify-content:center;color:#76777E;font-size:11px;">Uploading…</div>' +
+                  '<div style="padding:8px;font-size:11px;">' +
+                    '<div data-tile-name style="font-weight:600;color:#14161C;word-break:break-all;">' + esc(file.name) + '</div>' +
+                    '<div data-tile-status style="color:#76777E;margin-top:2px;">Uploading…</div>' +
+                  '</div>';
+                grid.appendChild(tile);
+                try {
+                  const fd = new FormData();
+                  fd.append('photo', file);
+                  fd.append('project_code', PROJECT_CODE);
+                  fd.append('date', getCurrentDate());
+                  if (locInput && locInput.value.trim()) fd.append('location', locInput.value.trim());
+                  if (descInput && descInput.value.trim()) fd.append('description', descInput.value.trim());
+                  const resp = await fetch('/api/photos/upload', {method: 'POST', body: fd});
+                  const json = await resp.json();
+                  if (resp.status === 201 && json && json.data) {
+                    const thumb = tile.querySelector('[data-tile-thumb]');
+                    thumb.innerHTML = '<img src="' + esc(json.data.url) + '" style="width:100%;height:100%;object-fit:cover;display:block;">';
+                    thumb.style.background = '';
+                    tile.querySelector('[data-tile-status]').textContent = '✓ Saved · ' + (json.data.location || '');
+                    tile.querySelector('[data-tile-status]').style.color = '#2F7C57';
+                  } else {
+                    tile.querySelector('[data-tile-status]').textContent = 'Failed: ' + ((json && json.error) || resp.status);
+                    tile.querySelector('[data-tile-status]').style.color = '#B11E2E';
+                    tile.style.borderColor = '#B11E2E';
+                  }
+                } catch (e) {
+                  console.warn('[DCR] photo upload failed:', e);
+                  tile.querySelector('[data-tile-status]').textContent = 'Network error';
+                  tile.querySelector('[data-tile-status]').style.color = '#B11E2E';
+                }
+              }
+              input.value = '';
+            });
+          }
+
           function initDcrForm() {
             const dateInput = document.getElementById('dcr-date');
             if (!dateInput) return;
@@ -1241,7 +1517,9 @@
             dateInput.addEventListener('change', () => loadDcr(dateInput.value));
             const refreshBtn = document.getElementById('dcr-refresh');
             if (refreshBtn) refreshBtn.addEventListener('click', () => loadDcr(dateInput.value));
-            loadDcr(dateInput.value);
+            setupOperatorSections();
+            setupPhotos();
+            loadToolboxLibrary().then(() => loadDcr(dateInput.value));
           }
 
           if (document.readyState === 'loading') {
