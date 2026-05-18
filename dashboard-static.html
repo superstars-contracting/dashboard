@@ -541,7 +541,7 @@
             </div>
           </div>
           <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 32px;">
-            <button class="hero-btn hero-btn-primary" data-link="/DCR-SC-2601-2026-05-05-internal.html">View Today's DCR</button>
+            <button class="hero-btn hero-btn-primary" id="ph-today-dcr-btn" type="button">View Today's DCR</button>
             <button class="hero-btn hero-btn-primary" data-link="/WPS-SC-2601-2026-05-01-internal.html">Weekly Summary</button>
             <button class="hero-btn hero-btn-primary" data-link="/LA-SC-2601-2026-05-07.html">2-Week Lookahead</button>
             <button class="hero-btn hero-btn-primary" data-link="/rfi_submission_form.html">Submit RFI</button>
@@ -556,11 +556,11 @@
               <div class="kpi-sublabel"><span data-stat="total-hours">82.25</span> hours</div>
             </div>
           </div>
-          <div class="kpi-card">
+          <div class="kpi-card" id="ph-today-dcr-tile" style="cursor:pointer;">
             <div class="kpi-header">Today's Report</div>
             <div class="kpi-content">
-              <div class="kpi-stat">DCR-0001</div>
-              <div class="kpi-sublabel"><span class="badge badge-ok">Ready</span></div>
+              <div class="kpi-stat" id="ph-today-dcr-id">—</div>
+              <div class="kpi-sublabel" id="ph-today-dcr-status">Loading…</div>
             </div>
           </div>
           <div class="kpi-card">
@@ -677,10 +677,10 @@
             </div>
           </div>
           <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px;">
-            <div style="background: white; border: 1px solid #E8E4DD; border-radius: 4px; padding: 20px;">
+            <div id="ph-today-dcr-card" style="background: white; border: 1px solid #E8E4DD; border-radius: 4px; padding: 20px; cursor:pointer;">
               <div class="eyebrow">Today's Report</div>
-              <div style="font-size: 16px; font-weight: 600; color: #14161C; margin: 8px 0;">DCR-0001</div>
-              <span class="badge badge-ok">Ready</span>
+              <div id="ph-today-dcr-card-id" style="font-size: 16px; font-weight: 600; color: #14161C; margin: 8px 0;">—</div>
+              <div id="ph-today-dcr-card-meta" style="font-size: 11px; color: #76777E;">Loading…</div>
             </div>
             <div style="background: white; border: 1px solid #E8E4DD; border-radius: 4px; padding: 20px;">
               <div class="eyebrow">Closure Status</div>
@@ -2542,17 +2542,52 @@ document.querySelectorAll('.nav-link').forEach(link => {
     if (el && value != null) el.textContent = value;
   };
 
+  function switchToDailyReport() {
+    const link = document.querySelector('.nav-link[data-view="daily-report"]');
+    if (link) link.click();
+  }
+
+  function renderTodayDcr(d) {
+    const tile = document.getElementById('ph-today-dcr-tile');
+    const tileId = document.getElementById('ph-today-dcr-id');
+    const tileStatus = document.getElementById('ph-today-dcr-status');
+    const btn = document.getElementById('ph-today-dcr-btn');
+    const card = document.getElementById('ph-today-dcr-card');
+    const cardId = document.getElementById('ph-today-dcr-card-id');
+    const cardMeta = document.getElementById('ph-today-dcr-card-meta');
+
+    if (d && d.html_url) {
+      if (tileId) { tileId.textContent = d.audience || 'issued'; tileId.title = d.report_id || ''; }
+      if (tileStatus) tileStatus.innerHTML = '<span class="badge badge-ok">✓ Issued</span>';
+      if (btn) btn.textContent = "View Today's DCR";
+      if (cardId) cardId.textContent = d.report_id || '—';
+      const dayLabel = d.days_ago === 0 ? 'today' : (d.days_ago + 'd ago');
+      if (cardMeta) cardMeta.textContent = dayLabel + ' · click to open';
+      const openHtml = () => window.open(d.html_url, '_blank');
+      if (tile) tile.onclick = openHtml;
+      if (btn) btn.onclick = openHtml;
+      if (card) card.onclick = openHtml;
+    } else {
+      if (tileId) { tileId.textContent = '—'; tileId.title = ''; }
+      if (tileStatus) tileStatus.innerHTML = '<span class="badge badge-bad">📋 Issue today</span>';
+      if (btn) btn.textContent = "Issue Today's DCR";
+      if (cardId) cardId.textContent = 'Not issued';
+      if (cardMeta) cardMeta.textContent = "click to start today's DCR";
+      if (tile) tile.onclick = switchToDailyReport;
+      if (btn) btn.onclick = switchToDailyReport;
+      if (card) card.onclick = switchToDailyReport;
+    }
+  }
+
   async function refresh() {
     try {
       const health = await fetch(API + '/api/health').then(r => r.json()).catch(() => null);
       if (!health) return;
 
-      const [proj, signins, rfis, drops, permits] = await Promise.all([
-        fetch(API + '/api/projects/SC-2601').then(r => r.json()).catch(() => null),
-        fetch(API + '/api/sign-ins?project=SC-2601&date=' + new Date().toISOString().split('T')[0]).then(r => r.json()).catch(() => null),
-        fetch(API + '/api/rfis').then(r => r.json()).catch(() => null),
-        fetch(API + '/api/drops').then(r => r.json()).catch(() => null),
-        fetch(API + '/api/permits').then(r => r.json()).catch(() => null),
+      const today = new Date().toISOString().slice(0, 10);
+      const [signins, latestDcr] = await Promise.all([
+        fetch(API + '/api/sign-ins?project=SC-2601&date=' + today).then(r => r.json()).catch(() => null),
+        fetch(API + '/api/projects/SC-2601/reports/latest?audience=internal&on_date=' + today).then(r => r.json()).catch(() => null),
       ]);
 
       if (signins?.data) {
@@ -2562,7 +2597,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
         updateText('[data-stat="total-hours"]', totalHours > 0 ? totalHours.toFixed(2) : '82.25');
       }
 
-      console.log('[Dashboard] Live data refreshed at', new Date().toISOString());
+      renderTodayDcr(latestDcr?.data || null);
     } catch (e) {
       console.warn('[Dashboard] API not reachable, using static data');
     }
