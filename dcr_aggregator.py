@@ -271,6 +271,22 @@ def aggregate_dcr(project_code, date_str, audience='internal'):
         'owner': r['owner'],
     } for r in (dict(x) for x in issue_rows)]
 
+    # visitors
+    visitor_rows = conn.execute(
+        "SELECT * FROM visitors WHERE project_code = ? AND date = ? ORDER BY time_in, id",
+        (project_code, date_str)
+    ).fetchall()
+    visitors_full = [{
+        'name': r['name'],
+        'company': r['company'],
+        'role': r['role'],
+        'time_in': r['time_in'],
+        'time_out': r['time_out'],
+        'purpose': r['purpose'],
+        'accompanied_by': r['accompanied_by'],
+        'notes': r['notes'],
+    } for r in (dict(x) for x in visitor_rows)]
+
     # weather: prefer weather_log row, fall back to live Open-Meteo
     weather_row = conn.execute(
         "SELECT * FROM weather_log WHERE project_code = ? AND date = ? LIMIT 1",
@@ -355,6 +371,18 @@ def aggregate_dcr(project_code, date_str, audience='internal'):
             summary = (i.get('description') or '')[:80] or (i.get('category') or '')
             issues_client.append({'category': i.get('category'), 'summary': summary})
         dcr['issues_delays'] = issues_client
+        # Visitors: count by role only, no names or purposes
+        by_role = {}
+        for v in visitors_full:
+            role = (v.get('role') or 'Unspecified').strip() or 'Unspecified'
+            by_role[role] = by_role.get(role, 0) + 1
+        dcr['visitors'] = {
+            'count_by_role': sorted(
+                [{'role': r, 'count': c} for r, c in by_role.items()],
+                key=lambda x: x['role']
+            ),
+            'total_visits': len(visitors_full),
+        }
     else:
         dcr['labor'] = {
             'rows': labor_rows_full,
@@ -372,5 +400,6 @@ def aggregate_dcr(project_code, date_str, audience='internal'):
             } for e in safety_events_raw],
         }
         dcr['issues_delays'] = issues_full
+        dcr['visitors'] = visitors_full
 
     return dcr
