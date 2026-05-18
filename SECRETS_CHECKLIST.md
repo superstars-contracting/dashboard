@@ -4,7 +4,38 @@
 
 **Rule:** admin@'s 1Password vault is the source of truth for every value listed here. The `.env` file on the workstation is a working copy. If you ever lose `.env`, regenerate from 1Password.
 
+> **Update (current pattern):** the plaintext `.env`-as-working-copy approach is being replaced by the **Vault pattern** below. New cut-overs land item-by-item as each key gets vaulted. The legacy per-key sections further down describe the older workflow.
+
 **admin@ is the only role with access to these. amit@ never sees any of these.**
+
+---
+
+## Vault pattern (current — Anthropic API and forward)
+
+All authenticating secrets live in **1Password Business** under the **"Dashboard Secrets"** vault — one item per service. `.env.template` (committed) contains `op://Vault/Item/field` references, not values. `.env` on the workstation is empty or absent — never paste real keys there.
+
+Runtime invocation:
+
+```
+op run --env-file=".env.template" -- python <script>
+```
+
+The CLI authenticates via the 1Password desktop app (Settings → Developer → "Integrate with 1Password CLI"), which is itself unlocked by Windows Hello / master password / YubiKey. Every `op` fetch is logged in the 1Password Business audit console.
+
+**Scope:** authenticating keys that bill the company or grant access to non-public data (Anthropic, SendGrid, Twilio, OpenAI). Does NOT apply to:
+
+- No-key public APIs (Open-Meteo)
+- Intentionally-public client-side keys (Stripe publishable, domain-restricted Google Maps keys)
+
+For operational hygiene, every external service still gets a 1Password item — even no-credential ones — so the vault doubles as the service inventory.
+
+**Verify the pipeline locally:**
+
+```
+op run --env-file=".env.template" -- python -c "import os; print(len(os.environ.get('ANTHROPIC_API_KEY','')))"
+```
+
+A length > 50 confirms resolution. The raw key is never printed.
 
 ---
 
