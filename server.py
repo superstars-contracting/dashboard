@@ -2633,9 +2633,9 @@ def get_employee_credential(emp_id):
         eligibility = 'cof' if eligible else 'company_id'
         face_present = bool(emp["face_image_path"])
 
-        current_type = card_number_display_v = issued_date_v = expires_v = status_v = pdf_export_path = None
+        current_type = card_number_display_v = issued_date_v = expires_v = status_v = html_export_path = None
         cof_row = conn.execute(
-            """SELECT card_id, issued_date, expires_date, status, pdf_export_path
+            """SELECT card_id, issued_date, expires_date, status, html_export_path
                FROM cof_cards WHERE employee_id = ? AND status = 'issued'
                ORDER BY issued_date DESC LIMIT 1""",
             (emp_id,)
@@ -2646,10 +2646,10 @@ def get_employee_credential(emp_id):
             issued_date_v = cof_row["issued_date"]
             expires_v = cof_row["expires_date"]
             status_v = cof_row["status"]
-            pdf_export_path = cof_row["pdf_export_path"]
+            html_export_path = cof_row["html_export_path"]
         else:
             cid_row = conn.execute(
-                """SELECT card_id, card_number_display, issued_date, status, pdf_export_path
+                """SELECT card_id, card_number_display, issued_date, status, html_export_path
                    FROM company_id_cards WHERE employee_id = ? AND status = 'active'
                    ORDER BY issued_date DESC, created_at DESC LIMIT 1""",
                 (emp_id,)
@@ -2659,21 +2659,21 @@ def get_employee_credential(emp_id):
                 card_number_display_v = cid_row["card_number_display"]
                 issued_date_v = cid_row["issued_date"]
                 status_v = cid_row["status"]
-                pdf_export_path = cid_row["pdf_export_path"]
+                html_export_path = cid_row["html_export_path"]
         conn.close()
 
-        pdf_url = None
-        if pdf_export_path:
-            full = SCRIPT_DIR / pdf_export_path.lstrip("/")
+        html_url = None
+        if html_export_path:
+            full = SCRIPT_DIR / html_export_path.lstrip("/")
             if full.exists():
-                pdf_url = "/files/" + pdf_export_path
+                html_url = "/files/" + html_export_path
 
         payload = {
             "type": current_type,
             "card_number_display": card_number_display_v,
             "issued_date": issued_date_v,
             "status": status_v,
-            "pdf_url": pdf_url,
+            "html_url": html_url,
             "eligibility": eligibility,
             "face_image_path_present": face_present,
         }
@@ -2689,12 +2689,11 @@ def issue_employee_credential(emp_id):
     """Unified credential issuance — dispatches CoF vs Company ID based on
     eligibility. Hard-gates on face_image_path. 409 if there's already an
     active credential of the chosen type unless override_active=true.
-    Renders the PDF, updates pdf_export_path on the new row, returns the
-    full credential info including pdf_url."""
-    import subprocess
-    import sys as sysmod
-    import tempfile
-    import html as htmlmod
+    Renders the HTML template inline (Jinja2), saves to disk, updates
+    html_export_path on the new row, returns the credential info with
+    html_url. Operator opens the URL and uses browser print-to-PDF when
+    a paper card is needed (per CLAUDE.md HTML-first rule)."""
+    import jinja2
     try:
         data = request.get_json() or {}
         issued_by = data.get('issued_by')
@@ -2765,74 +2764,79 @@ def issue_employee_credential(emp_id):
             logging.error(f"POST .../credential/issue ({emp_id}) issuer-step: {ex}")
             return jsonify({"error": f"Issuance failed: {ex}"}), 500
 
-        # Render PDF (non-fatal on this workstation — WeasyPrint requires
-        # GTK runtime libs that aren't installed on Windows here. If render
-        # fails the credential is still issued; the operator falls back to
-        # browser print-to-PDF per CLAUDE.md HTML-first rule).
+        # Render HTML inline via Jinja2. WeasyPrint subprocess removed —
+        # GTK runtime isn't installed on this workstation. Per CLAUDE.md
+        # HTML-first rule the operator opens the html_url in a browser
+        # and uses Ctrl+P / print-to-PDF when a paper card is needed.
+        # pdf_export_path stays NULL on the row for future re-introduction
+        # of an automated PDF renderer (WeasyPrint w/ GTK, or Playwright).
         if cred_type == 'cof':
             template_name = 'cof_card_print.html'
-            pdf_subdir = 'cof'
+            subdir = 'cof'
             cnd = card['card_id']
             expires_str = card.get('expires_date') or ''
         else:
             template_name = 'company_id_card_print.html'
-            pdf_subdir = 'company_id'
+            subdir = 'company_id'
             cnd = card['card_number_display']
             expires_str = ''
-        pdf_url = None
-        pdf_warning = None
+        # PHOTO_URL_OR_BLANK + SIGNATURE_URL: "/files/<rel>" if the file
+        # exists, else empty string (the template's {% if %} fallback
+        # handles the no-photo / no-signature case).
+        photo_url = ''
+        photo_snapshot = card.get('photo_snapshot_path')
+        if photo_snapshot:
+            photo_full = SCRIPT_DIR / photo_snapshot.lstrip('/')
+            if photo_full.exists():
+                photo_url = '/files/' + photo_snapshot
+        signature_url = ''
+        sig_path = card.get('signature_path')
+        if sig_path:
+            sig_full = SCRIPT_DIR / sig_path.lstrip('/')
+            if sig_full.exists():
+                signature_url = '/files/' + sig_path
+        ctx = {
+            'NAME': emp['name'] or '',
+            'EMPLOYEE_ID': emp_id,
+            'CARD_NUMBER_DISPLAY': cnd or '',
+            'ISSUED_DATE': card.get('issued_date') or '',
+            'ISSUED_BY': card.get('issued_by') or issued_by,
+            'EXPIRES_DATE': expires_str,
+            'TRADE': emp['trade'] or '',
+            'PHOTO_URL_OR_BLANK': photo_url,
+            'RIGGER_NAME': card.get('rigger_name_snapshot') or '',
+            'RIGGER_LICENSE': card.get('rigger_license_snapshot') or '',
+            'SIGNATURE_URL': signature_url,
+        }
+        env = jinja2.Environment(
+            loader=jinja2.FileSystemLoader(str(SCRIPT_DIR)),
+            autoescape=True,
+        )
         try:
-            pdf_dir = SCRIPT_DIR / "data_room" / "credentials" / pdf_subdir
-            pdf_dir.mkdir(parents=True, exist_ok=True)
-            pdf_file = pdf_dir / f"{emp_id}.pdf"
-            tpl = (SCRIPT_DIR / template_name).read_text(encoding='utf-8')
-            replacements = {
-                '{{NAME}}': htmlmod.escape(emp['name'] or ''),
-                '{{CARD_NO}}': htmlmod.escape(cnd or ''),
-                '{{EMP_ID}}': htmlmod.escape(emp_id),
-                '{{TRADE}}': htmlmod.escape(emp['trade'] or ''),
-                '{{ISSUED}}': htmlmod.escape(card['issued_date'] or ''),
-                '{{ISSUED_BY}}': htmlmod.escape(card.get('issued_by') or issued_by),
-                '{{EXPIRES}}': htmlmod.escape(expires_str),
-                '{{PHOTO_HTML}}': '',
-                '{{SIGNATURE_HTML}}': '',
-                '{{ISSUE_DATE_HTML}}': htmlmod.escape(card['issued_date'] or ''),
-            }
-            for k, v in replacements.items():
-                tpl = tpl.replace(k, v)
-            # Temp HTML in SCRIPT_DIR so WeasyPrint resolves relative
-            # asset paths against the same base_url the templates expect.
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False,
-                                              encoding='utf-8', dir=str(SCRIPT_DIR)) as tmpf:
-                tmpf.write(tpl)
-                tmp_path = Path(tmpf.name)
-            try:
-                result = subprocess.run(
-                    [sysmod.executable, 'render_pdf.py', tmp_path.name, str(pdf_file)],
-                    cwd=str(SCRIPT_DIR), capture_output=True, text=True, timeout=60
-                )
-                if result.returncode != 0:
-                    raise RuntimeError(f"render_pdf.py exit {result.returncode}")
-            finally:
-                tmp_path.unlink(missing_ok=True)
-            pdf_rel = pdf_file.relative_to(SCRIPT_DIR).as_posix()
-            conn = db()
-            if cred_type == 'cof':
-                conn.execute(
-                    "UPDATE cof_cards SET pdf_export_path = ?, updated_at = CURRENT_TIMESTAMP WHERE card_id = ?",
-                    (pdf_rel, card['card_id'])
-                )
-            else:
-                conn.execute(
-                    "UPDATE company_id_cards SET pdf_export_path = ?, updated_at = CURRENT_TIMESTAMP WHERE card_id = ?",
-                    (pdf_rel, card['card_id'])
-                )
-            conn.commit()
-            conn.close()
-            pdf_url = "/files/" + pdf_rel
+            tpl = env.get_template(template_name)
+            html_out = tpl.render(**ctx)
         except Exception as ex:
-            logging.warning(f"POST .../credential/issue ({emp_id}) pdf-step failed (non-fatal): {ex}")
-            pdf_warning = f"PDF render failed: {ex}. Card issued in DB; use browser print-to-PDF as fallback."
+            logging.error(f"POST .../credential/issue ({emp_id}) jinja render failed: {ex}")
+            return jsonify({"error": f"Template render failed: {ex}"}), 500
+        html_dir = SCRIPT_DIR / "data_room" / "credentials" / subdir
+        html_dir.mkdir(parents=True, exist_ok=True)
+        html_file = html_dir / f"{emp_id}.html"
+        html_file.write_text(html_out, encoding='utf-8')
+        html_rel = html_file.relative_to(SCRIPT_DIR).as_posix()
+        conn = db()
+        if cred_type == 'cof':
+            conn.execute(
+                "UPDATE cof_cards SET html_export_path = ?, updated_at = CURRENT_TIMESTAMP WHERE card_id = ?",
+                (html_rel, card['card_id'])
+            )
+        else:
+            conn.execute(
+                "UPDATE company_id_cards SET html_export_path = ?, updated_at = CURRENT_TIMESTAMP WHERE card_id = ?",
+                (html_rel, card['card_id'])
+            )
+        conn.commit()
+        conn.close()
+        html_url = '/files/' + html_rel
 
         response_body = {
             "type": cred_type,
@@ -2840,12 +2844,10 @@ def issue_employee_credential(emp_id):
             "card_id": card['card_id'],
             "issued_date": card['issued_date'],
             "status": card['status'],
-            "pdf_url": pdf_url,
+            "html_url": html_url,
         }
         if cred_type == 'cof':
             response_body["expires_date"] = card.get('expires_date')
-        if pdf_warning:
-            response_body["pdf_warning"] = pdf_warning
         return response_wrapper(response_body), 201
     except Exception as e:
         logging.error(f"POST .../credential/issue ({emp_id}): {e}")

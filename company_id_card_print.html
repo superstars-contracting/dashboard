@@ -225,29 +225,29 @@
         <table class="body-grid">
           <tr>
             <td class="photo-cell">
-              <div class="photo-box">{{PHOTO_HTML}}</div>
+              <div class="photo-box">{% if PHOTO_URL_OR_BLANK %}<img src="{{ PHOTO_URL_OR_BLANK }}" style="width:100%;height:100%;object-fit:cover;display:block;">{% else %}PHOTO{% endif %}</div>
             </td>
             <td>
               <div class="field">
                 <div class="field-label">Name of Holder</div>
-                <div class="field-value">{{NAME}}</div>
+                <div class="field-value">{{ NAME }}</div>
               </div>
               <div class="field">
                 <div class="field-label">Card Number</div>
-                <div class="field-value mono">{{CARD_NO}}</div>
+                <div class="field-value mono">{{ CARD_NUMBER_DISPLAY }}</div>
               </div>
               <table class="field-row">
                 <tr>
                   <td>
                     <div class="field">
                       <div class="field-label">Employee ID</div>
-                      <div class="field-value mono">{{EMP_ID}}</div>
+                      <div class="field-value mono">{{ EMPLOYEE_ID }}</div>
                     </div>
                   </td>
                   <td>
                     <div class="field">
                       <div class="field-label">Trade</div>
-                      <div class="field-value">{{TRADE}}</div>
+                      <div class="field-value">{{ TRADE }}</div>
                     </div>
                   </td>
                 </tr>
@@ -257,13 +257,13 @@
                   <td>
                     <div class="field">
                       <div class="field-label">Issued</div>
-                      <div class="field-value mono">{{ISSUED}}</div>
+                      <div class="field-value mono">{{ ISSUED_DATE }}</div>
                     </div>
                   </td>
                   <td>
                     <div class="field">
                       <div class="field-label">Authorized By</div>
-                      <div class="field-value">{{ISSUED_BY}}</div>
+                      <div class="field-value">{{ ISSUED_BY }}</div>
                     </div>
                   </td>
                 </tr>
