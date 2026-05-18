@@ -1,0 +1,376 @@
+#!/usr/bin/env python3
+"""Aggregate the DCR JSON for (project_code, report_date) from SQLite.
+
+This is the DB-driven replacement for the Excel-based generate_dcr.py.
+Both the GET /api/projects/<code>/daily/<date> route and the CLI wrapper
+dcr_from_db.py call into aggregate_dcr() — no internal HTTP roundtrip.
+
+Returns a dict matching render_dcr_html.py's JSON input contract.
+Caller is responsible for serializing to JSON or feeding to the renderer.
+"""
+import sqlite3
+from datetime import datetime, date
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+DB_PATH = SCRIPT_DIR / "superstars.db"
+
+# Default coords for SC-2601 (Bronx, Mott Haven). Used when weather_log is
+# absent and we need to fetch live data. Future: pull from a projects.lat/lng
+# column once added.
+DEFAULT_LAT = 40.8083
+DEFAULT_LNG = -73.9162
+
+
+def _db():
+    conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _day_of_week(date_str):
+    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    return days[datetime.strptime(date_str, '%Y-%m-%d').date().weekday()]
+
+
+def _compute_hours(time_in, time_out):
+    """Return decimal hours between two HH:MM strings, or None if either missing."""
+    if not time_in or not time_out:
+        return None
+    try:
+        h_in, m_in = map(int, time_in.split(':')[:2])
+        h_out, m_out = map(int, time_out.split(':')[:2])
+        in_mins = h_in * 60 + m_in
+        out_mins = h_out * 60 + m_out
+        if out_mins < in_mins:
+            out_mins += 24 * 60
+        return round((out_mins - in_mins) / 60.0, 2)
+    except (ValueError, IndexError):
+        return None
+
+
+def _weather_from_log(row):
+    """Shape a weather_log row into the renderer's am/pm/wind block."""
+    return {
+        'am': {'temp_f': row.get('am_temp_f'),
+               'conditions': row.get('am_conditions') or row.get('conditions')},
+        'pm': {'temp_f': row.get('pm_temp_f'),
+               'conditions': row.get('pm_conditions') or row.get('conditions')},
+        'wind': row.get('wind'),
+        'source': 'weather_log',
+    }
+
+
+def _weather_from_live(date_str):
+    """Call Open-Meteo via the server helper and reshape to am/pm/wind block."""
+    from server import fetch_open_meteo_weather
+    live = fetch_open_meteo_weather(DEFAULT_LAT, DEFAULT_LNG, date_str)
+    wind_str = None
+    if live.get('wind_mph') is not None:
+        wind_str = f"{live['wind_mph']} mph"
+        if live.get('wind_dir'):
+            wind_str += f" {live['wind_dir']}"
+    return {
+        'am': {'temp_f': live.get('temp_min'), 'conditions': live.get('condition_label')},
+        'pm': {'temp_f': live.get('temp_max'), 'conditions': live.get('condition_label')},
+        'wind': wind_str,
+        'source': live.get('source', 'open-meteo'),
+    }
+
+
+def aggregate_dcr(project_code, date_str, audience='internal'):
+    """Build the full DCR JSON for (project_code, date) at the given audience.
+
+    Returns a dict matching render_dcr_html.py's JSON input contract.
+    Raises ValueError on bad inputs (date format, audience).
+    Raises KeyError if project_code is unknown.
+    """
+    if audience not in ('internal', 'client'):
+        raise ValueError(f"audience must be 'internal' or 'client', got '{audience}'")
+    datetime.strptime(date_str, '%Y-%m-%d')
+
+    conn = _db()
+    proj_row = conn.execute(
+        "SELECT * FROM projects WHERE project_code = ?", (project_code,)
+    ).fetchone()
+    if not proj_row:
+        conn.close()
+        raise KeyError(f"Unknown project_code: {project_code}")
+    proj = dict(proj_row)
+
+    address_parts = [p for p in [proj.get('address'), proj.get('city_zip')] if p]
+    address = ', '.join(address_parts)
+
+    warnings = []
+    target = datetime.strptime(date_str, '%Y-%m-%d').date()
+    if target > date.today():
+        warnings.append(f"VAL-002: report_date {date_str} is in the future")
+
+    project_block = {
+        'code': proj.get('project_code'),
+        'name': proj.get('name'),
+        'address': address,
+        'date': date_str,
+        'day_of_week': _day_of_week(date_str),
+        'superintendent': proj.get('superintendent'),
+        'project_manager': None,
+        'owner_client': proj.get('client'),
+        'status': proj.get('status'),
+    }
+
+    # Labor — auto from sign_in_log JOIN employees
+    sign_ins = conn.execute(
+        """SELECT s.*, e.name AS emp_name, e.trade AS emp_trade
+           FROM sign_in_log s
+           LEFT JOIN employees e ON s.employee_id = e.employee_id
+           WHERE s.project_code = ? AND s.date = ?
+           ORDER BY s.time_in, s.id""",
+        (project_code, date_str)
+    ).fetchall()
+    labor_rows_full = []
+    total_hours = 0.0
+    for i, r in enumerate(sign_ins, 1):
+        r = dict(r)
+        emp_id = r.get('employee_id')
+        if emp_id and not r.get('emp_name'):
+            warnings.append(f"VAL-005: sign_in row {i}: unknown employee_id {emp_id}")
+        hours = _compute_hours(r.get('time_in'), r.get('time_out'))
+        if hours is not None:
+            if not (0 <= hours <= 24):
+                warnings.append(f"VAL-004: sign_in row {i}: hours {hours} out of range 0..24")
+            total_hours += hours
+        if r.get('time_in') and r.get('time_out') and r['time_out'] < r['time_in']:
+            warnings.append(f"VAL-003: sign_in row {i}: time_out {r['time_out']} before time_in {r['time_in']}")
+        labor_rows_full.append({
+            'n': i, 'employee_id': emp_id, 'name': r.get('emp_name'),
+            'company': 'Superstars Contracting', 'trade': r.get('emp_trade'),
+            'time_in': r.get('time_in'), 'time_out': r.get('time_out'),
+            'hours': hours, 'area': None, 'notes': None,
+        })
+    headcount = len(labor_rows_full)
+    total_hours = round(total_hours, 2)
+
+    # work_log → work_performed
+    work_rows = conn.execute(
+        "SELECT * FROM work_log WHERE project_code = ? AND date = ?",
+        (project_code, date_str)
+    ).fetchall()
+    work_performed = []
+    for r in work_rows:
+        r = dict(r)
+        work_performed.append({
+            'trade_area': r.get('trade_area') or r.get('trades_working'),
+            'location_elevation': r.get('location_elevation'),
+            'description': r.get('description') or r.get('scope_of_work'),
+        })
+
+    # deliveries → materials_deliveries
+    delivery_rows = conn.execute(
+        "SELECT * FROM deliveries WHERE project_code = ? AND date = ?",
+        (project_code, date_str)
+    ).fetchall()
+    materials_deliveries = []
+    for r in delivery_rows:
+        r = dict(r)
+        materials_deliveries.append({
+            'time': r.get('time'),
+            'material': r.get('material') or r.get('description'),
+            'qty': r.get('qty'),
+            'unit': r.get('unit'),
+            'supplier': r.get('supplier') or r.get('delivered_by'),
+            'notes': r.get('notes'),
+        })
+
+    # equipment_log → equipment
+    equipment_rows = conn.execute(
+        "SELECT * FROM equipment_log WHERE project_code = ? AND date = ?",
+        (project_code, date_str)
+    ).fetchall()
+    equipment = []
+    for r in equipment_rows:
+        r = dict(r)
+        equipment.append({
+            'equipment': r.get('equipment_type'),
+            'equipment_id': r.get('equipment_id'),
+            'owner': r.get('owner'),
+            'hours_used': r.get('hours_used'),
+            'issues': r.get('issues') or r.get('notes'),
+        })
+
+    # inspections
+    insp_rows = conn.execute(
+        "SELECT * FROM inspections WHERE project_code = ? AND date = ?",
+        (project_code, date_str)
+    ).fetchall()
+    inspections = []
+    for r in insp_rows:
+        r = dict(r)
+        inspections.append({
+            'type': r.get('type') or r.get('scope'),
+            'inspector': r.get('inspector_name'),
+            'agency': r.get('agency'),
+            'area': r.get('area'),
+            'result': r.get('result'),
+            'notes': r.get('notes'),
+        })
+
+    # photos
+    photo_rows = conn.execute(
+        "SELECT * FROM photos WHERE project_code = ? AND date = ? ORDER BY id",
+        (project_code, date_str)
+    ).fetchall()
+    photos = []
+    for r in photo_rows:
+        r = dict(r)
+        photos.append({
+            'filename': r.get('filename'),
+            'url': r.get('url'),
+            'location': r.get('location'),
+            'description': r.get('description'),
+            'uploaded_by': r.get('uploaded_by'),
+        })
+
+    # Toolbox talk + safety events
+    tb_row = conn.execute(
+        "SELECT * FROM toolbox_talk_records WHERE project_code = ? AND date = ? LIMIT 1",
+        (project_code, date_str)
+    ).fetchone()
+    toolbox_talk = None
+    if tb_row:
+        tb = dict(tb_row)
+        topic = None
+        if tb.get('talk_id'):
+            lib = conn.execute(
+                "SELECT title FROM toolbox_talk_library WHERE talk_id = ?",
+                (tb['talk_id'],)
+            ).fetchone()
+            if lib:
+                topic = dict(lib).get('title')
+        toolbox_talk = {
+            'conducted': True,
+            'topic': topic,
+            'conducted_by': tb.get('facilitator'),
+        }
+
+    event_rows = conn.execute(
+        "SELECT * FROM safety_events WHERE project_code = ? AND date = ? ORDER BY time, id",
+        (project_code, date_str)
+    ).fetchall()
+    safety_events_raw = [dict(r) for r in event_rows]
+
+    # issues
+    issue_rows = conn.execute(
+        "SELECT * FROM issues WHERE project_code = ? AND date = ?",
+        (project_code, date_str)
+    ).fetchall()
+    issues_full = [{
+        'category': r['category'],
+        'description': r['description'],
+        'time_lost_hrs': r['time_lost_hrs'],
+        'action': r['action'],
+        'owner': r['owner'],
+    } for r in (dict(x) for x in issue_rows)]
+
+    # weather: prefer weather_log row, fall back to live Open-Meteo
+    weather_row = conn.execute(
+        "SELECT * FROM weather_log WHERE project_code = ? AND date = ? LIMIT 1",
+        (project_code, date_str)
+    ).fetchone()
+    if weather_row:
+        weather_block = _weather_from_log(dict(weather_row))
+    else:
+        try:
+            weather_block = _weather_from_live(date_str)
+        except Exception as e:
+            warnings.append(f"VAL-006: weather data unavailable ({e})")
+            weather_block = {'am': None, 'pm': None, 'wind': None, 'source': 'unavailable'}
+
+    if weather_block.get('source') == 'unavailable':
+        # already warned
+        pass
+    elif weather_block.get('am') is None and weather_block.get('pm') is None:
+        warnings.append(f"VAL-006: weather data missing for {date_str}")
+
+    conn.close()
+
+    dcr = {
+        'report_id': None,
+        'audience': audience,
+        'project': project_block,
+        'weather': weather_block,
+        'work_performed': work_performed,
+        'materials_deliveries': materials_deliveries,
+        'equipment': equipment,
+        'inspections': inspections,
+        'photos': photos,
+        'signoff': {
+            'superintendent_name': proj.get('superintendent'),
+            'pm_name': None,
+            'date': date_str,
+            'time_signed': None,
+        },
+        'metadata': {
+            'generated_at': datetime.utcnow().isoformat() + 'Z',
+            'source': 'sqlite',
+            'warnings': warnings,
+            'redactions_applied': audience == 'client',
+        },
+    }
+
+    if audience == 'client':
+        by_trade = {}
+        for r in labor_rows_full:
+            trade = (r.get('trade') or 'Unknown').split(' / ')[0]
+            d = by_trade.setdefault(trade, {'count': 0, 'hours': 0.0})
+            d['count'] += 1
+            if r.get('hours'):
+                d['hours'] += r['hours']
+        dcr['labor'] = {
+            'rows': [],
+            'summary': {
+                'by_trade': sorted(
+                    [{'trade': t, 'count': v['count'], 'hours': round(v['hours'], 2)}
+                     for t, v in by_trade.items()],
+                    key=lambda x: x['trade']
+                ),
+                'headcount': headcount,
+                'total_hours': total_hours,
+                'site_open': headcount > 0,
+                'site_closed': headcount == 0,
+            },
+            'headcount': headcount,
+            'total_hours': total_hours,
+        }
+        events_client = []
+        for e in safety_events_raw:
+            summary = (e.get('description') or '')[:80] or (e.get('event_type') or '')
+            events_client.append({'type': e.get('event_type'), 'summary': summary})
+        dcr['safety'] = {
+            'toolbox_talk': ({'conducted': toolbox_talk['conducted'], 'topic': toolbox_talk['topic']}
+                             if toolbox_talk else None),
+            'events': events_client,
+        }
+        issues_client = []
+        for i in issues_full:
+            summary = (i.get('description') or '')[:80] or (i.get('category') or '')
+            issues_client.append({'category': i.get('category'), 'summary': summary})
+        dcr['issues_delays'] = issues_client
+    else:
+        dcr['labor'] = {
+            'rows': labor_rows_full,
+            'headcount': headcount,
+            'total_hours': total_hours,
+        }
+        dcr['safety'] = {
+            'toolbox_talk': toolbox_talk,
+            'events': [{
+                'type': e.get('event_type'),
+                'time': e.get('time'),
+                'person': e.get('person'),
+                'description': e.get('description'),
+                'action': e.get('action'),
+            } for e in safety_events_raw],
+        }
+        dcr['issues_delays'] = issues_full
+
+    return dcr

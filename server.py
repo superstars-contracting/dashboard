@@ -643,6 +643,35 @@ def create_inspection():
         return jsonify({"error": str(e)}), 500
 
 
+# ============= DCR AGGREGATOR =============
+
+@app.route('/api/projects/<project_code>/daily/<report_date>', methods=['GET'])
+def get_dcr_daily(project_code, report_date):
+    """Return the full DCR JSON for (project_code, report_date) at the
+    requested audience. ?audience=internal (default) or ?audience=client."""
+    audience = request.args.get('audience', 'internal')
+    if audience not in ('internal', 'client'):
+        return jsonify({"error": "audience must be 'internal' or 'client'"}), 400
+    try:
+        datetime.strptime(report_date, '%Y-%m-%d')
+    except ValueError:
+        return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+    conn = db()
+    if not validate_project_exists(conn, project_code):
+        conn.close()
+        return jsonify({"error": "Project not found"}), 400
+    conn.close()
+    try:
+        from dcr_aggregator import aggregate_dcr  # lazy to avoid circular import
+        dcr = aggregate_dcr(project_code, report_date, audience)
+        return response_wrapper(dcr)
+    except (KeyError, ValueError) as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logging.error(f"GET /api/projects/{project_code}/daily/{report_date}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ============= DROP PLAN ENDPOINTS =============
 
 @app.route('/api/drops/<drop_id>/status', methods=['PATCH'])
