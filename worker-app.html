@@ -1046,7 +1046,30 @@ function updateGeofence() {
   }
   geofencePending = true;
   renderGeofence();
+
+  // Watchdog: the browser's `timeout` option only counts after the permission
+  // prompt is resolved. On desktops without GPS hardware, OS location services
+  // disabled, or a never-answered prompt, neither callback fires and the UI is
+  // stuck on "Checking location…" indefinitely. Force a timeout path manually
+  // so the user always sees actionable state (and TESTING_BYPASS can take over).
+  let _settled = false;
+  const _watchdog = setTimeout(() => {
+    if (_settled) return;
+    _settled = true;
+    geofencePending = false;
+    geofenceError = 'timeout';
+    geofenceData.onSite = false;
+    geofenceData.distance = null;
+    geofenceData.latitude = null;
+    geofenceData.longitude = null;
+    renderGeofence();
+    updateSignInButton();
+  }, 15000);
+
   navigator.geolocation.getCurrentPosition((pos) => {
+    if (_settled) return;
+    _settled = true;
+    clearTimeout(_watchdog);
     geofencePending = false;
     geofenceError = null;
     const dist = haversine(PROJECT_LAT, PROJECT_LNG, pos.coords.latitude, pos.coords.longitude);
@@ -1057,6 +1080,9 @@ function updateGeofence() {
     renderGeofence();
     updateSignInButton();
   }, (err) => {
+    if (_settled) return;
+    _settled = true;
+    clearTimeout(_watchdog);
     geofencePending = false;
     // err.code: 1=PERMISSION_DENIED, 2=POSITION_UNAVAILABLE, 3=TIMEOUT
     if (err.code === 1) geofenceError = 'denied';
