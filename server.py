@@ -2531,8 +2531,14 @@ def api_cert_types():
 
 @app.route('/api/workers/intake-summary', methods=['GET'])
 def api_workers_intake_summary():
-    """List of all workers with intake status + cert health + doc count."""
+    """List of all workers with intake status + cert health + doc count
+    + credential eligibility + current_credential state. The two new
+    fields let the workforce list render the Action button per row
+    without follow-up round-trips."""
     try:
+        # Lazy import — cof_issuer needs the DB open and we want server.py
+        # startup to stay light.
+        from cof_issuer import has_valid_prerequisite
         conn = db()
         emps = conn.execute(
             "SELECT employee_id, name, trade, phone, language, intake_status, folder_path FROM employees ORDER BY name"
@@ -2541,12 +2547,13 @@ def api_workers_intake_summary():
         today = datetime.utcnow().date().isoformat()
         out = []
         for e in emps:
+            emp_id = e["employee_id"]
             doc_count = conn.execute(
-                "SELECT COUNT(*) FROM worker_documents WHERE employee_id = ?", (e["employee_id"],)
+                "SELECT COUNT(*) FROM worker_documents WHERE employee_id = ?", (emp_id,)
             ).fetchone()[0]
             certs = conn.execute(
                 """SELECT cert_type_id, expiration_date, status FROM certifications
-                   WHERE employee_id = ?""", (e["employee_id"],)
+                   WHERE employee_id = ?""", (emp_id,)
             ).fetchall()
             cert_count = len(certs)
             expiring_30 = sum(
@@ -2557,12 +2564,47 @@ def api_workers_intake_summary():
             expired = sum(
                 1 for c in certs if c["expiration_date"] and c["expiration_date"] < today
             )
+            # Eligibility: SCAFFOLD-16 or RIGGER-32 currently valid → 'cof'; else 'company_id'.
+            eligible, _ = has_valid_prerequisite(emp_id)
+            eligibility = 'cof' if eligible else 'company_id'
+            # Current credential — CoF (status='issued') takes precedence; fall back to Company ID (status='active').
+            current_credential = None
+            cof_row = conn.execute(
+                """SELECT card_id, issued_date, expires_date, status FROM cof_cards
+                   WHERE employee_id = ? AND status = 'issued'
+                   ORDER BY issued_date DESC LIMIT 1""",
+                (emp_id,)
+            ).fetchone()
+            if cof_row:
+                current_credential = {
+                    "type": "cof",
+                    "card_number_display": cof_row["card_id"],
+                    "issued_date": cof_row["issued_date"],
+                    "expires_date": cof_row["expires_date"],
+                    "status": cof_row["status"],
+                }
+            else:
+                cid_row = conn.execute(
+                    """SELECT card_id, card_number_display, issued_date, status FROM company_id_cards
+                       WHERE employee_id = ? AND status = 'active'
+                       ORDER BY issued_date DESC, created_at DESC LIMIT 1""",
+                    (emp_id,)
+                ).fetchone()
+                if cid_row:
+                    current_credential = {
+                        "type": "company_id",
+                        "card_number_display": cid_row["card_number_display"],
+                        "issued_date": cid_row["issued_date"],
+                        "status": cid_row["status"],
+                    }
             out.append({
                 **dict(e),
                 "doc_count": doc_count,
                 "cert_count": cert_count,
                 "certs_expiring_30d": expiring_30,
                 "certs_expired": expired,
+                "eligibility": eligibility,
+                "current_credential": current_credential,
             })
         conn.close()
         return response_wrapper(out)
