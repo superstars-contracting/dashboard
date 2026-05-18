@@ -423,33 +423,147 @@ def create_employee():
 
 @app.route('/api/employees/<emp_id>', methods=['PATCH'])
 def update_employee(emp_id):
-    """Update employee"""
+    """Edit an existing employee. Allowed fields: name, trade, dob, phone,
+    email, emergency_contact_*, language, hire_date.
+
+    Side-effects run inside a single DB transaction:
+    - phone change re-derives PIN (last-4 of digits-only) and checks collision
+      against every other row; conflict aborts with 409, no DB write.
+    - name change renames worker_records/{emp_id}_{slug}/ on disk after the
+      DB UPDATE but before commit; rename failure rolls the UPDATE back.
+
+    Immutable post-import: employee_id, pin (mutated only via phone),
+    folder_path (mutated only via name), intake_status, face_image_path,
+    photo_path, created_at, updated_at."""
+    import re
+    EDITABLE = {'name', 'trade', 'dob', 'phone', 'email',
+                'emergency_contact_name', 'emergency_contact_phone',
+                'emergency_contact_relation', 'language', 'hire_date'}
+
     try:
-        data = request.get_json()
-        updates = []
-        params = []
-        
-        for key in ['name', 'trade']:
-            if key in data:
-                updates.append(f"{key} = ?")
-                params.append(data[key])
-        
-        if updates:
-            updates.append("updated_at = ?")
-            params.append(datetime.now().isoformat())
-            params.append(emp_id)
-            
-            conn = db()
-            conn.execute(f"UPDATE employees SET {', '.join(updates)} WHERE employee_id = ?", params)
-            conn.commit()
-            
-            row = conn.execute("SELECT * FROM employees WHERE employee_id = ?", (emp_id,)).fetchone()
+        data = request.get_json(silent=True) or {}
+
+        # ----- Pre-validation (no DB writes) -----
+        if 'name' in data and not (data.get('name') or '').strip():
+            return jsonify({"error": "name cannot be empty"}), 400
+        if 'phone' in data and not (data.get('phone') or '').strip():
+            return jsonify({"error": "phone cannot be empty"}), 400
+        if 'language' in data and data['language'] and data['language'] not in ('EN', 'ES'):
+            return jsonify({"error": "language must be 'EN' or 'ES'"}), 400
+        for df in ('dob', 'hire_date'):
+            if df in data and data[df]:
+                try:
+                    datetime.strptime(data[df], "%Y-%m-%d")
+                except ValueError:
+                    return jsonify({"error": f"{df} must be ISO YYYY-MM-DD"}), 400
+        if 'phone' in data and data['phone']:
+            if len(re.sub(r'\D', '', data['phone'])) < 4:
+                return jsonify({"error": "phone must contain at least 4 digits"}), 400
+
+        # ----- Build updates dict from editable fields only -----
+        updates = {}
+        for k in EDITABLE:
+            if k in data:
+                v = data[k]
+                if isinstance(v, str):
+                    v = v.strip()
+                    updates[k] = v if v else None
+                else:
+                    updates[k] = v
+
+        if not updates:
+            return jsonify({"error": "No editable fields in payload"}), 400
+
+        conn = db()
+        current = conn.execute(
+            "SELECT employee_id, folder_path FROM employees WHERE employee_id = ?",
+            (emp_id,)
+        ).fetchone()
+        if not current:
             conn.close()
-            
-            return response_wrapper(dict(row) if row else {}), 200
-        
-        return jsonify({"error": "No fields to update"}), 400
+            return jsonify({"error": "employee not found"}), 404
+
+        # ----- Phone change → re-derive PIN + collision check -----
+        pin_changed = False
+        new_pin = None
+        if 'phone' in updates and updates['phone']:
+            phone_digits = re.sub(r'\D', '', updates['phone'])
+            new_pin = phone_digits[-4:]
+            collision = conn.execute(
+                "SELECT employee_id FROM employees WHERE pin = ? AND employee_id != ?",
+                (new_pin, emp_id)
+            ).fetchone()
+            if collision:
+                conn.close()
+                return jsonify({
+                    "error": f"PIN collision with {collision['employee_id']} — choose a phone with different last-4"
+                }), 409
+            updates['phone'] = phone_digits
+            updates['pin'] = new_pin
+            pin_changed = True
+
+        # ----- Name change → prepare folder rename (done after UPDATE so the
+        #      DB rollback path is meaningful) -----
+        rename_from = None
+        rename_to = None
+        if 'name' in updates and updates['name']:
+            new_slug = slugify_name(updates['name'])
+            new_folder = WORKER_RECORDS_DIR / f"{emp_id}_{new_slug}"
+            current_folder_path = current['folder_path']
+            if current_folder_path:
+                current_folder = Path(current_folder_path)
+                if current_folder.resolve() != new_folder.resolve():
+                    if current_folder.exists():
+                        rename_from = current_folder
+                        rename_to = new_folder
+                    updates['folder_path'] = str(new_folder)
+            else:
+                updates['folder_path'] = str(new_folder)
+
+        # ----- UPDATE row -----
+        set_clauses = [f"{k} = ?" for k in updates] + ["updated_at = CURRENT_TIMESTAMP"]
+        params = list(updates.values()) + [emp_id]
+        conn.execute(
+            f"UPDATE employees SET {', '.join(set_clauses)} WHERE employee_id = ?",
+            params
+        )
+
+        # ----- Folder side-effects (transaction still open) -----
+        if rename_from is not None:
+            try:
+                rename_from.rename(rename_to)
+            except OSError as e:
+                conn.rollback()
+                conn.close()
+                return jsonify({"error": f"folder rename failed: {e}"}), 500
+        elif 'folder_path' in updates:
+            try:
+                Path(updates['folder_path']).mkdir(parents=True, exist_ok=True)
+            except OSError as e:
+                conn.rollback()
+                conn.close()
+                return jsonify({"error": f"folder mkdir failed: {e}"}), 500
+
+        conn.commit()
+
+        row = conn.execute(
+            "SELECT * FROM employees WHERE employee_id = ?",
+            (emp_id,)
+        ).fetchone()
+        conn.close()
+
+        # CLAUDE.md PII discipline: pin is not volunteered in normal responses.
+        # Only surfaced when this call caused the change so the operator can
+        # share the new PIN with the worker once.
+        result = dict(row) if row else {}
+        result.pop('pin', None)
+        if pin_changed:
+            result['pin_changed'] = True
+            result['new_pin'] = new_pin
+
+        return response_wrapper(result), 200
     except Exception as e:
+        app.logger.error(f"PATCH /api/employees/{emp_id} failed: {e}")
         return jsonify({"error": str(e)}), 500
 
 # ============= CERTIFICATION ENDPOINTS =============
