@@ -1194,6 +1194,9 @@ function checkCertStatus() {
 
 // TESTING ONLY — when true, allows sign-in even with no GPS / blocked GPS.
 // Toggled by tapping the geofence widget 5 times in a row. Off by default.
+// Intentionally retained for Monday morning QA: lets the operator validate
+// the end-to-end sign-in flow from the office before workers arrive on site.
+// Track removal as a post-Monday cleanup once the field flow is proven.
 let TESTING_BYPASS = localStorage.getItem('testing_bypass') === '1';
 
 function updateSignInButton() {

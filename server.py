@@ -717,7 +717,9 @@ def worker_login():
         a = (dLat/2)**2 + (dLng/2)**2
         distance = R * 2 * (a**0.5)
 
-        if distance > 160934:  # 100 miles in meters — TESTING ONLY, change back to 200 for production
+        # Production geofence per project lat/lng accuracy. Previously relaxed
+        # to 100 miles for cross-borough testing.
+        if distance > 200:
             conn.close()
             return jsonify({"error": "Not on site", "distance": round(distance)}), 403
 
