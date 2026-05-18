@@ -1655,6 +1655,186 @@ def api_certification_extract(employee_id):
         return jsonify({"error": str(e)}), 400
 
 
+@app.route('/api/employees/<employee_id>/certifications', methods=['POST'])
+def api_certification_save(employee_id):
+    """Save a confirmed certification row after operator review. Mirrors the
+    validation rules in import_certifications.py and dedups on the same
+    4-tuple (employee_id, cert_type_id, card_number, date_obtained).
+
+    JSON body: cert_type_id (required), card_number, date_obtained,
+    expiration_date, issuing_body, notes, scan_path.
+
+    On dedup hit: 200 with {already_exists: True, row}. Otherwise 201 with
+    {already_exists: False, cert_id, row}."""
+    try:
+        data = request.get_json(silent=True) or {}
+
+        cert_type_id = (data.get("cert_type_id") or "").strip()
+        card_number = (data.get("card_number") or "").strip() or None
+        date_obtained = (data.get("date_obtained") or "").strip() or None
+        expiration_date = (data.get("expiration_date") or "").strip() or None
+        issuing_body = (data.get("issuing_body") or "").strip() or None
+        notes = (data.get("notes") or "").strip() or None
+        scan_path = (data.get("scan_path") or "").strip() or None
+
+        if not cert_type_id:
+            return jsonify({"error": "cert_type_id is required"}), 400
+        for df, dval in (("date_obtained", date_obtained), ("expiration_date", expiration_date)):
+            if dval:
+                try:
+                    datetime.strptime(dval, "%Y-%m-%d")
+                except ValueError:
+                    return jsonify({"error": f"{df} must be ISO YYYY-MM-DD"}), 400
+        if date_obtained and expiration_date and expiration_date < date_obtained:
+            return jsonify({
+                "error": f"expiration_date ({expiration_date}) is before date_obtained ({date_obtained})"
+            }), 400
+
+        conn = db()
+
+        emp = conn.execute(
+            "SELECT employee_id FROM employees WHERE employee_id = ?",
+            (employee_id,)
+        ).fetchone()
+        if not emp:
+            conn.close()
+            return jsonify({"error": "employee not found"}), 404
+
+        ct = conn.execute(
+            "SELECT cert_type_id FROM cert_types WHERE cert_type_id = ?",
+            (cert_type_id,)
+        ).fetchone()
+        if not ct:
+            conn.close()
+            return jsonify({
+                "error": f"cert_type_id={cert_type_id!r} not in cert_types library"
+            }), 400
+
+        # 4-tuple dedup. IFNULL(...) so NULL == NULL behaves intuitively.
+        existing = conn.execute(
+            "SELECT id FROM certifications "
+            "WHERE employee_id = ? AND cert_type_id = ? "
+            "AND IFNULL(card_number, '') = IFNULL(?, '') "
+            "AND IFNULL(date_obtained, '') = IFNULL(?, '')",
+            (employee_id, cert_type_id, card_number, date_obtained)
+        ).fetchone()
+        if existing:
+            row = conn.execute(
+                "SELECT * FROM certifications WHERE id = ?", (existing["id"],)
+            ).fetchone()
+            conn.close()
+            return response_wrapper({
+                "cert_id": existing["id"],
+                "already_exists": True,
+                "row": dict(row),
+            }), 200
+
+        cur = conn.execute(
+            """INSERT INTO certifications
+               (employee_id, cert_type_id, card_number, date_obtained,
+                expiration_date, issuing_body, notes, status, scan_path)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?)""",
+            (employee_id, cert_type_id, card_number, date_obtained,
+             expiration_date, issuing_body, notes, scan_path)
+        )
+        new_id = cur.lastrowid
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM certifications WHERE id = ?", (new_id,)
+        ).fetchone()
+        conn.close()
+
+        return response_wrapper({
+            "cert_id": new_id,
+            "already_exists": False,
+            "row": dict(row),
+        }), 201
+    except Exception as e:
+        app.logger.error(f"POST /api/employees/{employee_id}/certifications failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/employees/<employee_id>/face-photo', methods=['POST'])
+def api_employee_face_photo(employee_id):
+    """Upload a face photo for the worker. Overwrites any existing face image
+    (the worker has one current face — re-taking replaces). Updates
+    employees.face_image_path."""
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "no file in request"}), 400
+        f = request.files['file']
+        if not f.filename:
+            return jsonify({"error": "empty filename"}), 400
+
+        # Face photos: images only — explicitly reject PDF even though it's
+        # in the wider doc-upload whitelist.
+        FACE_IMAGE_EXTS = {'.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif'}
+        if f.mimetype not in ALLOWED_DOC_MIME_TYPES or f.mimetype == 'application/pdf':
+            return jsonify({"error": f"face photo must be an image (got {f.mimetype})"}), 400
+        ext = Path(f.filename).suffix.lower()
+        if ext not in FACE_IMAGE_EXTS:
+            return jsonify({"error": f"face photo extension {ext} not allowed"}), 400
+
+        conn = db()
+        emp = conn.execute(
+            "SELECT employee_id, name, folder_path FROM employees WHERE employee_id = ?",
+            (employee_id,)
+        ).fetchone()
+        if not emp:
+            conn.close()
+            return jsonify({"error": "employee not found"}), 404
+
+        folder_path = emp["folder_path"]
+        if not folder_path:
+            folder_slug = slugify_name(emp["name"])
+            folder_path = str(WORKER_RECORDS_DIR / f"{employee_id}_{folder_slug}")
+            conn.execute(
+                "UPDATE employees SET folder_path = ? WHERE employee_id = ?",
+                (folder_path, employee_id)
+            )
+            conn.commit()
+
+        folder = Path(folder_path).resolve()
+        if not str(folder).startswith(str(WORKER_RECORDS_DIR.resolve())):
+            conn.close()
+            return jsonify({"error": "invalid folder path"}), 400
+
+        folder.mkdir(parents=True, exist_ok=True)
+
+        # Remove any prior face.* so we don't leave a stale file when the
+        # extension changes between uploads (face.jpg → face.heic etc.).
+        for old in folder.glob("face.*"):
+            try:
+                old.unlink()
+            except OSError as e:
+                app.logger.warning(f"could not remove old face file {old}: {e}")
+
+        target_path = (folder / f"face{ext}").resolve()
+        if not str(target_path).startswith(str(WORKER_RECORDS_DIR.resolve())):
+            conn.close()
+            return jsonify({"error": "path traversal blocked"}), 400
+
+        f.save(str(target_path))
+        conn.execute(
+            "UPDATE employees SET face_image_path = ?, updated_at = CURRENT_TIMESTAMP "
+            "WHERE employee_id = ?",
+            (str(target_path), employee_id)
+        )
+        conn.commit()
+        conn.close()
+
+        relative = target_path.relative_to(WORKER_RECORDS_DIR.resolve())
+        image_url = "/worker-files/" + str(relative).replace("\\", "/")
+
+        return response_wrapper({
+            "face_image_path": str(target_path),
+            "image_url": image_url,
+        })
+    except Exception as e:
+        app.logger.error(f"POST /api/employees/{employee_id}/face-photo failed: {e}")
+        return jsonify({"error": str(e)}), 400
+
+
 @app.route('/api/cert-types', methods=['GET'])
 def api_cert_types():
     """List all cert types for autocomplete."""
