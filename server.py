@@ -1910,6 +1910,6 @@ if __name__ == '__main__':
     print("  Or:             http://localhost:5050", flush=True)
     print("=" * 60 + "\n", flush=True)
     sys.stdout.flush()
-    # Loopback only per CLAUDE.md rule #6: workstation lives on a shared
-    # coworking-space network — the dashboard must not be reachable from LAN.
+    # Loopback only per CLAUDE.md loopback policy: the workstation lives on a
+    # shared coworking-space network — the dashboard must not be reachable from LAN.
     app.run(host='127.0.0.1', port=5050, debug=False, use_reloader=False, threaded=True)
