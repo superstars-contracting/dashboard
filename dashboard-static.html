@@ -1583,25 +1583,16 @@
               });
               const json = await resp.json();
               if (resp.status === 201 && json && json.data && json.data.internal_url) {
-                // window.open first while still in the click-resolved chain
-                // so popup blockers allow this single auto-open.
+                // window.open while still in the click-resolved chain so
+                // popup blockers allow this single auto-open. Client HTML
+                // is generated server-side (for downstream distribution)
+                // but not surfaced in the operator UI.
                 window.open(json.data.internal_url, '_blank');
-                // Set the issued banner in the archive view, then switch to
-                // it — the [View client version] link inside the banner is
-                // a fresh user gesture and gets a second window.open().
                 const banner = document.getElementById('dcr-issued-banner');
                 if (banner) {
                   banner.style.display = 'block';
                   banner.innerHTML =
-                    '<strong style="color:#2F7C57;">✓ DCR issued — internal opened.</strong> ' +
-                    '<a href="#" id="dcr-view-client-link" style="color:#B11E2E;font-weight:600;text-decoration:underline;cursor:pointer;">[View client version]</a>';
-                  const link = document.getElementById('dcr-view-client-link');
-                  if (link && json.data.client_url) {
-                    link.addEventListener('click', (e) => {
-                      e.preventDefault();
-                      window.open(json.data.client_url, '_blank');
-                    });
-                  }
+                    '<strong style="color:#2F7C57;">✓ DCR issued — opened in new tab.</strong>';
                 }
                 showArchive();
               } else {
@@ -1616,15 +1607,12 @@
           // ---- Archive list (state 1) ----
 
           function renderArchiveRow(r) {
-            const audBadge = r.audience
-              ? '<span style="font-size:10px;color:#76777E;text-transform:uppercase;letter-spacing:0.05em;padding:1px 6px;border:1px solid #E8E4DD;border-radius:3px;margin-left:6px;">' + esc(r.audience) + '</span>'
-              : '';
             const statusColor = r.status === 'issued' ? '#2F7C57' : '#76777E';
             const viewLink = r.html_url
               ? '<a href="' + esc(r.html_url) + '" target="_blank" style="color:#B11E2E;font-weight:600;text-decoration:none;">View →</a>'
               : '<span style="color:#76777E;">—</span>';
             return '<tr>' +
-              '<td style="font-family:Georgia,serif;font-size:13px;font-weight:600;">' + esc(r.report_id || '—') + audBadge + '</td>' +
+              '<td style="font-family:Georgia,serif;font-size:13px;font-weight:600;">' + esc(r.report_id || '—') + '</td>' +
               '<td>' + esc(r.report_date || '—') + '</td>' +
               '<td><span style="padding:3px 8px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;background:' + statusColor + ';color:white;">' + esc(r.status || '—') + '</span></td>' +
               '<td style="font-size:12px;color:#76777E;">' + esc(r.updated_at || r.created_at || '—') + '</td>' +

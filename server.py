@@ -814,9 +814,13 @@ def list_reports(project_code):
     ordered by report_date DESC, id DESC. html_url is synthesized from
     the disk layout for issued DCR rows; NULL for rows where we can't
     derive a path."""
-    audience = request.args.get('audience')
-    if audience and audience not in ('internal', 'client'):
-        return jsonify({"error": "audience must be 'internal' or 'client'"}), 400
+    # Default to internal-only so the operator-facing archive list shows
+    # one row per (project, date). API consumers can pass audience=all to
+    # get both audiences (back-compat for callers that relied on the
+    # pre-default "no filter" behavior).
+    audience = request.args.get('audience', 'internal')
+    if audience not in ('internal', 'client', 'all'):
+        return jsonify({"error": "audience must be 'internal', 'client', or 'all'"}), 400
     for k in ('from_date', 'to_date'):
         v = request.args.get(k)
         if v:
@@ -834,7 +838,7 @@ def list_reports(project_code):
     if rt:
         where.append("report_type = ?")
         params.append(rt)
-    if audience:
+    if audience != 'all':
         where.append("report_id LIKE ?")
         params.append(f"%-{audience}")
     fd = request.args.get('from_date')
