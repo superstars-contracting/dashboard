@@ -1141,6 +1141,13 @@
             </div>
             <div id="dcr-photo-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:12px;"></div>
           </div>
+
+          <!-- Issue buttons -->
+          <div style="margin-top:32px;padding-top:24px;border-top:2px solid #E8E4DD;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+            <div id="dcr-issue-status" style="font-size:12px;color:#76777E;margin-right:auto;"></div>
+            <button id="dcr-issue-internal" type="button" style="font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:10px 20px;border:1px solid #14161C;border-radius:4px;background:white;color:#14161C;cursor:pointer;">Issue Internal DCR</button>
+            <button id="dcr-issue-client" type="button" style="font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:10px 20px;border:none;border-radius:4px;background:#B11E2E;color:white;cursor:pointer;">Issue Client DCR</button>
+          </div>
         </div>
 
         <script>
@@ -1509,6 +1516,46 @@
             });
           }
 
+          // ---- Issue DCR ----
+
+          function setIssueStatus(text, color) {
+            const el = document.getElementById('dcr-issue-status');
+            if (!el) return;
+            el.textContent = text;
+            el.style.color = color || '#76777E';
+          }
+
+          async function issueDcr(audience) {
+            const dateStr = getCurrentDate();
+            const projName = (document.querySelector('#dcr-project-info .site-value') || {}).textContent || PROJECT_CODE;
+            if (!confirm('Issue ' + audience + ' DCR for ' + dateStr + ' (' + projName + ')?')) return;
+            setIssueStatus('Issuing ' + audience + '…', '#76777E');
+            try {
+              const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/daily/' + encodeURIComponent(dateStr) + '/issue', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({audience: audience})
+              });
+              const json = await resp.json();
+              if (resp.status === 201 && json && json.data) {
+                setIssueStatus('✓ ' + json.data.report_id + ' issued — opening in new tab', '#2F7C57');
+                window.open(json.data.html_url, '_blank');
+              } else {
+                setIssueStatus('Failed: ' + ((json && json.error) || ('HTTP ' + resp.status)), '#B11E2E');
+              }
+            } catch (e) {
+              console.warn('[DCR] issue failed:', e);
+              setIssueStatus('Network error', '#B11E2E');
+            }
+          }
+
+          function setupIssueButtons() {
+            const internalBtn = document.getElementById('dcr-issue-internal');
+            const clientBtn = document.getElementById('dcr-issue-client');
+            if (internalBtn) internalBtn.addEventListener('click', () => issueDcr('internal'));
+            if (clientBtn) clientBtn.addEventListener('click', () => issueDcr('client'));
+          }
+
           function initDcrForm() {
             const dateInput = document.getElementById('dcr-date');
             if (!dateInput) return;
@@ -1519,6 +1566,7 @@
             if (refreshBtn) refreshBtn.addEventListener('click', () => loadDcr(dateInput.value));
             setupOperatorSections();
             setupPhotos();
+            setupIssueButtons();
             loadToolboxLibrary().then(() => loadDcr(dateInput.value));
           }
 
