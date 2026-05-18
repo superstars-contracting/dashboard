@@ -949,6 +949,11 @@ applyLanguage();
       }
       exitEditMode();
       await loadProfile();
+      // Refresh the workforce list so it doesn't show stale name/trade/lang
+      // after an edit. loadProfile only updates the slide-in panel.
+      if (typeof loadWorkforce === 'function') {
+        try { await loadWorkforce(); } catch (_) { /* roster refresh is best-effort */ }
+      }
     } catch (e) {
       errEl.textContent = 'Network error: ' + (e && e.message ? e.message : e);
       errEl.style.display = 'block';
