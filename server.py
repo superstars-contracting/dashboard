@@ -498,6 +498,151 @@ def create_weather_log():
         return jsonify({"error": str(e)}), 500
 
 
+# ============= DCR SAFETY + COMPLIANCE ENDPOINTS =============
+
+@app.route('/api/toolbox-talks/records', methods=['POST'])
+def create_toolbox_talk_record():
+    """Log a toolbox-talk occurrence. `topic` is resolved from toolbox_talk_library
+    via talk_id at render time, so a `topic` field in the body is accepted but not
+    persisted. `conducted_by` is accepted as a synonym for `facilitator`."""
+    try:
+        data = request.get_json() or {}
+        project_code = data.get('project_code')
+        if not project_code:
+            return jsonify({"error": "project_code required"}), 400
+        try:
+            date_str = _parse_dcr_date(data.get('date'))
+        except ValueError:
+            return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+        facilitator = data.get('facilitator') or data.get('conducted_by')
+        conn = db()
+        if not validate_project_exists(conn, project_code):
+            conn.close()
+            return jsonify({"error": "Project not found"}), 400
+        conn.execute(
+            "INSERT INTO toolbox_talk_records (date, project_code, talk_id, "
+            "facilitator, attendees, duration_minutes) VALUES (?, ?, ?, ?, ?, ?)",
+            (date_str, project_code, data.get('talk_id'), facilitator,
+             data.get('attendees'), data.get('duration_minutes'))
+        )
+        conn.commit()
+        new_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()['id']
+        row = conn.execute("SELECT * FROM toolbox_talk_records WHERE id = ?", (new_id,)).fetchone()
+        conn.close()
+        return response_wrapper(dict(row)), 201
+    except Exception as e:
+        logging.error(f"POST /api/toolbox-talks/records: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/safety-events', methods=['POST'])
+def create_safety_event():
+    """Log a safety event (incident, near-miss, observation)."""
+    try:
+        data = request.get_json() or {}
+        project_code = data.get('project_code')
+        if not project_code:
+            return jsonify({"error": "project_code required"}), 400
+        try:
+            date_str = _parse_dcr_date(data.get('date'))
+        except ValueError:
+            return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+        conn = db()
+        if not validate_project_exists(conn, project_code):
+            conn.close()
+            return jsonify({"error": "Project not found"}), 400
+        conn.execute(
+            "INSERT INTO safety_events (date, project_code, event_type, severity, "
+            "time, person, description, action, reported_by) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (date_str, project_code, data.get('event_type'), data.get('severity'),
+             data.get('time'), data.get('person'), data.get('description'),
+             data.get('action'), data.get('reported_by'))
+        )
+        conn.commit()
+        new_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()['id']
+        row = conn.execute("SELECT * FROM safety_events WHERE id = ?", (new_id,)).fetchone()
+        conn.close()
+        return response_wrapper(dict(row)), 201
+    except Exception as e:
+        logging.error(f"POST /api/safety-events: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/issues', methods=['POST'])
+def create_issue():
+    """Log a project issue / delay."""
+    try:
+        data = request.get_json() or {}
+        project_code = data.get('project_code')
+        if not project_code:
+            return jsonify({"error": "project_code required"}), 400
+        try:
+            date_str = _parse_dcr_date(data.get('date'))
+        except ValueError:
+            return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+        due_date = data.get('due_date')
+        if due_date:
+            try:
+                datetime.strptime(due_date, '%Y-%m-%d')
+            except ValueError:
+                return jsonify({"error": "due_date must be YYYY-MM-DD"}), 400
+        conn = db()
+        if not validate_project_exists(conn, project_code):
+            conn.close()
+            return jsonify({"error": "Project not found"}), 400
+        conn.execute(
+            "INSERT INTO issues (date, project_code, category, description, "
+            "time_lost_hrs, action, owner, status, due_date) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (date_str, project_code, data.get('category'), data.get('description'),
+             data.get('time_lost_hrs'), data.get('action'), data.get('owner'),
+             data.get('status'), due_date)
+        )
+        conn.commit()
+        new_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()['id']
+        row = conn.execute("SELECT * FROM issues WHERE id = ?", (new_id,)).fetchone()
+        conn.close()
+        return response_wrapper(dict(row)), 201
+    except Exception as e:
+        logging.error(f"POST /api/issues: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/inspections', methods=['POST'])
+def create_inspection():
+    """Log an inspection (DOB, 3rd party, internal QC)."""
+    try:
+        data = request.get_json() or {}
+        project_code = data.get('project_code')
+        if not project_code:
+            return jsonify({"error": "project_code required"}), 400
+        try:
+            date_str = _parse_dcr_date(data.get('date'))
+        except ValueError:
+            return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+        conn = db()
+        if not validate_project_exists(conn, project_code):
+            conn.close()
+            return jsonify({"error": "Project not found"}), 400
+        conn.execute(
+            "INSERT INTO inspections (date, project_code, type, inspector_name, "
+            "agency, area, result, notes, scope) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (date_str, project_code, data.get('type'), data.get('inspector_name'),
+             data.get('agency'), data.get('area'), data.get('result'),
+             data.get('notes'), data.get('scope'))
+        )
+        conn.commit()
+        new_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()['id']
+        row = conn.execute("SELECT * FROM inspections WHERE id = ?", (new_id,)).fetchone()
+        conn.close()
+        return response_wrapper(dict(row)), 201
+    except Exception as e:
+        logging.error(f"POST /api/inspections: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ============= DROP PLAN ENDPOINTS =============
 
 @app.route('/api/drops/<drop_id>/status', methods=['PATCH'])
