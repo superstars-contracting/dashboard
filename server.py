@@ -353,6 +353,151 @@ def update_closure_checklist(closure_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ============= DCR SITE ACTIVITY ENDPOINTS =============
+
+def _parse_dcr_date(date_str):
+    """Validate YYYY-MM-DD or return today's date if not supplied. Raises ValueError on bad format."""
+    if not date_str:
+        return date.today().isoformat()
+    datetime.strptime(date_str, '%Y-%m-%d')
+    return date_str
+
+
+@app.route('/api/work-log', methods=['POST'])
+def create_work_log():
+    """Log work performed for a project on a given date."""
+    try:
+        data = request.get_json() or {}
+        project_code = data.get('project_code')
+        if not project_code:
+            return jsonify({"error": "project_code required"}), 400
+        try:
+            date_str = _parse_dcr_date(data.get('date'))
+        except ValueError:
+            return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+        conn = db()
+        if not validate_project_exists(conn, project_code):
+            conn.close()
+            return jsonify({"error": "Project not found"}), 400
+        conn.execute(
+            "INSERT INTO work_log (date, project_code, trade_area, location_elevation, "
+            "description, scope_of_work, trades_working) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (date_str, project_code, data.get('trade_area'), data.get('location_elevation'),
+             data.get('description'), data.get('scope_of_work'), data.get('trades_working'))
+        )
+        conn.commit()
+        new_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()['id']
+        row = conn.execute("SELECT * FROM work_log WHERE id = ?", (new_id,)).fetchone()
+        conn.close()
+        return response_wrapper(dict(row)), 201
+    except Exception as e:
+        logging.error(f"POST /api/work-log: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/deliveries', methods=['POST'])
+def create_delivery():
+    """Log a material delivery."""
+    try:
+        data = request.get_json() or {}
+        project_code = data.get('project_code')
+        if not project_code:
+            return jsonify({"error": "project_code required"}), 400
+        try:
+            date_str = _parse_dcr_date(data.get('date'))
+        except ValueError:
+            return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+        conn = db()
+        if not validate_project_exists(conn, project_code):
+            conn.close()
+            return jsonify({"error": "Project not found"}), 400
+        conn.execute(
+            "INSERT INTO deliveries (date, project_code, time, material, qty, unit, "
+            "supplier, notes, description, delivered_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (date_str, project_code, data.get('time'), data.get('material'),
+             data.get('qty'), data.get('unit'), data.get('supplier'), data.get('notes'),
+             data.get('description'), data.get('delivered_by'))
+        )
+        conn.commit()
+        new_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()['id']
+        row = conn.execute("SELECT * FROM deliveries WHERE id = ?", (new_id,)).fetchone()
+        conn.close()
+        return response_wrapper(dict(row)), 201
+    except Exception as e:
+        logging.error(f"POST /api/deliveries: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/equipment-log', methods=['POST'])
+def create_equipment_log():
+    """Log equipment on site for a given day. Renderer uses `equipment` as display
+    name; accepted as alias for the schema's equipment_type column."""
+    try:
+        data = request.get_json() or {}
+        project_code = data.get('project_code')
+        if not project_code:
+            return jsonify({"error": "project_code required"}), 400
+        try:
+            date_str = _parse_dcr_date(data.get('date'))
+        except ValueError:
+            return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+        equipment_type = data.get('equipment_type') or data.get('equipment')
+        conn = db()
+        if not validate_project_exists(conn, project_code):
+            conn.close()
+            return jsonify({"error": "Project not found"}), 400
+        conn.execute(
+            "INSERT INTO equipment_log (date, project_code, equipment_type, equipment_id, "
+            "owner, hours_used, issues, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (date_str, project_code, equipment_type, data.get('equipment_id'),
+             data.get('owner'), data.get('hours_used'), data.get('issues'),
+             data.get('status'), data.get('notes'))
+        )
+        conn.commit()
+        new_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()['id']
+        row = conn.execute("SELECT * FROM equipment_log WHERE id = ?", (new_id,)).fetchone()
+        conn.close()
+        return response_wrapper(dict(row)), 201
+    except Exception as e:
+        logging.error(f"POST /api/equipment-log: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/weather-log', methods=['POST'])
+def create_weather_log():
+    """Log site weather for a given date. Operator-entered values override
+    the live Open-Meteo fallback at DCR aggregation time."""
+    try:
+        data = request.get_json() or {}
+        project_code = data.get('project_code')
+        if not project_code:
+            return jsonify({"error": "project_code required"}), 400
+        try:
+            date_str = _parse_dcr_date(data.get('date'))
+        except ValueError:
+            return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+        conn = db()
+        if not validate_project_exists(conn, project_code):
+            conn.close()
+            return jsonify({"error": "Project not found"}), 400
+        conn.execute(
+            "INSERT INTO weather_log (date, project_code, am_temp_f, pm_temp_f, "
+            "am_conditions, pm_conditions, wind, conditions) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (date_str, project_code, data.get('am_temp_f'), data.get('pm_temp_f'),
+             data.get('am_conditions'), data.get('pm_conditions'),
+             data.get('wind'), data.get('conditions'))
+        )
+        conn.commit()
+        new_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()['id']
+        row = conn.execute("SELECT * FROM weather_log WHERE id = ?", (new_id,)).fetchone()
+        conn.close()
+        return response_wrapper(dict(row)), 201
+    except Exception as e:
+        logging.error(f"POST /api/weather-log: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ============= DROP PLAN ENDPOINTS =============
 
 @app.route('/api/drops/<drop_id>/status', methods=['PATCH'])
