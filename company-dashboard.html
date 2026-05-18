@@ -1125,6 +1125,150 @@ applyLanguage();
     document.getElementById('img-lightbox-content').src = '';
   };
 
+  // Shared camera-capture helper. Returns a Promise that resolves with:
+  //   - a Blob (image/jpeg, quality 0.85) when the operator confirms a shot,
+  //   - the string 'manual' when allowManualFallback is true AND the operator
+  //     hits "Enter manually" on a camera-error screen (caller decides what
+  //     that means — typically: show a blank form),
+  //   - null when the operator cancels.
+  //
+  // Always cleans up the MediaStream tracks on resolve (success or error path),
+  // so leaving the modal never leaves the camera light on.
+  //
+  // Reused by: Scan Cert flow + Take ID Photo flow.
+  function openCameraModal({title = 'Capture', facingMode = 'environment', allowManualFallback = false} = {}) {
+    return new Promise((resolve) => {
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:2500;display:flex;align-items:center;justify-content:center;padding:12px;';
+
+      const card = document.createElement('div');
+      card.style.cssText = 'background:white;border-radius:12px;width:100%;max-width:680px;max-height:96vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.4);';
+      card.innerHTML = `
+        <div style="padding:14px 18px;border-bottom:1px solid #E8E4DD;display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-family:'Playfair Display',Georgia,serif;font-size:18px;font-weight:700;color:#14161C;">${esc(title)}</div>
+          <button data-role="cam-cancel" style="background:none;border:none;font-size:28px;color:#76777E;cursor:pointer;line-height:1;padding:0 4px;" aria-label="Close">×</button>
+        </div>
+        <div data-role="cam-body" style="position:relative;background:#000;min-height:240px;display:flex;align-items:center;justify-content:center;flex:1;">
+          <video data-role="cam-video" autoplay playsinline muted style="max-width:100%;max-height:70vh;display:block;"></video>
+          <img data-role="cam-preview" style="max-width:100%;max-height:70vh;display:none;" alt="">
+          <canvas data-role="cam-canvas" style="display:none;"></canvas>
+          <div data-role="cam-error" style="display:none;color:white;padding:24px;text-align:center;font-size:14px;line-height:1.5;max-width:480px;"></div>
+        </div>
+        <div data-role="cam-controls" style="padding:14px 18px;display:flex;gap:10px;justify-content:center;background:#FAF7F1;flex-wrap:wrap;">
+          <button data-role="cam-capture" style="background:#B11E2E;color:white;border:none;padding:14px 28px;font-size:14px;font-weight:600;border-radius:8px;cursor:pointer;min-width:140px;min-height:48px;">📸 Capture</button>
+          <button data-role="cam-retake" style="background:white;color:#14161C;border:1px solid #E8E4DD;padding:14px 24px;font-size:14px;font-weight:600;border-radius:8px;cursor:pointer;display:none;min-height:48px;">Retake</button>
+          <button data-role="cam-use" style="background:#B11E2E;color:white;border:none;padding:14px 28px;font-size:14px;font-weight:600;border-radius:8px;cursor:pointer;display:none;min-width:140px;min-height:48px;">Use Photo</button>
+        </div>
+      `;
+      modal.appendChild(card);
+      document.body.appendChild(modal);
+
+      const q = (sel) => card.querySelector(`[data-role="${sel}"]`);
+      const video = q('cam-video'), preview = q('cam-preview'), canvas = q('cam-canvas');
+      const errorEl = q('cam-error'), controls = q('cam-controls');
+      const captureBtn = q('cam-capture'), retakeBtn = q('cam-retake'), useBtn = q('cam-use');
+      const cancelBtn = q('cam-cancel');
+
+      let stream = null;
+      let capturedBlob = null;
+
+      function cleanup() {
+        if (stream) {
+          try { stream.getTracks().forEach(t => t.stop()); } catch (_) {}
+          stream = null;
+        }
+        try { video.srcObject = null; } catch (_) {}
+        if (preview.src && preview.src.startsWith('blob:')) {
+          try { URL.revokeObjectURL(preview.src); } catch (_) {}
+        }
+        try { modal.remove(); } catch (_) {}
+      }
+      function done(result) { cleanup(); resolve(result); }
+
+      function showCameraError(err) {
+        video.style.display = 'none';
+        controls.style.display = 'none';
+        let msg = 'Camera unavailable.';
+        const name = err && err.name;
+        if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+          msg = 'Camera permission denied. Allow camera access in your browser settings and reload, or use a different device.';
+        } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+          msg = 'No camera found on this device.';
+        } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+          msg = 'Camera is in use by another application.';
+        } else if (err) {
+          msg = 'Camera error: ' + (err.message || String(err));
+        }
+        const manualBtn = allowManualFallback
+          ? `<button data-role="cam-manual" style="background:white;color:#14161C;border:1px solid #E8E4DD;padding:10px 18px;border-radius:6px;cursor:pointer;font-weight:600;">Enter manually</button>`
+          : '';
+        errorEl.innerHTML = `<div>${esc(msg)}</div>
+          <div style="margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+            <button data-role="cam-err-close" style="background:#B11E2E;color:white;border:none;padding:10px 18px;border-radius:6px;cursor:pointer;font-weight:600;">Close</button>
+            ${manualBtn}
+          </div>`;
+        errorEl.style.display = 'block';
+        errorEl.querySelector('[data-role="cam-err-close"]').addEventListener('click', () => done(null));
+        const mb = errorEl.querySelector('[data-role="cam-manual"]');
+        if (mb) mb.addEventListener('click', () => done('manual'));
+      }
+
+      async function startCamera() {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: facingMode }, width: {ideal: 1920}, height: {ideal: 1080} }
+          });
+        } catch (e) {
+          // Fallback: any camera (desktop without rear cam, etc.)
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          } catch (e2) {
+            showCameraError(e2);
+            return;
+          }
+        }
+        video.srcObject = stream;
+      }
+
+      captureBtn.addEventListener('click', () => {
+        const w = video.videoWidth, h = video.videoHeight;
+        if (!w || !h) return;
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+        canvas.toBlob((blob) => {
+          capturedBlob = blob;
+          if (preview.src && preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src);
+          preview.src = URL.createObjectURL(blob);
+          preview.style.display = 'block';
+          video.style.display = 'none';
+          captureBtn.style.display = 'none';
+          retakeBtn.style.display = 'inline-block';
+          useBtn.style.display = 'inline-block';
+        }, 'image/jpeg', 0.85);
+      });
+
+      retakeBtn.addEventListener('click', () => {
+        if (preview.src && preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src);
+        capturedBlob = null;
+        preview.src = '';
+        preview.style.display = 'none';
+        video.style.display = 'block';
+        captureBtn.style.display = 'inline-block';
+        retakeBtn.style.display = 'none';
+        useBtn.style.display = 'none';
+      });
+
+      useBtn.addEventListener('click', () => {
+        if (capturedBlob) done(capturedBlob);
+      });
+
+      cancelBtn.addEventListener('click', () => done(null));
+      modal.addEventListener('click', (e) => { if (e.target === modal) done(null); });
+
+      startCamera();
+    });
+  }
+
   async function loadCertTypes() {
     try {
       const resp = await fetch('/api/cert-types').then(r => r.json());
