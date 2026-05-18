@@ -1054,7 +1054,35 @@
 
       <!-- DAILY REPORT -->
       <section class="view" data-view="daily-report">
-        <div class="section">
+        <!-- State 1: Archive list (default) -->
+        <div id="dcr-archive-view" class="section">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+            <h2 style="margin-bottom:0;">Daily Construction Reports</h2>
+            <button id="dcr-new-btn" type="button" style="font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:10px 20px;border:none;border-radius:4px;background:#B11E2E;color:white;cursor:pointer;">📋 Issue New DCR</button>
+          </div>
+          <div id="dcr-issued-banner" style="display:none;background:#FAF7F1;border-left:3px solid #2F7C57;padding:10px 14px;border-radius:4px;margin-bottom:12px;font-size:12px;"></div>
+          <div style="background:white;border:1px solid #E8E4DD;border-radius:4px;padding:14px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+            <span style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">From</span>
+            <input type="date" id="dcr-filter-from" style="padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
+            <span style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">To</span>
+            <input type="date" id="dcr-filter-to" style="padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
+            <button id="dcr-filter-apply" type="button" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:6px 14px;border:none;border-radius:4px;background:#14161C;color:white;cursor:pointer;">Apply</button>
+            <div id="dcr-archive-status" style="margin-left:auto;font-size:11px;color:#76777E;">Loading…</div>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th>Report ID</th><th>Date</th><th>Status</th><th>Issued At</th><th></th></tr>
+              </thead>
+              <tbody id="dcr-archive-tbody">
+                <tr><td colspan="5" style="padding:24px;text-align:center;color:#76777E;">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- State 2: Entry form (hidden by default) -->
+        <div id="dcr-entry-view" class="section" style="display:none;">
           <h2>Daily Report</h2>
 
           <!-- Controls bar: date picker + refresh + status -->
@@ -1554,11 +1582,17 @@
               });
               const json = await resp.json();
               if (resp.status === 201 && json && json.data && json.data.internal_url) {
-                const statusEl = document.getElementById('dcr-issue-status');
-                if (statusEl) {
-                  statusEl.style.color = '#2F7C57';
-                  statusEl.innerHTML =
-                    '✓ Issued — internal opened. ' +
+                // window.open first while still in the click-resolved chain
+                // so popup blockers allow this single auto-open.
+                window.open(json.data.internal_url, '_blank');
+                // Set the issued banner in the archive view, then switch to
+                // it — the [View client version] link inside the banner is
+                // a fresh user gesture and gets a second window.open().
+                const banner = document.getElementById('dcr-issued-banner');
+                if (banner) {
+                  banner.style.display = 'block';
+                  banner.innerHTML =
+                    '<strong style="color:#2F7C57;">✓ DCR issued — internal opened.</strong> ' +
                     '<a href="#" id="dcr-view-client-link" style="color:#B11E2E;font-weight:600;text-decoration:underline;cursor:pointer;">[View client version]</a>';
                   const link = document.getElementById('dcr-view-client-link');
                   if (link && json.data.client_url) {
@@ -1568,10 +1602,7 @@
                     });
                   }
                 }
-                // Only the internal tab auto-opens. The client tab opens
-                // on a separate user gesture (clicking the link above)
-                // so popup blockers don't suppress the second window.open().
-                window.open(json.data.internal_url, '_blank');
+                showArchive();
               } else {
                 setIssueStatus('Failed: ' + ((json && json.error) || ('HTTP ' + resp.status)), '#B11E2E');
               }
@@ -1581,23 +1612,127 @@
             }
           }
 
+          // ---- Archive list (state 1) ----
+
+          function renderArchiveRow(r) {
+            const audBadge = r.audience
+              ? '<span style="font-size:10px;color:#76777E;text-transform:uppercase;letter-spacing:0.05em;padding:1px 6px;border:1px solid #E8E4DD;border-radius:3px;margin-left:6px;">' + esc(r.audience) + '</span>'
+              : '';
+            const statusColor = r.status === 'issued' ? '#2F7C57' : '#76777E';
+            const viewLink = r.html_url
+              ? '<a href="' + esc(r.html_url) + '" target="_blank" style="color:#B11E2E;font-weight:600;text-decoration:none;">View →</a>'
+              : '<span style="color:#76777E;">—</span>';
+            return '<tr>' +
+              '<td style="font-family:Georgia,serif;font-size:13px;font-weight:600;">' + esc(r.report_id || '—') + audBadge + '</td>' +
+              '<td>' + esc(r.report_date || '—') + '</td>' +
+              '<td><span style="padding:3px 8px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;background:' + statusColor + ';color:white;">' + esc(r.status || '—') + '</span></td>' +
+              '<td style="font-size:12px;color:#76777E;">' + esc(r.updated_at || r.created_at || '—') + '</td>' +
+              '<td>' + viewLink + '</td>' +
+            '</tr>';
+          }
+
+          async function loadArchive() {
+            const fromInput = document.getElementById('dcr-filter-from');
+            const toInput = document.getElementById('dcr-filter-to');
+            const tbody = document.getElementById('dcr-archive-tbody');
+            const status = document.getElementById('dcr-archive-status');
+            if (!tbody) return;
+            const params = new URLSearchParams();
+            params.set('report_type', 'DCR');
+            if (fromInput && fromInput.value) params.set('from_date', fromInput.value);
+            if (toInput && toInput.value) params.set('to_date', toInput.value);
+            if (status) { status.textContent = 'Loading…'; status.style.color = '#76777E'; }
+            try {
+              const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/reports?' + params.toString());
+              const json = await resp.json();
+              const rows = (json && json.data) || [];
+              if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="5" style="padding:32px;text-align:center;color:#76777E;">No DCRs in this range. Click <strong>Issue New DCR</strong> to create one.</td></tr>';
+                if (status) { status.textContent = 'No reports'; status.style.color = '#76777E'; }
+              } else {
+                tbody.innerHTML = rows.map(renderArchiveRow).join('');
+                if (status) { status.textContent = rows.length + ' report(s)'; status.style.color = '#2F7C57'; }
+              }
+            } catch (e) {
+              console.warn('[DCR] archive load failed:', e);
+              tbody.innerHTML = '<tr><td colspan="5" style="padding:24px;text-align:center;color:#B11E2E;">Network error</td></tr>';
+              if (status) { status.textContent = 'Network error'; status.style.color = '#B11E2E'; }
+            }
+          }
+
+          function setupArchiveControls() {
+            const fromInput = document.getElementById('dcr-filter-from');
+            const toInput = document.getElementById('dcr-filter-to');
+            const newBtn = document.getElementById('dcr-new-btn');
+            const applyBtn = document.getElementById('dcr-filter-apply');
+            if (fromInput && !fromInput.value) {
+              const d = new Date(); d.setDate(d.getDate() - 30);
+              fromInput.value = d.toISOString().slice(0, 10);
+            }
+            if (toInput && !toInput.value) {
+              toInput.value = new Date().toISOString().slice(0, 10);
+            }
+            if (applyBtn) applyBtn.addEventListener('click', () => loadArchive());
+            if (newBtn) newBtn.addEventListener('click', () => showEntry());
+          }
+
+          function showArchive() {
+            const archive = document.getElementById('dcr-archive-view');
+            const entry = document.getElementById('dcr-entry-view');
+            if (archive) archive.style.display = '';
+            if (entry) entry.style.display = 'none';
+            loadArchive();
+          }
+
+          function showEntry() {
+            const archive = document.getElementById('dcr-archive-view');
+            const entry = document.getElementById('dcr-entry-view');
+            if (archive) archive.style.display = 'none';
+            if (entry) entry.style.display = '';
+            // The issued banner is a one-shot — hide it once the operator
+            // starts a new entry.
+            const banner = document.getElementById('dcr-issued-banner');
+            if (banner) banner.style.display = 'none';
+            // Clear stale operator-entry rows from the previous session.
+            document.querySelectorAll('[data-dcr-rows]').forEach(c => { c.innerHTML = ''; });
+            const photoGrid = document.getElementById('dcr-photo-grid');
+            if (photoGrid) photoGrid.innerHTML = '';
+            const issueStatus = document.getElementById('dcr-issue-status');
+            if (issueStatus) { issueStatus.textContent = ''; issueStatus.style.color = '#76777E'; }
+            // Reset date to today and reload auto-fill sections.
+            const dateInput = document.getElementById('dcr-date');
+            if (dateInput) {
+              dateInput.value = new Date().toISOString().slice(0, 10);
+              loadDcr(dateInput.value);
+            }
+          }
+
           function setupIssueButtons() {
             const btn = document.getElementById('dcr-issue');
             if (btn) btn.addEventListener('click', () => issueDcr());
           }
 
           function initDcrForm() {
+            // Wire entry-form controls — they live in the hidden entry view
+            // and only get exercised once showEntry() makes the view visible.
             const dateInput = document.getElementById('dcr-date');
-            if (!dateInput) return;
-            const today = new Date().toISOString().slice(0, 10);
-            if (!dateInput.value) dateInput.value = today;
-            dateInput.addEventListener('change', () => loadDcr(dateInput.value));
-            const refreshBtn = document.getElementById('dcr-refresh');
-            if (refreshBtn) refreshBtn.addEventListener('click', () => loadDcr(dateInput.value));
+            if (dateInput) {
+              const today = new Date().toISOString().slice(0, 10);
+              if (!dateInput.value) dateInput.value = today;
+              dateInput.addEventListener('change', () => loadDcr(dateInput.value));
+              const refreshBtn = document.getElementById('dcr-refresh');
+              if (refreshBtn) refreshBtn.addEventListener('click', () => loadDcr(dateInput.value));
+            }
             setupOperatorSections();
             setupPhotos();
             setupIssueButtons();
-            loadToolboxLibrary().then(() => loadDcr(dateInput.value));
+            setupArchiveControls();
+            // Preload the toolbox-talk library so the entry form's dropdown
+            // is ready the moment the operator clicks "Issue New DCR".
+            loadToolboxLibrary();
+            // Default state: archive list. Auto-fill data is fetched lazily
+            // when showEntry() runs (saves a wasted call on every page load).
+            showArchive();
           }
 
           if (document.readyState === 'loading') {
