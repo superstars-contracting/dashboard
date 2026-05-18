@@ -2720,34 +2720,63 @@ def issue_employee_credential(emp_id):
         eligible, _ = has_valid_prerequisite(emp_id)
         cred_type = 'cof' if eligible else 'company_id'
 
-        if cred_type == 'cof':
-            existing = conn.execute(
-                "SELECT card_id, issued_date, expires_date, status FROM cof_cards "
-                "WHERE employee_id = ? AND status = 'issued' LIMIT 1",
-                (emp_id,)
-            ).fetchone()
-        else:
-            existing = conn.execute(
-                "SELECT card_id, card_number_display, issued_date, status FROM company_id_cards "
-                "WHERE employee_id = ? AND status = 'active' LIMIT 1",
-                (emp_id,)
-            ).fetchone()
+        # Cross-type mutual exclusivity: a worker holds exactly one
+        # credential at a time. Check for an active credential of EITHER
+        # type. If any active credential exists (same or other type) and
+        # override_active is false, return 409 with the current credential.
+        existing_cof = conn.execute(
+            "SELECT card_id, issued_date, expires_date, status FROM cof_cards "
+            "WHERE employee_id = ? AND status = 'issued' LIMIT 1",
+            (emp_id,)
+        ).fetchone()
+        existing_cid = conn.execute(
+            "SELECT card_id, card_number_display, issued_date, status FROM company_id_cards "
+            "WHERE employee_id = ? AND status = 'active' LIMIT 1",
+            (emp_id,)
+        ).fetchone()
+        existing_any = existing_cof or existing_cid
 
-        if existing and not override_active:
-            current_cred = {
-                "type": cred_type,
-                "card_number_display": existing["card_id"] if cred_type == 'cof' else existing["card_number_display"],
-                "issued_date": existing["issued_date"],
-                "status": existing["status"],
-            }
-            if cred_type == 'cof':
-                current_cred["expires_date"] = existing["expires_date"]
+        if existing_any and not override_active:
+            if existing_cof:
+                current_cred = {
+                    "type": "cof",
+                    "card_number_display": existing_cof["card_id"],
+                    "issued_date": existing_cof["issued_date"],
+                    "expires_date": existing_cof["expires_date"],
+                    "status": existing_cof["status"],
+                }
+            else:
+                current_cred = {
+                    "type": "company_id",
+                    "card_number_display": existing_cid["card_number_display"],
+                    "issued_date": existing_cid["issued_date"],
+                    "status": existing_cid["status"],
+                }
             conn.close()
             return jsonify({
-                "error": f"Worker already has an active {cred_type}",
+                "error": f"Worker already has an active {current_cred['type']}",
                 "current_credential": current_cred,
                 "hint": "Pass override_active=true to supersede"
             }), 409
+
+        # override_active=true → supersede CROSS-type rows before issuance.
+        # Same-type supersede is handled inside the issuer modules
+        # (cof_issuer.issue_cof / company_id_issuer.issue_company_id both
+        # mark prior 'issued'/'active' rows as 'replaced' internally).
+        if override_active:
+            if cred_type == 'cof' and existing_cid:
+                conn.execute(
+                    "UPDATE company_id_cards SET status='replaced', updated_at=CURRENT_TIMESTAMP "
+                    "WHERE employee_id=? AND status='active'",
+                    (emp_id,)
+                )
+            elif cred_type == 'company_id' and existing_cof:
+                conn.execute(
+                    "UPDATE cof_cards SET status='replaced', updated_at=CURRENT_TIMESTAMP "
+                    "WHERE employee_id=? AND status='issued'",
+                    (emp_id,)
+                )
+            conn.commit()
         conn.close()
 
         # Issue the card row
