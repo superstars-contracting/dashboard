@@ -7,6 +7,10 @@ import logging
 import json
 import uuid
 
+# Vision-based cert extraction (requires ANTHROPIC_API_KEY in env — launch
+# the server via `op run --env-file=".env.template" -- python server.py`).
+from cert_extractor import extract_cert_from_image, load_cert_types_from_db
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 DB_PATH = SCRIPT_DIR / "superstars.db"
 COMPANY_DASHBOARD_PATH = SCRIPT_DIR / "company-dashboard.html"
@@ -1551,6 +1555,103 @@ def api_worker_add_cert(employee_id):
 
         return response_wrapper({"cert_id": cert_id, "cert_type_id": cert_type_id})
     except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/employees/<employee_id>/certifications/extract', methods=['POST'])
+def api_certification_extract(employee_id):
+    """Upload a cert card photo, save to the worker folder, run vision-based
+    extraction, return structured cert data for operator review.
+
+    Does NOT insert into certifications — the operator reviews the extracted
+    fields and then POSTs to /api/employees/<id>/certifications to save.
+
+    Multipart form fields: file=<image>.
+
+    Returns {extracted, image_path, image_url}. image_url is what the
+    operator's browser fetches to render the saved photo via /worker-files/.
+    """
+    import re as _re
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "no file in request"}), 400
+        f = request.files['file']
+        if not f.filename:
+            return jsonify({"error": "empty filename"}), 400
+
+        # Same whitelist used by api_worker_upload — images + PDF.
+        if f.mimetype not in ALLOWED_DOC_MIME_TYPES:
+            return jsonify({"error": f"file type {f.mimetype} not allowed"}), 400
+        ext = Path(f.filename).suffix.lower()
+        if ext not in ALLOWED_DOC_EXTENSIONS:
+            return jsonify({"error": f"file extension {ext} not allowed"}), 400
+
+        conn = db()
+        emp = conn.execute(
+            "SELECT employee_id, name, folder_path FROM employees WHERE employee_id = ?",
+            (employee_id,)
+        ).fetchone()
+        if not emp:
+            conn.close()
+            return jsonify({"error": "employee not found"}), 404
+
+        # Back-fill folder_path if the row predates the standardized layout.
+        folder_path = emp["folder_path"]
+        if not folder_path:
+            folder_slug = slugify_name(emp["name"])
+            folder_path = str(WORKER_RECORDS_DIR / f"{employee_id}_{folder_slug}")
+            conn.execute(
+                "UPDATE employees SET folder_path = ? WHERE employee_id = ?",
+                (folder_path, employee_id)
+            )
+            conn.commit()
+
+        folder = Path(folder_path).resolve()
+        if not str(folder).startswith(str(WORKER_RECORDS_DIR.resolve())):
+            conn.close()
+            return jsonify({"error": "invalid folder path"}), 400
+
+        certs_dir = folder / "certs"
+        certs_dir.mkdir(parents=True, exist_ok=True)
+
+        # cert_N.<ext>. Pick N = max(existing) + 1 — never overwrite.
+        existing_nums = []
+        for p in certs_dir.iterdir():
+            m = _re.match(r"^cert_(\d+)", p.name)
+            if m:
+                existing_nums.append(int(m.group(1)))
+        next_n = (max(existing_nums) + 1) if existing_nums else 1
+        target_path = (certs_dir / f"cert_{next_n}{ext}").resolve()
+        if not str(target_path).startswith(str(WORKER_RECORDS_DIR.resolve())):
+            conn.close()
+            return jsonify({"error": "path traversal blocked"}), 400
+
+        f.save(str(target_path))
+        conn.close()
+
+        # Run extraction. If the API call fails, leave the image on disk so the
+        # operator can retry or do manual entry — return 500 with the path.
+        try:
+            cert_types = load_cert_types_from_db(DB_PATH)
+            extracted = extract_cert_from_image(target_path, cert_types)
+        except (RuntimeError, FileNotFoundError) as e:
+            app.logger.error(f"cert extraction failed for {target_path}: {e}")
+            return jsonify({
+                "error": f"extraction failed: {e}",
+                "image_path": str(target_path),
+                "note": "image saved on disk; operator can retry or use manual entry",
+            }), 500
+
+        relative = target_path.relative_to(WORKER_RECORDS_DIR.resolve())
+        image_url = "/worker-files/" + str(relative).replace("\\", "/")
+
+        return response_wrapper({
+            "extracted": extracted,
+            "image_path": str(target_path),
+            "image_url": image_url,
+        })
+    except Exception as e:
+        app.logger.error(f"POST /api/employees/{employee_id}/certifications/extract failed: {e}")
         return jsonify({"error": str(e)}), 400
 
 
