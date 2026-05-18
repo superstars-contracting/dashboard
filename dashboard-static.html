@@ -1085,8 +1085,9 @@
         <div id="dcr-entry-view" class="section" style="display:none;">
           <h2>Daily Report</h2>
 
-          <!-- Controls bar: date picker + refresh + status -->
-          <div style="display:flex;gap:16px;align-items:center;background:white;border:1px solid #E8E4DD;border-radius:4px;padding:14px 16px;margin-bottom:24px;">
+          <!-- Controls bar: cancel + date picker + refresh + status -->
+          <div style="display:flex;gap:16px;align-items:center;background:white;border:1px solid #E8E4DD;border-radius:4px;padding:14px 16px;margin-bottom:24px;flex-wrap:wrap;">
+            <button id="dcr-cancel" type="button" style="padding:6px 14px;border:1px solid #E8E4DD;border-radius:4px;background:white;color:#14161C;font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;">← Cancel</button>
             <label for="dcr-date" style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Date</label>
             <input type="date" id="dcr-date" style="padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
             <button id="dcr-refresh" type="button" style="padding:6px 14px;border:none;border-radius:4px;background:#14161C;color:white;font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;">Refresh from data</button>
@@ -1712,6 +1713,14 @@
             if (btn) btn.addEventListener('click', () => issueDcr());
           }
 
+          function cancelDcr() {
+            const unsavedRows = document.querySelectorAll('.dcr-row[data-saved="0"]');
+            if (unsavedRows.length > 0) {
+              if (!confirm('Discard ' + unsavedRows.length + ' unsaved DCR row(s)?')) return;
+            }
+            showArchive();
+          }
+
           function initDcrForm() {
             // Wire entry-form controls — they live in the hidden entry view
             // and only get exercised once showEntry() makes the view visible.
@@ -1722,6 +1731,8 @@
               dateInput.addEventListener('change', () => loadDcr(dateInput.value));
               const refreshBtn = document.getElementById('dcr-refresh');
               if (refreshBtn) refreshBtn.addEventListener('click', () => loadDcr(dateInput.value));
+              const cancelBtn = document.getElementById('dcr-cancel');
+              if (cancelBtn) cancelBtn.addEventListener('click', () => cancelDcr());
             }
             setupOperatorSections();
             setupPhotos();
