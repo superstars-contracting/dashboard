@@ -32,7 +32,7 @@ class DCRHTMLRenderer:
                 <div class="project-field"><label>Date</label><p>{} ({})</p></div>
                 <div class="project-field"><label>Superintendent</label><p>{}</p></div>
                 <div class="project-field"><label>PM</label><p>{}</p></div>
-            </div>""".format(p.get('code'), p.get('name'), p.get('address'), p.get('date'), p.get('day_of_week'), p.get('superintendent'), p.get('project_manager')), self._labor_internal(), self._work_section(), self._materials_section(), self._equipment_section(), self._safety_section_internal(), self._issues_section_internal(), self._inspections_section(), self._photos_section(), self._signoff_section(), """
+            </div>""".format(p.get('code'), p.get('name'), p.get('address'), p.get('date'), p.get('day_of_week'), p.get('superintendent'), p.get('project_manager')), self._labor_internal(), self._work_section(), self._materials_section(), self._equipment_section(), self._safety_section_internal(), self._issues_section_internal(), self._inspections_section(), self._visitors_section_internal(), self._photos_section(), self._signoff_section(), """
         </section>
         </body></html>"""]
         return ''.join(html_parts)
@@ -48,7 +48,7 @@ class DCRHTMLRenderer:
                 <div class="project-field"><label>Name</label><p>{}</p></div>
                 <div class="project-field"><label>Address</label><p>{}</p></div>
                 <div class="project-field"><label>Date</label><p>{}</p></div>
-            </div>""".format(p.get('code'), p.get('name'), p.get('address'), p.get('date')), self._labor_client(), self._work_section(), self._materials_section(), self._equipment_section(), self._safety_section_client(), self._issues_section_client(), self._inspections_section(), self._photos_section(), self._signoff_section_client(), """
+            </div>""".format(p.get('code'), p.get('name'), p.get('address'), p.get('date')), self._labor_client(), self._work_section(), self._materials_section(), self._equipment_section(), self._safety_section_client(), self._issues_section_client(), self._inspections_section(), self._visitors_section_client(), self._photos_section(), self._signoff_section_client(), """
         </section>
         </body></html>"""]
         return ''.join(html_parts)
@@ -202,11 +202,35 @@ class DCRHTMLRenderer:
         html += "</table>"
         return html
 
+    def _visitors_section_internal(self) -> str:
+        visitors = self.dcr.get('visitors', [])
+        if not visitors:
+            return "<div class='section-header'>9. VISITORS</div><p>No visitors recorded.</p>"
+        html = "<div class='section-header'>9. VISITORS</div><table><tr><th>Name</th><th>Company</th><th>Role</th><th>Time In</th><th>Time Out</th><th>Purpose</th></tr>"
+        for v in visitors:
+            html += f"<tr><td>{v.get('name') or '—'}</td><td>{v.get('company') or '—'}</td><td>{v.get('role') or '—'}</td><td>{v.get('time_in') or '—'}</td><td>{v.get('time_out') or '—'}</td><td>{v.get('purpose') or '—'}</td></tr>"
+        html += "</table>"
+        return html
+
+    def _visitors_section_client(self) -> str:
+        visitors = self.dcr.get('visitors') or {}
+        if not isinstance(visitors, dict):
+            visitors = {}
+        by_role = visitors.get('count_by_role', [])
+        total = visitors.get('total_visits', 0)
+        if not by_role and not total:
+            return "<div class='section-header'>9. VISITORS</div><p>No visitors recorded.</p>"
+        html = "<div class='section-header'>9. VISITORS</div><table><tr><th>Role</th><th>Visits</th></tr>"
+        for item in by_role:
+            html += f"<tr><td>{item.get('role')}</td><td>{item.get('count')}</td></tr>"
+        html += f"</table><p><strong>Total visits:</strong> {total}</p>"
+        return html
+
     def _photos_section(self) -> str:
         photos = self.dcr.get('photos', [])
         if not photos:
-            return "<div class='section-header'>9. PHOTOS</div><p>No photos available.</p>"
-        html = "<div class='section-header'>9. PHOTOS</div>"
+            return "<div class='section-header'>10. PHOTOS</div><p>No photos available.</p>"
+        html = "<div class='section-header'>10. PHOTOS</div>"
         for p in photos[:6]:
             html += f"<p><strong>{p.get('location')}</strong><br>{p.get('description')}</p>"
         html += "</div>"
@@ -214,14 +238,14 @@ class DCRHTMLRenderer:
 
     def _signoff_section(self) -> str:
         signoff = self.dcr.get('signoff', {})
-        return f"""<div class='section-header'>10. SIGN-OFF</div>
+        return f"""<div class='section-header'>11. SIGN-OFF</div>
         <p><strong>Superintendent:</strong> {signoff.get('superintendent_name')} ___________________</p>
         <p><strong>Project Manager:</strong> {signoff.get('pm_name')} ___________________</p>
         <div class='footer'>Report generated {signoff.get('time_signed')}</div>"""
 
     def _signoff_section_client(self) -> str:
         signoff = self.dcr.get('signoff', {})
-        return f"""<div class='section-header'>10. SIGN-OFF</div>
+        return f"""<div class='section-header'>11. SIGN-OFF</div>
         <p><strong>Project Superintendent:</strong> {signoff.get('superintendent_name')}</p>
         <p><strong>Project Manager:</strong> {signoff.get('pm_name')}</p>
         <div class='footer'>This report is provided to the building owner / managing agent. For full project records, contact your project manager.</div>"""
