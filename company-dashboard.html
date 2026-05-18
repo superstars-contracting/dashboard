@@ -1307,13 +1307,212 @@ applyLanguage();
     });
   });
 
-  // Scan Cert / Take ID Photo — no-op for now. Part B wires both to the
-  // camera-capture modal (getUserMedia → upload → AI extract → review form).
-  $('#pp-scan-cert').addEventListener('click', () => {
-    alert('Scan Cert: camera-based capture coming in Part B.');
-  });
+  // Spinner CSS — injected once on first use.
+  function ensureSpinnerStyle() {
+    if (document.getElementById('pp-spin-style')) return;
+    const s = document.createElement('style');
+    s.id = 'pp-spin-style';
+    s.textContent = '@keyframes ppspin { to { transform: rotate(360deg); } }';
+    document.head.appendChild(s);
+  }
+
+  function showLoader(message) {
+    ensureSpinnerStyle();
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2600;display:flex;align-items:center;justify-content:center;';
+    el.innerHTML = `
+      <div style="background:white;padding:28px 36px;border-radius:12px;text-align:center;max-width:360px;">
+        <div style="display:inline-block;width:36px;height:36px;border:3px solid #E8E4DD;border-top-color:#B11E2E;border-radius:50%;animation:ppspin 0.8s linear infinite;margin-bottom:14px;"></div>
+        <div style="font-size:14px;color:#14161C;line-height:1.5;">${esc(message)}</div>
+      </div>`;
+    document.body.appendChild(el);
+    return el;
+  }
+
+  // Open the cert review/save modal. Resolves after Save success or Cancel.
+  // imagePath may be null (operator chose manual entry, or extract failed before
+  // saving the image). scan_path is sent verbatim to the save route — null is
+  // a valid value there.
+  function openCertReviewModal({extracted = {}, imagePath = null, imageUrl = null, extractionError = null}) {
+    return new Promise((resolve) => {
+      const types = window._certTypes || [];
+      const selectedId = extracted.cert_type_id_guess || '';
+      const optionsHtml = ['<option value="">— select cert type —</option>']
+        .concat(types.map(t => {
+          const sel = t.cert_type_id === selectedId ? 'selected' : '';
+          return `<option value="${esc(t.cert_type_id)}" ${sel}>${esc(t.cert_type_id)} — ${esc(t.name)}</option>`;
+        })).join('');
+
+      const visibleAI = extracted.cert_type_name_visible
+        ? `<div style="font-size:11px;color:#76777E;margin-top:2px;">AI saw: <em>${esc(extracted.cert_type_name_visible)}</em></div>` : '';
+
+      const errBanner = extractionError
+        ? `<div style="background:#FFF3E5;border:1px solid #B68838;color:#7A5500;padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:14px;">AI couldn't read this card — please fill in manually. <span style="color:#76777E;">(${esc(extractionError)})</span></div>`
+        : '';
+
+      const thumb = imageUrl
+        ? `<img src="${esc(imageUrl)}" style="width:120px;height:120px;object-fit:cover;border-radius:6px;border:1px solid #E8E4DD;cursor:zoom-in;flex-shrink:0;" onclick="window.showLightbox('${esc(imageUrl)}')" alt="">`
+        : `<div style="width:120px;height:120px;background:#F1EEE8;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#76777E;text-align:center;flex-shrink:0;">No photo<br>(manual entry)</div>`;
+
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position:fixed;inset:0;background:rgba(20,22,28,0.6);z-index:2500;display:flex;align-items:center;justify-content:center;padding:12px;overflow-y:auto;';
+      const card = document.createElement('div');
+      card.style.cssText = 'background:white;border-radius:12px;width:100%;max-width:560px;max-height:96vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.3);';
+      card.innerHTML = `
+        <div style="padding:14px 18px;border-bottom:1px solid #E8E4DD;display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-family:'Playfair Display',Georgia,serif;font-size:18px;font-weight:700;color:#14161C;">Review & save certification</div>
+          <button data-role="x" style="background:none;border:none;font-size:26px;color:#76777E;cursor:pointer;line-height:1;padding:0 4px;" aria-label="Close">×</button>
+        </div>
+        <div style="padding:18px;overflow-y:auto;flex:1;">
+          ${errBanner}
+          <div style="display:flex;gap:14px;margin-bottom:18px;align-items:flex-start;">
+            ${thumb}
+            <div style="flex:1;min-width:0;">
+              <label style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;display:block;margin-bottom:4px;">Cert type *</label>
+              <select data-role="cert_type_id" style="width:100%;padding:8px 10px;border:1px solid #E8E4DD;border-radius:6px;font-size:13px;background:white;">${optionsHtml}</select>
+              ${visibleAI}
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+            <div>
+              <label style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;display:block;margin-bottom:4px;">Card #</label>
+              <input data-role="card_number" type="text" value="${esc(extracted.card_number || '')}" style="width:100%;padding:8px 10px;border:1px solid #E8E4DD;border-radius:6px;font-size:13px;font-family:monospace;">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;display:block;margin-bottom:4px;">Issuing body</label>
+              <input data-role="issuing_body" type="text" value="${esc(extracted.issuing_body || '')}" style="width:100%;padding:8px 10px;border:1px solid #E8E4DD;border-radius:6px;font-size:13px;">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;display:block;margin-bottom:4px;">Date obtained</label>
+              <input data-role="date_obtained" type="date" value="${esc(extracted.date_obtained || '')}" style="width:100%;padding:8px 10px;border:1px solid #E8E4DD;border-radius:6px;font-size:13px;">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;display:block;margin-bottom:4px;">Expiration date</label>
+              <input data-role="expiration_date" type="date" value="${esc(extracted.expiration_date || '')}" style="width:100%;padding:8px 10px;border:1px solid #E8E4DD;border-radius:6px;font-size:13px;">
+            </div>
+          </div>
+          <div style="margin-bottom:6px;">
+            <label style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;display:block;margin-bottom:4px;">Notes</label>
+            <textarea data-role="notes" rows="3" style="width:100%;padding:8px 10px;border:1px solid #E8E4DD;border-radius:6px;font-size:13px;font-family:inherit;resize:vertical;">${esc(extracted.extraction_notes || '')}</textarea>
+          </div>
+          <div data-role="form-error" style="display:none;background:#FFE5E5;border:1px solid #B11E2E;color:#7A1118;padding:10px 14px;border-radius:6px;font-size:12px;margin-top:12px;"></div>
+        </div>
+        <div style="padding:14px 18px;border-top:1px solid #E8E4DD;display:flex;gap:10px;justify-content:flex-end;background:#FAF7F1;">
+          <button data-role="cancel" style="background:white;color:#14161C;border:1px solid #E8E4DD;padding:10px 18px;border-radius:6px;cursor:pointer;font-weight:600;">Cancel</button>
+          <button data-role="save" style="background:#B11E2E;color:white;border:none;padding:10px 22px;border-radius:6px;cursor:pointer;font-weight:600;min-width:120px;">Save</button>
+        </div>`;
+      modal.appendChild(card);
+      document.body.appendChild(modal);
+
+      const q = (r) => card.querySelector(`[data-role="${r}"]`);
+      const errorEl = q('form-error');
+      const saveBtn = q('save');
+
+      function close() { try { modal.remove(); } catch (_) {} resolve(); }
+
+      q('x').addEventListener('click', close);
+      q('cancel').addEventListener('click', close);
+      // Don't close on backdrop click — too easy to lose work mid-form. Operator
+      // must explicitly hit Cancel or X. The image file stays on disk regardless
+      // (intentional: photos are evidence, never silently deleted on cancel).
+
+      saveBtn.addEventListener('click', async () => {
+        const payload = {
+          cert_type_id: q('cert_type_id').value.trim(),
+          card_number: q('card_number').value.trim() || null,
+          date_obtained: q('date_obtained').value || null,
+          expiration_date: q('expiration_date').value || null,
+          issuing_body: q('issuing_body').value.trim() || null,
+          notes: q('notes').value.trim() || null,
+          scan_path: imagePath,
+        };
+        if (!payload.cert_type_id) {
+          errorEl.textContent = 'Cert type is required.';
+          errorEl.style.display = 'block';
+          return;
+        }
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+        errorEl.style.display = 'none';
+        try {
+          const resp = await fetch('/api/employees/' + encodeURIComponent(currentEmployeeId) + '/certifications', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+          });
+          const body = await resp.json().catch(() => ({}));
+          if (resp.status === 201) {
+            close();
+            showToast('✓ Cert saved', 3000);
+            await renderCertsForCurrentWorker();
+            await loadMetrics();
+          } else if (resp.status === 200) {
+            // Idempotency hit — same 4-tuple already exists
+            close();
+            showToast('Already on file — no duplicate inserted', 3500);
+            await renderCertsForCurrentWorker();
+          } else {
+            errorEl.textContent = (body && body.error) || `Save failed (${resp.status})`;
+            errorEl.style.display = 'block';
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save';
+          }
+        } catch (e) {
+          errorEl.textContent = 'Network error: ' + (e.message || String(e));
+          errorEl.style.display = 'block';
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save';
+        }
+      });
+    });
+  }
+
+  // End-to-end cert intake: camera → AI extract → review form → save.
+  async function runCertIntake() {
+    if (!currentEmployeeId) return;
+    const result = await openCameraModal({title: 'Scan Cert', allowManualFallback: true});
+    if (!result) return;  // user cancelled
+
+    let extracted = {};
+    let imagePath = null;
+    let imageUrl = null;
+    let extractionError = null;
+
+    if (result instanceof Blob) {
+      const loader = showLoader('AI is reading the card… (10–15 seconds)');
+      try {
+        const fd = new FormData();
+        fd.append('file', result, 'cert.jpeg');
+        const resp = await fetch('/api/employees/' + encodeURIComponent(currentEmployeeId) + '/certifications/extract', {
+          method: 'POST', body: fd,
+        });
+        const body = await resp.json().catch(() => ({}));
+        loader.remove();
+        if (resp.ok) {
+          const d = body.data || body;
+          extracted = d.extracted || {};
+          imagePath = d.image_path || null;
+          imageUrl = d.image_url || null;
+        } else {
+          // Extract failed but the image may have been saved before the API call.
+          imagePath = (body && body.image_path) || null;
+          extractionError = (body && body.error) || `extraction failed (${resp.status})`;
+        }
+      } catch (e) {
+        loader.remove();
+        extractionError = 'network error during extraction: ' + (e.message || String(e));
+      }
+    }
+    // result === 'manual' path: extracted stays {}, no image. Form opens blank.
+
+    await openCertReviewModal({extracted, imagePath, imageUrl, extractionError});
+  }
+
+  // Wire Scan Cert button.
+  $('#pp-scan-cert').addEventListener('click', () => { runCertIntake(); });
+
+  // Take ID Photo — wired in commit B3.
   $('#pp-take-face').addEventListener('click', () => {
-    alert('Take ID Photo: camera-based capture coming in Part B.');
+    alert('Take ID Photo: wired in next commit.');
   });
 
   window.deleteDoc = async function(docId) {
