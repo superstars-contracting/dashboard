@@ -60,13 +60,13 @@
 
   /* ============== FRONT ============== */
 
-  /* Banner row */
+  /* Banner row — trimmed 1mm to make headroom for the taller body. */
   td.banner {
-    height: 11mm;
+    height: 10mm;
     background: linear-gradient(135deg, var(--brand-red), var(--brand-red-deep));
     color: white;
     text-align: center;
-    padding: 1.6mm 4mm 1.4mm;
+    padding: 1.4mm 4mm 1.2mm;
   }
   .banner-title {
     font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
@@ -81,10 +81,12 @@
     white-space: nowrap;
   }
 
-  /* Body row — contains a nested table for photo + info */
+  /* Body row — grew 32mm -> 36mm to fit a taller passport-style photo
+     and the bumped-up field fonts. Banner -1mm + front-footer -3mm
+     keeps the card height at 53.98mm. */
   td.body {
-    height: 32mm;
-    padding: 2.5mm 3.5mm 1.5mm;
+    height: 36mm;
+    padding: 2mm 3.5mm 1mm;
   }
   table.body-grid {
     width: 100%;
@@ -93,30 +95,35 @@
   }
   table.body-grid td { vertical-align: top; padding: 0; }
   td.photo-cell { width: 28mm; padding-right: 3mm; }
+  /* Photo extended ~7mm vertically (passport-style aspect ratio) per
+     user feedback that the box looked cramped at 26x26mm. */
   .photo-box {
-    width: 26mm; height: 26mm;
+    width: 26mm; height: 33mm;
     background: var(--paper);
     border: 0.2mm solid var(--hairline);
     border-radius: 0.8mm;
     text-align: center;
-    line-height: 26mm;
+    line-height: 33mm;
     font-size: 2.2mm; color: var(--mute);
     letter-spacing: 0.4mm; font-weight: 600;
+    overflow: hidden;
   }
-  .field { margin-bottom: 2.4mm; }
+  .photo-box img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* Field fonts bumped for legibility on the printed card. */
+  .field { margin-bottom: 2mm; }
   .field:last-child { margin-bottom: 0; }
   .field-label {
-    font-size: 1.7mm; font-weight: 700; letter-spacing: 0.3mm;
+    font-size: 1.8mm; font-weight: 700; letter-spacing: 0.3mm;
     text-transform: uppercase; color: var(--mute); margin-bottom: 0.4mm;
   }
   .field-value {
-    font-size: 3mm; font-weight: 600; color: var(--ink);
+    font-size: 3.5mm; font-weight: 600; color: var(--ink);
     border-bottom: 0.25mm solid var(--ink); padding-bottom: 0.4mm;
-    line-height: 1.1; min-height: 3.4mm;
+    line-height: 1.1; min-height: 4mm;
   }
   .field-value.mono {
     font-family: 'Consolas', 'Menlo', monospace;
-    font-size: 2.4mm; letter-spacing: 0.2mm;
+    font-size: 3mm; letter-spacing: 0.2mm;
   }
   .field-value.expires {
     color: var(--brand-red); border-bottom-color: var(--brand-red);
@@ -124,12 +131,14 @@
   table.field-row { width: 100%; border-collapse: collapse; }
   table.field-row td { padding: 0; }
   table.field-row td:first-child { padding-right: 2mm; width: 50%; }
+  table.field-row .field-value { font-size: 3mm; }
+  table.field-row .field-value.mono { font-size: 2.7mm; }
 
-  /* Footer row — logo lockup + address */
+  /* Footer row — trimmed 3mm to absorb the body's 4mm growth. */
   td.front-footer {
-    height: 11mm;
+    height: 8mm;
     border-top: 0.2mm solid var(--hairline);
-    padding: 1mm 3mm 1.2mm;
+    padding: 0.8mm 3mm 0.8mm;
     text-align: center;
     background: var(--cream);
   }
@@ -150,18 +159,24 @@
     font-size: 1.6mm; font-weight: 700; letter-spacing: 0.5mm;
     color: var(--ink); line-height: 1; margin-top: 0.4mm;
   }
+  /* Company address bumped to a legible size. Fax dropped to fit at
+     the larger font (phone is the primary contact channel anyway). */
   .company-addr {
-    font-size: 1.55mm; color: var(--ink); font-weight: 700;
-    letter-spacing: 0; margin-top: 0.4mm;
+    font-size: 2mm; color: var(--ink); font-weight: 700;
+    letter-spacing: 0; margin-top: 0.5mm;
     white-space: nowrap;
   }
 
   /* ============== BACK ============== */
 
+  /* Extra right-padding (5mm vs 3.5mm left) keeps the cite clear of the
+     rounded top-right corner — the previous 3.5mm right padding let
+     "1 RCNY §104-20(k)" graze into the card-wrap's overflow-clipped
+     border-radius zone. */
   td.back-strip {
     height: 6mm;
     background: var(--ink); color: white;
-    padding: 1.4mm 3.5mm;
+    padding: 1.4mm 5mm 1.4mm 3.5mm;
   }
   table.back-strip-inner { width: 100%; border-collapse: collapse; }
   table.back-strip-inner td { padding: 0; }
@@ -170,9 +185,10 @@
     font-size: 2.6mm; font-weight: 700; letter-spacing: 0.4mm; text-transform: uppercase;
   }
   .back-cite {
-    font-size: 1.9mm; color: var(--gold-tint);
-    letter-spacing: 0.2mm; font-weight: 600; font-style: italic;
+    font-size: 1.8mm; color: var(--gold-tint);
+    letter-spacing: 0.15mm; font-weight: 600; font-style: italic;
     text-align: right;
+    white-space: nowrap;
   }
 
   td.back-body {
@@ -201,12 +217,15 @@
   .fillin.name { width: 28mm; }
   .fillin.license { width: 16mm; text-align: left; padding-left: 0.5mm; font-weight: 600; }
 
-  /* Sig row — two-column table, 60/40 split with ~3mm gap so the two
-     fields read as visually distinct rather than one continuous line. */
+  /* Sig row — explicit 3-column structure with an empty spacer cell
+     between signature and date. Padding-based gaps weren't producing
+     a visible break in the rendered PDF (user-flagged), so we make
+     the gap a literal table cell with no border-bottom. */
   table.sig-row { width: 100%; border-collapse: collapse; table-layout: fixed; }
   table.sig-row td { padding: 0; vertical-align: top; }
-  td.sig-cell-name { width: 60%; padding-right: 1.5mm; }
-  td.sig-cell-date { width: 40%; padding-left: 1.5mm; }
+  td.sig-cell-name { width: 57%; }
+  td.sig-spacer    { width: 6%; }
+  td.sig-cell-date { width: 37%; }
   .sig-line { border-bottom: 0.4mm solid var(--ink); height: 5mm; }
   .sig-label {
     font-size: 2mm; font-weight: 700; letter-spacing: 0.4mm;
@@ -322,7 +341,7 @@
           <div class="lockup-sub">CONTRACTING INC</div>
         </td></tr></table>
         <div class="company-addr">
-          40-27 24th Street, Long Island City, NY 11101 &nbsp;·&nbsp; P 917 498 0002 &nbsp;·&nbsp; F 718 709 4223
+          40-27 24th Street, Long Island City, NY 11101 &nbsp;·&nbsp; P 917 498 0002
         </div>
       </td>
     </tr>
@@ -350,6 +369,7 @@
             <div class="sig-line">{% if SIGNATURE_URL %}<img src="{{ SIGNATURE_URL }}" style="max-height:5mm;max-width:90%;">{% endif %}</div>
             <div class="sig-label">Issuer Signature</div>
           </td>
+          <td class="sig-spacer"></td>
           <td class="sig-cell-date">
             <div class="sig-line" style="text-align:center;font-family:'Consolas','Menlo',monospace;font-size:2.4mm;padding-top:1.5mm;">{{ ISSUED_DATE }}</div>
             <div class="sig-label">Date</div>

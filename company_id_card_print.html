@@ -62,10 +62,10 @@
   /* ============== FRONT ============== */
 
   td.banner {
-    height: 11mm;
+    height: 10mm;
     background: linear-gradient(135deg, var(--brand-red), var(--brand-red-deep));
     color: white; text-align: center;
-    padding: 1.6mm 4mm 1.4mm;
+    padding: 1.4mm 4mm 1.2mm;
   }
   .banner-title {
     font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
@@ -80,20 +80,22 @@
     white-space: nowrap;
   }
 
+  /* Body grew 32mm -> 36mm to fit a taller photo + bumped fonts.
+     Banner -1mm + front-footer -3mm keeps card height at 53.98mm. */
   td.body {
-    height: 32mm;
-    padding: 1.8mm 3.5mm 1mm;
+    height: 36mm;
+    padding: 2mm 3.5mm 1mm;
   }
   table.body-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
   table.body-grid td { vertical-align: top; padding: 0; }
   td.photo-cell { width: 28mm; padding-right: 3mm; }
   .photo-box {
-    width: 26mm; height: 26mm;
+    width: 26mm; height: 33mm;
     background: var(--paper);
     border: 0.2mm solid var(--hairline);
     border-radius: 0.8mm;
     text-align: center;
-    line-height: 26mm;
+    line-height: 33mm;
     font-size: 2.2mm; color: var(--mute);
     letter-spacing: 0.4mm; font-weight: 600;
     overflow: hidden;
@@ -103,32 +105,34 @@
     object-fit: cover; display: block;
   }
 
-  /* Tighter spacing — Company ID has 4 visual rows vs CoF's 3 */
-  .field { margin-bottom: 1.5mm; }
+  /* Field fonts bumped for legibility on the printed card. Company ID
+     has 3 visual rows now (Name + ID/PIN field-row + Issued/Issued By
+     field-row) so the field margins can stay roomy. */
+  .field { margin-bottom: 2mm; }
   .field:last-child { margin-bottom: 0; }
   .field-label {
-    font-size: 1.6mm; font-weight: 700; letter-spacing: 0.3mm;
-    text-transform: uppercase; color: var(--mute); margin-bottom: 0.3mm;
+    font-size: 1.8mm; font-weight: 700; letter-spacing: 0.3mm;
+    text-transform: uppercase; color: var(--mute); margin-bottom: 0.4mm;
   }
   .field-value {
-    font-size: 2.8mm; font-weight: 600; color: var(--ink);
-    border-bottom: 0.25mm solid var(--ink); padding-bottom: 0.3mm;
-    line-height: 1.1; min-height: 3.2mm;
+    font-size: 3.5mm; font-weight: 600; color: var(--ink);
+    border-bottom: 0.25mm solid var(--ink); padding-bottom: 0.4mm;
+    line-height: 1.1; min-height: 4mm;
   }
   .field-value.mono {
     font-family: 'Consolas', 'Menlo', monospace;
-    font-size: 2.3mm; letter-spacing: 0.2mm;
+    font-size: 3mm; letter-spacing: 0.2mm;
   }
   table.field-row { width: 100%; border-collapse: collapse; }
   table.field-row td { padding: 0; }
   table.field-row td:first-child { padding-right: 2mm; width: 50%; }
-  table.field-row .field-value { font-size: 2.4mm; }
-  table.field-row .field-value.mono { font-size: 2.1mm; letter-spacing: 0.15mm; }
+  table.field-row .field-value { font-size: 3mm; }
+  table.field-row .field-value.mono { font-size: 2.7mm; letter-spacing: 0.2mm; }
 
   td.front-footer {
-    height: 11mm;
+    height: 8mm;
     border-top: 0.2mm solid var(--hairline);
-    padding: 1mm 3mm 1.2mm;
+    padding: 0.8mm 3mm 0.8mm;
     text-align: center;
     background: var(--cream);
   }
@@ -147,8 +151,8 @@
     color: var(--ink); line-height: 1; margin-top: 0.4mm;
   }
   .company-addr {
-    font-size: 1.55mm; color: var(--ink); font-weight: 700;
-    letter-spacing: 0; margin-top: 0.4mm;
+    font-size: 2mm; color: var(--ink); font-weight: 700;
+    letter-spacing: 0; margin-top: 0.5mm;
     white-space: nowrap;
   }
 
@@ -316,7 +320,7 @@
           <div class="lockup-sub">CONTRACTING INC</div>
         </td></tr></table>
         <div class="company-addr">
-          40-27 24th Street, Long Island City, NY 11101 &nbsp;·&nbsp; P 917 498 0002 &nbsp;·&nbsp; F 718 709 4223
+          40-27 24th Street, Long Island City, NY 11101 &nbsp;·&nbsp; P 917 498 0002
         </div>
       </td>
     </tr>
