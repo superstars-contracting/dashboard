@@ -708,50 +708,90 @@ def get_dcr_daily(project_code, report_date):
         return jsonify({"error": str(e)}), 500
 
 
-def _issue_one_dcr(conn, project_code, report_date, audience):
+def lookup_existing_dcr_sequence(conn, project_code, report_date):
+    """If a DCR already exists for (project_code, report_date) at any audience,
+    return its dcr_sequence. Otherwise return None. Used to preserve the seq
+    number on re-issue (audiences for the same date share one seq)."""
+    row = conn.execute(
+        "SELECT dcr_sequence FROM report_index "
+        "WHERE project_code = ? AND report_date = ? AND report_type = 'DCR' "
+        "AND dcr_sequence IS NOT NULL LIMIT 1",
+        (project_code, report_date)
+    ).fetchone()
+    return row['dcr_sequence'] if row else None
+
+
+def next_dcr_sequence(conn, project_code):
+    """Return the next DCR sequence number for a project (MAX+1, or 1 if empty).
+    Per-project counter; tracks ISSUANCE order, not chronological."""
+    row = conn.execute(
+        "SELECT MAX(dcr_sequence) AS m FROM report_index "
+        "WHERE project_code = ? AND report_type = 'DCR'",
+        (project_code,)
+    ).fetchone()
+    return (row['m'] or 0) + 1
+
+
+def _issue_one_dcr(conn, project_code, report_date, audience, seq):
     """Aggregate + render + write + upsert for one audience. Returns
-    {report_id, audience, html_url}. Caller owns the connection and the
-    commit/close lifecycle so 'both' can run as a single transaction."""
+    {report_id, audience, html_url, sequence}. Caller owns the connection
+    and the commit/close lifecycle so 'both' can run as a single transaction.
+    The seq is computed once by the caller and shared across audiences."""
     from dcr_aggregator import aggregate_dcr
     from render_dcr_html import DCRHTMLRenderer
     dcr = aggregate_dcr(project_code, report_date, audience)
-    report_id = f"DCR-{project_code}-{report_date}-{audience}"
+    report_id = f"DCR-{project_code}-{seq:03d}-{audience}"
+    display_id = f"DCR-{project_code}-{seq:03d}"
     dcr['report_id'] = report_id
+    dcr['display_id'] = display_id
+    dcr['dcr_sequence'] = seq
     html = DCRHTMLRenderer(dcr).render()
-    out_dir = SCRIPT_DIR / "data_room" / "reports" / "dcr" / project_code / report_date
+    out_dir = SCRIPT_DIR / "data_room" / "reports" / "dcr" / project_code / f"{seq:03d}"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_file = out_dir / f"{audience}.html"
     out_file.write_text(html, encoding='utf-8')
     rel = out_file.relative_to(SCRIPT_DIR).as_posix()
     html_url = f"/files/{rel}"
     existing = conn.execute(
-        "SELECT id FROM report_index WHERE project_code = ? AND report_date = ? AND report_type = ? AND report_id = ?",
-        (project_code, report_date, 'DCR', report_id)
+        "SELECT id FROM report_index WHERE project_code = ? AND report_type = ? AND report_id = ?",
+        (project_code, 'DCR', report_id)
     ).fetchone()
     if existing:
         conn.execute(
-            "UPDATE report_index SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            ('issued', existing['id'])
+            "UPDATE report_index SET status = ?, report_date = ?, dcr_sequence = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            ('issued', report_date, seq, existing['id'])
         )
     else:
         conn.execute(
-            "INSERT INTO report_index (report_date, project_code, report_type, report_id, status) VALUES (?, ?, ?, ?, ?)",
-            (report_date, project_code, 'DCR', report_id, 'issued')
+            "INSERT INTO report_index (report_date, project_code, report_type, report_id, status, dcr_sequence) VALUES (?, ?, ?, ?, ?, ?)",
+            (report_date, project_code, 'DCR', report_id, 'issued', seq)
         )
-    return {"report_id": report_id, "audience": audience, "html_url": html_url}
+    return {"report_id": report_id, "audience": audience, "html_url": html_url,
+            "display_id": display_id, "sequence": seq}
 
 
 @app.route('/api/projects/<project_code>/daily/<report_date>/issue', methods=['POST'])
 def issue_dcr(project_code, report_date):
     """Issue a DCR for (project_code, report_date) at the given audience.
+
+    Body: {audience: 'internal'|'client'|'both' (default 'internal'),
+           override_active: bool (default false)}
+
     audience='internal' or 'client' returns the legacy single-row shape
-    ({report_id, audience, html_url, generated_at}). audience='both'
-    runs the issuance once per audience inside a single transaction and
+    ({report_id, display_id, audience, html_url, sequence, generated_at}).
+    audience='both' runs both audiences inside a single transaction and
     returns {internal_url, client_url, internal_report_id, client_report_id,
-    audience:'both', generated_at}. Re-issuing the same (project, date,
-    audience) overwrites the file and bumps updated_at."""
+    display_id, sequence, audience:'both', generated_at}.
+
+    Sequence semantics: per-project counter, tracks ISSUANCE order.
+    Both audiences for the same date share one sequence. Re-issuing a DCR
+    for the same (project, date) preserves the existing sequence — pass
+    override_active=true to opt into the re-issue (otherwise returns 409
+    with the existing sequence). The DATE is preserved in the rendered
+    HTML body, not in the report_id."""
     data = request.get_json() or {}
     audience = data.get('audience', 'internal')
+    override_active = bool(data.get('override_active', False))
     if audience not in ('internal', 'client', 'both'):
         return jsonify({"error": "audience must be 'internal', 'client', or 'both'"}), 400
     try:
@@ -763,10 +803,22 @@ def issue_dcr(project_code, report_date):
         conn.close()
         return jsonify({"error": "Project not found"}), 400
     try:
+        existing_seq = lookup_existing_dcr_sequence(conn, project_code, report_date)
+        if existing_seq is not None and not override_active:
+            conn.close()
+            display_id = f"DCR-{project_code}-{existing_seq:03d}"
+            return jsonify({
+                "error": f"DCR already exists for {project_code} on {report_date}",
+                "existing_sequence": existing_seq,
+                "existing_display_id": display_id,
+                "hint": "Pass override_active=true to re-issue (sequence stays the same)",
+            }), 409
+        seq = existing_seq if existing_seq is not None else next_dcr_sequence(conn, project_code)
+        display_id = f"DCR-{project_code}-{seq:03d}"
         generated_at = datetime.utcnow().isoformat() + 'Z'
         if audience == 'both':
-            internal = _issue_one_dcr(conn, project_code, report_date, 'internal')
-            client = _issue_one_dcr(conn, project_code, report_date, 'client')
+            internal = _issue_one_dcr(conn, project_code, report_date, 'internal', seq)
+            client = _issue_one_dcr(conn, project_code, report_date, 'client', seq)
             conn.commit()
             conn.close()
             return response_wrapper({
@@ -776,15 +828,19 @@ def issue_dcr(project_code, report_date):
                 "client_url": client["html_url"],
                 "internal_report_id": internal["report_id"],
                 "client_report_id": client["report_id"],
+                "display_id": display_id,
+                "sequence": seq,
             }), 201
         else:
-            result = _issue_one_dcr(conn, project_code, report_date, audience)
+            result = _issue_one_dcr(conn, project_code, report_date, audience, seq)
             conn.commit()
             conn.close()
             return response_wrapper({
                 "report_id": result["report_id"],
                 "audience": result["audience"],
                 "html_url": result["html_url"],
+                "display_id": display_id,
+                "sequence": seq,
                 "generated_at": generated_at,
             }), 201
     except (KeyError, ValueError) as e:
@@ -875,8 +931,8 @@ def list_reports(project_code):
             d['audience'] = 'client'
         else:
             d['audience'] = None
-        if d['audience'] and d.get('report_date') and d.get('report_type') == 'DCR':
-            d['html_url'] = f"/files/data_room/reports/dcr/{project_code}/{d['report_date']}/{d['audience']}.html"
+        if d['audience'] and d.get('dcr_sequence') is not None and d.get('report_type') == 'DCR':
+            d['html_url'] = f"/files/data_room/reports/dcr/{project_code}/{d['dcr_sequence']:03d}/{d['audience']}.html"
         else:
             d['html_url'] = None
         d['display_id'] = _display_id(rid)
@@ -916,8 +972,8 @@ def latest_report(project_code):
         return response_wrapper(None)
     d = dict(row)
     d['audience'] = audience
-    if d.get('report_date') and d.get('report_type') == 'DCR':
-        d['html_url'] = f"/files/data_room/reports/dcr/{project_code}/{d['report_date']}/{audience}.html"
+    if d.get('dcr_sequence') is not None and d.get('report_type') == 'DCR':
+        d['html_url'] = f"/files/data_room/reports/dcr/{project_code}/{d['dcr_sequence']:03d}/{audience}.html"
     else:
         d['html_url'] = None
     d['display_id'] = _display_id(d.get('report_id'))

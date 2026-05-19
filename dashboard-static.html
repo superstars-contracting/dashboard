@@ -1571,15 +1571,15 @@
             el.style.color = color || '#76777E';
           }
 
-          async function issueDcr() {
+          async function issueDcr(override) {
             const dateStr = getCurrentDate();
-            if (!confirm('Issue DCR for ' + dateStr + '? Generates internal and client versions.')) return;
-            setIssueStatus('Issuing internal + client…', '#76777E');
+            if (!override && !confirm('Issue DCR for ' + dateStr + '? Generates internal and client versions.')) return;
+            setIssueStatus(override ? 'Re-issuing internal + client…' : 'Issuing internal + client…', '#76777E');
             try {
               const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/daily/' + encodeURIComponent(dateStr) + '/issue', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({audience: 'both'})
+                body: JSON.stringify({audience: 'both', override_active: !!override})
               });
               const json = await resp.json();
               if (resp.status === 201 && json && json.data && json.data.internal_url) {
@@ -1592,9 +1592,16 @@
                 if (banner) {
                   banner.style.display = 'block';
                   banner.innerHTML =
-                    '<strong style="color:#2F7C57;">✓ DCR issued — opened in new tab.</strong>';
+                    '<strong style="color:#2F7C57;">✓ ' + (override ? 'DCR re-issued' : 'DCR issued') +
+                    ' — ' + (json.data.display_id || '') + ' — opened in new tab.</strong>';
                 }
                 showArchive();
+              } else if (resp.status === 409 && json && json.existing_sequence !== undefined) {
+                const existing = json.existing_display_id || ('DCR-' + PROJECT_CODE + '-' + String(json.existing_sequence).padStart(3, '0'));
+                if (confirm('A DCR already exists for ' + dateStr + ' (' + existing + '). Re-issue and overwrite with current data? Sequence number will stay the same.')) {
+                  return issueDcr(true);
+                }
+                setIssueStatus('Cancelled', '#76777E');
               } else {
                 setIssueStatus('Failed: ' + ((json && json.error) || ('HTTP ' + resp.status)), '#B11E2E');
               }
