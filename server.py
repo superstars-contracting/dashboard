@@ -2710,7 +2710,7 @@ def issue_employee_credential(emp_id):
 
         conn = db()
         emp = conn.execute(
-            "SELECT employee_id, name, trade, face_image_path FROM employees WHERE employee_id = ?",
+            "SELECT employee_id, name, trade, pin, face_image_path FROM employees WHERE employee_id = ?",
             (emp_id,)
         ).fetchone()
         if not emp:
@@ -2838,6 +2838,7 @@ def issue_employee_credential(emp_id):
             'ISSUED_BY': card.get('issued_by') or issued_by,
             'EXPIRES_DATE': expires_str,
             'TRADE': emp['trade'] or '',
+            'PIN': emp['pin'] or '----',
             'PHOTO_URL_OR_BLANK': photo_url,
             'RIGGER_NAME': card.get('rigger_name_snapshot') or '',
             'RIGGER_LICENSE': card.get('rigger_license_snapshot') or '',
