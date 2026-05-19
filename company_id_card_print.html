@@ -80,11 +80,11 @@
     white-space: nowrap;
   }
 
-  /* Body grew 32mm -> 36mm to fit a taller photo + bumped fonts.
-     Banner -1mm + front-footer -3mm keeps card height at 53.98mm. */
+  /* Body 34mm (was 32mm originally, polished to 36mm, now back to 34mm
+     to give footer 2 more mm for its 2-line address). */
   td.body {
-    height: 36mm;
-    padding: 2mm 3.5mm 1mm;
+    height: 34mm;
+    padding: 0.5mm 3.5mm 0.5mm;
   }
   table.body-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
   table.body-grid td { vertical-align: top; padding: 0; }
@@ -128,33 +128,44 @@
   table.field-row td:first-child { padding-right: 2mm; width: 50%; }
   table.field-row .field-value { font-size: 3mm; }
   table.field-row .field-value.mono { font-size: 2.7mm; letter-spacing: 0.2mm; }
+  /* PIN value bumped — most-actionable info on the card (worker app login). */
+  .field-value.pin-value {
+    font-size: 5.5mm;
+    font-weight: 700;
+    letter-spacing: 0.5mm;
+    line-height: 1.05;
+    min-height: 6mm;
+  }
 
+  /* Footer — 2-column: brand left, address right. Mirrors cof_card_print. */
   td.front-footer {
-    height: 8mm;
+    height: 10mm;
     border-top: 0.2mm solid var(--hairline);
-    padding: 0.8mm 3mm 0.8mm;
-    text-align: center;
+    padding: 1mm 3mm;
     background: var(--cream);
   }
-  table.lockup { margin: 0 auto; border-collapse: collapse; }
+  table.footer-grid {
+    width: 100%; border-collapse: collapse; table-layout: fixed;
+  }
+  table.footer-grid td { padding: 0; vertical-align: middle; }
+  td.ff-brand { width: 50%; }
+  td.ff-addr  { width: 50%; text-align: right; padding-left: 2mm; }
+  table.lockup { border-collapse: collapse; }
   table.lockup td { padding: 0; vertical-align: middle; }
-  .lockup-star { width: 5.5mm; height: 5.5mm; display: block; }
-  td.lockup-text-cell { padding-left: 1.6mm !important; text-align: left; }
+  .lockup-star { width: 6mm; height: 6mm; display: block; }
+  td.lockup-text-cell { padding-left: 1.5mm !important; text-align: left; }
   .lockup-name {
     font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
-    font-size: 3mm; font-weight: 700; letter-spacing: 0.25mm;
-    color: var(--ink); line-height: 1;
-  }
-  .lockup-sub {
-    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
-    font-size: 1.6mm; font-weight: 700; letter-spacing: 0.5mm;
-    color: var(--ink); line-height: 1; margin-top: 0.4mm;
-  }
-  .company-addr {
-    font-size: 2mm; color: var(--ink); font-weight: 700;
-    letter-spacing: 0; margin-top: 0.5mm;
+    font-size: 2.2mm; font-weight: 700; letter-spacing: 0.15mm;
+    color: var(--brand-red); line-height: 1.1;
     white-space: nowrap;
   }
+  .company-addr {
+    font-size: 2.2mm; color: var(--ink); font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1.2;
+  }
+  .company-addr .addr-line { display: block; }
 
   /* ============== BACK ============== */
 
@@ -269,7 +280,7 @@
                   <td>
                     <div class="field">
                       <div class="field-label">PIN</div>
-                      <div class="field-value mono">{{ PIN }}</div>
+                      <div class="field-value mono pin-value">{{ PIN }}</div>
                     </div>
                   </td>
                 </tr>
@@ -297,31 +308,37 @@
     </tr>
     <tr>
       <td class="front-footer">
-        <table class="lockup"><tr><td>
-          <svg class="lockup-star" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="rL" x1="0%" y1="0%" x2="70%" y2="100%"><stop offset="0%" stop-color="#E0394E"/><stop offset="100%" stop-color="#A01829"/></linearGradient>
-              <linearGradient id="rD" x1="100%" y1="0%" x2="30%" y2="100%"><stop offset="0%" stop-color="#831321"/><stop offset="100%" stop-color="#4A0A12"/></linearGradient>
-            </defs>
-            <polygon fill="url(#rL)" points="18,18 13.96,12.44 18,0"/>
-            <polygon fill="url(#rD)" points="18,18 18,0 22.04,12.44"/>
-            <polygon fill="url(#rL)" points="18,18 22.04,12.44 35.12,12.44"/>
-            <polygon fill="url(#rD)" points="18,18 35.12,12.44 24.54,20.13"/>
-            <polygon fill="url(#rL)" points="18,18 24.54,20.13 28.58,32.56"/>
-            <polygon fill="url(#rD)" points="18,18 28.58,32.56 18,24.88"/>
-            <polygon fill="url(#rL)" points="18,18 18,24.88 7.42,32.56"/>
-            <polygon fill="url(#rD)" points="18,18 7.42,32.56 11.46,20.13"/>
-            <polygon fill="url(#rL)" points="18,18 11.46,20.13 0.88,12.44"/>
-            <polygon fill="url(#rD)" points="18,18 0.88,12.44 13.96,12.44"/>
-            <polygon fill="#FAF7F1" points="18,10.8 20.02,15.94 25.34,15.94 21.02,19.25 22.68,24.39 18,21.26 13.32,24.39 14.98,19.25 10.66,15.94 15.98,15.94"/>
-          </svg>
-        </td><td class="lockup-text-cell">
-          <div class="lockup-name">SUPERSTARS</div>
-          <div class="lockup-sub">CONTRACTING INC</div>
-        </td></tr></table>
-        <div class="company-addr">
-          40-27 24th Street, Long Island City, NY 11101 &nbsp;·&nbsp; P 917 498 0002
-        </div>
+        <table class="footer-grid"><tr>
+          <td class="ff-brand">
+            <table class="lockup"><tr><td>
+              <svg class="lockup-star" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="rL" x1="0%" y1="0%" x2="70%" y2="100%"><stop offset="0%" stop-color="#E0394E"/><stop offset="100%" stop-color="#A01829"/></linearGradient>
+                  <linearGradient id="rD" x1="100%" y1="0%" x2="30%" y2="100%"><stop offset="0%" stop-color="#831321"/><stop offset="100%" stop-color="#4A0A12"/></linearGradient>
+                </defs>
+                <polygon fill="url(#rL)" points="18,18 13.96,12.44 18,0"/>
+                <polygon fill="url(#rD)" points="18,18 18,0 22.04,12.44"/>
+                <polygon fill="url(#rL)" points="18,18 22.04,12.44 35.12,12.44"/>
+                <polygon fill="url(#rD)" points="18,18 35.12,12.44 24.54,20.13"/>
+                <polygon fill="url(#rL)" points="18,18 24.54,20.13 28.58,32.56"/>
+                <polygon fill="url(#rD)" points="18,18 28.58,32.56 18,24.88"/>
+                <polygon fill="url(#rL)" points="18,18 18,24.88 7.42,32.56"/>
+                <polygon fill="url(#rD)" points="18,18 7.42,32.56 11.46,20.13"/>
+                <polygon fill="url(#rL)" points="18,18 11.46,20.13 0.88,12.44"/>
+                <polygon fill="url(#rD)" points="18,18 0.88,12.44 13.96,12.44"/>
+                <polygon fill="#FAF7F1" points="18,10.8 20.02,15.94 25.34,15.94 21.02,19.25 22.68,24.39 18,21.26 13.32,24.39 14.98,19.25 10.66,15.94 15.98,15.94"/>
+              </svg>
+            </td><td class="lockup-text-cell">
+              <div class="lockup-name">Superstars Contracting Inc.</div>
+            </td></tr></table>
+          </td>
+          <td class="ff-addr">
+            <div class="company-addr">
+              <span class="addr-line">40-27 24th Street, Long Island City, NY 11101</span>
+              <span class="addr-line">P 917 498 0002</span>
+            </div>
+          </td>
+        </tr></table>
       </td>
     </tr>
   </table></div>
