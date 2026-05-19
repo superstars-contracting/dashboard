@@ -1640,11 +1640,13 @@
             const viewLink = r.html_url
               ? '<a href="' + esc(r.html_url) + '" target="_blank" style="color:#B11E2E;font-weight:600;text-decoration:none;">View →</a>'
               : '<span style="color:#76777E;">—</span>';
-            const reportId = r.report_id || '';
             const displayId = r.display_id || r.report_id || '—';
             const reportDate = r.report_date || '';
-            const deleteBtn = reportId
-              ? '<button type="button" data-delete-report="' + esc(reportId) + '" data-display-id="' + esc(displayId) + '" data-report-date="' + esc(reportDate) + '" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 10px;border:1px solid #B11E2E;border-radius:4px;background:white;color:#B11E2E;cursor:pointer;margin-left:8px;">Delete</button>'
+            const seq = r.dcr_sequence;
+            // Delete acts on the whole DCR (both audiences for this sequence),
+            // not just the visible internal row — see /by-sequence/<seq> route.
+            const deleteBtn = (seq !== undefined && seq !== null)
+              ? '<button type="button" data-delete-seq="' + esc(seq) + '" data-display-id="' + esc(displayId) + '" data-report-date="' + esc(reportDate) + '" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 10px;border:1px solid #B11E2E;border-radius:4px;background:white;color:#B11E2E;cursor:pointer;margin-left:8px;">Delete</button>'
               : '';
             return '<tr>' +
               '<td style="font-family:Georgia,serif;font-size:13px;font-weight:600;">' + esc(displayId) + '</td>' +
@@ -1656,14 +1658,14 @@
           }
 
           async function handleArchiveDelete(btn) {
-            const reportId = btn.dataset.deleteReport;
+            const seq = btn.dataset.deleteSeq;
             const displayId = btn.dataset.displayId;
             const reportDate = btn.dataset.reportDate;
-            if (!reportId) return;
-            if (!confirm('Delete DCR ' + displayId + ' from ' + reportDate + '? This cannot be undone.')) return;
+            if (!seq) return;
+            if (!confirm('Delete DCR ' + displayId + ' from ' + reportDate + '? This removes BOTH the internal and client copies. This cannot be undone.')) return;
             btn.disabled = true; btn.textContent = '…';
             try {
-              const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/reports/' + encodeURIComponent(reportId), {method: 'DELETE'});
+              const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/reports/by-sequence/' + encodeURIComponent(seq), {method: 'DELETE'});
               if (resp.status === 200 || resp.status === 404) {
                 loadArchive();
               } else {
@@ -1687,7 +1689,7 @@
             // One-time event delegation: any Delete button inside the tbody routes here.
             if (!tbody.dataset.deleteWired) {
               tbody.addEventListener('click', (e) => {
-                const btn = e.target.closest('[data-delete-report]');
+                const btn = e.target.closest('[data-delete-seq]');
                 if (btn) handleArchiveDelete(btn);
               });
               tbody.dataset.deleteWired = '1';

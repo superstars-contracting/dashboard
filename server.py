@@ -780,6 +780,64 @@ def delete_photo(row_id):
     }), 200
 
 
+@app.route('/api/projects/<project_code>/reports/by-sequence/<int:seq>', methods=['DELETE'])
+def delete_report_by_sequence(project_code, seq):
+    """Atomic DCR delete: removes BOTH internal and client report_index rows for
+    (project_code, dcr_sequence=seq) plus both HTML files. Frontend Delete button
+    uses this so the operator's 'Delete' action removes the entire report (the
+    legacy per-report_id route is retained below for low-level use). 404 if no
+    rows match. DB deletes are transactional; file deletes are best-effort."""
+    conn = db()
+    try:
+        rows = conn.execute(
+            "SELECT report_id FROM report_index "
+            "WHERE project_code = ? AND dcr_sequence = ? AND report_type = 'DCR'",
+            (project_code, seq)
+        ).fetchall()
+        if not rows:
+            return jsonify({"error": "Not found"}), 404
+        deleted_report_ids = [r['report_id'] for r in rows]
+        conn.execute(
+            "DELETE FROM report_index "
+            "WHERE project_code = ? AND dcr_sequence = ? AND report_type = 'DCR'",
+            (project_code, seq)
+        )
+        conn.commit()
+    except Exception as e:
+        logging.error(f"DELETE /api/projects/{project_code}/reports/by-sequence/{seq}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+    files_deleted = []
+    file_errors = {}
+    seq_dir = SCRIPT_DIR / "data_room" / "reports" / "dcr" / project_code / f"{seq:03d}"
+    for audience in ('internal', 'client'):
+        out_file = seq_dir / f"{audience}.html"
+        try:
+            if out_file.exists():
+                out_file.unlink()
+                files_deleted.append(f"{audience}.html")
+        except Exception as e:
+            file_errors[f"{audience}.html"] = str(e)
+            logging.warning(f"DCR HTML delete failed for {project_code} seq={seq} {audience}: {e}")
+    # Best-effort rmdir the now-empty sequence directory so we don't leave a stub.
+    try:
+        if seq_dir.exists() and not any(seq_dir.iterdir()):
+            seq_dir.rmdir()
+    except Exception:
+        pass
+
+    return jsonify({
+        "deleted": True,
+        "project_code": project_code,
+        "sequence": seq,
+        "report_ids_deleted": deleted_report_ids,
+        "files_deleted": files_deleted,
+        "file_errors": file_errors or None,
+    }), 200
+
+
 @app.route('/api/projects/<project_code>/reports/<report_id>', methods=['DELETE'])
 def delete_report(project_code, report_id):
     """Delete a single report_index row + its rendered HTML file (sequence-based
@@ -869,14 +927,19 @@ def lookup_existing_dcr_sequence(conn, project_code, report_date):
 
 
 def next_dcr_sequence(conn, project_code):
-    """Return the next DCR sequence number for a project (MAX+1, or 1 if empty).
-    Per-project counter; tracks ISSUANCE order, not chronological."""
-    row = conn.execute(
-        "SELECT MAX(dcr_sequence) AS m FROM report_index "
-        "WHERE project_code = ? AND report_type = 'DCR'",
+    """Return the next DCR sequence number for a project — the smallest positive
+    integer not currently in use. Gap-filling allocation so a deleted sequence
+    becomes available again (matches operator mental model: 'delete and re-issue
+    reuses the same number'). Per-project counter; tracks ISSUANCE order."""
+    used = {row[0] for row in conn.execute(
+        "SELECT DISTINCT dcr_sequence FROM report_index "
+        "WHERE project_code = ? AND report_type = 'DCR' AND dcr_sequence IS NOT NULL",
         (project_code,)
-    ).fetchone()
-    return (row['m'] or 0) + 1
+    )}
+    n = 1
+    while n in used:
+        n += 1
+    return n
 
 
 def _issue_one_dcr(conn, project_code, report_date, audience, seq):
