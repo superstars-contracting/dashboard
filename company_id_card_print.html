@@ -63,13 +63,15 @@
   }
   .banner-title {
     font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
-    font-size: 5mm; font-weight: 700; letter-spacing: 0.2mm;
+    font-size: 4mm; font-weight: 700; letter-spacing: 0.15mm;
     text-transform: uppercase; line-height: 1;
+    white-space: nowrap;
   }
   .banner-sub {
-    font-size: 2mm; font-weight: 600; letter-spacing: 0.3mm;
+    font-size: 1.6mm; font-weight: 600; letter-spacing: 0.25mm;
     text-transform: uppercase; color: rgba(255,255,255,0.92);
-    margin-top: 0.8mm;
+    margin-top: 0.6mm;
+    white-space: nowrap;
   }
 
   td.body {
@@ -246,22 +248,18 @@
                 <div class="field-label">Name of Holder</div>
                 <div class="field-value">{{ NAME }}</div>
               </div>
-              <div class="field">
-                <div class="field-label">Card Number</div>
-                <div class="field-value mono">{{ CARD_NUMBER_DISPLAY }}</div>
-              </div>
               <table class="field-row">
                 <tr>
                   <td>
                     <div class="field">
-                      <div class="field-label">Employee ID</div>
+                      <div class="field-label">ID</div>
                       <div class="field-value mono">{{ EMPLOYEE_ID }}</div>
                     </div>
                   </td>
                   <td>
                     <div class="field">
-                      <div class="field-label">Trade</div>
-                      <div class="field-value">{{ TRADE }}</div>
+                      <div class="field-label">PIN</div>
+                      <div class="field-value mono">{{ PIN }}</div>
                     </div>
                   </td>
                 </tr>
@@ -276,7 +274,7 @@
                   </td>
                   <td>
                     <div class="field">
-                      <div class="field-label">Authorized By</div>
+                      <div class="field-label">Issued By</div>
                       <div class="field-value">{{ ISSUED_BY }}</div>
                     </div>
                   </td>
@@ -320,36 +318,42 @@
 </div>
 
 <!-- ============================ PAGE 2 — BACK ============================ -->
+<!-- Minimal back: brand mark + property line. No address, no contact, no
+     DOB disclaimer — operator can stamp/label the physical card if needed. -->
 <div class="sheet">
   <table class="card">
     <tr>
-      <td class="back-strip">
-        <table class="back-strip-inner"><tr>
-          <td><div class="back-title">If Found</div></td>
-          <td><div class="back-cite">Please Return</div></td>
-        </tr></table>
-      </td>
-    </tr>
-    <tr>
-      <td class="back-body">
-        <div class="return-text">
-          This card identifies an authorized employee of <strong>Superstars Contracting Inc.</strong>
-          If found, please return to:
+      <td style="height:54mm;text-align:center;vertical-align:middle;padding:6mm;">
+        <table style="margin:0 auto 4mm;border-collapse:collapse;">
+          <tr>
+            <td style="padding:0;vertical-align:middle;">
+              <svg style="width:8mm;height:8mm;display:block;" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="rLBack" x1="0%" y1="0%" x2="70%" y2="100%"><stop offset="0%" stop-color="#E0394E"/><stop offset="100%" stop-color="#A01829"/></linearGradient>
+                  <linearGradient id="rDBack" x1="100%" y1="0%" x2="30%" y2="100%"><stop offset="0%" stop-color="#831321"/><stop offset="100%" stop-color="#4A0A12"/></linearGradient>
+                </defs>
+                <polygon fill="url(#rLBack)" points="18,18 13.96,12.44 18,0"/>
+                <polygon fill="url(#rDBack)" points="18,18 18,0 22.04,12.44"/>
+                <polygon fill="url(#rLBack)" points="18,18 22.04,12.44 35.12,12.44"/>
+                <polygon fill="url(#rDBack)" points="18,18 35.12,12.44 24.54,20.13"/>
+                <polygon fill="url(#rLBack)" points="18,18 24.54,20.13 28.58,32.56"/>
+                <polygon fill="url(#rDBack)" points="18,18 28.58,32.56 18,24.88"/>
+                <polygon fill="url(#rLBack)" points="18,18 18,24.88 7.42,32.56"/>
+                <polygon fill="url(#rDBack)" points="18,18 7.42,32.56 11.46,20.13"/>
+                <polygon fill="url(#rLBack)" points="18,18 11.46,20.13 0.88,12.44"/>
+                <polygon fill="url(#rDBack)" points="18,18 0.88,12.44 13.96,12.44"/>
+                <polygon fill="#FAF7F1" points="18,10.8 20.02,15.94 25.34,15.94 21.02,19.25 22.68,24.39 18,21.26 13.32,24.39 14.98,19.25 10.66,15.94 15.98,15.94"/>
+              </svg>
+            </td>
+            <td style="padding:0 0 0 2.4mm;vertical-align:middle;text-align:left;">
+              <div style="font-family:'Playfair Display','Georgia',serif;font-size:4.4mm;font-weight:700;letter-spacing:0.4mm;color:#14161C;line-height:1;">SUPERSTARS</div>
+              <div style="font-family:'Playfair Display','Georgia',serif;font-size:2.2mm;font-weight:700;letter-spacing:0.7mm;color:#14161C;line-height:1;margin-top:0.6mm;">CONTRACTING INC</div>
+            </td>
+          </tr>
+        </table>
+        <div style="font-size:1.8mm;font-weight:700;color:#76777E;letter-spacing:0.4mm;text-transform:uppercase;">
+          Property of Superstars Contracting Inc.
         </div>
-        <div class="return-block">
-          <div class="company-name">Superstars Contracting Inc.</div>
-          <div>40-27 24th Street &nbsp;&middot;&nbsp; Long Island City, NY 11101</div>
-          <div class="email">admin@superstarscontracting.com</div>
-          <div>P 917 498 0002</div>
-        </div>
-      </td>
-    </tr>
-    <tr>
-      <td class="back-footer">
-        <span class="disclaim">
-          <strong>NOT FOR DOB FITNESS PURPOSES.</strong> This card identifies employment only;
-          it does not grant authority to perform scaffold or rigging work.
-        </span>
       </td>
     </tr>
   </table>

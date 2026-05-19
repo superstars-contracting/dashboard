@@ -236,19 +236,14 @@
             <div class="field-value" id="card-name">Maria Lopez</div>
           </div>
 
-          <div class="field">
-            <div class="field-label">Card Number</div>
-            <div class="field-value mono" id="card-no">SSC-CID-E-00002</div>
-          </div>
-
           <div class="field-row">
             <div class="field">
-              <div class="field-label">Employee ID</div>
+              <div class="field-label">ID</div>
               <div class="field-value mono" id="emp-id">E-00002</div>
             </div>
             <div class="field">
-              <div class="field-label">Trade</div>
-              <div class="field-value" id="trade">Laborer</div>
+              <div class="field-label">PIN</div>
+              <div class="field-value mono" id="card-pin">5678</div>
             </div>
           </div>
 
@@ -258,7 +253,7 @@
               <div class="field-value mono" id="card-issued">2026-05-18</div>
             </div>
             <div class="field">
-              <div class="field-label">Authorized By</div>
+              <div class="field-label">Issued By</div>
               <div class="field-value" id="auth-by">Amit Mal</div>
             </div>
           </div>
@@ -314,29 +309,47 @@
   <div class="stage-row">
     <div class="card card-back">
 
-      <div class="back-strip">
-        <div class="back-title">If Found</div>
-        <div class="back-cite">Please Return</div>
-      </div>
-
-      <div class="back-body">
-        <div class="return-text">
-          This card identifies an authorized employee of <strong>Superstars Contracting Inc.</strong>
-          If found, please return to:
+      <!-- Minimal back: brand mark + property line. No address, no contact,
+           no DOB disclaimer — operator can add a stamp/label to physical
+           cards if needed. -->
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 36px;text-align:center;">
+        <div style="height:80px;margin-bottom:16px;">
+          <svg viewBox="0 0 240 80" xmlns="http://www.w3.org/2000/svg" style="height:100%;width:auto;display:block;">
+            <defs>
+              <linearGradient id="redLightBack" x1="0%" y1="0%" x2="70%" y2="100%">
+                <stop offset="0%" stop-color="#E0394E"/>
+                <stop offset="100%" stop-color="#A01829"/>
+              </linearGradient>
+              <linearGradient id="redDarkBack" x1="100%" y1="0%" x2="30%" y2="100%">
+                <stop offset="0%" stop-color="#831321"/>
+                <stop offset="100%" stop-color="#4A0A12"/>
+              </linearGradient>
+            </defs>
+            <g transform="translate(102, 0)">
+              <polygon fill="url(#redLightBack)" points="18,18 13.96,12.44 18,0"/>
+              <polygon fill="url(#redDarkBack)" points="18,18 18,0 22.04,12.44"/>
+              <polygon fill="url(#redLightBack)" points="18,18 22.04,12.44 35.12,12.44"/>
+              <polygon fill="url(#redDarkBack)" points="18,18 35.12,12.44 24.54,20.13"/>
+              <polygon fill="url(#redLightBack)" points="18,18 24.54,20.13 28.58,32.56"/>
+              <polygon fill="url(#redDarkBack)" points="18,18 28.58,32.56 18,24.88"/>
+              <polygon fill="url(#redLightBack)" points="18,18 18,24.88 7.42,32.56"/>
+              <polygon fill="url(#redDarkBack)" points="18,18 7.42,32.56 11.46,20.13"/>
+              <polygon fill="url(#redLightBack)" points="18,18 11.46,20.13 0.88,12.44"/>
+              <polygon fill="url(#redDarkBack)" points="18,18 0.88,12.44 13.96,12.44"/>
+              <polygon fill="#FAF7F1" points="18,10.8 20.02,15.94 25.34,15.94 21.02,19.25 22.68,24.39 18,21.26 13.32,24.39 14.98,19.25 10.66,15.94 15.98,15.94"/>
+            </g>
+            <text x="120" y="58"
+                  font-family="'Playfair Display', 'Georgia', 'Times New Roman', serif"
+                  font-size="20" font-weight="700" fill="#14161C"
+                  text-anchor="middle" letter-spacing="2.2">SUPERSTARS</text>
+            <text x="120" y="74"
+                  font-family="'Playfair Display', 'Georgia', 'Times New Roman', serif"
+                  font-size="10.5" font-weight="700" fill="#14161C"
+                  text-anchor="middle" letter-spacing="3.2">CONTRACTING INC</text>
+          </svg>
         </div>
-
-        <div class="return-block">
-          <div class="company-name">Superstars Contracting Inc.</div>
-          <div>40-27 24th Street &nbsp;·&nbsp; Long Island City, NY 11101</div>
-          <div class="email">admin@superstarscontracting.com</div>
-          <div>P 917 498 0002</div>
-        </div>
-      </div>
-
-      <div class="back-footer">
-        <div class="disclaim">
-          <strong>NOT FOR DOB FITNESS PURPOSES.</strong> This card identifies employment only;
-          it does not grant authority to perform scaffold or rigging work.
+        <div style="font-size:11px;font-weight:700;color:#76777E;letter-spacing:2px;text-transform:uppercase;">
+          Property of Superstars Contracting Inc.
         </div>
       </div>
 
