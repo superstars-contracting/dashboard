@@ -22,17 +22,19 @@ class DCRHTMLRenderer:
     def render_internal(self) -> str:
         """Render internal DCR with full detail."""
         p = self.dcr['project']
+        report_number = self.dcr.get('display_id') or self.dcr.get('report_id') or '—'
         html_parts = [self._head("Daily Construction Report"), self._header(), """
         <section class="content">
             <div class="section-header">1. PROJECT INFORMATION</div>
             <div class="project-grid">
+                <div class="project-field"><label>Report Number</label><p>{}</p></div>
                 <div class="project-field"><label>Code</label><p>{}</p></div>
                 <div class="project-field"><label>Name</label><p>{}</p></div>
                 <div class="project-field"><label>Address</label><p>{}</p></div>
                 <div class="project-field"><label>Date</label><p>{} ({})</p></div>
                 <div class="project-field"><label>Superintendent</label><p>{}</p></div>
                 <div class="project-field"><label>PM</label><p>{}</p></div>
-            </div>""".format(p.get('code'), p.get('name'), p.get('address'), p.get('date'), p.get('day_of_week'), p.get('superintendent'), p.get('project_manager')), self._labor_internal(), self._work_section(), self._materials_section(), self._equipment_section(), self._safety_section_internal(), self._issues_section_internal(), self._inspections_section(), self._visitors_section_internal(), self._photos_section(), self._signoff_section(), """
+            </div>""".format(report_number, p.get('code'), p.get('name'), p.get('address'), p.get('date'), p.get('day_of_week'), p.get('superintendent'), p.get('project_manager')), self._labor_internal(), self._work_section(), self._materials_section(), self._equipment_section(), self._safety_section_internal(), self._issues_section_internal(), self._inspections_section(), self._visitors_section_internal(), self._photos_section(), self._signoff_section(), """
         </section>
         </body></html>"""]
         return ''.join(html_parts)
@@ -40,15 +42,17 @@ class DCRHTMLRenderer:
     def render_client(self) -> str:
         """Render client-facing DCR with redacted sensitive data."""
         p = self.dcr['project']
+        report_number = self.dcr.get('display_id') or self.dcr.get('report_id') or '—'
         html_parts = [self._head("Daily Progress Report"), self._header(), """
         <section class="content">
             <div class="section-header">1. PROJECT INFORMATION</div>
             <div class="project-grid">
+                <div class="project-field"><label>Report Number</label><p>{}</p></div>
                 <div class="project-field"><label>Code</label><p>{}</p></div>
                 <div class="project-field"><label>Name</label><p>{}</p></div>
                 <div class="project-field"><label>Address</label><p>{}</p></div>
                 <div class="project-field"><label>Date</label><p>{}</p></div>
-            </div>""".format(p.get('code'), p.get('name'), p.get('address'), p.get('date')), self._labor_client(), self._work_section(), self._materials_section(), self._equipment_section(), self._safety_section_client(), self._issues_section_client(), self._inspections_section(), self._visitors_section_client(), self._photos_section(), self._signoff_section_client(), """
+            </div>""".format(report_number, p.get('code'), p.get('name'), p.get('address'), p.get('date')), self._labor_client(), self._work_section(), self._materials_section(), self._equipment_section(), self._safety_section_client(), self._issues_section_client(), self._inspections_section(), self._visitors_section_client(), self._photos_section(), self._signoff_section_client(), """
         </section>
         </body></html>"""]
         return ''.join(html_parts)
