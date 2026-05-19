@@ -245,7 +245,7 @@ class RFIWorkflow:
   <!-- Greeting + intro -->
   <tr><td style="padding:24px 20px 16px;">
     <p style="margin:0 0 12px; font-size:15px; color:#1a1a1a;">Hi {recipient_name},</p>
-    <p style="margin:0; font-size:14px; color:#555; line-height:1.5;">A new RFI has been submitted for review on the 890 E 135th St Mott Haven Restoration project. Brief details below — full document attached as PDF.</p>
+    <p style="margin:0; font-size:14px; color:#555; line-height:1.5;">A new RFI has been submitted for review on the 890 E 135th St 890 E 135th Street project. Brief details below — full document attached as PDF.</p>
   </td></tr>
 
   {urgent_callout}

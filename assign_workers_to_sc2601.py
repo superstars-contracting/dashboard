@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""One-shot link of the imported roster to project SC-2601 (Mott Haven).
+"""One-shot link of the imported roster to project FR-BX-001 (890 E 135th St).
+
+NOTE: This script is historical. Project assignments are now seeded during
+the rebuild flow. Re-running is safe (INSERT OR IGNORE-style), but typically a no-op.
 
 cleanup_all_sample_workers.py wiped project_assignments along with everything
 else dependent on employees; import_workers.py inserts into employees only.
 This script bridges that gap by inserting an active assignment row for every
-existing employee against SC-2601 so the project dashboard's roster loads.
+existing employee against FR-BX-001 so the project dashboard's roster loads.
 
 DRY-RUN by default; pass --execute to actually INSERT. Idempotent: any row
 where (project_code, employee_id) already has an active assignment is skipped
@@ -22,7 +25,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DB_PATH = SCRIPT_DIR / "superstars.db"
-PROJECT_CODE = "SC-2601"
+PROJECT_CODE = "FR-BX-001"
 
 
 def main():

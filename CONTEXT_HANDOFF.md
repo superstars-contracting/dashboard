@@ -19,7 +19,7 @@ Communication style: blunt, fast, wants execution not lectures. Skip "great ques
 A **local-first project management + operations platform** for a small facade restoration shop. Three primary surfaces:
 
 - **Company Console** (`company-dashboard.html`) — strategic top-of-org view for the operator wearing the admin hat. EN/ES bilingual toggle. Eventually adds Subscriptions module, asset inventory, financial roll-up, portfolio health.
-- **Project Dashboard** (`dashboard-static.html`) — operational per-project view for the PM. Currently focused on **Mott Haven Restoration (SC-2601)** — facade work in the Bronx, ~7 workers.
+- **Project Dashboard** (`dashboard-static.html`) — operational per-project view for the PM. Currently focused on **890 E 135th Street (FR-BX-001)** — facade work in the Bronx, ~7 workers.
 - **Worker PWA** (`worker-app.html`) — mobile sign-in app for the field crew. PIN = last 4 of worker's phone. Tested live on site, works.
 
 Plus a **Certificate of Fitness (CoF) card** issuance system (NYC DOB suspended scaffold credential, ID-1 sized, multi-rigger schema for auto-fill).
@@ -58,7 +58,7 @@ Plus a **Certificate of Fitness (CoF) card** issuance system (NYC DOB suspended 
 
 In rough priority order:
 
-1. **Workers CSV import** (Phase 1 of the Monday deployment plan) — bulk-import the 7 real Mott Haven workers from CSV, auto-derive PINs from phone last-4
+1. **Workers CSV import** (Phase 1 of the Monday deployment plan) — bulk-import the 8 real 890 E 135th St workers from CSV, auto-derive PINs from phone last-4. **Status (2026-05-18):** completed via `import_workers.py --execute` during the FR-BX-001 rebuild flow.
 2. **Certifications CSV import** (Phase 2) — link certs to workers by employee_id
 3. **CoF Phase C** — dashboard issuance UI (PM picks worker + rigger → generates printable PDF)
 4. **OpenCV card auto-crop script** — Amit has fresh phone photos of worker IDs/certs against white background; script detects, deskews, crops per-worker folders. Task #105 / `crop_id_cards.py` (pending build)
@@ -183,6 +183,43 @@ Major foundation work that you're inheriting:
 - All migration package files written (this one, .gitignore, requirements.txt, MIGRATION_MANIFEST, SECRETS_CHECKLIST)
 
 You're picking up an established, secured, well-architected foundation. Build on it. The PM (Amit) has earned the right to focus on operational work now that infrastructure is sound.
+
+---
+
+## DB backup & restore (post-2026-05-18 incident)
+
+On 2026-05-18 the working `superstars.db` was unexpectedly replaced with a 0-byte file under unclear circumstances mid-session; no backup existed, and the DB was rebuilt from `workers_import_template.csv` + the schema migrations. To prevent recurrence:
+
+**Manual snapshot before any destructive operation:**
+
+```powershell
+$ts = Get-Date -Format yyyyMMdd-HHmmss
+Copy-Item C:\Users\SSC-Admin\Superstars\dashboard\superstars.db `
+          C:\Users\SSC-Admin\Superstars\dashboard\data_room\db_backups\superstars-checkpoint-$ts.db
+```
+
+**Daily scheduled snapshot (set up 2026-05-18, runs 23:00 nightly):**
+
+```powershell
+schtasks /Query /TN "Superstars DB Snapshot"     # verify it's installed
+schtasks /Run   /TN "Superstars DB Snapshot"     # force a run now
+schtasks /Delete /TN "Superstars DB Snapshot" /F # remove if no longer needed
+```
+
+**Restore from snapshot:**
+
+```powershell
+# 1. Stop the running Flask server first (Ctrl-C in its terminal)
+# 2. Pick a snapshot
+Get-ChildItem C:\Users\SSC-Admin\Superstars\dashboard\data_room\db_backups\ |
+    Sort-Object LastWriteTime -Descending | Select-Object Name, Length, LastWriteTime
+# 3. Restore
+Copy-Item C:\Users\SSC-Admin\Superstars\dashboard\data_room\db_backups\<chosen-snapshot>.db `
+          C:\Users\SSC-Admin\Superstars\dashboard\superstars.db -Force
+# 4. Restart server
+```
+
+Snapshots are gitignored (`*.db`) and stay local. Rotate manually — there's no auto-prune.
 
 ---
 

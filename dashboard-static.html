@@ -497,7 +497,7 @@
     <header class="topbar">
       <div>
         <div class="eyebrow" id="topbar-breadcrumb">Overview</div>
-        <div class="topbar-title">890 E 135th St · SC-2601</div>
+        <div class="topbar-title">890 E 135th St · FR-BX-001</div>
       </div>
       <div class="topbar-meta">
         <span>Tue · May 6, 2026</span>
@@ -511,7 +511,7 @@
         <div class="hero">
           <div class="eyebrow">Project Health · Week 13</div>
           <h1>890 East 135th Street</h1>
-          <div class="hero-subtitle">Mott Haven Restoration</div>
+          <div class="hero-subtitle">890 E 135th Street</div>
           <div class="hero-meta">
             <div>
               <div class="eyebrow" style="margin-bottom: 4px;">Project Manager</div>
@@ -542,8 +542,8 @@
           </div>
           <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 32px;">
             <button class="hero-btn hero-btn-primary" id="ph-today-dcr-btn" type="button">View Today's DCR</button>
-            <button class="hero-btn hero-btn-primary" data-link="/WPS-SC-2601-2026-05-01-internal.html">Weekly Summary</button>
-            <button class="hero-btn hero-btn-primary" data-link="/LA-SC-2601-2026-05-07.html">2-Week Lookahead</button>
+            <button class="hero-btn hero-btn-primary" data-link="/WPS-FR-BX-001-2026-05-01-internal.html">Weekly Summary</button>
+            <button class="hero-btn hero-btn-primary" data-link="/LA-FR-BX-001-2026-05-07.html">2-Week Lookahead</button>
             <button class="hero-btn hero-btn-primary" data-link="/rfi_submission_form.html">Submit RFI</button>
           </div>
         </div>
@@ -1187,7 +1187,7 @@
         (function() {
           function getProjectCode() {
             const m = window.location.pathname.match(/\/projects\/([^\/]+)/);
-            return m ? decodeURIComponent(m[1]) : 'SC-2601';
+            return m ? decodeURIComponent(m[1]) : 'FR-BX-001';
           }
           const PROJECT_CODE = getProjectCode();
 
@@ -2052,11 +2052,11 @@
           <h2>Project Settings</h2>
           <div class="card">
             <div class="card-title">Project Code</div>
-            <div class="card-status">SC-2601</div>
+            <div class="card-status">FR-BX-001</div>
           </div>
           <div class="card" style="margin-top: 16px;">
             <div class="card-title">Project Name</div>
-            <div class="card-status">890 East 135th Street · Mott Haven Restoration</div>
+            <div class="card-status">890 East 135th Street · 890 E 135th Street</div>
           </div>
           <div class="card" style="margin-top: 16px;">
             <div class="card-title">Status</div>
@@ -2098,10 +2098,10 @@ document.querySelectorAll('.nav-link').forEach(link => {
 // Project Crew (filtered by project_code from URL) + Cert Health
 // =====================================================================
 (function() {
-  // Read project_code from /projects/<code> URL, fallback to SC-2601
+  // Read project_code from /projects/<code> URL, fallback to FR-BX-001
   function getProjectCode() {
     const m = window.location.pathname.match(/\/projects\/([^\/]+)/);
-    return m ? decodeURIComponent(m[1]) : 'SC-2601';
+    return m ? decodeURIComponent(m[1]) : 'FR-BX-001';
   }
   const PROJECT_CODE = getProjectCode();
 
@@ -2322,7 +2322,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
 // NYC Compliance Watch — live data loader
 // =====================================================================
 (function() {
-  const PROJECT = 'SC-2601';
+  const PROJECT = 'FR-BX-001';
 
   // Used by inline onclick="cwScrollTo(...)"
   window.cwScrollTo = function(id) {
@@ -2574,8 +2574,8 @@ document.querySelectorAll('.nav-link').forEach(link => {
 
       const today = new Date().toISOString().slice(0, 10);
       const [signins, latestDcr] = await Promise.all([
-        fetch(API + '/api/sign-ins?project=SC-2601&date=' + today).then(r => r.json()).catch(() => null),
-        fetch(API + '/api/projects/SC-2601/reports/latest?audience=internal&on_date=' + today).then(r => r.json()).catch(() => null),
+        fetch(API + '/api/sign-ins?project=FR-BX-001&date=' + today).then(r => r.json()).catch(() => null),
+        fetch(API + '/api/projects/FR-BX-001/reports/latest?audience=internal&on_date=' + today).then(r => r.json()).catch(() => null),
       ]);
 
       if (signins?.data) {

@@ -1264,7 +1264,7 @@ async function signIn() {
     sessionData.employeeId = emp.employee_id;
     sessionData.name = emp.name;
     sessionData.sessionToken = emp.session_token;
-    sessionData.projectCode = emp.project_code || 'SC-2601';
+    sessionData.projectCode = emp.project_code || 'FR-BX-001';
     sessionData.certifications = emp.certifications || [];
 
     const startResp = await fetch('/api/worker/session/start', {

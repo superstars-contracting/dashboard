@@ -1464,7 +1464,7 @@ def worker_login():
             "employee_id": emp['employee_id'],
             "name": emp['name'],
             "session_token": f"TOKEN-{uuid.uuid4().hex[:12]}",
-            "project_code": "SC-2601",
+            "project_code": "FR-BX-001",
             "certifications": certs
         })
     except Exception as e:
@@ -1480,7 +1480,7 @@ def worker_session_start():
     try:
         data = request.get_json(silent=True) or {}
         employee_id = data.get('employee_id')
-        project_code = data.get('project_code') or 'SC-2601'
+        project_code = data.get('project_code') or 'FR-BX-001'
         now_iso = datetime.now().isoformat()
         today = date.today().isoformat()
 
@@ -1647,7 +1647,7 @@ def get_photos():
     """Get photos for a date/project"""
     try:
         date_filter = request.args.get('date', date.today().isoformat())
-        project_code = request.args.get('project', 'SC-2601')
+        project_code = request.args.get('project', 'FR-BX-001')
         
         conn = db()
         rows = conn.execute(
@@ -2797,9 +2797,9 @@ def issue_employee_credential(emp_id):
             if cred_type == 'cof':
                 rigger_id_param = rigger_id
                 if not rigger_id_param:
-                    rigger = get_default_rigger_for_project('SC-2601')
+                    rigger = get_default_rigger_for_project('FR-BX-001')
                     rigger_id_param = rigger['id'] if rigger else None
-                card = issue_cof(emp_id, rigger_id=rigger_id_param, project_code='SC-2601')
+                card = issue_cof(emp_id, rigger_id=rigger_id_param, project_code='FR-BX-001')
             else:
                 card = issue_company_id(emp_id, issued_by)
         except Exception as ex:
@@ -3013,7 +3013,7 @@ def fetch_open_meteo_weather(lat, lng, date_str=None):
 @app.route('/api/weather', methods=['GET'])
 def api_weather():
     """Live weather for a project's coords + a given date. Default lat/lng
-    is the Bronx (Mott Haven) site. ?date=YYYY-MM-DD selects the day —
+    is the 890 E 135th Street site (Bronx). ?date=YYYY-MM-DD selects the day —
     today by default; past dates >5 days back pull from Open-Meteo's archive
     endpoint. Same response shape regardless of which endpoint was hit."""
     try:
@@ -3171,7 +3171,7 @@ def api_compliance_complaints():
 
 @app.route('/api/compliance/refresh', methods=['POST'])
 def api_compliance_refresh():
-    """Trigger a live pull from NYC OpenData. Body: {project_code: 'SC-2601'} or {} for all."""
+    """Trigger a live pull from NYC OpenData. Body: {project_code: 'FR-BX-001'} or {} for all."""
     try:
         import nyc_compliance
         body = request.get_json(silent=True) or {}
@@ -3217,7 +3217,7 @@ def serve_files(filepath):
 
 @app.route('/<path:filename>')
 def static_files(filename):
-    """Serve any other file in the outputs folder by name (e.g. /DCR-SC-2601-2026-05-05-internal.html, /drop_plans/DP-001.html)"""
+    """Serve any other file in the outputs folder by name (e.g. /DCR-FR-BX-001-2026-05-05-internal.html, /drop_plans/DP-001.html)"""
     file_path = SCRIPT_DIR / filename
     if file_path.exists() and file_path.is_file():
         return send_file(str(file_path))

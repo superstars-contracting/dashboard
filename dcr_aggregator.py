@@ -15,7 +15,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 DB_PATH = SCRIPT_DIR / "superstars.db"
 
-# Default coords for SC-2601 (Bronx, Mott Haven). Used when weather_log is
+# Default coords for FR-BX-001 (890 E 135th St, Bronx). Used when weather_log is
 # absent and we need to fetch live data. Future: pull from a projects.lat/lng
 # column once added.
 DEFAULT_LAT = 40.8083

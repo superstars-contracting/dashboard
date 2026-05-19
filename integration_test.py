@@ -15,7 +15,7 @@ import os
 from datetime import date
 
 API_BASE = 'http://localhost:5000'
-TEST_PROJECT = 'SC-2601'
+TEST_PROJECT = 'FR-BX-001'
 PASSED = 0
 FAILED = 0
 

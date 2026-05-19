@@ -7,7 +7,7 @@ import pandas as pd
 
 def validate_project_code(code):
     """VAL-001: Project code exists in Projects sheet."""
-    valid_codes = ['SC-2601']
+    valid_codes = ['FR-BX-001']
     if code not in valid_codes:
         raise ValueError(f"Invalid project code: {code}")
     return code
@@ -231,7 +231,7 @@ def generate_lookahead_json(workbook, project_code, meeting_date_str, today_str)
         "report_id": report_id,
         "project": {
             "code": project_code,
-            "name": "890 E 135th St — Mott Haven Restoration",
+            "name": "890 E 135th St — 890 E 135th Street",
             "address": "890 East 135th Street, Bronx, NY 10454",
             "prepared_by": "Susan Park",
             "meeting_date": meeting_date_str,

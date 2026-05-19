@@ -4,7 +4,7 @@ generate_dcr.py. Calls dcr_aggregator.aggregate_dcr() in-process and
 serializes the result to JSON.
 
 Usage:
-  dcr_from_db.py --project_code SC-2601 [--report_date YYYY-MM-DD]
+  dcr_from_db.py --project_code FR-BX-001 [--report_date YYYY-MM-DD]
                  [--audience internal|client] [--output_json PATH]
 
 Output goes to --output_json if supplied, else stdout. Pipe the JSON
@@ -20,7 +20,7 @@ from dcr_aggregator import aggregate_dcr
 
 def main():
     parser = argparse.ArgumentParser(description="Generate DCR JSON from SQLite")
-    parser.add_argument("--project_code", required=True, help="Project code (e.g. SC-2601)")
+    parser.add_argument("--project_code", required=True, help="Project code (e.g. FR-BX-001)")
     parser.add_argument("--report_date", default=date.today().isoformat(),
                         help="Report date YYYY-MM-DD (default: today)")
     parser.add_argument("--audience", choices=["internal", "client"], default="internal",

@@ -28,10 +28,10 @@ ALTER TABLE cof_cards ADD COLUMN rigger_id INTEGER REFERENCES project_riggers(id
 ALTER TABLE cof_cards ADD COLUMN rigger_name_snapshot TEXT;     -- name as it appeared on the card
 ALTER TABLE cof_cards ADD COLUMN rigger_license_snapshot TEXT;  -- license # as it appeared on the card
 
--- Seed: two sample riggers for SC-2601 so the system has something to test against.
--- Update these (or replace via the dashboard) with the real names + license #s.
+-- Seed: two placeholder riggers for FR-BX-001 so the system has something to test against.
+-- Replace these with real names + license #s via the dashboard before issuing a real CoF.
 INSERT OR IGNORE INTO project_riggers
   (project_code, rigger_name, license_number, rigger_type, is_default, notes)
 VALUES
-  ('SC-2601', 'Amit Mal', '7652', 'Special Rigger', 1, 'Primary rigger on Mott Haven Restoration'),
-  ('SC-2601', 'Arun Mal', '8341', 'Special Rigger', 0, 'Secondary rigger / back-up signer');
+  ('FR-BX-001', 'TBD - Replace before live use', 'TBD', 'Special Rigger', 1, 'Placeholder pending replacement by user — primary signer'),
+  ('FR-BX-001', 'TBD - Replace before live use', 'TBD', 'Special Rigger', 0, 'Placeholder pending replacement by user — backup signer');

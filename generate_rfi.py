@@ -78,7 +78,7 @@ def generate_rfi(workbook_path, rfi_number, today, output_json):
         'rfi_id': rfi_id,
         'project': {
             'code': proj_code,
-            'name': '890 E 135th St — Mott Haven Restoration',
+            'name': '890 E 135th St — 890 E 135th Street',
             'address': '890 East 135th Street, Bronx, NY 10454'
         },
         'submitter': {

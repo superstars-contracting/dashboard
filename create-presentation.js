@@ -87,7 +87,7 @@ slide.addText("Project Console", {
 });
 
 // Address
-slide.addText("890 East 135th Street · Mott Haven Restoration", {
+slide.addText("890 East 135th Street · 890 E 135th Street", {
   x: 0.5, y: 3.85, w: 9, h: 0.3,
   fontSize: 14, color: colors.white,
   fontFace: fonts.body,

@@ -155,13 +155,18 @@ worker_records/*
 
 # ===== GENERATED HTML RENDERS WITH PROJECT-SPECIFIC DATA =====
 # These are output files (rendered with sample data), not source templates.
-# The templates themselves (no SC-2601 / dates in filename) ARE source — keep.
-DCR-SC-*.html
-DCR-SC-*.json
-WPS-SC-*.html
-WPS-SC-*.json
-LA-SC-*.html
-LA-SC-*.json
+# The templates themselves (no project_code / dates in filename) ARE source — keep.
+# Match any project_code prefix (SC-, FR-BX-, FR-MN-, IRA-, PG-, INT-, etc.)
+DCR-*-internal.html
+DCR-*-internal.json
+DCR-*-client.html
+DCR-*-client.json
+WPS-*-internal.html
+WPS-*-internal.json
+WPS-*-client.html
+WPS-*-client.json
+LA-*.html
+LA-*.json
 RFI-001.html
 RFI-002.html
 RFI-003.html

@@ -20,8 +20,8 @@ STAKEHOLDER_EMAILS = {
 }
 
 PROJECT_INFO = {
-    'SC-2601': {
-        'name': '890 E 135th St — Mott Haven Restoration',
+    'FR-BX-001': {
+        'name': '890 E 135th St — 890 E 135th Street',
         'address': '890 East 135th Street, Bronx, NY 10454'
     }
 }

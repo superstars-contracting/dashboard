@@ -336,7 +336,7 @@ def main():
     print("[DEPRECATED] generate_dcr.py reads from Daily_Construction_Report.xlsx, which is not present on this workstation. The live path is dcr_from_db.py (SQLite-driven). This script is kept for historical reference only.", file=sys.stderr)
     parser = argparse.ArgumentParser(description='Generate Daily Construction Report from Excel')
     parser.add_argument('--workbook', required=True, help='Path to Daily_Construction_Report.xlsx')
-    parser.add_argument('--project_code', required=True, help='Project code (e.g., SC-2601)')
+    parser.add_argument('--project_code', required=True, help='Project code (e.g., FR-BX-001)')
     parser.add_argument('--report_date', required=True, help='Report date (YYYY-MM-DD)')
     parser.add_argument('--output_json', required=True, help='Output JSON file path')
     parser.add_argument('--today', help='Override current date for testing (YYYY-MM-DD)')

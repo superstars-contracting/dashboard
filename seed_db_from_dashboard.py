@@ -232,7 +232,7 @@ for date, emp_id, time_in, time_out in sign_in_data:
     cur.execute("""INSERT INTO sign_in_log
         (date, project_code, employee_id, time_in, time_out)
         VALUES (?, ?, ?, ?, ?)""",
-        (date, 'SC-2601', emp_id, time_in, time_out))
+        (date, 'FR-BX-001', emp_id, time_in, time_out))
 print(f"  ✓ sign_in_log: {len(sign_in_data)}")
 
 conn.commit()
