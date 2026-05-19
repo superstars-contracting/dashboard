@@ -226,38 +226,40 @@
       </div>
 
       <div class="body">
-        <div class="photo-box" id="photo-slot">{{PHOTO_HTML}}</div>
+        <!-- Sample-data preview: leave photo-slot empty so the
+             .photo-box:empty::after rule renders the "PHOTO" placeholder -->
+        <div class="photo-box" id="photo-slot"></div>
 
         <div class="info">
           <div class="field">
             <div class="field-label">Name of Holder</div>
-            <div class="field-value" id="card-name">{{NAME}}</div>
+            <div class="field-value" id="card-name">Maria Lopez</div>
           </div>
 
           <div class="field">
             <div class="field-label">Card Number</div>
-            <div class="field-value mono" id="card-no">{{CARD_NO}}</div>
+            <div class="field-value mono" id="card-no">SSC-CID-E-00002</div>
           </div>
 
           <div class="field-row">
             <div class="field">
               <div class="field-label">Employee ID</div>
-              <div class="field-value mono" id="emp-id">{{EMP_ID}}</div>
+              <div class="field-value mono" id="emp-id">E-00002</div>
             </div>
             <div class="field">
               <div class="field-label">Trade</div>
-              <div class="field-value" id="trade">{{TRADE}}</div>
+              <div class="field-value" id="trade">Laborer</div>
             </div>
           </div>
 
           <div class="field-row">
             <div class="field">
               <div class="field-label">Issued</div>
-              <div class="field-value mono" id="card-issued">{{ISSUED}}</div>
+              <div class="field-value mono" id="card-issued">2026-05-18</div>
             </div>
             <div class="field">
               <div class="field-label">Authorized By</div>
-              <div class="field-value" id="auth-by">{{ISSUED_BY}}</div>
+              <div class="field-value" id="auth-by">Amit Mal</div>
             </div>
           </div>
         </div>

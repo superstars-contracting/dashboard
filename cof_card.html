@@ -366,27 +366,29 @@
 
       <!-- Photo on left, fields on right -->
       <div class="body">
-        <div class="photo-box" id="photo-slot">{{PHOTO_HTML}}</div>
+        <!-- Sample-data preview: leave photo-slot empty so the
+             .photo-box:empty::after rule renders the "PHOTO" placeholder -->
+        <div class="photo-box" id="photo-slot"></div>
 
         <div class="info">
           <div class="field">
             <div class="field-label">Name of Holder</div>
-            <div class="field-value" id="card-name">{{NAME}}</div>
+            <div class="field-value" id="card-name">Robert Arriciaga</div>
           </div>
 
           <div class="field">
             <div class="field-label">Card Number</div>
-            <div class="field-value mono" id="card-no">{{CARD_NO}}</div>
+            <div class="field-value mono" id="card-no">SSC-COF-E-00001</div>
           </div>
 
           <div class="field-row">
             <div class="field">
               <div class="field-label">Issued</div>
-              <div class="field-value mono" id="card-issued">{{ISSUED}}</div>
+              <div class="field-value mono" id="card-issued">2026-05-18</div>
             </div>
             <div class="field">
               <div class="field-label">Expires</div>
-              <div class="field-value mono expires" id="card-expires">{{EXPIRES}}</div>
+              <div class="field-value mono expires" id="card-expires">2027-01-14</div>
             </div>
           </div>
         </div>
@@ -462,16 +464,16 @@
 
       <div class="back-body">
         <div class="attest-text">
-          I, <strong>ARUN MAL</strong>, NYC DOB Special Rigger <strong>#7652</strong>, having found the named holder capable of performing scaffold work in a safe and responsible manner and confirmed training per <strong>NYC Building Code §3314.4</strong>, hereby issue this Certificate of Fitness for use of a two-point suspension scaffold under the supervision of my designated Rigging Foreman.
+          I, <strong>John Smith</strong>, NYC DOB Special Rigger <strong>#4321</strong>, having found the named holder capable of performing scaffold work in a safe and responsible manner and confirmed training per <strong>NYC Building Code §3314.4</strong>, hereby issue this Certificate of Fitness for use of a two-point suspension scaffold under the supervision of my designated Rigging Foreman.
         </div>
 
         <div class="sig-row">
           <div class="sig-cell">
-            <div class="sig-line">{{SIGNATURE_HTML}}</div>
+            <div class="sig-line"></div>
             <div class="sig-label">Issuer Signature</div>
           </div>
           <div class="sig-cell">
-            <div class="sig-line">{{ISSUE_DATE_HTML}}</div>
+            <div class="sig-line" style="text-align:center;font-family:'SF Mono','Consolas','Menlo',monospace;font-size:14px;padding-top:10px;color:#14161C;font-weight:600;">2026-05-18</div>
             <div class="sig-label">Date</div>
           </div>
         </div>
