@@ -42,15 +42,20 @@
   }
   .sheet:last-child { page-break-after: auto; }
 
+  /* Card wrap clips inner table corners (see cof_card_print.html). */
+  .card-wrap {
+    display: inline-block;
+    border-radius: 3mm;
+    overflow: hidden;
+    box-shadow: 0 0 0 0.1mm var(--hairline);
+  }
   table.card {
     width: 85.6mm; height: 53.98mm;
     background: var(--cream);
     color: var(--ink);
-    border-radius: 3mm;
     border-collapse: collapse;
-    margin: 0 auto;
+    margin: 0;
     table-layout: fixed;
-    box-shadow: 0 0 0 0.1mm var(--hairline);
   }
   table.card td { vertical-align: top; padding: 0; }
 
@@ -230,7 +235,7 @@
 
 <!-- ============================ PAGE 1 — FRONT ============================ -->
 <div class="sheet">
-  <table class="card">
+  <div class="card-wrap"><table class="card">
     <tr>
       <td class="banner">
         <div class="banner-title">Company ID</div>
@@ -315,14 +320,14 @@
         </div>
       </td>
     </tr>
-  </table>
+  </table></div>
 </div>
 
 <!-- ============================ PAGE 2 — BACK ============================ -->
 <!-- Minimal back: brand mark + property line. No address, no contact, no
      DOB disclaimer — operator can stamp/label the physical card if needed. -->
 <div class="sheet">
-  <table class="card">
+  <div class="card-wrap"><table class="card">
     <tr>
       <td style="height:54mm;text-align:center;vertical-align:middle;padding:6mm;">
         <table style="margin:0 auto 4mm;border-collapse:collapse;">
@@ -357,7 +362,7 @@
         </div>
       </td>
     </tr>
-  </table>
+  </table></div>
 </div>
 
 </body>

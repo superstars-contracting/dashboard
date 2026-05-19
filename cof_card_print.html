@@ -38,17 +38,23 @@
   }
   .sheet:last-child { page-break-after: auto; }
 
-  /* Card = a table with fixed dimensions */
+  /* Card wrap clips the inner table corners — border-radius alone on
+     a <table> doesn't visually round nested <td> backgrounds in any
+     major engine, so the visual rounding has to live on a div wrapper. */
+  .card-wrap {
+    display: inline-block;
+    border-radius: 3mm;
+    overflow: hidden;
+    box-shadow: 0 0 0 0.1mm var(--hairline);
+  }
   table.card {
     width: 85.6mm;
     height: 53.98mm;
     background: var(--cream);
     color: var(--ink);
-    border-radius: 3mm;
     border-collapse: collapse;
-    margin: 0 auto;
+    margin: 0;
     table-layout: fixed;
-    box-shadow: 0 0 0 0.1mm var(--hairline);
   }
   table.card td { vertical-align: top; padding: 0; }
 
@@ -170,16 +176,16 @@
   }
 
   td.back-body {
-    height: 38mm;
+    height: 41mm;
     padding: 2mm 4mm 1mm;
     vertical-align: top;
   }
   .attest-text {
-    font-size: 2.6mm;
-    line-height: 1.3;
+    font-size: 2.9mm;
+    line-height: 1.5;
     color: var(--ink);
     font-weight: 500;
-    margin-bottom: 3.5mm;
+    margin-bottom: 5mm;
     text-align: justify;
     text-justify: inter-word;
     hyphens: none;
@@ -195,28 +201,30 @@
   .fillin.name { width: 28mm; }
   .fillin.license { width: 16mm; text-align: left; padding-left: 0.5mm; font-weight: 600; }
 
-  /* Sig row — two-column table */
+  /* Sig row — two-column table, 60/40 split with ~3mm gap so the two
+     fields read as visually distinct rather than one continuous line. */
   table.sig-row { width: 100%; border-collapse: collapse; table-layout: fixed; }
   table.sig-row td { padding: 0; vertical-align: top; }
-  td.sig-cell-name { padding-right: 4mm; }
-  td.sig-cell-date { width: 28mm; padding-left: 2mm; }
+  td.sig-cell-name { width: 60%; padding-right: 1.5mm; }
+  td.sig-cell-date { width: 40%; padding-left: 1.5mm; }
   .sig-line { border-bottom: 0.4mm solid var(--ink); height: 5mm; }
   .sig-label {
     font-size: 2mm; font-weight: 700; letter-spacing: 0.4mm;
     text-transform: uppercase; color: var(--ink); margin-top: 0.6mm;
   }
 
-  /* Back footer row */
+  /* Back footer row — compacted to absorb the extra vertical space the
+     attestation text uses now (back-body grew 38mm -> 41mm). */
   td.back-footer {
-    height: 9mm;
+    height: 6mm;
     border-top: 0.2mm solid var(--hairline);
-    padding: 1.5mm 3.5mm;
+    padding: 1mm 3.5mm;
     background: var(--cream);
     text-align: center;
     vertical-align: middle;
   }
   .carry-with {
-    font-size: 2mm; line-height: 1.2; color: #14161C;
+    font-size: 1.7mm; line-height: 1.15; color: #14161C;
     font-style: italic;
   }
   .carry-with strong { color: #14161C; font-style: normal; font-weight: 700; }
@@ -245,7 +253,7 @@
 
 <!-- ============================ PAGE 1 — FRONT ============================ -->
 <div class="sheet">
-  <table class="card">
+  <div class="card-wrap"><table class="card">
     <tr>
       <td class="banner">
         <div class="banner-title">Certificate of Fitness</div>
@@ -318,12 +326,12 @@
         </div>
       </td>
     </tr>
-  </table>
+  </table></div>
 </div>
 
 <!-- ============================ PAGE 2 — BACK ============================ -->
 <div class="sheet">
-  <table class="card">
+  <div class="card-wrap"><table class="card">
     <tr>
       <td class="back-strip">
         <table class="back-strip-inner"><tr>
@@ -352,7 +360,7 @@
     <tr>
       <td class="back-footer"><span class="carry-with"><strong>CARRY WITH:</strong> 16-hr Suspended Scaffold cert · SST card · photo ID</span></td>
     </tr>
-  </table>
+  </table></div>
 </div>
 
 </body>
