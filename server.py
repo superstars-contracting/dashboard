@@ -2572,7 +2572,7 @@ def api_workers_intake_summary():
             # has a direct link without a follow-up GET /credential round-trip.
             current_credential = None
             cof_row = conn.execute(
-                """SELECT card_id, issued_date, expires_date, status, html_export_path FROM cof_cards
+                """SELECT card_id, card_number_display, issued_date, expires_date, status, html_export_path FROM cof_cards
                    WHERE employee_id = ? AND status = 'issued'
                    ORDER BY issued_date DESC LIMIT 1""",
                 (emp_id,)
@@ -2581,7 +2581,7 @@ def api_workers_intake_summary():
                 cof_html = cof_row["html_export_path"]
                 current_credential = {
                     "type": "cof",
-                    "card_number_display": cof_row["card_id"],
+                    "card_number_display": cof_row["card_number_display"] or cof_row["card_id"],
                     "issued_date": cof_row["issued_date"],
                     "expires_date": cof_row["expires_date"],
                     "status": cof_row["status"],
@@ -2641,14 +2641,14 @@ def get_employee_credential(emp_id):
 
         current_type = card_number_display_v = issued_date_v = expires_v = status_v = html_export_path = None
         cof_row = conn.execute(
-            """SELECT card_id, issued_date, expires_date, status, html_export_path
+            """SELECT card_id, card_number_display, issued_date, expires_date, status, html_export_path
                FROM cof_cards WHERE employee_id = ? AND status = 'issued'
                ORDER BY issued_date DESC LIMIT 1""",
             (emp_id,)
         ).fetchone()
         if cof_row:
             current_type = 'cof'
-            card_number_display_v = cof_row["card_id"]
+            card_number_display_v = cof_row["card_number_display"] or cof_row["card_id"]
             issued_date_v = cof_row["issued_date"]
             expires_v = cof_row["expires_date"]
             status_v = cof_row["status"]
@@ -2731,7 +2731,7 @@ def issue_employee_credential(emp_id):
         # type. If any active credential exists (same or other type) and
         # override_active is false, return 409 with the current credential.
         existing_cof = conn.execute(
-            "SELECT card_id, issued_date, expires_date, status FROM cof_cards "
+            "SELECT card_id, card_number_display, issued_date, expires_date, status FROM cof_cards "
             "WHERE employee_id = ? AND status = 'issued' LIMIT 1",
             (emp_id,)
         ).fetchone()
@@ -2746,7 +2746,7 @@ def issue_employee_credential(emp_id):
             if existing_cof:
                 current_cred = {
                     "type": "cof",
-                    "card_number_display": existing_cof["card_id"],
+                    "card_number_display": existing_cof["card_number_display"] or existing_cof["card_id"],
                     "issued_date": existing_cof["issued_date"],
                     "expires_date": existing_cof["expires_date"],
                     "status": existing_cof["status"],
@@ -2808,7 +2808,7 @@ def issue_employee_credential(emp_id):
         if cred_type == 'cof':
             template_name = 'cof_card_print.html'
             subdir = 'cof'
-            cnd = card['card_id']
+            cnd = card.get('card_number_display') or card['card_id']
             expires_str = card.get('expires_date') or ''
         else:
             template_name = 'company_id_card_print.html'

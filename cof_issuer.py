@@ -202,12 +202,28 @@ def all_employees_status():
 # =====================================================================
 
 def card_number_for_employee(employee_id):
-    """Card number format: SSC-COF-{employee_id}
-    e.g. SSC-COF-E-00013. Same worker re-issuing gets the SAME number
-    (prior card row gets marked 'replaced' instead of creating a new number)."""
+    """Stable card_number_display for an employee — same across reissues.
+    Format: SSC-COF-{employee_id}, e.g. SSC-COF-E-00013.
+
+    The unique PK card_id has a revision suffix (-1, -2, ...) appended
+    by issue_cof so each issuance gets its own row without PK collision.
+    This function returns the display number that's shown on the printed
+    card and stays stable when the worker re-issues."""
     if not employee_id:
         raise RuntimeError("employee_id required to generate card number")
     return f"SSC-COF-{employee_id}"
+
+
+def _next_cof_revision(conn, employee_id):
+    """Next revision number for this employee's CoF cards. Count-based
+    (matches company_id_issuer._next_revision pattern) — every issuance
+    creates one row, including the row that gets marked 'replaced' by a
+    later reissue. Returns 1 if no prior cards."""
+    n = conn.execute(
+        "SELECT COUNT(*) FROM cof_cards WHERE employee_id = ?",
+        (employee_id,)
+    ).fetchone()[0]
+    return n + 1
 
 
 # =====================================================================
@@ -304,7 +320,7 @@ def issue_cof(employee_id, rigger_id=None, project_code=None, today_override=Non
         signature_path = get_setting("issuer_signature_path", "") or ""
         rigger_id_for_card = None
 
-    card_id = card_number_for_employee(employee_id)
+    card_number_display = card_number_for_employee(employee_id)
     certs = employee_certs(employee_id)
     basis = {
         "calculated_from": [
@@ -316,35 +332,47 @@ def issue_cof(employee_id, rigger_id=None, project_code=None, today_override=Non
 
     # Snapshot the employee photo path at time of issuance
     conn = db_conn()
-    emp = conn.execute(
-        "SELECT photo_path FROM employees WHERE employee_id = ?", (employee_id,)
-    ).fetchone()
-    photo_snapshot = emp["photo_path"] if emp else None
+    try:
+        emp = conn.execute(
+            "SELECT photo_path FROM employees WHERE employee_id = ?", (employee_id,)
+        ).fetchone()
+        photo_snapshot = emp["photo_path"] if emp else None
 
-    # Mark any existing 'issued' card as 'replaced'
-    conn.execute(
-        "UPDATE cof_cards SET status='replaced', updated_at=CURRENT_TIMESTAMP "
-        "WHERE employee_id = ? AND status = 'issued'",
-        (employee_id,)
-    )
+        # Compute revision + unique card_id BEFORE marking the prior card
+        # replaced — the count-based revision then sees the prior row as
+        # part of the existing history.
+        revision = _next_cof_revision(conn, employee_id)
+        card_id = f"{card_number_display}-{revision}"
 
-    conn.execute(
-        """INSERT INTO cof_cards
-           (card_id, employee_id, issued_date, expires_date, issued_by, issuer_license,
-            signature_path, photo_snapshot_path, status, basis_certs_json,
-            rigger_id, rigger_name_snapshot, rigger_license_snapshot)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'issued', ?, ?, ?, ?)""",
-        (card_id, employee_id, issued_date, expiry, issued_by, issuer_license,
-         signature_path, photo_snapshot, json.dumps(basis),
-         rigger_id_for_card, issued_by, issuer_license)
-    )
-    conn.commit()
+        # Mark any existing 'issued' card as 'replaced' so there's only
+        # ever one active card per worker (matches the same-type supersede
+        # behavior the route enforces).
+        conn.execute(
+            "UPDATE cof_cards SET status='replaced', updated_at=CURRENT_TIMESTAMP "
+            "WHERE employee_id = ? AND status = 'issued'",
+            (employee_id,)
+        )
 
-    row = conn.execute(
-        "SELECT * FROM cof_cards WHERE card_id = ?", (card_id,)
-    ).fetchone()
-    conn.close()
-    return dict(row)
+        conn.execute(
+            """INSERT INTO cof_cards
+               (card_id, employee_id, issued_date, expires_date, issued_by, issuer_license,
+                signature_path, photo_snapshot_path, status, basis_certs_json,
+                rigger_id, rigger_name_snapshot, rigger_license_snapshot,
+                card_number_display)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'issued', ?, ?, ?, ?, ?)""",
+            (card_id, employee_id, issued_date, expiry, issued_by, issuer_license,
+             signature_path, photo_snapshot, json.dumps(basis),
+             rigger_id_for_card, issued_by, issuer_license,
+             card_number_display)
+        )
+        conn.commit()
+
+        row = conn.execute(
+            "SELECT * FROM cof_cards WHERE card_id = ?", (card_id,)
+        ).fetchone()
+        return dict(row)
+    finally:
+        conn.close()
 
 
 def issue_batch(employee_ids, rigger_id=None, project_code=None):
