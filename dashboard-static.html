@@ -1445,9 +1445,30 @@
             const firstInput = row.querySelector('input, select, textarea');
             if (firstInput) firstInput.focus();
             row.querySelector('[data-row-save]').addEventListener('click', () => saveRow(row, sectionKey));
-            row.querySelector('[data-row-remove]').addEventListener('click', () => {
-              if (row.dataset.saved === '1') return;
-              row.remove();
+            row.querySelector('[data-row-remove]').addEventListener('click', async () => {
+              if (row.dataset.saved !== '1') {
+                row.remove();
+                return;
+              }
+              const dbId = row.dataset.dbId;
+              if (!dbId) { row.remove(); return; }  // saved but no id captured — best-effort DOM remove
+              if (!confirm('Delete this saved row? This cannot be undone.')) return;
+              const errEl = row.querySelector('[data-row-err]');
+              errEl.style.display = 'none';
+              try {
+                const resp = await fetch(cfg.endpoint + '/' + encodeURIComponent(dbId), {method: 'DELETE'});
+                if (resp.status === 200 || resp.status === 404) {
+                  row.remove();
+                } else {
+                  const json = await resp.json().catch(() => null);
+                  errEl.textContent = 'Delete failed: ' + ((json && json.error) || ('HTTP ' + resp.status));
+                  errEl.style.display = 'block';
+                }
+              } catch (e) {
+                console.warn('[DCR] delete failed:', e);
+                errEl.textContent = 'Network error on delete';
+                errEl.style.display = 'block';
+              }
             });
           }
 
@@ -1482,14 +1503,15 @@
               const json = await resp.json();
               if (resp.status === 201) {
                 row.dataset.saved = '1';
+                if (json && json.data && json.data.id !== undefined) row.dataset.dbId = json.data.id;
                 row.style.background = '#FAF7F1';
                 row.style.borderColor = '#2F7C57';
                 row.querySelectorAll('input, select, textarea').forEach(el => { el.readOnly = true; el.disabled = true; });
                 saveBtn.textContent = '✓ Saved';
                 saveBtn.style.background = '#76777E';
                 saveBtn.style.cursor = 'default';
-                const removeBtn = row.querySelector('[data-row-remove]');
-                if (removeBtn) { removeBtn.disabled = true; removeBtn.style.opacity = '0.3'; removeBtn.style.cursor = 'not-allowed'; }
+                // Keep the X button enabled so the operator can delete a saved row.
+                // The click handler (in addRow) checks row.dataset.saved and calls DELETE.
               } else {
                 saveBtn.disabled = false;
                 saveBtn.textContent = 'Save';
@@ -1618,13 +1640,42 @@
             const viewLink = r.html_url
               ? '<a href="' + esc(r.html_url) + '" target="_blank" style="color:#B11E2E;font-weight:600;text-decoration:none;">View →</a>'
               : '<span style="color:#76777E;">—</span>';
+            const reportId = r.report_id || '';
+            const displayId = r.display_id || r.report_id || '—';
+            const reportDate = r.report_date || '';
+            const deleteBtn = reportId
+              ? '<button type="button" data-delete-report="' + esc(reportId) + '" data-display-id="' + esc(displayId) + '" data-report-date="' + esc(reportDate) + '" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 10px;border:1px solid #B11E2E;border-radius:4px;background:white;color:#B11E2E;cursor:pointer;margin-left:8px;">Delete</button>'
+              : '';
             return '<tr>' +
-              '<td style="font-family:Georgia,serif;font-size:13px;font-weight:600;">' + esc(r.display_id || r.report_id || '—') + '</td>' +
-              '<td>' + esc(r.report_date || '—') + '</td>' +
+              '<td style="font-family:Georgia,serif;font-size:13px;font-weight:600;">' + esc(displayId) + '</td>' +
+              '<td>' + esc(reportDate || '—') + '</td>' +
               '<td><span style="padding:3px 8px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;background:' + statusColor + ';color:white;">' + esc(r.status || '—') + '</span></td>' +
               '<td style="font-size:12px;color:#76777E;">' + esc(r.updated_at || r.created_at || '—') + '</td>' +
-              '<td>' + viewLink + '</td>' +
+              '<td style="white-space:nowrap;">' + viewLink + deleteBtn + '</td>' +
             '</tr>';
+          }
+
+          async function handleArchiveDelete(btn) {
+            const reportId = btn.dataset.deleteReport;
+            const displayId = btn.dataset.displayId;
+            const reportDate = btn.dataset.reportDate;
+            if (!reportId) return;
+            if (!confirm('Delete DCR ' + displayId + ' from ' + reportDate + '? This cannot be undone.')) return;
+            btn.disabled = true; btn.textContent = '…';
+            try {
+              const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/reports/' + encodeURIComponent(reportId), {method: 'DELETE'});
+              if (resp.status === 200 || resp.status === 404) {
+                loadArchive();
+              } else {
+                const json = await resp.json().catch(() => null);
+                btn.disabled = false; btn.textContent = 'Delete';
+                alert('Delete failed: ' + ((json && json.error) || ('HTTP ' + resp.status)));
+              }
+            } catch (e) {
+              console.warn('[DCR] archive delete failed:', e);
+              btn.disabled = false; btn.textContent = 'Delete';
+              alert('Network error on delete');
+            }
           }
 
           async function loadArchive() {
@@ -1633,6 +1684,14 @@
             const tbody = document.getElementById('dcr-archive-tbody');
             const status = document.getElementById('dcr-archive-status');
             if (!tbody) return;
+            // One-time event delegation: any Delete button inside the tbody routes here.
+            if (!tbody.dataset.deleteWired) {
+              tbody.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-delete-report]');
+                if (btn) handleArchiveDelete(btn);
+              });
+              tbody.dataset.deleteWired = '1';
+            }
             const params = new URLSearchParams();
             params.set('report_type', 'DCR');
             if (fromInput && fromInput.value) params.set('from_date', fromInput.value);

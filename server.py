@@ -679,6 +679,153 @@ def create_visitor():
         return jsonify({"error": str(e)}), 500
 
 
+# ============= DELETE endpoints for DCR entry rows + reports =============
+
+def _delete_entry_row(table, row_id):
+    """Generic single-row delete by integer id. Parameterized SQL. Returns
+    Flask response tuple. 404 if no row matched, 200 otherwise."""
+    conn = db()
+    try:
+        existing = conn.execute(f"SELECT id FROM {table} WHERE id = ?", (row_id,)).fetchone()
+        if not existing:
+            return jsonify({"error": "Not found"}), 404
+        conn.execute(f"DELETE FROM {table} WHERE id = ?", (row_id,))
+        conn.commit()
+        return jsonify({"deleted": True, "id": row_id, "table": table}), 200
+    except Exception as e:
+        logging.error(f"DELETE {table}/{row_id}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/work-log/<int:row_id>', methods=['DELETE'])
+def delete_work_log(row_id):
+    return _delete_entry_row('work_log', row_id)
+
+
+@app.route('/api/deliveries/<int:row_id>', methods=['DELETE'])
+def delete_delivery(row_id):
+    return _delete_entry_row('deliveries', row_id)
+
+
+@app.route('/api/equipment-log/<int:row_id>', methods=['DELETE'])
+def delete_equipment_log(row_id):
+    return _delete_entry_row('equipment_log', row_id)
+
+
+@app.route('/api/weather-log/<int:row_id>', methods=['DELETE'])
+def delete_weather_log(row_id):
+    return _delete_entry_row('weather_log', row_id)
+
+
+@app.route('/api/toolbox-talks/records/<int:row_id>', methods=['DELETE'])
+def delete_toolbox_talk_record(row_id):
+    return _delete_entry_row('toolbox_talk_records', row_id)
+
+
+@app.route('/api/safety-events/<int:row_id>', methods=['DELETE'])
+def delete_safety_event(row_id):
+    return _delete_entry_row('safety_events', row_id)
+
+
+@app.route('/api/issues/<int:row_id>', methods=['DELETE'])
+def delete_issue(row_id):
+    return _delete_entry_row('issues', row_id)
+
+
+@app.route('/api/inspections/<int:row_id>', methods=['DELETE'])
+def delete_inspection(row_id):
+    return _delete_entry_row('inspections', row_id)
+
+
+@app.route('/api/visitors/<int:row_id>', methods=['DELETE'])
+def delete_visitor(row_id):
+    return _delete_entry_row('visitors', row_id)
+
+
+@app.route('/api/photos/<int:row_id>', methods=['DELETE'])
+def delete_photo(row_id):
+    """Delete photo row + file on disk. DB delete succeeds even if file
+    delete fails (orphan file is better than orphan DB row)."""
+    conn = db()
+    try:
+        row = conn.execute("SELECT file_path FROM photos WHERE id = ?", (row_id,)).fetchone()
+        if not row:
+            return jsonify({"error": "Not found"}), 404
+        file_path = row['file_path']
+        conn.execute("DELETE FROM photos WHERE id = ?", (row_id,))
+        conn.commit()
+    except Exception as e:
+        logging.error(f"DELETE /api/photos/{row_id}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+    file_deleted = False
+    file_error = None
+    if file_path:
+        try:
+            p = Path(file_path)
+            if not p.is_absolute():
+                p = SCRIPT_DIR / p
+            if p.exists():
+                p.unlink()
+                file_deleted = True
+        except Exception as e:
+            file_error = str(e)
+            logging.warning(f"Photo file delete failed for id={row_id}: {file_error}")
+    return jsonify({
+        "deleted": True, "id": row_id, "file_deleted": file_deleted,
+        "file_error": file_error,
+    }), 200
+
+
+@app.route('/api/projects/<project_code>/reports/<report_id>', methods=['DELETE'])
+def delete_report(project_code, report_id):
+    """Delete a single report_index row + its rendered HTML file (sequence-based
+    path). One row per audience: deleting the internal variant leaves the client
+    variant alone, and vice versa. DB delete succeeds even if file delete fails."""
+    conn = db()
+    try:
+        row = conn.execute(
+            "SELECT dcr_sequence FROM report_index WHERE project_code = ? AND report_id = ?",
+            (project_code, report_id)
+        ).fetchone()
+        if not row:
+            return jsonify({"error": "Not found"}), 404
+        seq = row['dcr_sequence']
+        conn.execute(
+            "DELETE FROM report_index WHERE project_code = ? AND report_id = ?",
+            (project_code, report_id)
+        )
+        conn.commit()
+    except Exception as e:
+        logging.error(f"DELETE /api/projects/{project_code}/reports/{report_id}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+    audience = None
+    for suf in ('internal', 'client'):
+        if report_id.endswith(f'-{suf}'):
+            audience = suf
+            break
+    file_deleted = False
+    file_error = None
+    if seq is not None and audience:
+        out_file = SCRIPT_DIR / "data_room" / "reports" / "dcr" / project_code / f"{seq:03d}" / f"{audience}.html"
+        try:
+            if out_file.exists():
+                out_file.unlink()
+                file_deleted = True
+        except Exception as e:
+            file_error = str(e)
+            logging.warning(f"DCR HTML delete failed for {report_id}: {file_error}")
+    return jsonify({
+        "deleted": True, "report_id": report_id, "file_deleted": file_deleted,
+        "file_error": file_error,
+    }), 200
+
+
 # ============= DCR AGGREGATOR =============
 
 @app.route('/api/projects/<project_code>/daily/<report_date>', methods=['GET'])
