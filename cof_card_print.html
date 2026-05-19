@@ -64,13 +64,15 @@
   }
   .banner-title {
     font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
-    font-size: 5mm; font-weight: 700; letter-spacing: 0.2mm;
+    font-size: 4mm; font-weight: 700; letter-spacing: 0.15mm;
     text-transform: uppercase; line-height: 1;
+    white-space: nowrap;
   }
   .banner-sub {
-    font-size: 2mm; font-weight: 600; letter-spacing: 0.3mm;
+    font-size: 1.6mm; font-weight: 600; letter-spacing: 0.25mm;
     text-transform: uppercase; color: rgba(255,255,255,0.92);
-    margin-top: 0.8mm;
+    margin-top: 0.6mm;
+    white-space: nowrap;
   }
 
   /* Body row — contains a nested table for photo + info */
@@ -270,14 +272,14 @@
                 <tr>
                   <td>
                     <div class="field">
-                      <div class="field-label">Issued</div>
-                      <div class="field-value mono">{{ ISSUED_DATE }}</div>
+                      <div class="field-label">Expires</div>
+                      <div class="field-value mono expires">{{ EXPIRES_DATE }}</div>
                     </div>
                   </td>
                   <td>
                     <div class="field">
-                      <div class="field-label">Expires</div>
-                      <div class="field-value mono expires">{{ EXPIRES_DATE }}</div>
+                      <div class="field-label">PIN</div>
+                      <div class="field-value mono">{{ PIN }}</div>
                     </div>
                   </td>
                 </tr>
