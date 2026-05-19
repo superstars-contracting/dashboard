@@ -2625,6 +2625,7 @@ def get_employee_credential(emp_id):
     """Return the worker's current credential state + eligibility +
     photo-readiness. Used by the workforce list (per-row context) and
     any per-worker detail view."""
+    conn = None
     try:
         from cof_issuer import has_valid_prerequisite
         conn = db()
@@ -2633,7 +2634,6 @@ def get_employee_credential(emp_id):
             (emp_id,)
         ).fetchone()
         if not emp:
-            conn.close()
             return jsonify({"error": "Employee not found"}), 404
         eligible, _ = has_valid_prerequisite(emp_id)
         eligibility = 'cof' if eligible else 'company_id'
@@ -2666,7 +2666,6 @@ def get_employee_credential(emp_id):
                 issued_date_v = cid_row["issued_date"]
                 status_v = cid_row["status"]
                 html_export_path = cid_row["html_export_path"]
-        conn.close()
 
         html_url = None
         if html_export_path:
@@ -2688,6 +2687,12 @@ def get_employee_credential(emp_id):
         return response_wrapper(payload)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 @app.route('/api/employees/<emp_id>/credential/issue', methods=['POST'])
@@ -2700,6 +2705,7 @@ def issue_employee_credential(emp_id):
     html_url. Operator opens the URL and uses browser print-to-PDF when
     a paper card is needed (per CLAUDE.md HTML-first rule)."""
     import jinja2
+    conn = None
     try:
         data = request.get_json() or {}
         issued_by = data.get('issued_by')
@@ -2714,10 +2720,8 @@ def issue_employee_credential(emp_id):
             (emp_id,)
         ).fetchone()
         if not emp:
-            conn.close()
             return jsonify({"error": "Employee not found"}), 404
         if not emp["face_image_path"]:
-            conn.close()
             return jsonify({"error": "Worker has no face photo on file. Take an ID photo before issuing a credential."}), 400
 
         from cof_issuer import has_valid_prerequisite, issue_cof, get_default_rigger_for_project
@@ -2758,7 +2762,6 @@ def issue_employee_credential(emp_id):
                     "issued_date": existing_cid["issued_date"],
                     "status": existing_cid["status"],
                 }
-            conn.close()
             return jsonify({
                 "error": f"Worker already has an active {current_cred['type']}",
                 "current_credential": current_cred,
@@ -2783,7 +2786,11 @@ def issue_employee_credential(emp_id):
                     (emp_id,)
                 )
             conn.commit()
+        # Close the first conn before calling into the issuer modules —
+        # they open their own conns and SQLite WAL prefers one writer at
+        # a time. Reset conn=None so the outer finally doesn't double-close.
         conn.close()
+        conn = None
 
         # Issue the card row
         try:
@@ -2872,6 +2879,7 @@ def issue_employee_credential(emp_id):
             )
         conn.commit()
         conn.close()
+        conn = None
         html_url = '/files/' + html_rel
 
         response_body = {
@@ -2888,6 +2896,12 @@ def issue_employee_credential(emp_id):
     except Exception as e:
         logging.error(f"POST .../credential/issue ({emp_id}): {e}")
         return jsonify({"error": str(e)}), 500
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 @app.route('/worker-files/<path:filepath>', methods=['GET'])
