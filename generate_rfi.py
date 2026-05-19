@@ -36,7 +36,7 @@ def generate_rfi(workbook_path, rfi_number, today, output_json):
                 emp_data[row[0]] = {
                     'name': row[1],
                     'position': row[2],
-                    'company_trade': row[3] if len(row) > 3 else 'Superstar Contracting',
+                    'company_trade': row[3] if len(row) > 3 else 'Superstars Contracting Inc.',
                     'phone': row[6] if len(row) > 6 else '',
                     'email': row[7] if len(row) > 7 else ''
                 }

@@ -85,7 +85,7 @@ class DCRHTMLRenderer:
 <body>"""
 
     def _header(self) -> str:
-        return f'<div class="header"><span class="header-star">★</span> Superstar Contracting</div>'
+        return f'<div class="header"><span class="header-star">★</span> Superstars Contracting Inc.</div>'
 
     def _labor_internal(self) -> str:
         labor = self.dcr.get('labor', {})
