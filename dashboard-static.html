@@ -1389,6 +1389,10 @@
 
           const WIDTHS = {sm:'110px', md:'160px', lg:'260px', full:'100%'};
           let toolboxLibrary = null;
+          // Track in-flight saveRow() promises so issueDcr() can await them
+          // before triggering the aggregator (otherwise the aggregator runs
+          // before all rows are committed and the DCR is missing data).
+          const pendingSaves = new Set();
 
           async function loadToolboxLibrary() {
             try {
@@ -1472,9 +1476,19 @@
             });
           }
 
-          async function saveRow(row, sectionKey) {
+          function saveRow(row, sectionKey) {
             const cfg = SECTIONS[sectionKey];
-            if (!cfg) return;
+            if (!cfg) return Promise.resolve();
+            // Stash the actual Promise in pendingSaves so issueDcr's
+            // Promise.allSettled() can await it. (A sentinel object wouldn't
+            // be thenable and would resolve immediately — bug-trap.)
+            const p = _saveRowInner(row, sectionKey, cfg);
+            pendingSaves.add(p);
+            p.finally(() => pendingSaves.delete(p));
+            return p;
+          }
+
+          async function _saveRowInner(row, sectionKey, cfg) {
             const body = {project_code: PROJECT_CODE, date: getCurrentDate()};
             for (const f of cfg.fields) {
               const input = row.querySelector('[name="' + f.name + '"]');
@@ -1595,9 +1609,24 @@
 
           async function issueDcr(override) {
             const dateStr = getCurrentDate();
+            const unsavedRows = document.querySelectorAll('.dcr-row[data-saved="0"]');
+            if (!override && unsavedRows.length > 0) {
+              if (!confirm(unsavedRows.length + ' row(s) in this DCR are unsaved and will NOT be included in the report. Issue anyway?')) return;
+            }
             if (!override && !confirm('Issue DCR for ' + dateStr + '? Generates internal and client versions.')) return;
-            setIssueStatus(override ? 'Re-issuing internal + client…' : 'Issuing internal + client…', '#76777E');
+            const issueBtn = document.getElementById('dcr-issue');
+            if (issueBtn) { issueBtn.disabled = true; issueBtn.style.opacity = '0.6'; issueBtn.style.cursor = 'wait'; }
             try {
+              // Wait for any in-flight saveRow() POSTs to commit before the
+              // aggregator runs — otherwise the DCR misses rows the operator
+              // just clicked Save on. Use allSettled so a slow/failed save
+              // doesn't block the rest.
+              if (pendingSaves.size > 0) {
+                setIssueStatus('Waiting on ' + pendingSaves.size + ' save(s)…', '#76777E');
+                // The set is mutated as saves complete; take a snapshot.
+                await Promise.allSettled(Array.from(pendingSaves));
+              }
+              setIssueStatus(override ? 'Re-issuing internal + client…' : 'Issuing internal + client…', '#76777E');
               const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/daily/' + encodeURIComponent(dateStr) + '/issue', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -1617,6 +1646,12 @@
                     '<strong style="color:#2F7C57;">✓ ' + (override ? 'DCR re-issued' : 'DCR issued') +
                     ' — ' + (json.data.display_id || '') + ' — opened in new tab.</strong>';
                 }
+                // Eager reset: clear the entry form state immediately so a
+                // browser back-button or accidental re-entry shows a clean
+                // form, not stale rows from the just-issued DCR. The next
+                // showEntry() also calls clearDcrFormState(); both paths are
+                // idempotent.
+                clearDcrFormState({preserveBanner: true});
                 showArchive();
               } else if (resp.status === 409 && json && json.existing_sequence !== undefined) {
                 const existing = json.existing_display_id || ('DCR-' + PROJECT_CODE + '-' + String(json.existing_sequence).padStart(3, '0'));
@@ -1630,6 +1665,47 @@
             } catch (e) {
               console.warn('[DCR] issue failed:', e);
               setIssueStatus('Network error', '#B11E2E');
+            } finally {
+              if (issueBtn) { issueBtn.disabled = false; issueBtn.style.opacity = ''; issueBtn.style.cursor = 'pointer'; }
+            }
+          }
+
+          // Centralized form reset — called from showEntry (new DCR), cancelDcr
+          // (operator-initiated discard), and issueDcr success (eager reset).
+          // Wipes operator-entry rows, photo grid, photo location/description
+          // inputs, issue status, and optionally resets the date + auto-fill.
+          function clearDcrFormState(opts) {
+            opts = opts || {};
+            // Operator-entry rows (all sections: work, deliveries, equipment,
+            // toolbox, safety, issues, inspections, visitors).
+            document.querySelectorAll('[data-dcr-rows]').forEach(c => { c.innerHTML = ''; });
+            // Photos grid + the location/caption inputs.
+            const photoGrid = document.getElementById('dcr-photo-grid');
+            if (photoGrid) photoGrid.innerHTML = '';
+            const photoLoc = document.getElementById('dcr-photo-location');
+            if (photoLoc) photoLoc.value = '';
+            const photoDesc = document.getElementById('dcr-photo-description');
+            if (photoDesc) photoDesc.value = '';
+            const photoFile = document.getElementById('dcr-photo-input');
+            if (photoFile) photoFile.value = '';
+            // Issue status line — clear unless caller wants to keep a message.
+            if (!opts.preserveStatus) {
+              const issueStatus = document.getElementById('dcr-issue-status');
+              if (issueStatus) { issueStatus.textContent = ''; issueStatus.style.color = '#76777E'; }
+            }
+            // Issued banner — caller decides (issueDcr success keeps it visible
+            // briefly so the operator sees the confirmation).
+            if (!opts.preserveBanner) {
+              const banner = document.getElementById('dcr-issued-banner');
+              if (banner) banner.style.display = 'none';
+            }
+            // Date — reset to today + reload auto-fill unless caller opts out.
+            if (!opts.preserveDate) {
+              const dateInput = document.getElementById('dcr-date');
+              if (dateInput) {
+                dateInput.value = new Date().toISOString().slice(0, 10);
+                loadDcr(dateInput.value);
+              }
             }
           }
 
@@ -1746,22 +1822,11 @@
             const entry = document.getElementById('dcr-entry-view');
             if (archive) archive.style.display = 'none';
             if (entry) entry.style.display = '';
-            // The issued banner is a one-shot — hide it once the operator
-            // starts a new entry.
-            const banner = document.getElementById('dcr-issued-banner');
-            if (banner) banner.style.display = 'none';
-            // Clear stale operator-entry rows from the previous session.
-            document.querySelectorAll('[data-dcr-rows]').forEach(c => { c.innerHTML = ''; });
-            const photoGrid = document.getElementById('dcr-photo-grid');
-            if (photoGrid) photoGrid.innerHTML = '';
-            const issueStatus = document.getElementById('dcr-issue-status');
-            if (issueStatus) { issueStatus.textContent = ''; issueStatus.style.color = '#76777E'; }
-            // Reset date to today and reload auto-fill sections.
-            const dateInput = document.getElementById('dcr-date');
-            if (dateInput) {
-              dateInput.value = new Date().toISOString().slice(0, 10);
-              loadDcr(dateInput.value);
-            }
+            // Defensive: every entry into the form starts from a known-clean
+            // state. The eager reset in issueDcr() success already clears
+            // most of this on the way out, but we re-do it here so paths that
+            // skip that (e.g. browser back, manual nav) still land fresh.
+            clearDcrFormState();
           }
 
           function setupIssueButtons() {
@@ -1774,6 +1839,8 @@
             if (unsavedRows.length > 0) {
               if (!confirm('Discard ' + unsavedRows.length + ' unsaved DCR row(s)?')) return;
             }
+            // Eager clear on cancel too — same hygiene as issue-success path.
+            clearDcrFormState();
             showArchive();
           }
 
