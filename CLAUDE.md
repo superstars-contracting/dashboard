@@ -38,6 +38,95 @@ these are pasted into chats. When values must be discussed, redact: `W1`,
 All real data lives in `superstars.db` on the encrypted workstation drive.
 API keys live in `.env`, gitignored, never committed.
 
+### What counts as PII-bearing by default
+
+These surfaces embed names or other PII in their values/paths. Treat them
+as PII-bearing without inspection — assume sensitive unless proven otherwise:
+
+- Anything under `worker_records/`. Folder names follow
+  `E-XXXXX_<First>_<Last>`, so even a directory listing leaks names.
+- Any `*_path` column on the `employees` table — `face_image_path`,
+  `photo_path`, `folder_path`. They embed the slugified worker name.
+- `workers_import_template.csv`, `certifications_import_template.csv`, and
+  any future PII intake CSV.
+- Server logs that include those paths (e.g. face-photo upload logs).
+- Any `name`, `phone`, `email`, `dob`, `emergency_contact_*`, `pin`,
+  `license_number` value pulled from `employees`, `project_riggers`, or
+  certifications.
+
+### Inspection patterns: WRONG vs RIGHT
+
+These are the failure modes that have actually leaked names into chat —
+each got fixed retroactively but the fix is too late, the leak is in
+scrollback. Don't rely on remembering. Use the right pattern from the start.
+
+**WRONG — leaks PII to chat output:**
+
+```bash
+# Directory listings under worker_records/ — every folder name has the worker's name
+ls worker_records/
+ls -la worker_records/E-00001_*
+
+# Raw file inspection on any PII-bearing file
+head workers_import_template.csv
+cat certifications_import_template.csv
+tail server.log                            # server logs include face-photo paths
+type workers_import_template.csv           # PowerShell equivalent
+Get-Content workers_import_template.csv
+
+# Printing path values from the DB or API responses
+print(d.get("face_image_path"))            # contains worker name slug
+print(employee_row["folder_path"])         # same
+print(response_json["data"]["image_url"])  # same — /worker-files/E-00001_<Name>/...
+
+# Echoing CSV rows or DB rows raw
+print(csv_row)                             # rows have name, phone, dob, etc.
+print(conn.execute("SELECT * FROM employees").fetchone())
+```
+
+**RIGHT — counts, shape, booleans, redacted values:**
+
+```bash
+# Counts and shape only
+wc -l workers_import_template.csv
+awk -F, 'END{print NR}' workers_import_template.csv
+awk -F, 'NR==1{print NF}' workers_import_template.csv   # column count
+
+# Python: len, booleans, derived flags — never raw values
+print(len(rows))
+print(bool(face_image_path), face_image_path.endswith(".jpg") if face_image_path else False)
+print({"has_phone": bool(row["phone"]), "has_dob": bool(row["dob"])})
+
+# Worker-record file counts without naming the workers
+python -c "
+from pathlib import Path
+total = sum(1 for p in Path('worker_records').iterdir() if p.is_dir())
+print(f'{total} worker folders')
+# count face.* across all worker folders without printing any name
+n = sum(1 for d in Path('worker_records').iterdir() if d.is_dir() for _ in d.glob('face.*'))
+print(f'{n} face files')
+"
+
+# If a value must be discussed, redact: first initial + last 4 (phone)
+def redact_name(s): return f"{s[0]}." if s else "—"
+def redact_phone(s): return f"XXX-XXX-{s[-4:]}" if s and len(s) >= 4 else "—"
+```
+
+**Test-assertion pattern:**
+
+```python
+# Assert by booleans, counts, sizes — never print the PII-bearing value itself
+expect("face.jpg sibling exists", file_count("E-00001", "face.jpg") == 1)
+expect("face_image_path ends in .jpg", fp and fp.lower().endswith(".jpg"))
+# NOT: expect("face_image_path matches", fp == "C:\\...\\Robert_Arriciaga\\face.jpg")
+```
+
+### Default posture
+
+When uncertain whether a value is PII-bearing, treat it as PII-bearing.
+A false positive ("I redacted something that turned out to be safe") costs
+nothing; a false negative is permanent — it lives in scrollback forever.
+
 ## 3. Schema rule: IDs sort numerically, not lexicographically
 
 Employee IDs are `E-XXXXX`. When computing the next ID or sorting workers:
