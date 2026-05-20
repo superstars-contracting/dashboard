@@ -972,9 +972,14 @@ def next_dcr_sequence(conn, project_code):
 
 def _issue_one_dcr(conn, project_code, report_date, audience, seq):
     """Aggregate + render + write + upsert for one audience. Returns
-    {report_id, audience, html_url, sequence}. Caller owns the connection
-    and the commit/close lifecycle so 'both' can run as a single transaction.
-    The seq is computed once by the caller and shared across audiences."""
+    {report_id, audience, html_url, html_path, sequence}. Caller owns the
+    connection + commit/close so 'both' can run as a single transaction; the
+    caller also owns the html_path so it can roll back orphaned HTML files
+    if the transaction fails after the file write. The seq is computed once
+    by the caller and shared across audiences.
+
+    HTML is written ATOMICALLY (.tmp then rename) so a concurrent fetch via
+    /files/ during a re-issue can never catch a half-written file."""
     from dcr_aggregator import aggregate_dcr
     from render_dcr_html import DCRHTMLRenderer
     dcr = aggregate_dcr(project_code, report_date, audience)
@@ -987,7 +992,9 @@ def _issue_one_dcr(conn, project_code, report_date, audience, seq):
     out_dir = SCRIPT_DIR / "data_room" / "reports" / "dcr" / project_code / f"{seq:03d}"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_file = out_dir / f"{audience}.html"
-    out_file.write_text(html, encoding='utf-8')
+    tmp_file = out_dir / f"{audience}.html.tmp"
+    tmp_file.write_text(html, encoding='utf-8')
+    tmp_file.replace(out_file)  # atomic on POSIX and Windows
     rel = out_file.relative_to(SCRIPT_DIR).as_posix()
     html_url = f"/files/{rel}"
     existing = conn.execute(
@@ -1005,7 +1012,7 @@ def _issue_one_dcr(conn, project_code, report_date, audience, seq):
             (report_date, project_code, 'DCR', report_id, 'issued', seq)
         )
     return {"report_id": report_id, "audience": audience, "html_url": html_url,
-            "display_id": display_id, "sequence": seq}
+            "html_path": out_file, "display_id": display_id, "sequence": seq}
 
 
 @app.route('/api/projects/<project_code>/daily/<report_date>/issue', methods=['POST'])
@@ -1040,6 +1047,10 @@ def issue_dcr(project_code, report_date):
     if not validate_project_exists(conn, project_code):
         conn.close()
         return jsonify({"error": "Project not found"}), 400
+    # Track HTML files written so we can roll them back if the transaction
+    # fails. Otherwise a half-issued DCR leaves orphan HTML on disk that the
+    # /files/ static route would happily serve.
+    written_files = []
     try:
         existing_seq = lookup_existing_dcr_sequence(conn, project_code, report_date)
         if existing_seq is not None and not override_active:
@@ -1056,7 +1067,9 @@ def issue_dcr(project_code, report_date):
         generated_at = datetime.utcnow().isoformat() + 'Z'
         if audience == 'both':
             internal = _issue_one_dcr(conn, project_code, report_date, 'internal', seq)
+            written_files.append(internal["html_path"])
             client = _issue_one_dcr(conn, project_code, report_date, 'client', seq)
+            written_files.append(client["html_path"])
             conn.commit()
             conn.close()
             return response_wrapper({
@@ -1071,6 +1084,7 @@ def issue_dcr(project_code, report_date):
             }), 201
         else:
             result = _issue_one_dcr(conn, project_code, report_date, audience, seq)
+            written_files.append(result["html_path"])
             conn.commit()
             conn.close()
             return response_wrapper({
@@ -1082,11 +1096,26 @@ def issue_dcr(project_code, report_date):
                 "generated_at": generated_at,
             }), 201
     except (KeyError, ValueError) as e:
+        try: conn.rollback()
+        except Exception: pass
         conn.close()
+        for fp in written_files:
+            try: fp.unlink(missing_ok=True)
+            except Exception: pass
         return jsonify({"error": str(e)}), 400
     except Exception as e:
+        try: conn.rollback()
+        except Exception: pass
         conn.close()
-        logging.error(f"POST /api/projects/{project_code}/daily/{report_date}/issue: {str(e)}")
+        # Orphan-HTML cleanup: any file we wrote before the DB transaction
+        # rolled back becomes a ghost report otherwise.
+        for fp in written_files:
+            try: fp.unlink(missing_ok=True)
+            except Exception: pass
+        logging.error(
+            f"POST /api/projects/{project_code}/daily/{report_date}/issue "
+            f"(audience={audience}, override={override_active}): {str(e)}"
+        )
         return jsonify({"error": str(e)}), 500
 
 
