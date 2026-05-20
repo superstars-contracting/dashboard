@@ -1007,6 +1007,7 @@ def _issue_one_dcr(conn, project_code, report_date, audience, seq):
     pdf_path = None
     pdf_url = None
     pdf_status = None
+    drive_status = None  # Drive archive runs only if PDF render succeeded
     if audience == 'internal':
         from pdf_export import render_html_to_pdf, PDFExportError
         pdf_target = out_dir / f"{audience}.pdf"
@@ -1018,6 +1019,18 @@ def _issue_one_dcr(conn, project_code, report_date, audience, seq):
         if pdf_status.get('ok'):
             pdf_path = pdf_target
             pdf_url = f"/files/{pdf_target.relative_to(SCRIPT_DIR).as_posix()}"
+            # Drive archive — copy the local PDF into the project's synced
+            # folder. Failure here is a WARN, never an error: local PDF is
+            # always retained; Drive may simply not be configured/running.
+            from drive_archive import archive_dcr_pdf
+            drive_status = archive_dcr_pdf(
+                pdf_target, project_code, report_date, seq, audience='internal'
+            )
+            if not drive_status.get('ok'):
+                logging.warning(
+                    f"DCR {report_id}: Drive archive {drive_status.get('status','unavailable')} "
+                    f"— {drive_status.get('reason')}"
+                )
         else:
             logging.warning(
                 f"DCR {report_id}: PDF render failed — {pdf_status.get('error')}"
@@ -1039,7 +1052,8 @@ def _issue_one_dcr(conn, project_code, report_date, audience, seq):
         )
     return {"report_id": report_id, "audience": audience, "html_url": html_url,
             "html_path": out_file, "display_id": display_id, "sequence": seq,
-            "pdf_path": pdf_path, "pdf_url": pdf_url, "pdf_status": pdf_status}
+            "pdf_path": pdf_path, "pdf_url": pdf_url, "pdf_status": pdf_status,
+            "drive_status": drive_status}
 
 
 @app.route('/api/projects/<project_code>/daily/<report_date>/issue', methods=['POST'])
@@ -1113,6 +1127,7 @@ def issue_dcr(project_code, report_date):
                 # issuance succeeded.
                 "pdf_url": internal.get("pdf_url"),
                 "pdf_status": internal.get("pdf_status"),
+                "drive_status": internal.get("drive_status"),
             }), 201
         else:
             result = _issue_one_dcr(conn, project_code, report_date, audience, seq)
@@ -1128,6 +1143,7 @@ def issue_dcr(project_code, report_date):
                 "generated_at": generated_at,
                 "pdf_url": result.get("pdf_url"),
                 "pdf_status": result.get("pdf_status"),
+                "drive_status": result.get("drive_status"),
             }), 201
     except (KeyError, ValueError) as e:
         try: conn.rollback()

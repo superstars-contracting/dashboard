@@ -1,0 +1,8 @@
+{
+  "_doc": "Per-project mapping into the local Google Drive for Desktop mount. The dashboard COPIES the finalized DCR PDF into <root>\\Daily Reports — Drive for Desktop syncs from there. No Google API tokens needed. Edit this file (and restart the server) when adding a new project or correcting a path. If 'root' is unset or doesn't exist on disk, the archive step WARNs and skips (finalize still succeeds; local PDF is the source of truth).",
+  "FR-BX-001": {
+    "root": "",
+    "slug": "890-E-135th",
+    "_note": "Set 'root' to the absolute path of 890's project folder as it appears in File Explorer once Google Drive for Desktop is installed and signed in (e.g. 'G:\\\\My Drive\\\\Projects\\\\890 E 135th Street'). Until then, the archive step warns + skips."
+  }
+}
