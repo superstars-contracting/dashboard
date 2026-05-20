@@ -67,7 +67,7 @@ def find_edge_executable():
     )
 
 
-def render_html_to_pdf(html_path, pdf_path, timeout_sec=30):
+def render_html_to_pdf(html_path, pdf_path, timeout_sec=60):
     """Render an HTML file to PDF using headless Edge.
 
     Args:
@@ -76,7 +76,14 @@ def render_html_to_pdf(html_path, pdf_path, timeout_sec=30):
                  deterministic and doesn't depend on whether Edge can reach
                  the dashboard's static-file route.
       pdf_path:  Path or str — destination. Parent dirs are created.
-      timeout_sec: hard cap on Edge process runtime.
+      timeout_sec: hard cap on Edge process runtime (default 60s — generous
+                   ceiling so a slow first-launch Edge doesn't hit the limit,
+                   but well under any reasonable operator patience for the
+                   finalize request to return). On timeout, subprocess.run
+                   kills the Edge process via Popen.kill() (Python stdlib
+                   contract) and we return ok=False so the caller WARNs and
+                   finalize still returns 201 — the DCR is the source of
+                   truth; the PDF is derivative and can be regenerated.
 
     Returns dict:
       {"ok": True,  "pdf_path": "<abs>", "edge_path": "<abs>", "size": int}
