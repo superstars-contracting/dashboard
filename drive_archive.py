@@ -79,12 +79,19 @@ def archive_dcr_pdf(pdf_path, project_code, report_date, sequence,
                           f"Is Google Drive for Desktop running? "
                           f"Local PDF retained at {pdf_path}."}
 
+    # 'Daily Reports' must already exist under the project root. The Drive
+    # folder structure is set up by a separate stamping script when a project
+    # is provisioned — if it's missing here, the operator pointed `root` at
+    # the wrong folder. Silently mkdir'ing would scatter a stray 'Daily
+    # Reports' inside whatever they DID point at, which makes the bad config
+    # invisible. WARN instead so the mistake surfaces.
     dst_dir = root_path / "Daily Reports"
-    try:
-        dst_dir.mkdir(parents=True, exist_ok=True)
-    except Exception as e:
-        return {"ok": False, "status": "error",
-                "reason": f"Cannot create {dst_dir}: {e}"}
+    if not dst_dir.exists():
+        return {"ok": False, "status": "unavailable",
+                "reason": f"'Daily Reports' subfolder not found under {root_path}. "
+                          f"Either Drive hasn't synced it yet, or 'root' in "
+                          f"drive_targets.json points at the wrong folder. "
+                          f"Local PDF retained at {pdf_path}."}
 
     slug = cfg.get("slug") or _slugify(project_code) or project_code
     filename = f"DCR-{project_code}-{sequence:03d}_{report_date}_{slug}_{audience}.pdf"
