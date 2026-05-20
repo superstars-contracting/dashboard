@@ -221,20 +221,219 @@ def update_sign_in(sign_in_id):
     try:
         data = request.get_json()
         time_out = data.get('time_out')
-        
+
         conn = db()
         conn.execute(
             "UPDATE sign_in_log SET time_out = ?, updated_at = ? WHERE id = ?",
             (time_out, datetime.now().isoformat(), sign_in_id)
         )
         conn.commit()
-        
+
         row = conn.execute("SELECT * FROM sign_in_log WHERE id = ?", (sign_in_id,)).fetchone()
         conn.close()
-        
+
         return response_wrapper(dict(row)), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/sign-ins/<int:sign_in_id>', methods=['PUT'])
+def replace_sign_in(sign_in_id):
+    """Full replace of a sign_in_log row's billable times.
+
+    Used by the Weekly Hours Log when the operator edits a cell that already
+    has an entry. Distinct from PATCH (which only updates time_out) because
+    the payroll grid lets the operator change BOTH time_in and time_out at
+    once (e.g., late arrival + early departure on the same shift).
+
+    Body: {time_in: "HH:MM", time_out: "HH:MM"}. Both required.
+    Validates time_out >= time_in via the same HH:MM string compare used by
+    POST. Returns the updated row, or 404 if the id doesn't exist."""
+    try:
+        data = request.get_json() or {}
+        time_in = data.get('time_in')
+        time_out = data.get('time_out')
+        if not time_in or not time_out:
+            return jsonify({"error": "time_in and time_out are required"}), 400
+        if time_out < time_in:
+            return jsonify({"error": f"time_out ({time_out}) is before time_in ({time_in})"}), 400
+
+        conn = db()
+        existing = conn.execute("SELECT id FROM sign_in_log WHERE id = ?", (sign_in_id,)).fetchone()
+        if not existing:
+            conn.close()
+            return jsonify({"error": "sign_in_log row not found"}), 404
+        conn.execute(
+            "UPDATE sign_in_log SET time_in = ?, time_out = ?, updated_at = ? WHERE id = ?",
+            (time_in, time_out, datetime.now().isoformat(), sign_in_id)
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM sign_in_log WHERE id = ?", (sign_in_id,)).fetchone()
+        conn.close()
+        return response_wrapper(dict(row)), 200
+    except Exception as e:
+        logging.error(f"PUT /api/sign-ins/{sign_in_id}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/sign-ins/<int:sign_in_id>', methods=['DELETE'])
+def delete_sign_in(sign_in_id):
+    """Delete a sign_in_log row. Used by the Weekly Hours Log when the
+    operator clears a cell (a worker who was incorrectly marked as
+    present, or a row entered against the wrong worker/date).
+
+    Returns 404 if the id doesn't exist so the caller can distinguish
+    'already gone' from 'never existed' if needed."""
+    try:
+        conn = db()
+        existing = conn.execute("SELECT id FROM sign_in_log WHERE id = ?", (sign_in_id,)).fetchone()
+        if not existing:
+            conn.close()
+            return jsonify({"error": "sign_in_log row not found"}), 404
+        conn.execute("DELETE FROM sign_in_log WHERE id = ?", (sign_in_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"deleted": True, "id": sign_in_id}), 200
+    except Exception as e:
+        logging.error(f"DELETE /api/sign-ins/{sign_in_id}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ============= PAYROLL: WEEKLY HOURS LOG =============
+
+@app.route('/api/payroll/hours', methods=['GET'])
+def api_payroll_hours():
+    """Weekly Hours grid for payroll. Source of truth = sign_in_log.
+
+    Query params:
+      week_start (optional, ISO 'YYYY-MM-DD'): the Monday of the week. If
+        omitted, defaults to the last completed Mon-Fri week relative to
+        today (payroll runs one week in arrears).
+
+    Returns the payroll_hours.build_week_grid dict: dates, workers (with
+    per-day cells + weekly totals), totals_by_day, grand_total. Worker pool
+    = employees with at least one active project_assignment.
+    """
+    from payroll_hours import last_completed_week, build_week_grid
+    week_start = (request.args.get('week_start') or '').strip()
+    try:
+        if week_start:
+            monday = datetime.strptime(week_start, '%Y-%m-%d').date()
+            if monday.weekday() != 0:
+                return jsonify({"error": "week_start must be a Monday"}), 400
+        else:
+            monday, _ = last_completed_week()
+        conn = db()
+        grid = build_week_grid(conn, monday)
+        conn.close()
+        return response_wrapper(grid), 200
+    except Exception as e:
+        logging.error(f"GET /api/payroll/hours: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/payroll/hours.csv', methods=['GET'])
+def api_payroll_hours_csv():
+    """CSV export of the weekly hours grid. One row per worker; columns:
+    employee_id, name, trade, <Mon date>, <Tue>, <Wed>, <Thu>, <Fri>,
+    weekly_total. A 'DAILY TOTAL' summary row follows the data rows.
+
+    Hours are paid hours (lunch deducted) so the CSV matches what the
+    operator hands to payroll.
+    """
+    import csv
+    import io
+    from payroll_hours import last_completed_week, build_week_grid
+    week_start = (request.args.get('week_start') or '').strip()
+    try:
+        if week_start:
+            monday = datetime.strptime(week_start, '%Y-%m-%d').date()
+            if monday.weekday() != 0:
+                return jsonify({"error": "week_start must be a Monday"}), 400
+        else:
+            monday, _ = last_completed_week()
+        conn = db()
+        grid = build_week_grid(conn, monday)
+        conn.close()
+
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["employee_id", "name", "trade",
+                    *grid["dates"], "weekly_total"])
+        for emp in grid["workers"]:
+            w.writerow([
+                emp["employee_id"], emp["name"], emp["trade"] or "",
+                *[(d["hours"] if d["has_entry"] else "") for d in emp["days"]],
+                emp["weekly_total"],
+            ])
+        w.writerow(["", "DAILY TOTAL", "",
+                    *grid["totals_by_day"], grid["grand_total"]])
+
+        csv_bytes = buf.getvalue().encode("utf-8")
+        filename = f"weekly-hours-{grid['week_start']}-to-{grid['week_end']}.csv"
+        from flask import Response
+        return Response(
+            csv_bytes, status=200, mimetype="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as e:
+        logging.error(f"GET /api/payroll/hours.csv: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/payroll/hours.pdf', methods=['GET'])
+def api_payroll_hours_pdf():
+    """PDF export of the weekly hours grid. Renders an HTML timesheet via
+    render_timesheet_html and pipes through pdf_export (headless Edge),
+    same pipeline as the DCR PDFs. Returns the PDF as an attachment.
+
+    PDF render failures return 502 with the error so the UI can surface
+    "PDF render failed — try CSV instead" rather than a blank download.
+    """
+    from payroll_hours import last_completed_week, build_week_grid
+    from render_timesheet_html import render_timesheet_html
+    from pdf_export import render_html_to_pdf, PDFExportError
+    week_start = (request.args.get('week_start') or '').strip()
+    try:
+        if week_start:
+            monday = datetime.strptime(week_start, '%Y-%m-%d').date()
+            if monday.weekday() != 0:
+                return jsonify({"error": "week_start must be a Monday"}), 400
+        else:
+            monday, _ = last_completed_week()
+        conn = db()
+        grid = build_week_grid(conn, monday)
+        conn.close()
+
+        html_str = render_timesheet_html(grid)
+
+        # Use a stable temp filename pair under data_room so the file is
+        # locatable for post-mortem if rendering fails. Overwritten each call.
+        out_dir = SCRIPT_DIR / "data_room" / "reports" / "weekly_hours"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        html_tmp = out_dir / f"week-{grid['week_start']}.html"
+        pdf_tmp = out_dir / f"week-{grid['week_start']}.pdf"
+        # Atomic write
+        html_swap = out_dir / f"week-{grid['week_start']}.html.tmp"
+        html_swap.write_text(html_str, encoding='utf-8')
+        html_swap.replace(html_tmp)
+
+        try:
+            result = render_html_to_pdf(html_tmp, pdf_tmp)
+        except PDFExportError as e:
+            return jsonify({"error": f"PDF setup error: {e}"}), 502
+        if not result.get("ok"):
+            return jsonify({"error": result.get("error", "PDF render failed")}), 502
+
+        filename = f"weekly-hours-{grid['week_start']}-to-{grid['week_end']}.pdf"
+        return send_file(
+            str(pdf_tmp), mimetype="application/pdf",
+            as_attachment=True, download_name=filename,
+        )
+    except Exception as e:
+        logging.error(f"GET /api/payroll/hours.pdf: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 
 # ============= RFI ENDPOINTS =============
 

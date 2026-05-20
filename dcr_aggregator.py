@@ -34,19 +34,15 @@ def _day_of_week(date_str):
 
 
 def _compute_hours(time_in, time_out):
-    """Return decimal hours between two HH:MM strings, or None if either missing."""
+    """Paid hours (30-minute lunch deducted) — unified with the Weekly Hours
+    Log so the DCR labor section and payroll's grid can never drift apart.
+    Returns None when either time is missing (the DCR renders '—' for an
+    in-progress shift); payroll's compute_paid_hours returns 0.0 for the
+    same case, but the DCR semantics want a visual blank, not a zero."""
+    from payroll_hours import compute_paid_hours
     if not time_in or not time_out:
         return None
-    try:
-        h_in, m_in = map(int, time_in.split(':')[:2])
-        h_out, m_out = map(int, time_out.split(':')[:2])
-        in_mins = h_in * 60 + m_in
-        out_mins = h_out * 60 + m_out
-        if out_mins < in_mins:
-            out_mins += 24 * 60
-        return round((out_mins - in_mins) / 60.0, 2)
-    except (ValueError, IndexError):
-        return None
+    return compute_paid_hours(time_in, time_out)
 
 
 def _weather_from_log(row):
