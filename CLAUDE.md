@@ -85,6 +85,19 @@ hygiene, every external service the dashboard depends on still gets a
 1Password vault item even with no credential — the vault doubles as the
 service inventory.
 
+## Dependency security tooling (safety net, not a substitute for judgment)
+
+Two automated dependency-security layers are active on this repo:
+- **GitHub Dependabot** — alerts on known CVEs in dependencies and auto-opens patch PRs.
+- **Socket Security** (GitHub app, scoped to this repo only) — supply-chain attack detection: malware, typosquatting, hidden/obfuscated code, suspicious privileged-API usage (filesystem/network/child_process/eval), reviewed inline on pull requests.
+
+These are a SAFETY NET. Their presence must NOT reduce the system's own vigilance or confidence in preventing malware, spyware, data exfiltration, or anything that could harm the system or leak PII. When adding or updating ANY dependency, Claude/agents still:
+- Vet the package first — legitimate, actively maintained, exact correct name. No blind `pip install` / `npm install` of unfamiliar packages.
+- Never introduce malware, spyware, obfuscated code, or anything that exfiltrates data, credentials, or worker PII.
+- Uphold all existing security rules — secrets vaulted in 1Password (never plaintext on disk), PII never in chats or logs, parameterized SQL, 127.0.0.1 loopback bind only.
+
+The tools catch what slips past discipline; they do not license carelessness. Socket and Dependabot run quietly in the background so the operator can focus on organizing the business and the work — not on policing threats. First-principles security judgment remains the system's responsibility; the tooling is backup, not the primary defense.
+
 ---
 
 ## File layout
