@@ -271,6 +271,38 @@
     </div>
   </div>
 
+  <!-- HOURS (PAYROLL) -->
+  <div class="panel" data-panel="hours">
+    <div class="section">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;flex-wrap:wrap;gap:12px;">
+        <div>
+          <h2>Hours <span style="font-size:12px;color:#76777E;font-weight:400;text-transform:none;letter-spacing:0;">· Payroll · paid hours, lunch (−30 min) always deducted</span></h2>
+          <div class="h2-sub">Last completed Mon-Fri week defaults below. Source = sign_in_log (same as DCR labor — they can never disagree).</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button id="hrs-prev" type="button" style="background:white;border:1px solid #B11E2E;color:#B11E2E;padding:6px 12px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;">‹ Prev</button>
+          <div id="hrs-range" style="font-family:Georgia,serif;font-size:14px;font-weight:700;min-width:220px;text-align:center;">—</div>
+          <button id="hrs-next" type="button" style="background:white;border:1px solid #B11E2E;color:#B11E2E;padding:6px 12px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;">Next ›</button>
+          <button id="hrs-csv" type="button" style="background:#14161C;color:white;border:none;padding:6px 14px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;margin-left:14px;">⬇ CSV</button>
+          <button id="hrs-pdf" type="button" style="background:#B11E2E;color:white;border:none;padding:6px 14px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;">⬇ PDF</button>
+        </div>
+      </div>
+      <div id="hrs-status" style="font-size:12px;color:#76777E;min-height:18px;margin-bottom:8px;"></div>
+      <div id="hrs-grid-wrap" style="overflow-x:auto;">
+        <table id="hrs-grid" style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead id="hrs-thead"></thead>
+          <tbody id="hrs-tbody">
+            <tr><td colspan="9" style="padding:20px;text-align:center;color:#76777E;">Loading…</td></tr>
+          </tbody>
+          <tfoot id="hrs-tfoot"></tfoot>
+        </table>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:#76777E;">
+        Click a cell to edit time-in/time-out. <strong>Full day</strong> per cell, <strong>Everyone full day</strong> per column, <strong>Full week</strong> per worker. Clear a cell to mark absent. Standard day 07:00–15:30 = 8.00h.
+      </div>
+    </div>
+  </div>
+
   <!-- CERT HEALTH -->
   <div class="panel" data-panel="cert-health">
     <div class="section">
@@ -1751,6 +1783,265 @@ applyLanguage();
   // Init
   Promise.all([loadMetrics(), loadProjects()]);
   setInterval(loadMetrics, 60000);
+})();
+</script>
+
+<!-- Weekly Hours Log (payroll) — sign_in_log grid editor + CSV/PDF export. -->
+<script>
+(function() {
+  // FR-BX-001 is the only active project right now. Spec says "keep it
+  // project-aware" — when multiple active projects appear, lift this to a
+  // selector. For now, hardcoded so the cell writes have a project_code.
+  const PROJECT_CODE = 'FR-BX-001';
+  const STD_IN = '07:00';
+  const STD_OUT = '15:30';
+  const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+
+  let currentMonday = null;  // Date object
+  let currentGrid = null;    // last loaded grid response
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => (s == null ? '' : String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'));
+
+  function fmtRange(monday) {
+    const d = new Date(monday); const e = new Date(monday); e.setDate(e.getDate()+4);
+    const mo = (x) => x.toLocaleString('en-US', {month:'short'});
+    return `${mo(d)} ${d.getDate()} – ${mo(e)} ${e.getDate()}, ${e.getFullYear()}`;
+  }
+  function isoDate(d) { const z = new Date(d); z.setMinutes(z.getMinutes()-z.getTimezoneOffset()); return z.toISOString().slice(0,10); }
+  function setStatus(t, color) { const el = $('hrs-status'); if (!el) return; el.textContent = t || ''; el.style.color = color || '#76777E'; }
+
+  async function loadGrid(monday) {
+    setStatus('Loading…', '#76777E');
+    const wstart = monday ? isoDate(monday) : '';
+    const url = '/api/payroll/hours' + (wstart ? `?week_start=${wstart}` : '');
+    try {
+      const r = await fetch(url);
+      const j = await r.json();
+      if (!r.ok) { setStatus('Failed: ' + (j.error || r.status), '#B11E2E'); return; }
+      currentGrid = j.data || j;
+      currentMonday = new Date(currentGrid.week_start + 'T00:00:00');
+      $('hrs-range').textContent = fmtRange(currentMonday);
+      renderGrid(currentGrid);
+      setStatus('', '#76777E');
+    } catch (e) {
+      setStatus('Network error', '#B11E2E');
+    }
+  }
+
+  function renderGrid(g) {
+    // Header
+    let headHtml = '<tr>'
+      + '<th style="text-align:left;padding:8px 10px;background:#1a1a1a;color:white;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;">Worker</th>'
+      + '<th style="padding:8px 6px;background:#1a1a1a;color:white;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;">Trade</th>';
+    g.dates.forEach((d, i) => {
+      const dt = new Date(d + 'T00:00:00');
+      headHtml += `<th style="padding:8px 6px;background:#B11E2E;color:white;font-size:11px;text-align:center;">
+        <div style="font-weight:700;">${DAY_LABELS[i]} ${dt.getDate()}</div>
+        <button type="button" data-hrs-col-full="${esc(d)}" title="Everyone full day"
+          style="margin-top:4px;background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.4);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;">All full day</button>
+      </th>`;
+    });
+    headHtml += '<th style="padding:8px 8px;background:#1a1a1a;color:white;font-size:11px;text-align:center;text-transform:uppercase;letter-spacing:0.05em;">Week</th>';
+    headHtml += '</tr>';
+    $('hrs-thead').innerHTML = headHtml;
+
+    // Body
+    const rows = g.workers.map(w => {
+      const cells = w.days.map(day => {
+        const cls = day.has_entry ? '' : ' hrs-blank';
+        const hours = day.has_entry ? day.hours.toFixed(2) : '';
+        const times = day.has_entry ? `${esc(day.time_in||'')}–${esc(day.time_out||'')}` : '';
+        const multi = (day.row_count||1) > 1 ? `<span style="font-size:9px;background:#eee;padding:0 4px;border-radius:3px;margin-left:3px;">×${day.row_count}</span>` : '';
+        return `<td class="hrs-cell${cls}" data-emp="${esc(w.employee_id)}" data-date="${esc(day.date)}" data-id="${esc(day.sign_in_id || '')}"
+          data-in="${esc(day.time_in||'')}" data-out="${esc(day.time_out||'')}"
+          style="border:1px solid #E8E4DD;padding:6px 8px;text-align:center;cursor:pointer;${day.has_entry?'background:#fffefb':'background:#fafafa;color:#bbb'}">
+          <div style="font-weight:700;font-size:13px;">${hours||'—'}${multi}</div>
+          <div style="font-size:9px;color:#76777E;">${times}</div>
+        </td>`;
+      }).join('');
+      return `<tr>
+        <td style="border:1px solid #E8E4DD;padding:6px 10px;">
+          <div style="font-weight:700;font-size:12px;">${esc(w.name)}</div>
+          <div style="font-size:9px;color:#76777E;font-family:monospace;">${esc(w.employee_id)}
+            <button type="button" data-hrs-row-full="${esc(w.employee_id)}" title="Fill Mon-Fri full days for this worker"
+              style="margin-left:6px;background:#f1eee8;color:#14161C;border:1px solid #C8C0B4;font-size:9px;padding:1px 5px;border-radius:3px;cursor:pointer;">Full week</button>
+          </div>
+        </td>
+        <td style="border:1px solid #E8E4DD;padding:6px 8px;font-size:11px;color:#76777E;">${esc(w.trade||'')}</td>
+        ${cells}
+        <td style="border:1px solid #E8E4DD;padding:6px 10px;text-align:center;font-weight:700;background:#fef5f6;font-size:13px;">
+          ${w.weekly_total.toFixed(2)}
+        </td>
+      </tr>`;
+    }).join('');
+    $('hrs-tbody').innerHTML = rows || '<tr><td colspan="9" style="padding:20px;text-align:center;color:#76777E;">No active workers.</td></tr>';
+
+    // Footer
+    let footHtml = '<tr>'
+      + '<td style="border:1px solid #E8E4DD;padding:8px 10px;text-align:right;font-weight:700;background:#f1eee8;" colspan="2">DAILY TOTALS</td>';
+    g.totals_by_day.forEach(t => {
+      footHtml += `<td style="border:1px solid #E8E4DD;padding:8px;text-align:center;font-weight:700;background:#f1eee8;">${t.toFixed(2)}</td>`;
+    });
+    footHtml += `<td style="border:1px solid #E8E4DD;padding:8px;text-align:center;font-weight:700;background:#B11E2E;color:white;">${g.grand_total.toFixed(2)}</td>`;
+    footHtml += '</tr>';
+    $('hrs-tfoot').innerHTML = footHtml;
+  }
+
+  // Cell editor: replace the cell's innerHTML with an inline edit form.
+  function openCellEditor(td) {
+    const empId = td.dataset.emp;
+    const dateStr = td.dataset.date;
+    const sid = td.dataset.id;
+    const tin = td.dataset.in || STD_IN;
+    const tout = td.dataset.out || STD_OUT;
+    td.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:3px;align-items:stretch;">
+        <input type="time" class="hrs-edit-in" value="${esc(tin)}" style="font-size:10px;padding:2px;width:100%;">
+        <input type="time" class="hrs-edit-out" value="${esc(tout)}" style="font-size:10px;padding:2px;width:100%;">
+        <div style="display:flex;gap:2px;">
+          <button type="button" class="hrs-edit-save" style="flex:1;background:#B11E2E;color:white;border:none;font-size:9px;padding:3px 4px;border-radius:2px;cursor:pointer;">Save</button>
+          <button type="button" class="hrs-edit-full" title="07:00–15:30" style="background:#14161C;color:white;border:none;font-size:9px;padding:3px 4px;border-radius:2px;cursor:pointer;">8h</button>
+          <button type="button" class="hrs-edit-clear" title="Mark absent" style="background:white;color:#B11E2E;border:1px solid #B11E2E;font-size:9px;padding:2px 4px;border-radius:2px;cursor:pointer;">×</button>
+          <button type="button" class="hrs-edit-cancel" title="Cancel" style="background:white;color:#76777E;border:1px solid #ccc;font-size:9px;padding:2px 4px;border-radius:2px;cursor:pointer;">↶</button>
+        </div>
+      </div>`;
+    td.style.cursor = 'default';
+    const ti = td.querySelector('.hrs-edit-in');
+    const to = td.querySelector('.hrs-edit-out');
+    td.querySelector('.hrs-edit-full').addEventListener('click', (e) => { e.stopPropagation(); ti.value = STD_IN; to.value = STD_OUT; });
+    td.querySelector('.hrs-edit-save').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await saveCell(empId, dateStr, sid, ti.value, to.value);
+    });
+    td.querySelector('.hrs-edit-clear').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await clearCell(sid);
+    });
+    td.querySelector('.hrs-edit-cancel').addEventListener('click', (e) => { e.stopPropagation(); loadGrid(currentMonday); });
+  }
+
+  async function saveCell(empId, dateStr, sid, tin, tout) {
+    if (!tin || !tout) { setStatus('Both times required', '#B11E2E'); return; }
+    if (tout < tin) { setStatus('Time-out is before time-in', '#B11E2E'); return; }
+    try {
+      let r;
+      if (sid && sid !== '') {
+        r = await fetch('/api/sign-ins/' + sid, {
+          method:'PUT', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({time_in: tin, time_out: tout})
+        });
+      } else {
+        r = await fetch('/api/sign-ins', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({employee_id: empId, project_code: PROJECT_CODE,
+                                date: dateStr, time_in: tin, time_out: tout})
+        });
+        // 409: a row already exists (probably from concurrent edit). Fetch latest grid.
+        if (r.status === 409) { setStatus('Already had an entry — refreshed', '#B68838'); await loadGrid(currentMonday); return; }
+      }
+      if (!r.ok) { const j = await r.json().catch(()=>({})); setStatus('Save failed: ' + (j.error || r.status), '#B11E2E'); return; }
+      await loadGrid(currentMonday);
+    } catch (e) { setStatus('Network error', '#B11E2E'); }
+  }
+
+  async function clearCell(sid) {
+    if (!sid) { loadGrid(currentMonday); return; }
+    try {
+      const r = await fetch('/api/sign-ins/' + sid, {method:'DELETE'});
+      if (!r.ok && r.status !== 404) { setStatus('Clear failed: ' + r.status, '#B11E2E'); return; }
+      await loadGrid(currentMonday);
+    } catch (e) { setStatus('Network error', '#B11E2E'); }
+  }
+
+  // Bulk: everyone full day on a specific date
+  async function fillColumnFullDay(dateStr) {
+    if (!currentGrid) return;
+    setStatus('Filling column…', '#76777E');
+    const ops = currentGrid.workers.map(w => {
+      const day = w.days.find(d => d.date === dateStr);
+      if (!day) return Promise.resolve();
+      if (day.has_entry && day.sign_in_id) {
+        return fetch('/api/sign-ins/' + day.sign_in_id, {
+          method:'PUT', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({time_in: STD_IN, time_out: STD_OUT})
+        });
+      } else {
+        return fetch('/api/sign-ins', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({employee_id: w.employee_id, project_code: PROJECT_CODE,
+                                date: dateStr, time_in: STD_IN, time_out: STD_OUT})
+        });
+      }
+    });
+    await Promise.allSettled(ops);
+    await loadGrid(currentMonday);
+  }
+
+  // Bulk: full Mon-Fri week for a specific worker
+  async function fillRowFullWeek(empId) {
+    if (!currentGrid) return;
+    setStatus('Filling week…', '#76777E');
+    const w = currentGrid.workers.find(x => x.employee_id === empId);
+    if (!w) return;
+    const ops = w.days.map(day => {
+      if (day.has_entry && day.sign_in_id) {
+        return fetch('/api/sign-ins/' + day.sign_in_id, {
+          method:'PUT', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({time_in: STD_IN, time_out: STD_OUT})
+        });
+      } else {
+        return fetch('/api/sign-ins', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({employee_id: empId, project_code: PROJECT_CODE,
+                                date: day.date, time_in: STD_IN, time_out: STD_OUT})
+        });
+      }
+    });
+    await Promise.allSettled(ops);
+    await loadGrid(currentMonday);
+  }
+
+  // Event delegation: cell clicks + bulk-action buttons
+  document.addEventListener('click', (ev) => {
+    // Edit a cell
+    const cell = ev.target.closest('.hrs-cell');
+    if (cell && !ev.target.closest('.hrs-edit-save, .hrs-edit-full, .hrs-edit-clear, .hrs-edit-cancel, .hrs-edit-in, .hrs-edit-out')) {
+      // Don't re-open the editor if it's already open in this cell
+      if (cell.querySelector('.hrs-edit-save')) return;
+      openCellEditor(cell); return;
+    }
+    // Everyone full day
+    const colBtn = ev.target.closest('[data-hrs-col-full]');
+    if (colBtn) { ev.stopPropagation(); fillColumnFullDay(colBtn.dataset.hrsColFull); return; }
+    // Full week
+    const rowBtn = ev.target.closest('[data-hrs-row-full]');
+    if (rowBtn) { ev.stopPropagation(); fillRowFullWeek(rowBtn.dataset.hrsRowFull); return; }
+  });
+
+  // Week navigation
+  $('hrs-prev').addEventListener('click', () => {
+    if (!currentMonday) return;
+    const d = new Date(currentMonday); d.setDate(d.getDate()-7); loadGrid(d);
+  });
+  $('hrs-next').addEventListener('click', () => {
+    if (!currentMonday) return;
+    const d = new Date(currentMonday); d.setDate(d.getDate()+7); loadGrid(d);
+  });
+
+  // Downloads
+  $('hrs-csv').addEventListener('click', () => {
+    if (!currentMonday) return;
+    window.location.href = '/api/payroll/hours.csv?week_start=' + isoDate(currentMonday);
+  });
+  $('hrs-pdf').addEventListener('click', () => {
+    if (!currentMonday) return;
+    window.location.href = '/api/payroll/hours.pdf?week_start=' + isoDate(currentMonday);
+  });
+
+  // Init: load the default week (server resolves to last_completed_week)
+  loadGrid(null);
 })();
 </script>
 </body>
