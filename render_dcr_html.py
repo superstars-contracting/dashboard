@@ -64,9 +64,19 @@ class DCRHTMLRenderer:
     <meta charset="UTF-8">
     <title>{title}</title>
     <style>
+        /* Page rules used by the headless-Edge PDF export. Harmless on screen. */
+        @page {{ size: Letter; margin: 0.6in 0.5in; }}
         :root {{ color-scheme: light; }}
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{ font-family: 'DM Sans', -apple-system, sans-serif; background: {self.CREAM}; padding: 40px 20px; }}
+        /* Tighter PDF: drop the cream page background and the heavy padding,
+           keep the inner content card so the letterhead reads as a header. */
+        @media print {{
+            body {{ background: white; padding: 0; }}
+            .content {{ box-shadow: none; padding: 24px 32px; max-width: none; }}
+            table {{ page-break-inside: avoid; }}
+            tr {{ page-break-inside: avoid; }}
+        }}
         .header {{ background: #1a1a1a; color: {self.CREAM}; padding: 20px 40px; text-align: center; font-size: 28px; font-weight: bold; margin-bottom: 30px; }}
         .header-star {{ color: {self.BRAND_RED}; }}
         .content {{ max-width: 900px; margin: 0 auto; background: white; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}

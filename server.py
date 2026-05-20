@@ -997,6 +997,32 @@ def _issue_one_dcr(conn, project_code, report_date, audience, seq):
     tmp_file.replace(out_file)  # atomic on POSIX and Windows
     rel = out_file.relative_to(SCRIPT_DIR).as_posix()
     html_url = f"/files/{rel}"
+
+    # PDF render: internal audience only (the "full record" copy that gets
+    # archived). Client audience stays HTML-only — it's the consumer-facing
+    # progress report, not the official record. PDF failure does NOT fail
+    # the issuance — HTML is the source of truth; the PDF can be regenerated
+    # from it via pdf_export.py. Warnings surface in the response so the UI
+    # can show "DCR issued, PDF render failed" instead of pretending it's OK.
+    pdf_path = None
+    pdf_url = None
+    pdf_status = None
+    if audience == 'internal':
+        from pdf_export import render_html_to_pdf, PDFExportError
+        pdf_target = out_dir / f"{audience}.pdf"
+        try:
+            pdf_status = render_html_to_pdf(out_file, pdf_target)
+        except PDFExportError as e:
+            pdf_status = {"ok": False, "error": str(e)}
+            logging.warning(f"DCR {report_id}: Edge not installed, PDF skipped: {e}")
+        if pdf_status.get('ok'):
+            pdf_path = pdf_target
+            pdf_url = f"/files/{pdf_target.relative_to(SCRIPT_DIR).as_posix()}"
+        else:
+            logging.warning(
+                f"DCR {report_id}: PDF render failed — {pdf_status.get('error')}"
+            )
+
     existing = conn.execute(
         "SELECT id FROM report_index WHERE project_code = ? AND report_type = ? AND report_id = ?",
         (project_code, 'DCR', report_id)
@@ -1012,7 +1038,8 @@ def _issue_one_dcr(conn, project_code, report_date, audience, seq):
             (report_date, project_code, 'DCR', report_id, 'issued', seq)
         )
     return {"report_id": report_id, "audience": audience, "html_url": html_url,
-            "html_path": out_file, "display_id": display_id, "sequence": seq}
+            "html_path": out_file, "display_id": display_id, "sequence": seq,
+            "pdf_path": pdf_path, "pdf_url": pdf_url, "pdf_status": pdf_status}
 
 
 @app.route('/api/projects/<project_code>/daily/<report_date>/issue', methods=['POST'])
@@ -1081,6 +1108,11 @@ def issue_dcr(project_code, report_date):
                 "client_report_id": client["report_id"],
                 "display_id": display_id,
                 "sequence": seq,
+                # PDF render runs on internal only; surface its status so the
+                # UI can show a "PDF render failed" warning even when HTML
+                # issuance succeeded.
+                "pdf_url": internal.get("pdf_url"),
+                "pdf_status": internal.get("pdf_status"),
             }), 201
         else:
             result = _issue_one_dcr(conn, project_code, report_date, audience, seq)
@@ -1094,6 +1126,8 @@ def issue_dcr(project_code, report_date):
                 "display_id": display_id,
                 "sequence": seq,
                 "generated_at": generated_at,
+                "pdf_url": result.get("pdf_url"),
+                "pdf_status": result.get("pdf_status"),
             }), 201
     except (KeyError, ValueError) as e:
         try: conn.rollback()
