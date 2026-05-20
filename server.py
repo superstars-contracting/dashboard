@@ -151,37 +151,65 @@ def validate_project_exists(conn, project_code):
 
 @app.route('/api/sign-ins', methods=['POST'])
 def create_sign_in():
-    """Create new sign-in record"""
+    """Create a sign-in row. Two supported callers:
+    - worker-app live flow (via /api/worker-sign-in, not this route): time_in
+      only, time_out set later by sign-out
+    - DCR form's backdated manual labor entry: passes BOTH time_in + time_out
+      with an arbitrary date (the operator entering a past day's roster)
+
+    Validates: employee + project exist, time_out >= time_in when both present,
+    and rejects duplicates for the same (employee_id, date, project_code) with
+    409 — silent duplicates double-count hours in the DCR labor aggregator, so
+    the caller must explicitly delete the existing row before re-adding.
+    """
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         employee_id = data.get('employee_id')
         project_code = data.get('project_code')
         date_str = data.get('date', date.today().isoformat())
         time_in = data.get('time_in')
-        
+        time_out = data.get('time_out')  # optional — backdated entry supplies both
+
+        if not employee_id or not project_code or not date_str or not time_in:
+            return jsonify({"error": "employee_id, project_code, date, time_in are required"}), 400
+        # HH:MM string compare is correct for same-day shifts (the DCR labor
+        # path doesn't model overnight). Reject inverted ranges explicitly so
+        # they don't silently render as negative hours later.
+        if time_out and time_out < time_in:
+            return jsonify({"error": f"time_out ({time_out}) is before time_in ({time_in})"}), 400
+
         conn = db()
-        
-        # Validate FKs
         if not validate_employee_exists(conn, employee_id):
             conn.close()
             return jsonify({"error": "Employee not found"}), 400
         if not validate_project_exists(conn, project_code):
             conn.close()
             return jsonify({"error": "Project not found"}), 400
-        
-        # Insert
+
+        existing = conn.execute(
+            "SELECT id, time_in, time_out FROM sign_in_log "
+            "WHERE employee_id = ? AND date = ? AND project_code = ?",
+            (employee_id, date_str, project_code)
+        ).fetchone()
+        if existing:
+            conn.close()
+            return jsonify({
+                "error": "Sign-in already exists for this worker on this date",
+                "existing_id": existing["id"],
+                "existing_time_in": existing["time_in"],
+                "existing_time_out": existing["time_out"],
+            }), 409
+
+        now = datetime.now().isoformat()
         conn.execute(
-            "INSERT INTO sign_in_log (date, employee_id, project_code, time_in, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (date_str, employee_id, project_code, time_in, datetime.now().isoformat(), datetime.now().isoformat())
+            "INSERT INTO sign_in_log (date, employee_id, project_code, time_in, time_out, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (date_str, employee_id, project_code, time_in, time_out, now, now)
         )
         conn.commit()
-        
-        # Fetch created record
         new_id = conn.execute("SELECT last_insert_rowid() as id").fetchone()['id']
         row = conn.execute("SELECT * FROM sign_in_log WHERE id = ?", (new_id,)).fetchone()
         conn.close()
-        
         return response_wrapper(dict(row)), 201
     except Exception as e:
         logging.error(f"POST /api/sign-ins: {str(e)}")

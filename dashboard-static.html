@@ -1105,7 +1105,7 @@
             <div id="dcr-weather" style="background:white;border:1px solid #E8E4DD;border-radius:4px;padding:20px;"></div>
           </div>
 
-          <!-- 3. LABOR (auto from sign_in_log) -->
+          <!-- 3. LABOR (auto from sign_in_log + manual backdated entry) -->
           <div style="margin-bottom:24px;">
             <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">3. Labor (Sign-Ins)</h3>
             <div id="dcr-labor-summary" style="margin-bottom:8px;font-size:13px;color:#76777E;"></div>
@@ -1116,6 +1116,22 @@
                 </thead>
                 <tbody id="dcr-labor-tbody"></tbody>
               </table>
+            </div>
+            <!-- Backdated manual entry: workers signed in before the app went
+                 live (or any day they forgot to use it). Writes to sign_in_log
+                 with the DCR's currently-selected date so the labor section
+                 picks it up automatically on next refresh. -->
+            <div style="margin-top:14px;padding:12px 14px;background:#FAF8F3;border:1px dashed #C8C0B4;border-radius:4px;">
+              <div style="font-size:11px;font-weight:600;color:#76777E;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">+ Add worker manually (for backdated DCRs or missed sign-ins)</div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <select id="dcr-labor-add-worker" style="flex:2;min-width:200px;padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
+                  <option value="">— Select worker —</option>
+                </select>
+                <input type="time" id="dcr-labor-add-in" value="07:00" style="padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
+                <input type="time" id="dcr-labor-add-out" value="15:30" style="padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
+                <button type="button" id="dcr-labor-add-btn" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:6px 14px;border:none;border-radius:4px;background:#14161C;color:white;cursor:pointer;">Add</button>
+                <span id="dcr-labor-add-status" style="font-size:11px;color:#76777E;"></span>
+              </div>
             </div>
           </div>
 
@@ -1389,6 +1405,7 @@
 
           const WIDTHS = {sm:'110px', md:'160px', lg:'260px', full:'100%'};
           let toolboxLibrary = null;
+          let projectWorkers = null;  // populated once for the manual-labor dropdown
           // Track in-flight saveRow() promises so issueDcr() can await them
           // before triggering the aggregator (otherwise the aggregator runs
           // before all rows are committed and the DCR is missing data).
@@ -1693,6 +1710,12 @@
               const issueStatus = document.getElementById('dcr-issue-status');
               if (issueStatus) { issueStatus.textContent = ''; issueStatus.style.color = '#76777E'; }
             }
+            // Reset the manual-labor-add controls so a fresh DCR doesn't show
+            // stale "Added ✓" status or a previously-picked worker.
+            const laborWorker = document.getElementById('dcr-labor-add-worker');
+            if (laborWorker) laborWorker.value = '';
+            const laborStatus = document.getElementById('dcr-labor-add-status');
+            if (laborStatus) { laborStatus.textContent = ''; laborStatus.style.color = '#76777E'; }
             // Issued banner — caller decides (issueDcr success keeps it visible
             // briefly so the operator sees the confirmation).
             if (!opts.preserveBanner) {
@@ -1834,6 +1857,90 @@
             if (btn) btn.addEventListener('click', () => issueDcr());
           }
 
+          // ---- Manual labor entry (backdated DCRs) ----
+
+          async function loadProjectWorkers() {
+            // One-shot fetch; the assigned-worker list rarely changes during a
+            // session, so we cache. If the operator just added a worker in the
+            // Workforce tab and wants them in the dropdown without a page
+            // reload, they can hit the Refresh button next to the date picker
+            // (which triggers loadDcr) — for now we don't force-refetch.
+            try {
+              const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/workers').then(r => r.json());
+              projectWorkers = (resp && resp.data) || [];
+            } catch (e) {
+              console.warn('[DCR] loadProjectWorkers failed:', e);
+              projectWorkers = [];
+            }
+            const sel = document.getElementById('dcr-labor-add-worker');
+            if (!sel) return;
+            sel.innerHTML = '<option value="">— Select worker —</option>';
+            for (const w of projectWorkers) {
+              const opt = document.createElement('option');
+              opt.value = w.employee_id;
+              opt.textContent = (w.name || w.employee_id) + ' (' + w.employee_id + ')';
+              sel.appendChild(opt);
+            }
+          }
+
+          function setupLaborManualAdd() {
+            const btn = document.getElementById('dcr-labor-add-btn');
+            if (!btn) return;
+            btn.addEventListener('click', async () => {
+              const sel = document.getElementById('dcr-labor-add-worker');
+              const inEl = document.getElementById('dcr-labor-add-in');
+              const outEl = document.getElementById('dcr-labor-add-out');
+              const statusEl = document.getElementById('dcr-labor-add-status');
+              const setStatus = (txt, color) => {
+                if (!statusEl) return;
+                statusEl.textContent = txt || '';
+                statusEl.style.color = color || '#76777E';
+              };
+
+              const employeeId = sel && sel.value;
+              const timeIn = inEl && inEl.value;
+              const timeOut = outEl && outEl.value;
+              const dateStr = getCurrentDate();
+
+              if (!employeeId) { setStatus('Pick a worker', '#B11E2E'); return; }
+              if (!timeIn) { setStatus('Time-in is required', '#B11E2E'); return; }
+              if (timeOut && timeOut < timeIn) { setStatus('Time-out is before time-in', '#B11E2E'); return; }
+              if (!dateStr) { setStatus('Pick a DCR date', '#B11E2E'); return; }
+
+              btn.disabled = true; setStatus('Adding…', '#76777E');
+              try {
+                const resp = await fetch('/api/sign-ins', {
+                  method: 'POST',
+                  headers: {'Content-Type': 'application/json'},
+                  body: JSON.stringify({
+                    employee_id: employeeId,
+                    project_code: PROJECT_CODE,
+                    date: dateStr,
+                    time_in: timeIn,
+                    time_out: timeOut || null,
+                  }),
+                });
+                const json = await resp.json().catch(() => ({}));
+                if (resp.status === 201) {
+                  // Reset for fast multi-add — keep times (likely same crew window),
+                  // but clear the worker pick so operator must select the next one.
+                  if (sel) sel.value = '';
+                  setStatus('Added ✓', '#2F7C57');
+                  loadDcr(dateStr);  // refresh labor table from sign_in_log
+                } else if (resp.status === 409) {
+                  setStatus('Already added for this date', '#B68838');
+                } else {
+                  setStatus('Failed: ' + (json.error || ('HTTP ' + resp.status)), '#B11E2E');
+                }
+              } catch (e) {
+                console.warn('[DCR] labor add failed:', e);
+                setStatus('Network error', '#B11E2E');
+              } finally {
+                btn.disabled = false;
+              }
+            });
+          }
+
           function cancelDcr() {
             const unsavedRows = document.querySelectorAll('.dcr-row[data-saved="0"]');
             if (unsavedRows.length > 0) {
@@ -1861,9 +1968,12 @@
             setupPhotos();
             setupIssueButtons();
             setupArchiveControls();
-            // Preload the toolbox-talk library so the entry form's dropdown
-            // is ready the moment the operator clicks "Issue New DCR".
+            setupLaborManualAdd();
+            // Preload the toolbox-talk library + assigned-workers list so the
+            // entry form's dropdowns are populated the moment the operator
+            // clicks "Issue New DCR".
             loadToolboxLibrary();
+            loadProjectWorkers();
             // Default state: archive list. Auto-fill data is fetched lazily
             // when showEntry() runs (saves a wasted call on every page load).
             showArchive();
