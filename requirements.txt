@@ -30,6 +30,12 @@ requests>=2.31
 # Email sending (used by RFI/meeting workflows)
 sendgrid>=6.11
 
+# Image handling — iPhone face photos arrive as HEIC and browsers can't
+# render them; we convert HEIC → JPEG server-side on face-photo upload.
+# Pillow is the engine; pillow-heif adds HEIC codec support to it.
+Pillow>=11.0
+pillow-heif>=1.3
+
 # ===== FUTURE / NOT YET IN CODEBASE =====
 # Uncomment when needed:
 

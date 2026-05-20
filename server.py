@@ -2867,20 +2867,50 @@ def api_employee_face_photo(employee_id):
             return jsonify({"error": "path traversal blocked"}), 400
 
         f.save(str(target_path))
+
+        # iPhones default to HEIC; browsers can't render HEIC in <img>. Convert
+        # to a sibling face.jpg so the profile thumbnail is always renderable.
+        # The HEIC original is preserved as source-of-truth; face_image_path
+        # points at the JPEG so the UI just works without conditional logic.
+        displayable_path = target_path
+        heic_conversion = None
+        if ext in {'.heic', '.heif'}:
+            try:
+                from PIL import Image
+                import pillow_heif
+                pillow_heif.register_heif_opener()
+                with Image.open(str(target_path)) as im:
+                    if im.mode != 'RGB':
+                        im = im.convert('RGB')
+                    jpeg_path = (folder / "face.jpg").resolve()
+                    im.save(str(jpeg_path), "JPEG", quality=85, optimize=True)
+                displayable_path = jpeg_path
+                heic_conversion = {"ok": True, "original": str(target_path),
+                                   "jpeg": str(jpeg_path)}
+            except Exception as e:
+                app.logger.warning(
+                    f"HEIC->JPEG conversion failed for {employee_id} "
+                    f"({target_path.name}): {e}"
+                )
+                heic_conversion = {"ok": False, "error": str(e)}
+                # Fall through: face_image_path still points at the HEIC. The
+                # UI will fail to render it but the record + file are intact.
+
         conn.execute(
             "UPDATE employees SET face_image_path = ?, updated_at = CURRENT_TIMESTAMP "
             "WHERE employee_id = ?",
-            (str(target_path), employee_id)
+            (str(displayable_path), employee_id)
         )
         conn.commit()
         conn.close()
 
-        relative = target_path.relative_to(WORKER_RECORDS_DIR.resolve())
+        relative = displayable_path.relative_to(WORKER_RECORDS_DIR.resolve())
         image_url = "/worker-files/" + str(relative).replace("\\", "/")
 
         return response_wrapper({
-            "face_image_path": str(target_path),
+            "face_image_path": str(displayable_path),
             "image_url": image_url,
+            "heic_conversion": heic_conversion,
         })
     except Exception as e:
         app.logger.error(f"POST /api/employees/{employee_id}/face-photo failed: {e}")

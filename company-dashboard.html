@@ -376,11 +376,22 @@
 
     <!-- Face Photo Section -->
     <div style="margin-bottom:24px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
         <h3 style="font-size:14px;font-weight:700;color:#14161C;text-transform:uppercase;letter-spacing:0.5px;">Face Photo</h3>
-        <button id="pp-take-face" style="background:#B11E2E;color:white;border:none;padding:8px 16px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
-          <span style="font-size:14px;">📷</span> Take ID Photo
-        </button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <!-- Desktop / secure-context path: live camera via getUserMedia.
+               Requires HTTPS (tailscale serve), won't work on plain http. -->
+          <button id="pp-take-face" style="background:#B11E2E;color:white;border:none;padding:8px 16px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+            <span style="font-size:14px;">📷</span> Take ID Photo
+          </button>
+          <!-- Mobile / file-input path: works on plain http over Tailscale
+               because it routes through the OS file/camera picker instead
+               of getUserMedia. Accepts HEIC; server converts to JPEG. -->
+          <label for="pp-upload-face" style="background:#14161C;color:white;border:none;padding:8px 16px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+            <span style="font-size:14px;">📁</span> Upload (mobile)
+          </label>
+          <input id="pp-upload-face" type="file" accept="image/*" capture="environment" style="display:none;">
+        </div>
       </div>
       <div style="background:#FAF7F1;border-radius:8px;padding:14px;display:flex;align-items:center;gap:14px;">
         <div id="pp-face-placeholder" style="width:96px;height:96px;border:2px dashed #E8E4DD;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#76777E;font-size:11px;text-align:center;flex-shrink:0;">No face photo</div>
@@ -1647,6 +1658,45 @@ applyLanguage();
   }
 
   $('#pp-take-face').addEventListener('click', () => { runFaceIntake(); });
+
+  // Mobile-friendly upload path: routes through the OS file/camera picker
+  // (capture=environment hints the rear camera on phones) so it works on
+  // plain http://<tailnet-ip>:5050 — no getUserMedia, no HTTPS required.
+  // Accepts HEIC; server converts to JPEG for the thumbnail.
+  async function runFaceUpload(file) {
+    if (!currentEmployeeId || !file) return;
+    const loader = showLoader('Uploading face photo…');
+    try {
+      const fd = new FormData();
+      fd.append('file', file, file.name || 'face.jpg');
+      const resp = await fetch('/api/employees/' + encodeURIComponent(currentEmployeeId) + '/face-photo', {
+        method: 'POST', body: fd,
+      });
+      const body = await resp.json().catch(() => ({}));
+      loader.remove();
+      if (resp.ok) {
+        const d = body.data || body;
+        renderFacePhoto(d.face_image_path);
+        const conv = d.heic_conversion;
+        const hint = (conv && conv.ok) ? ' (HEIC → JPEG)' :
+                     (conv && !conv.ok) ? ' (HEIC convert failed — original kept)' : '';
+        showToast('✓ Face photo saved' + hint, 3500);
+      } else {
+        const msg = (body && body.error) || `Upload failed (${resp.status})`;
+        alert('Face photo upload failed: ' + msg);
+      }
+    } catch (e) {
+      try { loader.remove(); } catch (_) {}
+      alert('Network error uploading face photo: ' + (e.message || String(e)));
+    }
+  }
+
+  $('#pp-upload-face').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) runFaceUpload(file);
+    // Reset so re-uploading the same file fires 'change' again
+    e.target.value = '';
+  });
 
   window.deleteDoc = async function(docId) {
     if (!confirm('Delete this document?')) return;
