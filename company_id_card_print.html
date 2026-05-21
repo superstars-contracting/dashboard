@@ -129,30 +129,33 @@
     line-height: 1.1; min-height: 4mm;
     text-align: center;
   }
+  /* Card Number + PIN — sit JUST BELOW the name's 3.5mm so they're
+     clearly legible on a printed card (#100). PIN scoped under
+     table.field-row to win the specificity over the row's mono rule. */
   .field-value.mono {
     font-family: 'Consolas', 'Menlo', monospace;
-    font-size: 3mm; letter-spacing: 0.2mm;
+    font-size: 3.3mm; letter-spacing: 0.2mm;
   }
   table.field-row { width: 100%; border-collapse: collapse; }
   table.field-row td { padding: 0; vertical-align: top; }
   table.field-row td:first-child { padding-right: 2mm; width: 50%; }
-  /* Field-row values: equal min-height + bottom-aligned content keep the
-     underlines on both columns at the same y, even when PIN is at the
-     larger marquee size. Fixes the prior expires/PIN-bar offset. */
+  /* Field-row values: equal min-height + bottom-aligned content keep
+     the underlines on both columns at the same y. */
   table.field-row .field-value {
-    font-size: 3mm;
+    font-size: 3.3mm;
     min-height: 6mm;
     display: flex;
     align-items: flex-end;
     justify-content: center;
     padding-bottom: 0.4mm;
   }
-  table.field-row .field-value.mono { font-size: 2.7mm; letter-spacing: 0.2mm; }
-  /* PIN value bumped — most-actionable info on the card (worker app login). */
-  .field-value.pin-value {
-    font-size: 5.5mm;
+  table.field-row .field-value.mono { font-size: 3.3mm; letter-spacing: 0.2mm; }
+  /* PIN — same font-size as the other mono fields (legible per #100)
+     with weight + letter-spacing for emphasis. */
+  table.field-row .field-value.pin-value {
+    font-size: 3.3mm;
     font-weight: 700;
-    letter-spacing: 0.5mm;
+    letter-spacing: 0.35mm;
     line-height: 1.05;
   }
 

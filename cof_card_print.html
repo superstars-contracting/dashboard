@@ -134,9 +134,17 @@
     line-height: 1.1; min-height: 4mm;
     text-align: center;
   }
+  /* Card Number, Expires, PIN — all sit JUST BELOW the name's 3.5mm so
+     they're clearly legible on a printed card (#100). Mono variants are
+     tracked a touch wider for digit clarity; PIN keeps its bold weight
+     for emphasis. The prior 3mm / 2.7mm / 5.5mm split read tiny on
+     print, and a CSS-specificity bug made PIN actually render at 2.7mm
+     (overridden by table.field-row .field-value.mono) — fixed by
+     scoping the pin-value rule under the same row context so it wins
+     by equal specificity + later source order. */
   .field-value.mono {
     font-family: 'Consolas', 'Menlo', monospace;
-    font-size: 3mm; letter-spacing: 0.2mm;
+    font-size: 3.3mm; letter-spacing: 0.2mm;
   }
   .field-value.expires {
     color: var(--brand-red); border-bottom-color: var(--brand-red);
@@ -144,26 +152,26 @@
   table.field-row { width: 100%; border-collapse: collapse; }
   table.field-row td { padding: 0; vertical-align: top; }
   table.field-row td:first-child { padding-right: 2mm; width: 50%; }
-  /* Field-row values: both cells use the same min-height and bottom-aligned
-     content so the underline (border-bottom) sits at the same y on both
-     columns, even when PIN is set at the larger marquee size. Without this
-     the expires-bar lifted ~3mm above the PIN-bar on issued cards. */
+  /* Field-row values: both cells use the same min-height + bottom-
+     aligned content so the underline (border-bottom) sits at the same
+     y on both columns. */
   table.field-row .field-value {
-    font-size: 3mm;
+    font-size: 3.3mm;
     min-height: 6mm;
     display: flex;
     align-items: flex-end;
     justify-content: center;
     padding-bottom: 0.4mm;
   }
-  table.field-row .field-value.mono { font-size: 2.7mm; }
-  /* PIN value gets a marquee font bump — it's the worker's most-actionable
-     piece of info on the card (their app login). Height matches the row's
-     min-height so the underline aligns with the paired cell. */
-  .field-value.pin-value {
-    font-size: 5.5mm;
+  table.field-row .field-value.mono { font-size: 3.3mm; }
+  /* PIN — scoped under table.field-row to win the specificity over
+     table.field-row .field-value.mono. Same font-size as the other two
+     mono fields (clearly legible per #100), with weight + letter-spacing
+     for visual emphasis since PIN is the worker's actionable login. */
+  table.field-row .field-value.pin-value {
+    font-size: 3.3mm;
     font-weight: 700;
-    letter-spacing: 0.5mm;
+    letter-spacing: 0.35mm;
     line-height: 1.05;
   }
 
