@@ -2358,6 +2358,22 @@ document.querySelectorAll('.nav-link').forEach(link => {
     return `<span style="background:${color};color:white;font-size:10px;padding:2px 8px;border-radius:99px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">${text}</span>`;
   }
 
+  // Phone formatter — mirrors the helper on company-dashboard.html. Stored
+  // values are raw digits / any-format text; UI surfaces format consistently
+  // as XXX-XXX-XXXX. Inlined rather than shared (separate pages, separate
+  // IIFEs) so each surface is self-contained.
+  function formatPhone(raw) {
+    if (!raw) return '—';
+    const digits = String(raw).replace(/\D/g, '');
+    if (digits.length === 10) {
+      return digits.slice(0,3) + '-' + digits.slice(3,6) + '-' + digits.slice(6);
+    }
+    if (digits.length === 11 && digits[0] === '1') {
+      return digits.slice(1,4) + '-' + digits.slice(4,7) + '-' + digits.slice(7);
+    }
+    return String(raw);
+  }
+
   async function loadRoster() {
     try {
       const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/workers').then(r => r.json());
@@ -2380,7 +2396,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
             <td style="padding:10px 8px;font-weight:600;">${r.name || '—'}</td>
             <td style="padding:10px 8px;">${r.trade || '—'}</td>
             <td style="padding:10px 8px;font-size:11px;text-transform:uppercase;color:#76777E;">${(r.language || '—').toUpperCase().slice(0,2)}</td>
-            <td style="padding:10px 8px;font-family:monospace;font-size:11px;">${r.phone || '—'}</td>
+            <td style="padding:10px 8px;font-family:monospace;font-size:11px;">${formatPhone(r.phone)}</td>
             <td style="padding:10px 8px;text-align:center;">${r.doc_count}</td>
             <td style="padding:10px 8px;text-align:center;">${r.cert_count}</td>
             <td style="padding:10px 8px;text-align:center;">${health}</td>

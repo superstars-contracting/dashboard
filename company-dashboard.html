@@ -756,6 +756,25 @@ applyLanguage();
   const $ = sel => document.querySelector(sel);
   const $$ = sel => document.querySelectorAll(sel);
 
+  // Single display-side phone formatter: stored values are raw digits (or
+  // any-format text from the edit form); UI surfaces format consistently as
+  // XXX-XXX-XXXX. Server-side PII redaction in logs is untouched — this is
+  // purely the operator-facing display path. Reused across the workforce
+  // table cell, the profile slide-in, and the emergency-contact line.
+  function formatPhone(raw) {
+    if (!raw) return '—';
+    const digits = String(raw).replace(/\D/g, '');
+    if (digits.length === 10) {
+      return digits.slice(0,3) + '-' + digits.slice(3,6) + '-' + digits.slice(6);
+    }
+    if (digits.length === 11 && digits[0] === '1') {
+      // Strip the leading country code for the canonical 10-digit shape.
+      return digits.slice(1,4) + '-' + digits.slice(4,7) + '-' + digits.slice(7);
+    }
+    // Unknown shape — show as-is rather than mangle (e.g. extensions, intl).
+    return String(raw);
+  }
+
   // ===== Security: escape user-provided strings before injecting into innerHTML =====
   function esc(s) {
     if (s == null) return '';
@@ -919,7 +938,7 @@ applyLanguage();
           <td style="font-weight:600;">${esc(r.name || '—')}</td>
           <td>${esc(r.trade || '—')}</td>
           <td style="font-size:11px;text-transform:uppercase;color:#76777E;">${esc((r.language || '—').toUpperCase().slice(0,2))}</td>
-          <td style="font-family:monospace;font-size:11px;">${esc(r.phone || '—')}</td>
+          <td style="font-family:monospace;font-size:11px;">${esc(formatPhone(r.phone))}</td>
           <td style="text-align:center;">${r.doc_count}</td>
           <td style="text-align:center;">${r.cert_count}</td>
           <td style="text-align:center;">${health}</td>
@@ -1140,9 +1159,9 @@ applyLanguage();
       $('#pp-name').textContent = e.name || '—';
       $('#pp-trade').textContent = e.trade || '—';
       $('#pp-lang').textContent = (e.language || '—').toUpperCase();
-      $('#pp-phone').textContent = e.phone || '—';
+      $('#pp-phone').textContent = formatPhone(e.phone);
       $('#pp-dob').textContent = e.dob || '—';
-      $('#pp-ec').textContent = (e.emergency_contact_name || '—') + (e.emergency_contact_phone ? ' · ' + e.emergency_contact_phone : '');
+      $('#pp-ec').textContent = (e.emergency_contact_name || '—') + (e.emergency_contact_phone ? ' · ' + formatPhone(e.emergency_contact_phone) : '');
       $('#pp-hire').textContent = e.hire_date || '—';
 
       // Documents
