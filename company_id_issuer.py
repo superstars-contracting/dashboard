@@ -188,7 +188,11 @@ def issue_company_id(employee_id, issued_by, today_override=None):
     ).fetchone()
     if not emp:
         conn.close()
-        raise RuntimeError(f"Employee not found: {employee_id}")
+        # Don't echo the internal employee_id back — per CLAUDE.md the
+        # operator only ever sees worker_id (W-####). Since this branch
+        # means the employee_id didn't resolve, there's no W-#### to
+        # report; just say so.
+        raise RuntimeError("Worker not found.")
     face_path = emp["face_image_path"]
 
     revision = _next_revision(conn, employee_id)

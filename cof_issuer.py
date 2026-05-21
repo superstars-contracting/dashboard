@@ -298,14 +298,17 @@ def issue_cof(employee_id, rigger_id=None, project_code=None, today_override=Non
     Raises RuntimeError if the employee fails the prerequisite check.
     Returns the new card row as a dict.
     """
+    from worker_id import worker_id_for_display
     eligible, reason = has_valid_prerequisite(employee_id)
     if not eligible:
-        raise RuntimeError(f"Cannot issue CoF for {employee_id}: {reason}")
+        wid = worker_id_for_display(employee_id) or "(unknown worker)"
+        raise RuntimeError(f"Cannot issue CoF for {wid}: {reason}")
 
     expiry = calculate_cof_expiry(employee_id)
     if not expiry:
+        wid = worker_id_for_display(employee_id) or "(unknown worker)"
         raise RuntimeError(
-            f"Cannot calculate expiry for {employee_id}: no certifications with expiration dates."
+            f"Cannot calculate expiry for {wid}: no certifications with expiration dates."
         )
 
     issued_date = (today_override or date.today()).isoformat() if not isinstance(today_override, str) else today_override

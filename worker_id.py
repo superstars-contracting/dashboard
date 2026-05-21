@@ -15,6 +15,40 @@ Distinct from the internal employee_id (E-#####) primary key: that one
 is used by foreign keys (sign_in_log, project_assignments, certifications,
 etc.) and stays the canonical join key. worker_id is for humans.
 """
+import sqlite3
+from pathlib import Path
+
+_DB_PATH = Path(__file__).resolve().parent / "superstars.db"
+
+
+def worker_id_for_display(employee_id):
+    """Resolve an employee_id (E-#####) to the human-facing W-#### for
+    use in operator-facing error/warning messages. Returns the W-####
+    string if found, else None — callers should phrase the message so
+    they NEVER echo the E-##### back to the operator (per CLAUDE.md
+    terminology rule: nothing user-facing shows E-).
+
+    Opens its own short-lived read-only connection so callers don't need
+    to thread a conn into error-handling branches that may run before a
+    conn is open."""
+    if not employee_id:
+        return None
+    try:
+        conn = sqlite3.connect(str(_DB_PATH), timeout=10.0)
+    except sqlite3.Error:
+        return None
+    try:
+        row = conn.execute(
+            "SELECT worker_id FROM employees WHERE employee_id = ?",
+            (employee_id,)
+        ).fetchone()
+    except sqlite3.Error:
+        return None
+    finally:
+        conn.close()
+    if not row:
+        return None
+    return row[0] or None
 
 
 def next_worker_id_sequence(conn):

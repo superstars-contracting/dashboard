@@ -133,7 +133,10 @@ def aggregate_dcr(project_code, date_str, audience='internal'):
         r = dict(r)
         emp_id = r.get('employee_id')
         if emp_id and not r.get('emp_name'):
-            warnings.append(f"VAL-005: sign_in row {i}: unknown employee_id {emp_id}")
+            # Don't surface the orphan employee_id — the operator only
+            # sees worker_ids (W-####), and this row's id didn't resolve
+            # to one. Row number is enough to locate the bad sign_in.
+            warnings.append(f"VAL-005: sign_in row {i}: unknown worker reference")
         hours = _compute_hours(r.get('time_in'), r.get('time_out'))
         if hours is not None:
             if not (0 <= hours <= 24):
