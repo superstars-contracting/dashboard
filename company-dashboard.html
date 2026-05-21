@@ -460,6 +460,14 @@
           Used for verification on the project dashboard roster and the CoF card.
         </div>
       </div>
+      <!-- Section-level Save/Cancel — visible only while a staged change is pending
+           (Take / Upload / Remove update an in-memory preview; the single commit
+           point is this Save). Matches the cert/doc 'explicit save + toast' flow. -->
+      <div id="pp-face-actions" style="display:none;justify-content:flex-end;align-items:center;gap:10px;margin-top:10px;">
+        <span id="pp-face-pending-hint" style="font-size:11px;color:#76777E;font-style:italic;">Unsaved changes</span>
+        <button id="pp-face-cancel" style="background:none;border:1px solid #E8E4DD;color:#76777E;padding:8px 16px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;">Cancel</button>
+        <button id="pp-face-save" style="background:#B11E2E;color:white;border:none;padding:8px 18px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;">Save</button>
+      </div>
     </div>
 
     <!-- Documents Section -->
@@ -1169,6 +1177,11 @@ applyLanguage();
     currentEmployeeId = null;
     currentProfile = null;
     exitEditMode();  // Defensive — make sure the next open doesn't inherit edit state
+    // Discard any staged-but-not-saved face-photo change on close.
+    if (typeof clearFacePending === 'function') {
+      clearFacePending();
+      currentFacePath = null;
+    }
   }
   $('#pp-close').addEventListener('click', closeProfile);
   ppBg.addEventListener('click', closeProfile);
@@ -1518,32 +1531,90 @@ applyLanguage();
     </div>`;
   }
 
-  function renderFacePhoto(facePath) {
+  // ---- Face photo: deferred (staged) Save model ----
+  // Take / Upload / Remove update an in-memory `facePending` and re-render the
+  // FACE PHOTO panel as a *preview* of that pending state. Nothing is written
+  // to disk or DB until the section-level Save commits — at which point one
+  // POST (set) or one DELETE (remove) runs, the panel re-renders from the
+  // current record with the ?v=Date.now() cache-bust, and a "Face photo
+  // saved" toast confirms. Cancel discards the staged change and restores
+  // the current saved view. Single commit point per edit.
+  let facePending = null;       // null | {kind:'set', blob, previewUrl} | {kind:'remove'}
+  let currentFacePath = null;   // last-known server-side face_image_path (post-Save or initial load)
+
+  function clearFacePending() {
+    if (facePending && facePending.previewUrl && facePending.previewUrl.startsWith('blob:')) {
+      try { URL.revokeObjectURL(facePending.previewUrl); } catch (_) {}
+    }
+    facePending = null;
+  }
+
+  function applyFacePhotoUI() {
     const img = $('#pp-face-img');
     const ph = $('#pp-face-placeholder');
     const remove = $('#pp-remove-face');
-    function showPlaceholder() {
-      // Force the browser to drop the prior image entirely so Remove
-      // visibly clears the panel (not just the underlying record).
+    const actions = $('#pp-face-actions');
+
+    // 1) PENDING SET — show the staged image from the in-memory blob URL.
+    if (facePending && facePending.kind === 'set') {
+      img.src = facePending.previewUrl;
+      img.style.display = 'block';
+      img.onclick = null;  // staged blob has no /worker-files URL for the lightbox yet
+      ph.style.display = 'none';
+      if (remove) remove.style.display = 'inline-flex';
+      if (actions) actions.style.display = 'flex';
+      return;
+    }
+    // 2) PENDING REMOVE — show the placeholder; Save will commit the delete.
+    if (facePending && facePending.kind === 'remove') {
       img.removeAttribute('src');
       img.style.display = 'none';
+      img.onclick = null;
       ph.style.display = 'flex';
       if (remove) remove.style.display = 'none';
+      if (actions) actions.style.display = 'flex';
+      return;
     }
-    if (!facePath) { showPlaceholder(); return; }
+    // 3) NO PENDING — render the current saved record (or placeholder).
+    if (actions) actions.style.display = 'none';
+    const facePath = currentFacePath;
+    if (!facePath) {
+      // Drop the prior image entirely so the panel clears visibly.
+      img.removeAttribute('src');
+      img.style.display = 'none';
+      img.onclick = null;
+      ph.style.display = 'flex';
+      if (remove) remove.style.display = 'none';
+      return;
+    }
     // Server stores an absolute path; turn it into a /worker-files/ URL.
     const m = facePath.match(/[\/\\]worker_records[\/\\](.+)$/);
-    if (!m) { showPlaceholder(); return; }
-    // Cache-bust (#102): face files always live at the same path
-    // (face.jpg per worker), so a replace looks identical to the
-    // browser cache unless we change the URL. Append a fresh
-    // timestamp query so the <img> requests the new bytes.
+    if (!m) {
+      img.removeAttribute('src');
+      img.style.display = 'none';
+      img.onclick = null;
+      ph.style.display = 'flex';
+      if (remove) remove.style.display = 'none';
+      return;
+    }
+    // Cache-bust: face files always live at the same path (face.jpg per
+    // worker), so a replace looks identical to the browser cache unless
+    // we change the URL. Append a fresh timestamp query so the <img>
+    // requests the new bytes after Save.
     const url = '/worker-files/' + m[1].replace(/\\/g, '/');
     img.src = url + (url.indexOf('?') === -1 ? '?' : '&') + 'v=' + Date.now();
     img.style.display = 'block';
     img.onclick = () => window.showLightbox(url);
     ph.style.display = 'none';
     if (remove) remove.style.display = 'inline-flex';
+  }
+
+  // Called by loadProfile with the current saved face_image_path. Also
+  // discards any in-flight staged change so re-opening a profile is clean.
+  function renderFacePhoto(facePath) {
+    clearFacePending();
+    currentFacePath = facePath || null;
+    applyFacePhotoUI();
   }
 
   window.showLightbox = function(url) {
@@ -1590,7 +1661,7 @@ applyLanguage();
         <div data-role="cam-controls" style="padding:14px 18px;display:flex;gap:10px;justify-content:center;background:#FAF7F1;flex-wrap:wrap;">
           <button data-role="cam-capture" style="background:#B11E2E;color:white;border:none;padding:14px 28px;font-size:14px;font-weight:600;border-radius:8px;cursor:pointer;min-width:140px;min-height:48px;">📸 Capture</button>
           <button data-role="cam-retake" style="background:white;color:#14161C;border:1px solid #E8E4DD;padding:14px 24px;font-size:14px;font-weight:600;border-radius:8px;cursor:pointer;display:none;min-height:48px;">Retake</button>
-          <button data-role="cam-use" style="background:#B11E2E;color:white;border:none;padding:14px 28px;font-size:14px;font-weight:600;border-radius:8px;cursor:pointer;display:none;min-width:140px;min-height:48px;">Save Photo</button>
+          <button data-role="cam-use" style="background:#B11E2E;color:white;border:none;padding:14px 28px;font-size:14px;font-weight:600;border-radius:8px;cursor:pointer;display:none;min-width:140px;min-height:48px;">Use Photo</button>
         </div>
       `;
       modal.appendChild(card);
@@ -2038,83 +2109,130 @@ applyLanguage();
   // Wire Scan Cert button.
   $('#pp-scan-cert').addEventListener('click', () => { runCertIntake(); });
 
-  // End-to-end face photo: camera → upload → refresh.
-  // No AI step, no review form — face photo is pure capture-and-save.
-  // No manual fallback either: a face photo must be a photo.
+  // End-to-end face photo: camera → STAGE (preview only).
+  // Camera modal returns a Blob; we hold it in `facePending` until the
+  // section-level Save commits it. The camera modal's "Use Photo" button
+  // does NOT itself commit — single commit point is the section Save.
   async function runFaceIntake() {
     if (!currentEmployeeId) return;
     const blob = await openCameraModal({title: 'Take ID Photo', allowManualFallback: false});
     if (!blob || !(blob instanceof Blob)) return;
-
-    const loader = showLoader('Saving face photo…');
-    try {
-      const fd = new FormData();
-      fd.append('file', blob, 'face.jpeg');
-      const resp = await fetch('/api/employees/' + encodeURIComponent(currentEmployeeId) + '/face-photo', {
-        method: 'POST', body: fd,
-      });
-      const body = await resp.json().catch(() => ({}));
-      loader.remove();
-      if (resp.ok) {
-        const d = body.data || body;
-        // Re-render the face photo section from the path the server returned.
-        renderFacePhoto(d.face_image_path);
-        showToast('✓ Face photo saved', 3000);
-      } else {
-        const msg = (body && body.error) || `Upload failed (${resp.status})`;
-        alert('Face photo save failed: ' + msg);
-      }
-    } catch (e) {
-      try { loader.remove(); } catch (_) {}
-      alert('Network error saving face photo: ' + (e.message || String(e)));
-    }
+    stageFaceSet(blob);
   }
-
-  $('#pp-take-face').addEventListener('click', () => { runFaceIntake(); });
 
   // Mobile-friendly upload path: routes through the OS file/camera picker
   // (capture=environment hints the rear camera on phones) so it works on
   // plain http://<tailnet-ip>:5050 — no getUserMedia, no HTTPS required.
-  // Accepts HEIC; server converts to JPEG for the thumbnail.
+  // Accepts HEIC; server converts to JPEG on Save.
   async function runFaceUpload(file) {
     if (!currentEmployeeId || !file) return;
-    const loader = showLoader('Uploading face photo…');
-    try {
-      const fd = new FormData();
-      fd.append('file', file, file.name || 'face.jpg');
-      const resp = await fetch('/api/employees/' + encodeURIComponent(currentEmployeeId) + '/face-photo', {
-        method: 'POST', body: fd,
-      });
-      const body = await resp.json().catch(() => ({}));
-      loader.remove();
-      if (resp.ok) {
-        const d = body.data || body;
-        renderFacePhoto(d.face_image_path);
-        const conv = d.heic_conversion;
-        const hint = (conv && conv.ok) ? ' (HEIC → JPEG)' :
-                     (conv && !conv.ok) ? ' (HEIC convert failed — original kept)' : '';
-        showToast('✓ Face photo saved' + hint, 3500);
-      } else {
-        const msg = (body && body.error) || `Upload failed (${resp.status})`;
-        alert('Face photo upload failed: ' + msg);
+    stageFaceSet(file);
+  }
+
+  // Stage a new image (camera or upload). The preview is the in-memory
+  // blob URL — nothing is sent to the server until Save.
+  function stageFaceSet(blobLike) {
+    clearFacePending();
+    facePending = {
+      kind: 'set',
+      blob: blobLike,
+      previewUrl: URL.createObjectURL(blobLike),
+    };
+    applyFacePhotoUI();
+  }
+
+  // Stage a removal. No confirm — Cancel is the recovery path now.
+  // Only stages if there's actually a photo to remove (current saved
+  // OR a currently-staged set).
+  function stageFaceRemove() {
+    const hasStagedSet = facePending && facePending.kind === 'set';
+    if (!currentFacePath && !hasStagedSet) return;
+    clearFacePending();
+    facePending = {kind: 'remove'};
+    applyFacePhotoUI();
+  }
+
+  // Cancel — discard the staged change and re-render the current saved photo.
+  function cancelFacePending() {
+    clearFacePending();
+    applyFacePhotoUI();
+  }
+
+  // Save — commit the staged change. POST for set, DELETE for remove.
+  // On success: clear pending, refresh currentFacePath, re-render (with
+  // cache-bust), show toast, refresh the workforce list (face-photo state
+  // surfaces there).
+  async function commitFacePending() {
+    if (!currentEmployeeId || !facePending) return;
+    const kind = facePending.kind;
+
+    if (kind === 'set') {
+      const blob = facePending.blob;
+      const fname = (blob && blob.name) ? blob.name : 'face.jpeg';
+      const loader = showLoader('Saving face photo…');
+      try {
+        const fd = new FormData();
+        fd.append('file', blob, fname);
+        const resp = await fetch('/api/employees/' + encodeURIComponent(currentEmployeeId) + '/face-photo', {
+          method: 'POST', body: fd,
+        });
+        const body = await resp.json().catch(() => ({}));
+        loader.remove();
+        if (resp.ok) {
+          const d = body.data || body;
+          clearFacePending();
+          currentFacePath = d.face_image_path || null;
+          applyFacePhotoUI();
+          const conv = d.heic_conversion;
+          const hint = (conv && conv.ok) ? ' (HEIC → JPEG)' :
+                       (conv && !conv.ok) ? ' (HEIC convert failed — original kept)' : '';
+          showToast('✓ Face photo saved' + hint, 3500);
+          if (typeof loadWorkforce === 'function') {
+            try { await loadWorkforce(); } catch (_) { /* best-effort */ }
+          }
+        } else {
+          const msg = (body && body.error) || `Save failed (${resp.status})`;
+          alert('Face photo save failed: ' + msg);
+        }
+      } catch (e) {
+        try { loader.remove(); } catch (_) {}
+        alert('Network error saving face photo: ' + (e.message || String(e)));
       }
-    } catch (e) {
-      try { loader.remove(); } catch (_) {}
-      alert('Network error uploading face photo: ' + (e.message || String(e)));
+      return;
+    }
+
+    if (kind === 'remove') {
+      try {
+        const r = await fetch(`/api/employees/${encodeURIComponent(currentEmployeeId)}/face-photo`,
+                              {method: 'DELETE'});
+        if (r.ok) {
+          clearFacePending();
+          currentFacePath = null;
+          applyFacePhotoUI();
+          showToast('✓ Face photo saved', 3000);
+          if (typeof loadWorkforce === 'function') {
+            try { await loadWorkforce(); } catch (_) { /* best-effort */ }
+          }
+        } else {
+          const b = await r.json().catch(() => ({}));
+          alert('Save failed: ' + (b.error || r.status));
+        }
+      } catch (e) {
+        alert('Network error: ' + e.message);
+      }
     }
   }
 
+  $('#pp-take-face').addEventListener('click', () => { runFaceIntake(); });
   $('#pp-upload-face').addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];
     if (file) runFaceUpload(file);
-    // Reset so re-uploading the same file fires 'change' again
+    // Reset so re-staging the same file fires 'change' again
     e.target.value = '';
   });
-
-  // Remove Face Photo — visible only when a photo is on file (toggled by
-  // renderFacePhoto). The Take ID Photo / Upload tiles already cover the
-  // Replace path (re-uploading overwrites server-side).
-  $('#pp-remove-face').addEventListener('click', () => { window.removeFacePhoto(); });
+  $('#pp-remove-face').addEventListener('click', () => { stageFaceRemove(); });
+  $('#pp-face-save').addEventListener('click', () => { commitFacePending(); });
+  $('#pp-face-cancel').addEventListener('click', () => { cancelFacePending(); });
 
   window.deleteDoc = async function(docId) {
     if (!confirm('Remove this document?')) return;
@@ -2163,29 +2281,6 @@ applyLanguage();
     inp.click();
   };
 
-  // Remove the worker's face photo via the documented DELETE endpoint.
-  // After removal the worker can't be issued a new credential until
-  // another photo is uploaded (the server hard-gates on face_image_path).
-  window.removeFacePhoto = async function() {
-    if (!currentEmployeeId) return;
-    if (!confirm('Remove this worker’s face photo? They will need a new photo before another credential can be issued.')) return;
-    try {
-      const r = await fetch(`/api/employees/${encodeURIComponent(currentEmployeeId)}/face-photo`,
-                            {method: 'DELETE'});
-      if (r.ok) {
-        showToast('✓ Face photo removed', 3000);
-        renderFacePhoto(null);
-        if (typeof loadWorkforce === 'function') {
-          try { await loadWorkforce(); } catch (_) {}
-        }
-      } else {
-        const b = await r.json().catch(() => ({}));
-        alert('Remove failed: ' + (b.error || r.status));
-      }
-    } catch (e) {
-      alert('Network error: ' + e.message);
-    }
-  };
   window.deleteCert = async function(certId) {
     if (!confirm('Delete this certification?')) return;
     await fetch(`/api/workers/${encodeURIComponent(currentEmployeeId)}/certs/${certId}`, {method: 'DELETE'});
