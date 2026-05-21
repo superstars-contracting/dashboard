@@ -444,6 +444,11 @@
             <span style="font-size:14px;">📁</span> Upload (mobile)
           </label>
           <input id="pp-upload-face" type="file" accept="image/*" capture="environment" style="display:none;">
+          <!-- Remove (#99) — visible only when a face photo is on file;
+               renderFacePhoto toggles display based on face_image_path. -->
+          <button id="pp-remove-face" style="background:none;color:#B11E2E;border:1px solid #E8E4DD;padding:8px 16px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;display:none;align-items:center;gap:6px;">
+            Remove Photo
+          </button>
         </div>
       </div>
       <div style="background:#FAF7F1;border-radius:8px;padding:14px;display:flex;align-items:center;gap:14px;">
@@ -1422,14 +1427,21 @@ applyLanguage();
           const thumb = isImage
             ? `<img src="${esc(url)}" style="width:80px;height:80px;object-fit:cover;border-radius:4px;border:1px solid #E8E4DD;">`
             : `<div style="width:80px;height:80px;background:#FAF7F1;border-radius:4px;border:1px solid #E8E4DD;display:flex;align-items:center;justify-content:center;font-size:11px;color:#76777E;">${esc((doc.mime_type || '').split('/')[1] || 'doc').toUpperCase()}</div>`;
+          // Replace + Remove actions per #99. Replace = swap the file via
+          // the existing confirm modal then delete the old row (atomic from
+          // the operator's perspective). Remove = delete the row + file.
+          const safeType = esc(doc.doc_type);
           return `<div style="display:flex;gap:12px;align-items:center;padding:8px;border:1px solid #E8E4DD;border-radius:6px;margin-bottom:6px;">
             <a href="${esc(url)}" target="_blank">${thumb}</a>
-            <div style="flex:1;">
-              <div style="font-weight:600;font-size:12px;">${esc(doc.doc_type)}</div>
-              <div style="color:#76777E;font-size:11px;">${esc(doc.original_filename || '')}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:12px;">${safeType}</div>
+              <div style="color:#76777E;font-size:11px;word-break:break-all;">${esc(doc.original_filename || '')}</div>
               <div style="color:#76777E;font-size:10px;">${(doc.file_size_bytes/1024).toFixed(1)} KB · ${esc(doc.uploaded_at || '')}</div>
             </div>
-            <button onclick="window.deleteDoc(${doc.id})" style="background:none;border:1px solid #E8E4DD;color:#B11E2E;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;">Delete</button>
+            <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
+              <button onclick="window.replaceDoc(${doc.id}, '${safeType}')" style="background:none;border:1px solid #E8E4DD;color:#14161C;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;font-weight:600;">Replace</button>
+              <button onclick="window.deleteDoc(${doc.id})" style="background:none;border:1px solid #E8E4DD;color:#B11E2E;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;font-weight:600;">Remove</button>
+            </div>
           </div>`;
         }).join('');
       }
@@ -1506,25 +1518,23 @@ applyLanguage();
   function renderFacePhoto(facePath) {
     const img = $('#pp-face-img');
     const ph = $('#pp-face-placeholder');
-    if (!facePath) {
+    const remove = $('#pp-remove-face');
+    function showPlaceholder() {
       img.style.display = 'none';
       img.src = '';
       ph.style.display = 'flex';
-      return;
+      if (remove) remove.style.display = 'none';
     }
+    if (!facePath) { showPlaceholder(); return; }
     // Server stores an absolute path; turn it into a /worker-files/ URL.
     const m = facePath.match(/[\/\\]worker_records[\/\\](.+)$/);
-    if (!m) {
-      img.style.display = 'none';
-      img.src = '';
-      ph.style.display = 'flex';
-      return;
-    }
+    if (!m) { showPlaceholder(); return; }
     const url = '/worker-files/' + m[1].replace(/\\/g, '/');
     img.src = url;
     img.style.display = 'block';
     img.onclick = () => window.showLightbox(url);
     ph.style.display = 'none';
+    if (remove) remove.style.display = 'inline-flex';
   }
 
   window.showLightbox = function(url) {
@@ -2092,10 +2102,80 @@ applyLanguage();
     e.target.value = '';
   });
 
+  // Remove Face Photo — visible only when a photo is on file (toggled by
+  // renderFacePhoto). The Take ID Photo / Upload tiles already cover the
+  // Replace path (re-uploading overwrites server-side).
+  $('#pp-remove-face').addEventListener('click', () => { window.removeFacePhoto(); });
+
   window.deleteDoc = async function(docId) {
-    if (!confirm('Delete this document?')) return;
-    await fetch(`/api/workers/${encodeURIComponent(currentEmployeeId)}/documents/${docId}`, {method: 'DELETE'});
-    await loadProfile();
+    if (!confirm('Remove this document?')) return;
+    const r = await fetch(`/api/workers/${encodeURIComponent(currentEmployeeId)}/documents/${docId}`, {method: 'DELETE'});
+    if (r.ok) {
+      showToast('✓ Document removed', 3000);
+      await loadProfile();
+      // doc_count surfaces in the workforce list — refresh that row.
+      if (typeof loadWorkforce === 'function') {
+        try { await loadWorkforce(); } catch (_) { /* best-effort */ }
+      }
+    } else {
+      const b = await r.json().catch(() => ({}));
+      alert('Remove failed: ' + (b.error || r.status));
+    }
+  };
+
+  // Replace an existing document — file picker -> confirm modal -> upload
+  // new + delete old. Operator sees one explicit Save (in the confirm
+  // modal); after Save a toast confirms the replace. Uses the same
+  // confirm modal as the original Upload tile so the UX is consistent.
+  window.replaceDoc = async function(docId, docType) {
+    if (!currentEmployeeId) return;
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = '.jpg,.jpeg,.png,.pdf,.heic,.webp';
+    inp.style.display = 'none';
+    document.body.appendChild(inp);
+    inp.addEventListener('change', async () => {
+      const file = inp.files && inp.files[0];
+      inp.remove();
+      if (!file) return;
+      const result = await openDocUploadConfirmModal({file, docType});
+      if (!result || !result.ok) return;
+      // Delete the old row + file so the operator sees a clean replace.
+      try {
+        await fetch(`/api/workers/${encodeURIComponent(currentEmployeeId)}/documents/${docId}`,
+                    {method: 'DELETE'});
+      } catch (_) { /* best-effort — the new upload already landed */ }
+      showToast(`✓ ${result.docTypeLabel} replaced`, 3500);
+      await loadProfile();
+      if (typeof loadWorkforce === 'function') {
+        try { await loadWorkforce(); } catch (_) {}
+      }
+    });
+    inp.click();
+  };
+
+  // Remove the worker's face photo via the documented DELETE endpoint.
+  // After removal the worker can't be issued a new credential until
+  // another photo is uploaded (the server hard-gates on face_image_path).
+  window.removeFacePhoto = async function() {
+    if (!currentEmployeeId) return;
+    if (!confirm('Remove this worker’s face photo? They will need a new photo before another credential can be issued.')) return;
+    try {
+      const r = await fetch(`/api/employees/${encodeURIComponent(currentEmployeeId)}/face-photo`,
+                            {method: 'DELETE'});
+      if (r.ok) {
+        showToast('✓ Face photo removed', 3000);
+        renderFacePhoto(null);
+        if (typeof loadWorkforce === 'function') {
+          try { await loadWorkforce(); } catch (_) {}
+        }
+      } else {
+        const b = await r.json().catch(() => ({}));
+        alert('Remove failed: ' + (b.error || r.status));
+      }
+    } catch (e) {
+      alert('Network error: ' + e.message);
+    }
   };
   window.deleteCert = async function(certId) {
     if (!confirm('Delete this certification?')) return;
