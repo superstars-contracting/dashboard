@@ -1421,9 +1421,23 @@
             }
           }
 
+          // Local-timezone today as YYYY-MM-DD. NEVER use .toISOString() for
+          // this — that returns UTC, which on this workstation (Eastern)
+          // rolls over to "tomorrow" anywhere from ~7-8 PM local onward.
+          // Bug #74 traced to that: operator opened DCR form in the evening,
+          // picker auto-filled with UTC date, rows saved under UTC date, the
+          // "today (Eastern)" report came up empty.
+          function todayLocal() {
+            const d = new Date();
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return yyyy + '-' + mm + '-' + dd;
+          }
+
           function getCurrentDate() {
             const el = document.getElementById('dcr-date');
-            return (el && el.value) || new Date().toISOString().slice(0, 10);
+            return (el && el.value) || todayLocal();
           }
 
           function buildFieldHTML(f) {
@@ -1722,11 +1736,11 @@
               const banner = document.getElementById('dcr-issued-banner');
               if (banner) banner.style.display = 'none';
             }
-            // Date — reset to today + reload auto-fill unless caller opts out.
+            // Date — reset to LOCAL today (not UTC). See todayLocal() above.
             if (!opts.preserveDate) {
               const dateInput = document.getElementById('dcr-date');
               if (dateInput) {
-                dateInput.value = new Date().toISOString().slice(0, 10);
+                dateInput.value = todayLocal();
                 loadDcr(dateInput.value);
               }
             }
