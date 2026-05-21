@@ -1011,6 +1011,140 @@ def delete_photo(row_id):
     }), 200
 
 
+# ============= PATCH endpoints for DCR entry rows =============
+
+def _patch_dcr_row(table, row_id, allowed_fields, aliases=None):
+    """Generic PATCH for a DCR sub-section row.
+
+    Updates only the columns named in allowed_fields. Aliases is an optional
+    {alias: real_column} map for POST-compat field aliases (e.g. 'equipment'
+    → 'equipment_type' on equipment_log). 404 if no row matched; 400 if no
+    updatable fields were supplied. `date` and `project_code` are NOT
+    mutable here — re-creating a row is the operator path for moving it
+    across days or projects (the semantics of every DCR sub-section are
+    'this happened on this date for this project')."""
+    data = request.get_json(silent=True) or {}
+    updates = {}
+    for k in allowed_fields:
+        if k in data:
+            updates[k] = data[k]
+    if aliases:
+        for alias, real in aliases.items():
+            if alias in data and real not in updates:
+                updates[real] = data[alias]
+    if not updates:
+        return jsonify({"error": "no updatable fields in payload"}), 400
+    conn = db()
+    try:
+        existing = conn.execute(
+            f"SELECT id FROM {table} WHERE id = ?", (row_id,)
+        ).fetchone()
+        if not existing:
+            return jsonify({"error": "not found"}), 404
+        set_clauses = [f"{k} = ?" for k in updates] + ["updated_at = CURRENT_TIMESTAMP"]
+        params = list(updates.values()) + [row_id]
+        conn.execute(
+            f"UPDATE {table} SET {', '.join(set_clauses)} WHERE id = ?",
+            params
+        )
+        conn.commit()
+        row = conn.execute(f"SELECT * FROM {table} WHERE id = ?", (row_id,)).fetchone()
+        return response_wrapper(dict(row)), 200
+    except Exception as e:
+        logging.error(f"PATCH /api/{table}/{row_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/work-log/<int:row_id>', methods=['PATCH'])
+def patch_work_log(row_id):
+    return _patch_dcr_row('work_log', row_id, {
+        'trade_area', 'location_elevation', 'description',
+        'scope_of_work', 'trades_working',
+    })
+
+
+@app.route('/api/deliveries/<int:row_id>', methods=['PATCH'])
+def patch_delivery(row_id):
+    return _patch_dcr_row('deliveries', row_id, {
+        'time', 'material', 'qty', 'unit', 'supplier', 'notes',
+        'description', 'delivered_by',
+    })
+
+
+@app.route('/api/equipment-log/<int:row_id>', methods=['PATCH'])
+def patch_equipment_log(row_id):
+    return _patch_dcr_row('equipment_log', row_id, {
+        'equipment_type', 'equipment_id', 'owner', 'hours_used',
+        'issues', 'status', 'notes',
+    }, aliases={'equipment': 'equipment_type'})
+
+
+@app.route('/api/weather-log/<int:row_id>', methods=['PATCH'])
+def patch_weather_log(row_id):
+    return _patch_dcr_row('weather_log', row_id, {
+        'am_temp_f', 'pm_temp_f', 'am_conditions', 'pm_conditions',
+        'wind', 'conditions',
+    })
+
+
+@app.route('/api/toolbox-talks/records/<int:row_id>', methods=['PATCH'])
+def patch_toolbox_talk_record(row_id):
+    return _patch_dcr_row('toolbox_talk_records', row_id, {
+        'talk_id', 'facilitator', 'attendees', 'duration_minutes',
+    }, aliases={'conducted_by': 'facilitator'})
+
+
+@app.route('/api/safety-events/<int:row_id>', methods=['PATCH'])
+def patch_safety_event(row_id):
+    return _patch_dcr_row('safety_events', row_id, {
+        'event_type', 'severity', 'time', 'person', 'description',
+        'action', 'reported_by',
+    })
+
+
+@app.route('/api/issues/<int:row_id>', methods=['PATCH'])
+def patch_issue(row_id):
+    # Mirror POST due_date validation so PATCH can't sneak in a malformed value.
+    data = request.get_json(silent=True) or {}
+    if 'due_date' in data and data['due_date']:
+        try:
+            datetime.strptime(data['due_date'], '%Y-%m-%d')
+        except ValueError:
+            return jsonify({"error": "due_date must be YYYY-MM-DD"}), 400
+    return _patch_dcr_row('issues', row_id, {
+        'category', 'description', 'time_lost_hrs', 'action',
+        'owner', 'status', 'due_date',
+    })
+
+
+@app.route('/api/inspections/<int:row_id>', methods=['PATCH'])
+def patch_inspection(row_id):
+    return _patch_dcr_row('inspections', row_id, {
+        'type', 'inspector_name', 'agency', 'area', 'result',
+        'notes', 'scope',
+    })
+
+
+@app.route('/api/visitors/<int:row_id>', methods=['PATCH'])
+def patch_visitor(row_id):
+    return _patch_dcr_row('visitors', row_id, {
+        'name', 'company', 'role', 'time_in', 'time_out',
+        'purpose', 'accompanied_by', 'notes',
+    })
+
+
+@app.route('/api/photos/<int:row_id>', methods=['PATCH'])
+def patch_photo(row_id):
+    # Photo file metadata only — file_path / filename / url / date /
+    # project_code are NOT mutable here. Re-uploading is the path for
+    # changing the file itself.
+    return _patch_dcr_row('photos', row_id, {
+        'location', 'description', 'uploaded_by',
+    })
+
+
 @app.route('/api/projects/<project_code>/reports/by-sequence/<int:seq>', methods=['DELETE'])
 def delete_report_by_sequence(project_code, seq):
     """Atomic DCR delete: removes BOTH internal and client report_index rows for
