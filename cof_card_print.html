@@ -78,7 +78,7 @@
   }
   .banner-title {
     font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    font-size: 4mm; font-weight: 700; letter-spacing: 0.15mm;
+    font-size: 5mm; font-weight: 700; letter-spacing: 0.15mm;
     text-transform: uppercase; line-height: 1;
     white-space: nowrap;
   }
@@ -120,14 +120,19 @@
   /* Field fonts bumped for legibility on the printed card. */
   .field { margin-bottom: 2mm; }
   .field:last-child { margin-bottom: 0; }
+  /* Labels and values both center-aligned so EXPIRES + PIN read centered
+     under their labels (was left-aligned and visibly off-center). All
+     other lines also pick up the center treatment for consistency. */
   .field-label {
     font-size: 1.8mm; font-weight: 700; letter-spacing: 0.3mm;
     text-transform: uppercase; color: var(--mute); margin-bottom: 0.4mm;
+    text-align: center;
   }
   .field-value {
     font-size: 3.5mm; font-weight: 600; color: var(--ink);
     border-bottom: 0.25mm solid var(--ink); padding-bottom: 0.4mm;
     line-height: 1.1; min-height: 4mm;
+    text-align: center;
   }
   .field-value.mono {
     font-family: 'Consolas', 'Menlo', monospace;
@@ -148,6 +153,7 @@
     min-height: 6mm;
     display: flex;
     align-items: flex-end;
+    justify-content: center;
     padding-bottom: 0.4mm;
   }
   table.field-row .field-value.mono { font-size: 2.7mm; }
@@ -177,31 +183,35 @@
     table-layout: fixed;
   }
   table.footer-grid td { padding: 0; vertical-align: middle; }
-  td.ff-brand { width: 50%; }
-  td.ff-addr  { width: 50%; text-align: right; padding-left: 2mm; }
-  /* Brand lockup: star + single-line wordmark in brand-red, Playfair.
-     "Superstars Contracting Inc." at 28 chars wouldn't fit at the
-     user-requested 2.8-3mm in the column — capped at 2.2mm so the
-     full name still reads as one line. */
+  /* Footer column split tuned so the address fits on TWO clean lines
+     (street+city+ZIP, then phone) without the prior 3-line cramped wrap.
+     Brand stays anchored left (star + wordmark on the left half); address
+     gets the extra few mm it needs. */
+  td.ff-brand { width: 44%; }
+  td.ff-addr  { width: 56%; text-align: right; padding-left: 1mm; }
+  /* Brand lockup: star + single-line wordmark in brand-red. Star tightened
+     1mm and letter-spacing pulled in 0.05mm vs prior to free space for
+     the address column without dropping the wordmark from 2.2mm. */
   table.lockup { border-collapse: collapse; }
   table.lockup td { padding: 0; vertical-align: middle; }
-  .lockup-star { width: 6mm; height: 6mm; display: block; }
-  td.lockup-text-cell { padding-left: 1.5mm !important; text-align: left; }
+  .lockup-star { width: 5mm; height: 5mm; display: block; }
+  td.lockup-text-cell { padding-left: 1mm !important; text-align: left; }
   .lockup-name {
     font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    font-size: 2.2mm; font-weight: 700; letter-spacing: 0.15mm;
+    font-size: 2.2mm; font-weight: 700; letter-spacing: 0.1mm;
     color: var(--brand-red); line-height: 1.1;
     white-space: nowrap;
   }
-  /* Address: 2.2mm, 2 lines (street/city · phone). 60 chars at 2.5mm
-     wouldn't fit in 50% column — slightly smaller font + 2 lines is
-     the best honest compromise to "normal size and legible". */
+  /* Address: 2 lines, right-aligned, nowrap. Line 1 = street + city + ZIP,
+     line 2 = phone. font-size pulled from 2.2mm to 2.0mm so the full
+     address renders on ONE line in the wider 56% column. line-height
+     bumped to 1.35 for visual breathing room between the two lines. */
   .company-addr {
-    font-size: 2.2mm; color: var(--ink); font-weight: 700;
+    font-size: 2.0mm; color: var(--ink); font-weight: 700;
     letter-spacing: 0;
-    line-height: 1.2;
+    line-height: 1.35;
   }
-  .company-addr .addr-line { display: block; }
+  .company-addr .addr-line { display: block; white-space: nowrap; }
 
   /* ============== BACK ============== */
 
@@ -287,8 +297,11 @@
     text-align: center;
     vertical-align: middle;
   }
+  /* CARRY WITH line: bumped from 1.7mm to 2.0mm — the prior size was
+     unreadable in print. Back-footer height stays at 6mm; 2.0mm font +
+     line-height 1.2 = ~2.4mm rendered, fits with vertical-align middle. */
   .carry-with {
-    font-size: 1.7mm; line-height: 1.15; color: #14161C;
+    font-size: 2.0mm; line-height: 1.2; color: #14161C;
     font-style: italic;
   }
   .carry-with strong { color: #14161C; font-style: normal; font-weight: 700; }

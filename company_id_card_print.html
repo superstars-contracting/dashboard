@@ -75,7 +75,7 @@
   }
   .banner-title {
     font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    font-size: 4mm; font-weight: 700; letter-spacing: 0.15mm;
+    font-size: 5mm; font-weight: 700; letter-spacing: 0.15mm;
     text-transform: uppercase; line-height: 1;
     white-space: nowrap;
   }
@@ -116,14 +116,18 @@
      field-row) so the field margins can stay roomy. */
   .field { margin-bottom: 2mm; }
   .field:last-child { margin-bottom: 0; }
+  /* Labels + values center-aligned (was left). PIN and other field-row
+     values are visibly centered under their labels now. */
   .field-label {
     font-size: 1.8mm; font-weight: 700; letter-spacing: 0.3mm;
     text-transform: uppercase; color: var(--mute); margin-bottom: 0.4mm;
+    text-align: center;
   }
   .field-value {
     font-size: 3.5mm; font-weight: 600; color: var(--ink);
     border-bottom: 0.25mm solid var(--ink); padding-bottom: 0.4mm;
     line-height: 1.1; min-height: 4mm;
+    text-align: center;
   }
   .field-value.mono {
     font-family: 'Consolas', 'Menlo', monospace;
@@ -140,6 +144,7 @@
     min-height: 6mm;
     display: flex;
     align-items: flex-end;
+    justify-content: center;
     padding-bottom: 0.4mm;
   }
   table.field-row .field-value.mono { font-size: 2.7mm; letter-spacing: 0.2mm; }
@@ -162,24 +167,29 @@
     width: 100%; border-collapse: collapse; table-layout: fixed;
   }
   table.footer-grid td { padding: 0; vertical-align: middle; }
-  td.ff-brand { width: 50%; }
-  td.ff-addr  { width: 50%; text-align: right; padding-left: 2mm; }
+  /* Footer column split tuned to fit the full address on two clean
+     lines without the prior 3-line wrap. Mirrors cof_card_print. */
+  td.ff-brand { width: 44%; }
+  td.ff-addr  { width: 56%; text-align: right; padding-left: 1mm; }
   table.lockup { border-collapse: collapse; }
   table.lockup td { padding: 0; vertical-align: middle; }
-  .lockup-star { width: 6mm; height: 6mm; display: block; }
-  td.lockup-text-cell { padding-left: 1.5mm !important; text-align: left; }
+  .lockup-star { width: 5mm; height: 5mm; display: block; }
+  td.lockup-text-cell { padding-left: 1mm !important; text-align: left; }
   .lockup-name {
     font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    font-size: 2.2mm; font-weight: 700; letter-spacing: 0.15mm;
+    font-size: 2.2mm; font-weight: 700; letter-spacing: 0.1mm;
     color: var(--brand-red); line-height: 1.1;
     white-space: nowrap;
   }
+  /* Address: 2-line block, right-aligned, nowrap. Line 1 = street+city+ZIP,
+     line 2 = phone. Pulled to 2.0mm so line 1 fits the wider column on one
+     visual line; line-height 1.35 for breathing room. */
   .company-addr {
-    font-size: 2.2mm; color: var(--ink); font-weight: 700;
+    font-size: 2.0mm; color: var(--ink); font-weight: 700;
     letter-spacing: 0;
-    line-height: 1.2;
+    line-height: 1.35;
   }
-  .company-addr .addr-line { display: block; }
+  .company-addr .addr-line { display: block; white-space: nowrap; }
 
   /* ============== BACK ============== */
 
