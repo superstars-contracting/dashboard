@@ -71,7 +71,10 @@
     height: 10mm;
     background: linear-gradient(135deg, var(--brand-red), var(--brand-red-deep));
     color: white; text-align: center;
-    padding: 1.4mm 4mm 1.2mm;
+    /* vertical-align middle so the now-sole 'COMPANY ID' title sits in
+       the visual centre of the 10mm red band (no banner-sub line). */
+    vertical-align: middle;
+    padding: 0 4mm;
   }
   .banner-title {
     font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -286,7 +289,6 @@
     <tr>
       <td class="banner">
         <div class="banner-title">Company ID</div>
-        <div class="banner-sub">Authorized Employee Credential</div>
       </td>
     </tr>
     <tr>
