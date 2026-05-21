@@ -1373,8 +1373,9 @@ applyLanguage();
       const e = d.employee || {};
       currentProfile = e;  // Snapshot for the Edit form's change-detection
       // Worker ID (W-####) is the human-facing identifier — prominent.
-      // employee_id (E-#####) stays in the subtitle for the internal key.
-      $('#pp-id').textContent = (e.worker_id || '—') + (e.employee_id ? ' · ' + e.employee_id : '');
+      // employee_id (E-#####) is internal-only and not surfaced (per CLAUDE.md
+      // terminology rule: nothing user-facing should show E- codes).
+      $('#pp-id').textContent = e.worker_id || '—';
       $('#pp-name').textContent = e.name || '—';
       $('#pp-trade').textContent = e.trade || '—';
       $('#pp-lang').textContent = (e.language || '—').toUpperCase();
@@ -2099,7 +2100,7 @@ applyLanguage();
       // Relation dropdown has a paired Other-text input — reset both via helper.
       clearRelationField('in-ec-relation');
       await Promise.all([loadMetrics(), loadProjects(), loadWorkforce()]);
-      alert(`✓ Worker created: ${name}\nID: ${resp.data.employee_id}\nAssigned to: ${resp.data.assigned_to.join(', ') || '(no projects)'}\nFolder: ${resp.data.folder_path}`);
+      alert(`✓ Worker created: ${name}\nWorker ID: ${resp.data.worker_id || resp.data.employee_id}\nAssigned to: ${resp.data.assigned_to.join(', ') || '(no projects)'}\nFolder: ${resp.data.folder_path}`);
     } catch (e) { alert('Network error: ' + e.message); }
   });
 
@@ -2186,11 +2187,11 @@ applyLanguage();
       }).join('');
       return `<tr>
         <td style="border:1px solid #E8E4DD;padding:6px 10px;">
-          <div style="font-size:10px;font-family:monospace;font-weight:700;color:#B11E2E;letter-spacing:0.04em;">${esc(w.worker_id || w.employee_id)}</div>
+          <div style="font-size:10px;font-family:monospace;font-weight:700;color:#B11E2E;letter-spacing:0.04em;">${esc(w.worker_id || '—')}</div>
           <div style="font-weight:700;font-size:12px;">${esc(w.name)}</div>
-          <div style="font-size:9px;color:#76777E;font-family:monospace;">${esc(w.employee_id)}
+          <div style="font-size:9px;color:#76777E;">
             <button type="button" data-hrs-row-full="${esc(w.employee_id)}" title="Fill Mon-Fri full days for this worker"
-              style="margin-left:6px;background:#f1eee8;color:#14161C;border:1px solid #C8C0B4;font-size:9px;padding:1px 5px;border-radius:3px;cursor:pointer;">Full week</button>
+              style="background:#f1eee8;color:#14161C;border:1px solid #C8C0B4;font-size:9px;padding:1px 5px;border-radius:3px;cursor:pointer;">Full week</button>
           </div>
         </td>
         <td style="border:1px solid #E8E4DD;padding:6px 8px;font-size:11px;color:#76777E;">${esc(w.trade||'')}</td>

@@ -203,14 +203,32 @@ def all_employees_status():
 
 def card_number_for_employee(employee_id):
     """Stable card_number_display for an employee — same across reissues.
-    Format: SSC-COF-{employee_id}, e.g. SSC-COF-E-00013.
+    Format: SSC-COF-{worker_id}, e.g. SSC-COF-W-0013. Resolves worker_id
+    from the DB; falls back to SSC-COF-{employee_id} (legacy E- format)
+    with a logged warning if the worker has no worker_id on file.
 
-    The unique PK card_id has a revision suffix (-1, -2, ...) appended
-    by issue_cof so each issuance gets its own row without PK collision.
-    This function returns the display number that's shown on the printed
-    card and stays stable when the worker re-issues."""
+    Card numbers are user-facing — printed on the physical card and shown
+    in the UI. We use the human-facing W-#### identifier so cards line up
+    with the rest of the dashboard's worker references (per CLAUDE.md
+    terminology rule). The internal DB primary key card_id keeps the
+    employee_id + revision suffix for FK stability."""
     if not employee_id:
         raise RuntimeError("employee_id required to generate card number")
+    conn = db_conn()
+    try:
+        row = conn.execute(
+            "SELECT worker_id FROM employees WHERE employee_id = ?",
+            (employee_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+    if row and row["worker_id"]:
+        return f"SSC-COF-{row['worker_id']}"
+    print(
+        f"[cof_issuer] WARN: employee {employee_id} has no worker_id on file; "
+        f"falling back to legacy E- card number format",
+        file=sys.stderr,
+    )
     return f"SSC-COF-{employee_id}"
 
 

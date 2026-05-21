@@ -1272,7 +1272,7 @@
             tbody.innerHTML = labor.rows.map(r =>
               '<tr>' +
                 '<td>' + r.n + '</td>' +
-                '<td>' + (esc(r.name) || '—') + ' <span style="color:#76777E;font-size:11px;">' + (esc(r.employee_id) || '') + '</span></td>' +
+                '<td>' + (esc(r.name) || '—') + ' <span style="color:#76777E;font-size:11px;font-family:monospace;">' + (esc(r.worker_id) || '') + '</span></td>' +
                 '<td>' + (esc(r.trade) || '—') + '</td>' +
                 '<td>' + (esc(r.time_in) || '—') + '</td>' +
                 '<td>' + (esc(r.time_out) || '—') + '</td>' +
@@ -1894,11 +1894,12 @@
             for (const w of projectWorkers) {
               const opt = document.createElement('option');
               opt.value = w.employee_id;
-              // Display "W-#### — Name (E-#####)" so the operator sees the
-              // human-facing Worker ID first, then the name, then the internal
-              // employee_id in parens for disambiguation.
+              // Display "W-#### — Name" — the Worker ID is the human-facing
+              // identifier; employee_id stays as the option value for the
+              // backend POST but is not surfaced to the operator per
+              // CLAUDE.md terminology rule.
               const wid = w.worker_id || '—';
-              opt.textContent = wid + ' — ' + (w.name || w.employee_id) + ' (' + w.employee_id + ')';
+              opt.textContent = wid + ' — ' + (w.name || wid);
               sel.appendChild(opt);
             }
           }
@@ -2508,7 +2509,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
       }
       closeModal();
       await loadRoster();
-      alert(`✓ Worker ${name} created (${resp.data.employee_id}).\n\nFolder: ${resp.data.folder_path}\n\nClick their row in the roster to upload scans + add certs.`);
+      alert(`✓ Worker ${name} created (${resp.data.worker_id || resp.data.employee_id}).\n\nFolder: ${resp.data.folder_path}\n\nClick their row in the roster to upload scans + add certs.`);
     } catch (e) {
       alert('Network error: ' + e.message);
     }
@@ -2528,7 +2529,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
         const docList = (e.documents || [])
           .map(d => `  • ${d.doc_type}: ${d.original_filename}`)
           .join('\n') || '  (none uploaded yet)';
-        alert(`${e.employee.name} (${e.employee.employee_id})\n\n` +
+        alert(`${e.employee.name} (${e.employee.worker_id || e.employee.employee_id})\n\n` +
               `Folder: ${e.employee.folder_path}\n\n` +
               `CERTIFICATIONS:\n${certList}\n\n` +
               `DOCUMENTS:\n${docList}\n\n` +

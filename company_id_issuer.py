@@ -46,9 +46,28 @@ def db_conn():
 # =====================================================================
 
 def card_number_for_employee(employee_id):
-    """Stable display number — same across reissues. Format: SSC-CID-{emp_id}"""
+    """Stable display number — same across reissues. Format:
+    SSC-CID-{worker_id}, e.g. SSC-CID-W-0001. Resolves worker_id from
+    the DB; falls back to SSC-CID-{employee_id} with a logged warning if
+    no worker_id is on file. The card_id (internal PK) keeps the
+    employee_id + revision suffix for FK stability."""
     if not employee_id:
         raise RuntimeError("employee_id required to generate card number")
+    conn = db_conn()
+    try:
+        row = conn.execute(
+            "SELECT worker_id FROM employees WHERE employee_id = ?",
+            (employee_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+    if row and row["worker_id"]:
+        return f"SSC-CID-{row['worker_id']}"
+    print(
+        f"[company_id_issuer] WARN: employee {employee_id} has no worker_id on file; "
+        f"falling back to legacy E- card number format",
+        file=sys.stderr,
+    )
     return f"SSC-CID-{employee_id}"
 
 
