@@ -26,6 +26,7 @@ Usage:
 import os
 import sys
 import json
+import shutil
 import sqlite3
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -35,6 +36,7 @@ DB_PATH = SCRIPT_DIR / "superstars.db"
 PHOTOS_DIR = SCRIPT_DIR / "employee_photos"
 EXPORTS_DIR = SCRIPT_DIR / "cof_exports"
 SIGNATURES_DIR = SCRIPT_DIR / "issuer_signatures"
+CREDENTIALS_DIR = SCRIPT_DIR / "data_room" / "credentials" / "cof"
 
 # Renewal warning threshold
 RENEWAL_WARN_DAYS = 30
@@ -348,19 +350,44 @@ def issue_cof(employee_id, rigger_id=None, project_code=None, today_override=Non
         ]
     }
 
-    # Snapshot the employee photo path at time of issuance
+    # Snapshot the worker's face photo at issuance time. Read face_image_path
+    # (the authoritative current photo, set by POST /api/employees/<id>/face-photo)
+    # — NOT photo_path, which is the legacy intake column and is NULL for
+    # everyone post-Worker-app rollout. Then copy the file into
+    # data_room/credentials/cof/<emp_id>_v<rev>.<ext> so the issued card has
+    # a frozen-in-time photo (a future face-photo edit shouldn't retroactively
+    # change the photo on an already-printed card).
     conn = db_conn()
     try:
         emp = conn.execute(
-            "SELECT photo_path FROM employees WHERE employee_id = ?", (employee_id,)
+            "SELECT face_image_path FROM employees WHERE employee_id = ?",
+            (employee_id,)
         ).fetchone()
-        photo_snapshot = emp["photo_path"] if emp else None
+        face_src_path = emp["face_image_path"] if emp else None
 
         # Compute revision + unique card_id BEFORE marking the prior card
         # replaced — the count-based revision then sees the prior row as
         # part of the existing history.
         revision = _next_cof_revision(conn, employee_id)
         card_id = f"{card_number_display}-{revision}"
+
+        # Snapshot the photo to credentials dir (best-effort; if it fails the
+        # card still issues with photo_snapshot_path=NULL and the template
+        # falls back to its 'PHOTO' placeholder).
+        photo_snapshot = None
+        if face_src_path:
+            src = Path(face_src_path)
+            if not src.is_absolute():
+                src = SCRIPT_DIR / src
+            if src.exists():
+                CREDENTIALS_DIR.mkdir(parents=True, exist_ok=True)
+                ext = src.suffix.lower() or ".jpg"
+                dest = CREDENTIALS_DIR / f"{employee_id}_v{revision}{ext}"
+                try:
+                    shutil.copy2(str(src), str(dest))
+                    photo_snapshot = dest.relative_to(SCRIPT_DIR).as_posix()
+                except Exception as e:
+                    print(f"[cof_issuer] photo snapshot failed: {e}", file=sys.stderr)
 
         # Mark any existing 'issued' card as 'replaced' so there's only
         # ever one active card per worker (matches the same-type supersede

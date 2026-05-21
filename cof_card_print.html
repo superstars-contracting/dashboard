@@ -6,9 +6,13 @@
 <title>Superstars CoF — Single Card (Front + Back · 2 pages)</title>
 <style>
   /* =================================================================
-     Pure TABLE-based layout — bulletproof in any PDF renderer
+     Pure TABLE-based layout — bulletproof in any PDF renderer.
+     @page is CR80 / NYC-license size (85.6 × 53.98 mm) so Ctrl+P
+     produces a 2-page PDF where each page IS the card (front, back)
+     at the exact physical card dimensions. On-screen preview keeps the
+     letter-page wrapper for context.
      ================================================================= */
-  @page { size: letter; margin: 0; }
+  @page { size: 85.6mm 53.98mm; margin: 0; }
 
   :root {
     --brand-red: #B11E2E;
@@ -30,14 +34,17 @@
   }
 
   .sheet {
-    width: 215.9mm;
-    height: 279.4mm;
     background: white;
     page-break-after: always;
     text-align: center;
-    padding-top: 60mm;
   }
   .sheet:last-child { page-break-after: auto; }
+  /* In print, each .sheet fills exactly one CR80 page. Screen preview
+     overrides this to show the card centered on a letter-sized page. */
+  @media print {
+    .sheet { width: 85.6mm; height: 53.98mm; padding: 0; }
+    .card-wrap { box-shadow: none; }
+  }
 
   /* Card wrap clips the inner table corners — border-radius alone on
      a <table> doesn't visually round nested <td> backgrounds in any
@@ -130,20 +137,28 @@
     color: var(--brand-red); border-bottom-color: var(--brand-red);
   }
   table.field-row { width: 100%; border-collapse: collapse; }
-  table.field-row td { padding: 0; }
+  table.field-row td { padding: 0; vertical-align: top; }
   table.field-row td:first-child { padding-right: 2mm; width: 50%; }
-  table.field-row .field-value { font-size: 3mm; }
+  /* Field-row values: both cells use the same min-height and bottom-aligned
+     content so the underline (border-bottom) sits at the same y on both
+     columns, even when PIN is set at the larger marquee size. Without this
+     the expires-bar lifted ~3mm above the PIN-bar on issued cards. */
+  table.field-row .field-value {
+    font-size: 3mm;
+    min-height: 6mm;
+    display: flex;
+    align-items: flex-end;
+    padding-bottom: 0.4mm;
+  }
   table.field-row .field-value.mono { font-size: 2.7mm; }
   /* PIN value gets a marquee font bump — it's the worker's most-actionable
-     piece of info on the card (their app login). Cell height in the field-
-     row may grow to match; the paired cell aligns top so its label/value
-     pair stays at the top edge. */
+     piece of info on the card (their app login). Height matches the row's
+     min-height so the underline aligns with the paired cell. */
   .field-value.pin-value {
     font-size: 5.5mm;
     font-weight: 700;
     letter-spacing: 0.5mm;
     line-height: 1.05;
-    min-height: 6mm;
   }
 
   /* Footer row — horizontal 2-column: brand mark on left, address on
@@ -218,39 +233,48 @@
     vertical-align: top;
   }
   .attest-text {
-    font-size: 2.9mm;
-    line-height: 1.5;
+    font-size: 2.6mm;
+    line-height: 1.4;
     color: var(--ink);
     font-weight: 500;
-    margin-bottom: 5mm;
+    margin-bottom: 2.5mm;
     text-align: justify;
     text-justify: inter-word;
     hyphens: none;
   }
   .attest-text strong { font-weight: 700; }
-  .fillin {
-    display: inline-block;
-    border-bottom: 0.35mm solid var(--ink);
-    height: 3.4mm;
-    vertical-align: baseline;
-    margin: 0 0.8mm;
-  }
-  .fillin.name { width: 28mm; }
-  .fillin.license { width: 16mm; text-align: left; padding-left: 0.5mm; font-weight: 600; }
 
-  /* Sig row — explicit 3-column structure with an empty spacer cell
-     between signature and date. Padding-based gaps weren't producing
-     a visible break in the rendered PDF (user-flagged), so we make
-     the gap a literal table cell with no border-bottom. */
-  table.sig-row { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  table.sig-row td { padding: 0; vertical-align: top; }
-  td.sig-cell-name { width: 57%; }
-  td.sig-spacer    { width: 6%; }
-  td.sig-cell-date { width: 37%; }
-  .sig-line { border-bottom: 0.4mm solid var(--ink); height: 5mm; }
-  .sig-label {
-    font-size: 2mm; font-weight: 700; letter-spacing: 0.4mm;
-    text-transform: uppercase; color: var(--ink); margin-top: 0.6mm;
+  /* Back fields — labeled blanks for the issuer-attestation values.
+     Replaces the prior inline jinja-fillin spans inside the attestation
+     paragraph, which left raw text in place when rigger data was a
+     'TBD' placeholder. Two rows x two columns: Special Rigger name +
+     License #, then Issuer Signature + Date. Legal citations stay
+     intact (1 RCNY 104-20(k), NYC Building Code 3314.4). */
+  table.back-fields { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  table.back-fields td {
+    padding: 0 0 1.4mm 0;
+    vertical-align: top;
+  }
+  table.back-fields td:first-child { padding-right: 3mm; width: 60%; }
+  table.back-fields tr:last-child td { padding-bottom: 0; }
+  .bf-label {
+    font-size: 1.8mm; font-weight: 700; letter-spacing: 0.3mm;
+    text-transform: uppercase; color: var(--mute);
+    margin-bottom: 0.4mm;
+  }
+  .bf-value {
+    font-size: 2.6mm; font-weight: 600; color: var(--ink);
+    border-bottom: 0.3mm solid var(--ink);
+    min-height: 4.2mm;
+    line-height: 1.1;
+    padding-bottom: 0.4mm;
+    word-break: break-word;
+  }
+  .bf-value.sig { padding-top: 0.4mm; }
+  .bf-value.sig img { max-height: 3.6mm; max-width: 90%; vertical-align: bottom; }
+  .bf-value.mono {
+    font-family: 'Consolas', 'Menlo', monospace;
+    font-size: 2.4mm; letter-spacing: 0.2mm;
   }
 
   /* Back footer row — compacted to absorb the extra vertical space the
@@ -271,7 +295,14 @@
 
   @media screen {
     body { background: #ECE9E2; padding: 12mm 0; }
-    .sheet { box-shadow: 0 4px 20px rgba(0,0,0,0.15); margin: 0 auto 20mm; padding-top: 30mm; }
+    .sheet {
+      /* Letter-page frame on screen so the card has visual context;
+         the @media print rule above sizes it to CR80 for the actual PDF. */
+      width: 215.9mm; height: 279.4mm;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      margin: 0 auto 20mm;
+      padding-top: 60mm;
+    }
   }
 
   /* On-screen hint that disappears in print */
@@ -387,19 +418,30 @@
     <tr>
       <td class="back-body">
         <div class="attest-text">
-          I, <span class="fillin name">{{ RIGGER_NAME }}</span>, NYC DOB Special Rigger <span class="fillin license">#{{ RIGGER_LICENSE }}</span>, having found the named holder capable of performing scaffold work in a safe and responsible manner and confirmed training per <strong>NYC Building Code §3314.4</strong>, hereby issue this Certificate of Fitness for use of a two-point suspension scaffold under the supervision of my designated Rigging Foreman.
+          The named holder has been found capable of performing scaffold work in a safe and responsible manner and confirmed training per <strong>NYC Building Code §3314.4</strong>. This Certificate of Fitness authorizes use of a two-point suspension scaffold under the supervision of the designated Special Rigger identified below.
         </div>
-        <table class="sig-row"><tr>
-          <td class="sig-cell-name">
-            <div class="sig-line">{% if SIGNATURE_URL %}<img src="{{ SIGNATURE_URL }}" style="max-height:5mm;max-width:90%;">{% endif %}</div>
-            <div class="sig-label">Issuer Signature</div>
-          </td>
-          <td class="sig-spacer"></td>
-          <td class="sig-cell-date">
-            <div class="sig-line" style="text-align:center;font-family:'Consolas','Menlo',monospace;font-size:2.4mm;padding-top:1.5mm;">{{ ISSUED_DATE }}</div>
-            <div class="sig-label">Date</div>
-          </td>
-        </tr></table>
+        <table class="back-fields">
+          <tr>
+            <td>
+              <div class="bf-label">Special Rigger Name</div>
+              <div class="bf-value">{{ RIGGER_NAME }}</div>
+            </td>
+            <td>
+              <div class="bf-label">NYC DOB License #</div>
+              <div class="bf-value mono">{{ RIGGER_LICENSE }}</div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="bf-label">Issuer Signature</div>
+              <div class="bf-value sig">{% if SIGNATURE_URL %}<img src="{{ SIGNATURE_URL }}">{% endif %}</div>
+            </td>
+            <td>
+              <div class="bf-label">Date</div>
+              <div class="bf-value mono">{{ ISSUED_DATE }}</div>
+            </td>
+          </tr>
+        </table>
       </td>
     </tr>
     <tr>
