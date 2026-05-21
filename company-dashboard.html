@@ -141,7 +141,7 @@
   .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
   .modal-close { background: none; border: none; font-size: 28px; color: var(--mute); cursor: pointer; line-height: 1; }
   .form-section-label { font-size: 12px; font-weight: 700; color: var(--mute); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-  .form-grid { display: grid; gap: 12px; margin-bottom: 10px; }
+  .form-grid { display: grid; gap: 12px; margin-bottom: 10px; align-items: start; }
   .form-grid input, .form-grid select { padding: 10px; border: 1px solid var(--hairline); border-radius: 6px; font-size: 14px; font-family: inherit; }
   .modal-footer { display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--hairline); padding-top: 16px; margin-top: 16px; }
 
@@ -388,7 +388,7 @@
 
     <!-- Edit form (hidden until Edit button clicked) -->
     <div id="pp-edit-form" style="background:#FAF7F1;border-radius:8px;padding:14px 16px;margin-bottom:24px;font-size:13px;display:none;border:2px solid #B11E2E;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;align-items:start;">
         <div style="grid-column:1 / span 2;"><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Name *</label><input id="pp-edit-name" type="text" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
         <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Trade</label><input id="pp-edit-trade" type="text" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
         <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Language</label><select id="pp-edit-lang" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;background:white;"><option value="EN">EN</option><option value="ES">ES</option></select></div>
@@ -831,6 +831,80 @@ applyLanguage();
     return String(raw);
   }
 
+  // Incremental version used by the live input-mask: takes a digits-only
+  // string and inserts dashes at the right spots as the operator types. The
+  // read-only formatPhone above expects a complete 10/11-digit input and
+  // falls back to raw on weird shapes — that's wrong for partial entry. This
+  // one happily formats prefixes (e.g. "212-55" while still typing).
+  function formatPhoneDigits(digits) {
+    let d = String(digits || '').replace(/\D/g, '');
+    if (d.length === 11 && d[0] === '1') d = d.slice(1);  // tolerate leading country code
+    if (d.length > 10) d = d.slice(0, 10);                // cap at 10 — extras ignored
+    if (d.length === 0) return '';
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return d.slice(0, 3) + '-' + d.slice(3);
+    return d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6);
+  }
+
+  // Read path: strip a formatted (or any-format) input value back to raw
+  // digits for the API payload. Storage convention is raw 10-digit strings,
+  // so every save path that pulls from a phone <input> routes through this.
+  function rawPhoneDigits(s) {
+    if (!s) return null;
+    const d = String(s).replace(/\D/g, '');
+    return d || null;
+  }
+
+  // Live mask: as the user types in a phone <input>, reformat to XXX-XXX-XXXX.
+  // Caret strategy: after re-format, place the caret at a position equal to
+  // the number of digits to the LEFT of the previous caret position. That
+  // keeps left-to-right typing natural and survives backspace; mid-edit caret
+  // ends up just after the digit you just changed (good enough — facade ops
+  // mostly paste or type forward, rarely edit mid-string).
+  function attachPhoneMask(inputId) {
+    const el = document.getElementById(inputId);
+    if (!el) return;
+    if (el.dataset.phoneMasked === '1') return;  // idempotent — survive re-init
+    el.dataset.phoneMasked = '1';
+    el.addEventListener('input', () => {
+      const before = el.value || '';
+      const caretStart = el.selectionStart != null ? el.selectionStart : before.length;
+      // Count digits to the LEFT of the caret in the pre-format value.
+      const digitsLeft = before.slice(0, caretStart).replace(/\D/g, '').length;
+      const formatted = formatPhoneDigits(before);
+      if (formatted === before) return;
+      el.value = formatted;
+      // Re-position caret: walk the formatted string until we've passed
+      // `digitsLeft` digits.
+      let pos = 0, seen = 0;
+      while (pos < formatted.length && seen < digitsLeft) {
+        if (/\d/.test(formatted[pos])) seen++;
+        pos++;
+      }
+      try { el.setSelectionRange(pos, pos); } catch (_) { /* not all input types support selection */ }
+    });
+    // Also re-format on blur in case JS programmatically set a raw value
+    // earlier (e.g. enterEditMode set '2125550142'). Setting the input's
+    // value programmatically doesn't fire 'input', so we normalize on focus
+    // out too — and once on load below.
+    el.addEventListener('blur', () => {
+      const formatted = formatPhoneDigits(el.value);
+      if (formatted !== el.value) el.value = formatted;
+    });
+    // Normalize the current value once (catches values present in markup).
+    if (el.value) {
+      const formatted = formatPhoneDigits(el.value);
+      if (formatted !== el.value) el.value = formatted;
+    }
+  }
+
+  // Wire the mask on all four phone inputs once. Idempotent guard inside
+  // attachPhoneMask handles re-calls.
+  attachPhoneMask('in-phone');
+  attachPhoneMask('in-ec-phone');
+  attachPhoneMask('pp-edit-phone');
+  attachPhoneMask('pp-edit-ec-phone');
+
   // ===== Security: escape user-provided strings before injecting into innerHTML =====
   function esc(s) {
     if (s == null) return '';
@@ -1174,6 +1248,11 @@ applyLanguage();
         // Relation dropdown: select the matching option, or fall to Other +
         // prefill the text input for legacy free-text values not in the list.
         setRelationFromStored(domId, val);
+      } else if (domId === 'pp-edit-phone' || domId === 'pp-edit-ec-phone') {
+        // Phone inputs use the live XXX-XXX-XXXX mask. Storage is raw digits,
+        // so format before setting .value (programmatic .value doesn't fire
+        // the input handler that the mask is wired to).
+        el.value = val == null ? '' : formatPhoneDigits(val);
       } else {
         el.value = val == null ? '' : val;
       }
@@ -1210,15 +1289,21 @@ applyLanguage();
     for (const [domId, field] of Object.entries(EDIT_FIELD_MAP)) {
       const el = document.getElementById(domId);
       if (!el) continue;
-      let newVal;
+      let newVal, origForCompare;
       if (domId === 'pp-edit-ec-relation') {
         // Effective value: select.value, OR the Other-input text if select=Other.
         newVal = (getEffectiveRelation(domId) || '').trim();
+        origForCompare = currentProfile[field] == null ? '' : String(currentProfile[field]).trim();
+      } else if (domId === 'pp-edit-phone' || domId === 'pp-edit-ec-phone') {
+        // Phone: normalize both sides to raw digits so the formatted input
+        // ('212-555-0142') doesn't diff against the stored raw ('2125550142').
+        newVal = rawPhoneDigits(el.value) || '';
+        origForCompare = rawPhoneDigits(currentProfile[field]) || '';
       } else {
         newVal = (el.value || '').trim();
+        origForCompare = currentProfile[field] == null ? '' : String(currentProfile[field]).trim();
       }
-      const origVal = currentProfile[field] == null ? '' : String(currentProfile[field]).trim();
-      if (newVal !== origVal) payload[field] = newVal;
+      if (newVal !== origForCompare) payload[field] = newVal;
     }
 
     if (Object.keys(payload).length === 0) {
@@ -1915,10 +2000,10 @@ applyLanguage();
       dob: $('#in-dob').value || null,
       trade: $('#in-trade').value || null,
       language: $('#in-language').value || null,
-      phone: $('#in-phone').value || null,
+      phone: rawPhoneDigits($('#in-phone').value),
       email: $('#in-email').value || null,
       emergency_contact_name: $('#in-ec-name').value || null,
-      emergency_contact_phone: $('#in-ec-phone').value || null,
+      emergency_contact_phone: rawPhoneDigits($('#in-ec-phone').value),
       emergency_contact_relation: getEffectiveRelation('in-ec-relation'),
       hire_date: $('#in-hire-date').value || null,
       pin: $('#in-pin').value || null,
