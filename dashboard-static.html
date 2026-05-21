@@ -1060,7 +1060,10 @@
         <div id="dcr-archive-view" class="section">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
             <h2 style="margin-bottom:0;">Daily Construction Reports</h2>
-            <button id="dcr-new-btn" type="button" style="font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:10px 20px;border:none;border-radius:4px;background:#B11E2E;color:white;cursor:pointer;">📋 Issue New DCR</button>
+            <button id="dcr-new-btn" type="button" style="font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:10px 20px;border:none;border-radius:4px;background:#B11E2E;color:white;cursor:pointer;display:inline-flex;align-items:center;gap:8px;">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+              Issue New DCR
+            </button>
           </div>
           <div id="dcr-issued-banner" style="display:none;background:#FAF7F1;border-left:3px solid #2F7C57;padding:10px 14px;border-radius:4px;margin-bottom:12px;font-size:12px;"></div>
           <div style="background:white;border:1px solid #E8E4DD;border-radius:4px;padding:14px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
@@ -1202,7 +1205,10 @@
           <!-- Action pair: Cancel (secondary) + Issue DCR (primary) -->
           <div style="margin-top:32px;padding-top:24px;border-top:2px solid #E8E4DD;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
             <div id="dcr-issue-status" style="font-size:12px;color:#76777E;margin-right:auto;"></div>
-            <button id="dcr-issue" type="button" style="font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:12px 24px;border:none;border-radius:4px;background:#B11E2E;color:white;cursor:pointer;">📋 Issue DCR</button>
+            <button id="dcr-issue" type="button" style="font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:12px 24px;border:none;border-radius:4px;background:#B11E2E;color:white;cursor:pointer;display:inline-flex;align-items:center;gap:8px;">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+              Issue DCR
+            </button>
             <button id="dcr-cancel" type="button" style="font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:12px 24px;border:1px solid #B11E2E;border-radius:4px;background:white;color:#B11E2E;cursor:pointer;">Cancel</button>
           </div>
         </div>
@@ -2339,8 +2345,9 @@
               </div>
             </div>
             <button id="cw-refresh-btn"
-                    style="background:#B11E2E;color:white;border:none;border-radius:6px;padding:10px 18px;font-weight:600;cursor:pointer;font-size:13px;letter-spacing:0.3px;">
-              ↻ Refresh from NYC
+                    style="background:#B11E2E;color:white;border:none;border-radius:6px;padding:10px 18px;font-weight:600;cursor:pointer;font-size:13px;letter-spacing:0.3px;display:inline-flex;align-items:center;gap:8px;">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              <span data-label>Refresh from NYC</span>
             </button>
           </div>
 
@@ -2936,11 +2943,14 @@ document.querySelectorAll('.nav-link').forEach(link => {
     await Promise.all([loadSummary(), loadPermits(), loadViolations(), loadComplaints()]);
   }
 
-  // Refresh button — calls server-side which calls Socrata
+  // Refresh button — calls server-side which calls Socrata.
+  // Label-only swap (don't overwrite textContent of the whole button —
+  // that would wipe the inline-SVG icon #109).
   document.getElementById('cw-refresh-btn').addEventListener('click', async () => {
     const btn = document.getElementById('cw-refresh-btn');
+    const label = btn.querySelector('[data-label]');
     btn.disabled = true;
-    btn.textContent = '⏳ Pulling from NYC…';
+    if (label) label.textContent = 'Pulling from NYC…';
     try {
       const resp = await fetch('/api/compliance/refresh', {
         method: 'POST',
@@ -2956,7 +2966,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
       alert('Refresh error: ' + e.message);
     } finally {
       btn.disabled = false;
-      btn.textContent = '↻ Refresh from NYC';
+      if (label) label.textContent = 'Refresh from NYC';
     }
   });
 
