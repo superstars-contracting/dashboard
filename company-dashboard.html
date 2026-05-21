@@ -435,13 +435,15 @@
           <!-- Desktop / secure-context path: live camera via getUserMedia.
                Requires HTTPS (tailscale serve), won't work on plain http. -->
           <button id="pp-take-face" style="background:#B11E2E;color:white;border:none;padding:8px 16px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
-            <span style="font-size:14px;">📷</span> Take ID Photo
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Take ID Photo
           </button>
           <!-- Mobile / file-input path: works on plain http over Tailscale
                because it routes through the OS file/camera picker instead
                of getUserMedia. Accepts HEIC; server converts to JPEG. -->
           <label for="pp-upload-face" style="background:#14161C;color:white;border:none;padding:8px 16px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
-            <span style="font-size:14px;">📁</span> Upload (mobile)
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload (mobile)
           </label>
           <input id="pp-upload-face" type="file" accept="image/*" capture="environment" style="display:none;">
           <!-- Remove (#99) — visible only when a face photo is on file;
@@ -489,7 +491,8 @@
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="font-size:14px;font-weight:700;color:#14161C;text-transform:uppercase;letter-spacing:0.5px;">Certifications</h3>
         <button id="pp-scan-cert" style="background:#B11E2E;color:white;border:none;padding:8px 16px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
-          <span style="font-size:14px;">📸</span> Scan Cert
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+          Scan Cert
         </button>
       </div>
 
