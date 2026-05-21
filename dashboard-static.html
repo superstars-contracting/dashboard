@@ -1250,13 +1250,13 @@
             el.innerHTML =
               '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;align-items:center;">' +
                 '<div><div class="site-label" style="margin-bottom:4px;">AM</div>' +
-                '<div style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:24px;color:#14161C;">' + fmtT(w.am && w.am.temp_f) + '</div>' +
+                '<div style="font-family:\'Archivo\', -apple-system, BlinkMacSystemFont, \'Helvetica Neue\', Helvetica, Arial, sans-serif;font-size:24px;color:#14161C;">' + fmtT(w.am && w.am.temp_f) + '</div>' +
                 '<div style="font-size:11px;color:#76777E;">' + (esc(w.am && w.am.conditions) || '—') + '</div></div>' +
                 '<div><div class="site-label" style="margin-bottom:4px;">PM</div>' +
-                '<div style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:24px;color:#14161C;">' + fmtT(w.pm && w.pm.temp_f) + '</div>' +
+                '<div style="font-family:\'Archivo\', -apple-system, BlinkMacSystemFont, \'Helvetica Neue\', Helvetica, Arial, sans-serif;font-size:24px;color:#14161C;">' + fmtT(w.pm && w.pm.temp_f) + '</div>' +
                 '<div style="font-size:11px;color:#76777E;">' + (esc(w.pm && w.pm.conditions) || '—') + '</div></div>' +
                 '<div><div class="site-label" style="margin-bottom:4px;">Wind</div>' +
-                '<div style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:18px;color:#14161C;">' + (esc(w.wind) || '—') + '</div></div>' +
+                '<div style="font-family:\'Archivo\', -apple-system, BlinkMacSystemFont, \'Helvetica Neue\', Helvetica, Arial, sans-serif;font-size:18px;color:#14161C;">' + (esc(w.wind) || '—') + '</div></div>' +
               '</div>' +
               '<div style="margin-top:12px;padding-top:8px;border-top:1px solid #F1EEE8;font-size:10px;color:#76777E;text-align:right;">' + esc(sourceLabel) + '</div>';
           }
@@ -1283,11 +1283,17 @@
             ).join('');
           }
 
+          // 10s ceiling on the aggregator fetch — better to surface an error
+          // toast than leave the operator staring at "Loading…" forever (#106).
+          // AbortController fires after the timeout; the catch sets a clear
+          // status. Without this, a server hang would silently brick the form.
           async function loadDcr(dateStr) {
             setStatus('Loading…', '#76777E');
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 10000);
             try {
               const url = '/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/daily/' + encodeURIComponent(dateStr) + '?audience=internal';
-              const resp = await fetch(url).then(r => r.json());
+              const resp = await fetch(url, {signal: ctrl.signal}).then(r => r.json());
               if (resp && resp.error) {
                 setStatus('Error: ' + resp.error, '#B11E2E');
                 return;
@@ -1308,7 +1314,13 @@
               }
             } catch (e) {
               console.warn('[DCR] load failed:', e);
-              setStatus('Network error', '#B11E2E');
+              if (e && e.name === 'AbortError') {
+                setStatus('Timed out — try Refresh', '#B11E2E');
+              } else {
+                setStatus('Network error — try Refresh', '#B11E2E');
+              }
+            } finally {
+              clearTimeout(timer);
             }
           }
 
@@ -1663,12 +1675,25 @@
                 await Promise.allSettled(Array.from(pendingSaves));
               }
               setIssueStatus(override ? 'Re-issuing internal + client…' : 'Issuing internal + client…', '#76777E');
-              const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/daily/' + encodeURIComponent(dateStr) + '/issue', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({audience: 'both', override_active: !!override})
-              });
-              const json = await resp.json();
+              // 30s ceiling on the issuance round-trip (writes internal + client
+              // HTML, registers archive row). Typical = ~200ms; a hang past 30s
+              // is a server problem and shouldn't lock the operator out of the
+              // form (#106). The AbortError lands in the catch below as a
+              // plain "Failed" status, NOT an infinite spinner.
+              const issueCtrl = new AbortController();
+              const issueTimer = setTimeout(() => issueCtrl.abort(), 30000);
+              let resp, json;
+              try {
+                resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/daily/' + encodeURIComponent(dateStr) + '/issue', {
+                  method: 'POST',
+                  headers: {'Content-Type': 'application/json'},
+                  body: JSON.stringify({audience: 'both', override_active: !!override}),
+                  signal: issueCtrl.signal,
+                });
+                json = await resp.json();
+              } finally {
+                clearTimeout(issueTimer);
+              }
               if (resp.status === 201 && json && json.data && json.data.internal_url) {
                 // window.open while still in the click-resolved chain so
                 // popup blockers allow this single auto-open. Client HTML
@@ -1700,7 +1725,8 @@
               }
             } catch (e) {
               console.warn('[DCR] issue failed:', e);
-              setIssueStatus('Network error', '#B11E2E');
+              const label = (e && e.name === 'AbortError') ? 'Timed out issuing — try again' : 'Network error — try again';
+              setIssueStatus(label, '#B11E2E');
             } finally {
               if (issueBtn) { issueBtn.disabled = false; issueBtn.style.opacity = ''; issueBtn.style.cursor = 'pointer'; }
             }
@@ -1767,7 +1793,7 @@
               ? '<button type="button" data-delete-seq="' + esc(seq) + '" data-display-id="' + esc(displayId) + '" data-report-date="' + esc(reportDate) + '" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 10px;border:1px solid #B11E2E;border-radius:4px;background:white;color:#B11E2E;cursor:pointer;margin-left:8px;">Delete</button>'
               : '';
             return '<tr>' +
-              '<td style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:13px;font-weight:600;">' + esc(displayId) + '</td>' +
+              '<td style="font-family:\'Archivo\', -apple-system, BlinkMacSystemFont, \'Helvetica Neue\', Helvetica, Arial, sans-serif;font-size:13px;font-weight:600;">' + esc(displayId) + '</td>' +
               '<td>' + esc(reportDate || '—') + '</td>' +
               '<td><span style="padding:3px 8px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;background:' + statusColor + ';color:white;">' + esc(r.status || '—') + '</span></td>' +
               '<td style="font-size:12px;color:#76777E;">' + esc(r.updated_at || r.created_at || '—') + '</td>' +
@@ -1817,8 +1843,11 @@
             if (fromInput && fromInput.value) params.set('from_date', fromInput.value);
             if (toInput && toInput.value) params.set('to_date', toInput.value);
             if (status) { status.textContent = 'Loading…'; status.style.color = '#76777E'; }
+            // 10s ceiling — same reasoning as loadDcr (#106): never hang on "Loading…".
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 10000);
             try {
-              const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/reports?' + params.toString());
+              const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/reports?' + params.toString(), {signal: ctrl.signal});
               const json = await resp.json();
               const rows = (json && json.data) || [];
               if (!rows.length) {
@@ -1830,8 +1859,11 @@
               }
             } catch (e) {
               console.warn('[DCR] archive load failed:', e);
-              tbody.innerHTML = '<tr><td colspan="5" style="padding:24px;text-align:center;color:#B11E2E;">Network error</td></tr>';
-              if (status) { status.textContent = 'Network error'; status.style.color = '#B11E2E'; }
+              const label = (e && e.name === 'AbortError') ? 'Timed out — try Apply again' : 'Network error — try Apply again';
+              tbody.innerHTML = '<tr><td colspan="5" style="padding:24px;text-align:center;color:#B11E2E;">' + label + '</td></tr>';
+              if (status) { status.textContent = label; status.style.color = '#B11E2E'; }
+            } finally {
+              clearTimeout(timer);
             }
           }
 
