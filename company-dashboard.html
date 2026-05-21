@@ -249,7 +249,7 @@
           <h2 data-i18n="p-workforce-title">Workforce</h2>
           <div class="h2-sub" data-i18n="p-workforce-sub">All workers in the company. Add new workers here — they join the master roster and can be assigned to any project.</div>
         </div>
-        <button class="btn" id="add-worker-btn" data-i18n="btn-onboard">+ Onboard</button>
+        <button class="btn" id="add-worker-btn" data-i18n="btn-onboard">+ ONBOARD</button>
       </div>
 
       <table class="roster">
@@ -550,7 +550,7 @@
       </div>
     </div>
     <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
-      <input id="in-hire-date" type="date" data-i18n-ph="ph-hire-date" placeholder="Hire Date">
+      <input id="in-hire-date" type="date" data-i18n-ph="ph-hire-date" placeholder="Onboard Date">
       <input id="in-pin" type="text" data-i18n-ph="ph-pin" placeholder="App PIN (4 digits)" maxlength="4" style="font-family:monospace;">
       <input id="in-email" type="email" data-i18n-ph="ph-email" placeholder="Email (optional)">
     </div>
@@ -605,7 +605,7 @@ const I18N = {
     'loading-projects': 'Loading projects…',
     'p-workforce-title': 'Workforce',
     'p-workforce-sub': 'All workers in the company. Add new workers here — they join the master roster and can be assigned to any project.',
-    'btn-onboard': '+ Onboard',
+    'btn-onboard': '+ ONBOARD',
     'col-worker-id': 'Worker ID',
     'col-name': 'Name',
     'col-trade': 'Trade',
@@ -666,7 +666,7 @@ const I18N = {
     'opt-rel-other-relative': 'Other relative',
     'opt-rel-friend': 'Friend',
     'opt-rel-other': 'Other',
-    'ph-hire-date': 'Hire Date',
+    'ph-hire-date': 'Onboard Date',
     'ph-pin': 'App PIN (4 digits)',
     'ph-email': 'Email (optional)',
     'btn-cancel': 'Cancel',
@@ -757,7 +757,7 @@ const I18N = {
     'opt-rel-other-relative': 'Otro familiar',
     'opt-rel-friend': 'Amigo/a',
     'opt-rel-other': 'Otro',
-    'ph-hire-date': 'Fecha de Contratación',
+    'ph-hire-date': 'Fecha de Onboarding',
     'ph-pin': 'PIN (4 dígitos)',
     'ph-email': 'Correo electrónico (opcional)',
     'btn-cancel': 'Cancelar',
@@ -1056,7 +1056,7 @@ applyLanguage();
       const rows = (resp && resp.data) || [];
       const tbody = $('#workforce-tbody');
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="10" style="padding:20px;text-align:center;color:#76777E;">No workers yet. Click <strong>+ Onboard</strong> above.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="padding:20px;text-align:center;color:#76777E;">No workers yet. Click <strong>+ ONBOARD</strong> above.</td></tr>';
         return;
       }
       tbody.innerHTML = rows.map(r => {
