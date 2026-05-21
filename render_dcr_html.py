@@ -207,17 +207,24 @@ class DCRHTMLRenderer:
     color:var(--ink); font-size:12px; line-height:1.42;
     -webkit-print-color-adjust:exact; print-color-adjust:exact;
   }}
-  .page {{ width:8.5in; min-height:11in; margin:18px auto; background:var(--paper); box-shadow:0 6px 24px rgba(0,0,0,.22); }}
+  /* max-width (not fixed width) so the page shrinks on narrow viewports
+     rather than overflowing horizontally and clipping the right edge. */
+  .page {{ width:8.5in; max-width:100%; min-height:11in; margin:18px auto; background:var(--paper); box-shadow:0 6px 24px rgba(0,0,0,.22); }}
 
-  /* ---------- Letterhead ---------- */
-  .head {{ background:var(--black); color:#fff; display:flex; justify-content:space-between; align-items:center; padding:14px 0.55in; }}
-  .brand {{ display:flex; align-items:center; gap:14px; }}
+  /* ---------- Letterhead ----------
+     box-sizing:border-box keeps the 0.55in padding INSIDE the .page width,
+     not added on top of it (which would push content past the right edge
+     in print after the @page margin is applied). min-width:0 on the flex
+     children lets the docmeta block shrink rather than overflowing its
+     column when the page area is constrained. */
+  .head {{ background:var(--black); color:#fff; display:flex; justify-content:space-between; align-items:center; gap:16px; padding:14px 0.55in; box-sizing:border-box; }}
+  .brand {{ display:flex; align-items:center; gap:14px; min-width:0; flex-shrink:1; }}
   .brand .logo svg {{ display:block; }}
   .brand .name h1 {{ margin:0; font-size:20px; font-weight:800; letter-spacing:.3px; }}
   .brand .name .sub {{ margin:2px 0 0; font-size:9.5px; color:#c7c7cc; letter-spacing:1.6px; text-transform:uppercase; }}
-  .docmeta {{ text-align:right; }}
-  .docmeta .doctype {{ font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:1.2px; }}
-  .docmeta .rid {{ font-size:10.5px; color:#c7c7cc; margin-top:3px; font-variant-numeric:tabular-nums; }}
+  .docmeta {{ text-align:right; min-width:0; flex-shrink:0; }}
+  .docmeta .doctype {{ font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:1.2px; white-space:nowrap; }}
+  .docmeta .rid {{ font-size:10.5px; color:#c7c7cc; margin-top:3px; font-variant-numeric:tabular-nums; white-space:nowrap; }}
   .redbar {{ height:4px; background:var(--red); }}
 
   .wrap {{ padding:0.4in 0.55in 0.5in; }}
@@ -286,8 +293,17 @@ class DCRHTMLRenderer:
   @media print {{
     @page {{ size: Letter portrait; margin: 0.4in; }}
     html, body {{ background:#fff; }}
-    .page {{ box-shadow:none; margin:0; width:auto; min-height:auto; }}
-    .head {{ padding-left:0; padding-right:0; }}
+    /* In print, .page fills the printable area (Letter minus @page margin
+       = ~7.7in). max-width:none drops the 100% cap that the screen rule
+       imposes; width:auto + box-sizing:border-box ensures the .page
+       container itself has zero width-overflow risk. */
+    .page {{ box-shadow:none; margin:0; width:auto; max-width:none; min-height:auto; box-sizing:border-box; }}
+    /* DO NOT zero .head's horizontal padding — that put the right-aligned
+       doctype text right at the printable boundary, where the print driver
+       could clip the last character of "DAILY CONSTRUCTION REPORT". The
+       screen rule (padding:14px 0.55in) already gives breathing room
+       inside the @page margin; keep it explicit here so it's clear. */
+    .head {{ padding:14px 0.45in; box-sizing:border-box; }}
     .wrap {{ padding:0.25in 0 0; }}
     .foot {{ margin-left:0; margin-right:0; }}
     /* Section pagination: keep title with body; never split mid-section. */
