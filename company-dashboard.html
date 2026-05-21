@@ -1520,8 +1520,10 @@ applyLanguage();
     const ph = $('#pp-face-placeholder');
     const remove = $('#pp-remove-face');
     function showPlaceholder() {
+      // Force the browser to drop the prior image entirely so Remove
+      // visibly clears the panel (not just the underlying record).
+      img.removeAttribute('src');
       img.style.display = 'none';
-      img.src = '';
       ph.style.display = 'flex';
       if (remove) remove.style.display = 'none';
     }
@@ -1529,8 +1531,12 @@ applyLanguage();
     // Server stores an absolute path; turn it into a /worker-files/ URL.
     const m = facePath.match(/[\/\\]worker_records[\/\\](.+)$/);
     if (!m) { showPlaceholder(); return; }
+    // Cache-bust (#102): face files always live at the same path
+    // (face.jpg per worker), so a replace looks identical to the
+    // browser cache unless we change the URL. Append a fresh
+    // timestamp query so the <img> requests the new bytes.
     const url = '/worker-files/' + m[1].replace(/\\/g, '/');
-    img.src = url;
+    img.src = url + (url.indexOf('?') === -1 ? '?' : '&') + 'v=' + Date.now();
     img.style.display = 'block';
     img.onclick = () => window.showLightbox(url);
     ph.style.display = 'none';
@@ -1581,7 +1587,7 @@ applyLanguage();
         <div data-role="cam-controls" style="padding:14px 18px;display:flex;gap:10px;justify-content:center;background:#FAF7F1;flex-wrap:wrap;">
           <button data-role="cam-capture" style="background:#B11E2E;color:white;border:none;padding:14px 28px;font-size:14px;font-weight:600;border-radius:8px;cursor:pointer;min-width:140px;min-height:48px;">📸 Capture</button>
           <button data-role="cam-retake" style="background:white;color:#14161C;border:1px solid #E8E4DD;padding:14px 24px;font-size:14px;font-weight:600;border-radius:8px;cursor:pointer;display:none;min-height:48px;">Retake</button>
-          <button data-role="cam-use" style="background:#B11E2E;color:white;border:none;padding:14px 28px;font-size:14px;font-weight:600;border-radius:8px;cursor:pointer;display:none;min-width:140px;min-height:48px;">Use Photo</button>
+          <button data-role="cam-use" style="background:#B11E2E;color:white;border:none;padding:14px 28px;font-size:14px;font-weight:600;border-radius:8px;cursor:pointer;display:none;min-width:140px;min-height:48px;">Save Photo</button>
         </div>
       `;
       modal.appendChild(card);
