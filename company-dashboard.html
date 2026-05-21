@@ -1669,30 +1669,109 @@ applyLanguage();
     } catch (e) { console.warn(e); }
   }
 
-  // Upload handler — wired to both ID and cert upload inputs
+  // Pretty labels for the toast / modal title. Keys match data-doc-type.
+  const DOC_TYPE_LABELS = {
+    id_front: 'ID', id_back: 'ID (back)', passport: 'Passport', idnyc: 'IDNYC',
+    sst_front: 'SST', sst_back: 'SST (back)',
+    cert_front: 'Cert', cert_back: 'Cert (back)', cert_combined: 'Cert scan',
+    other: 'Document',
+  };
+
+  // Confirm-then-upload modal for ID / cert scans. Mirrors the cert review
+  // modal's Save/Cancel pattern so the operator gets a consistent
+  // 'preview → explicit Save → toast' flow across every upload surface.
+  // Previously a file pick auto-uploaded silently; the operator only saw
+  // the new row appear with an X/Delete button (no 'saved' moment), which
+  // was the source of the field complaint that cert scans 'just disappear'.
+  function openDocUploadConfirmModal({file, docType}) {
+    return new Promise((resolve) => {
+      const docTypeLabel = DOC_TYPE_LABELS[docType] || 'Document';
+      const isImage = (file.type || '').startsWith('image/');
+      const previewUrl = isImage ? URL.createObjectURL(file) : null;
+      const previewBlock = previewUrl
+        ? `<img src="${previewUrl}" style="width:100%;max-height:240px;object-fit:contain;background:#FAF7F1;border-radius:6px;margin-bottom:14px;">`
+        : `<div style="background:#FAF7F1;padding:32px 16px;text-align:center;color:#76777E;border-radius:6px;margin-bottom:14px;font-size:12px;letter-spacing:0.5px;">${esc((file.type || 'document').toUpperCase())}</div>`;
+
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position:fixed;inset:0;background:rgba(20,22,28,0.6);z-index:2500;display:flex;align-items:center;justify-content:center;padding:12px;overflow-y:auto;';
+      const card = document.createElement('div');
+      card.style.cssText = 'background:white;border-radius:12px;width:100%;max-width:460px;max-height:96vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.3);';
+      card.innerHTML = `
+        <div style="padding:14px 18px;border-bottom:1px solid #E8E4DD;display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-family:'Playfair Display',Georgia,serif;font-size:18px;font-weight:700;color:#14161C;">Upload ${esc(docTypeLabel)}?</div>
+          <button data-role="x" style="background:none;border:none;font-size:26px;color:#76777E;cursor:pointer;line-height:1;padding:0 4px;" aria-label="Close">×</button>
+        </div>
+        <div style="padding:18px;overflow-y:auto;flex:1;">
+          ${previewBlock}
+          <div style="font-size:13px;color:#14161C;font-weight:600;word-break:break-all;">${esc(file.name)}</div>
+          <div style="font-size:11px;color:#76777E;margin-top:2px;">${(file.size/1024).toFixed(1)} KB · ${esc(file.type || 'unknown')}</div>
+          <div data-role="error" style="display:none;background:#FFE5E5;border:1px solid #B11E2E;color:#7A1118;padding:10px 14px;border-radius:6px;font-size:12px;margin-top:12px;"></div>
+        </div>
+        <div style="padding:14px 18px;border-top:1px solid #E8E4DD;display:flex;gap:10px;justify-content:flex-end;background:#FAF7F1;">
+          <button data-role="cancel" style="background:white;color:#14161C;border:1px solid #E8E4DD;padding:10px 18px;border-radius:6px;cursor:pointer;font-weight:600;">Cancel</button>
+          <button data-role="save" style="background:#B11E2E;color:white;border:none;padding:10px 22px;border-radius:6px;cursor:pointer;font-weight:600;min-width:120px;">Save</button>
+        </div>`;
+      modal.appendChild(card);
+      document.body.appendChild(modal);
+
+      const q = (r) => card.querySelector(`[data-role="${r}"]`);
+      const errEl = q('error');
+      const saveBtn = q('save');
+      function close(result) {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        try { modal.remove(); } catch (_) {}
+        resolve(result);
+      }
+      q('x').addEventListener('click', () => close(null));
+      q('cancel').addEventListener('click', () => close(null));
+      // No backdrop-click close — too easy to lose the selected file by accident.
+
+      saveBtn.addEventListener('click', async () => {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+        errEl.style.display = 'none';
+        try {
+          const fd = new FormData();
+          fd.append('file', file);
+          fd.append('doc_type', docType);
+          fd.append('doc_label', file.name);
+          const resp = await fetch(
+            '/api/workers/' + encodeURIComponent(currentEmployeeId) + '/upload',
+            {method: 'POST', body: fd}
+          );
+          const body = await resp.json().catch(() => ({}));
+          if (resp.ok && (body.data || !body.error)) {
+            close({ok: true, docTypeLabel});
+          } else {
+            errEl.textContent = (body && body.error) || `Upload failed (${resp.status})`;
+            errEl.style.display = 'block';
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save';
+          }
+        } catch (err) {
+          errEl.textContent = 'Network error: ' + (err.message || String(err));
+          errEl.style.display = 'block';
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save';
+        }
+      });
+    });
+  }
+
+  // File-input handler: stage the selected file in the confirm modal, then
+  // the modal's Save button actually uploads. Toast on success.
   document.querySelectorAll('.upload-input').forEach(inp => {
     inp.addEventListener('change', async (e) => {
       if (!currentEmployeeId) return;
       const file = e.target.files[0];
       if (!file) return;
       const docType = e.target.getAttribute('data-doc-type');
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('doc_type', docType);
-      fd.append('doc_label', file.name);
-      try {
-        const resp = await fetch('/api/workers/' + encodeURIComponent(currentEmployeeId) + '/upload', {
-          method: 'POST', body: fd
-        }).then(r => r.json());
-        if (resp.error) {
-          alert('Upload failed: ' + resp.error);
-        } else {
-          await loadProfile();
-        }
-      } catch (err) {
-        alert('Network error: ' + err.message);
+      e.target.value = '';   // reset early so the same file can be re-selected after cancel
+      const result = await openDocUploadConfirmModal({file, docType});
+      if (result && result.ok) {
+        showToast(`✓ ${result.docTypeLabel} saved`, 3500);
+        await loadProfile();
       }
-      e.target.value = '';   // reset so same file can be re-uploaded
     });
   });
 
