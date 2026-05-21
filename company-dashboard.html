@@ -247,7 +247,7 @@
           <h2 data-i18n="p-workforce-title">Workforce</h2>
           <div class="h2-sub" data-i18n="p-workforce-sub">All workers in the company. Add new workers here — they join the master roster and can be assigned to any project.</div>
         </div>
-        <button class="btn" id="add-worker-btn" data-i18n="btn-add-worker">+ Add Worker</button>
+        <button class="btn" id="add-worker-btn" data-i18n="btn-onboard">+ Onboard</button>
       </div>
 
       <table class="roster">
@@ -382,7 +382,7 @@
         <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Phone</span><strong id="pp-phone">—</strong></div>
         <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">DOB</span><strong id="pp-dob">—</strong></div>
         <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Emergency</span><strong id="pp-ec">—</strong></div>
-        <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Hired</span><strong id="pp-hire">—</strong></div>
+        <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Onboarded</span><strong id="pp-hire">—</strong></div>
       </div>
     </div>
 
@@ -394,7 +394,7 @@
         <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Language</label><select id="pp-edit-lang" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;background:white;"><option value="EN">EN</option><option value="ES">ES</option></select></div>
         <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Phone (any format)</label><input id="pp-edit-phone" type="tel" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
         <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">DOB</label><input id="pp-edit-dob" type="date" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
-        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Hired</label><input id="pp-edit-hire" type="date" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Onboarded</label><input id="pp-edit-hire" type="date" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
         <div style="grid-column:1 / span 2;"><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Email</label><input id="pp-edit-email" type="email" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
         <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Emergency Name</label><input id="pp-edit-ec-name" type="text" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
         <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Emergency Phone</label><input id="pp-edit-ec-phone" type="tel" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
@@ -571,7 +571,8 @@ const I18N = {
     'loading-projects': 'Loading projects…',
     'p-workforce-title': 'Workforce',
     'p-workforce-sub': 'All workers in the company. Add new workers here — they join the master roster and can be assigned to any project.',
-    'btn-add-worker': '+ Add Worker',
+    'btn-onboard': '+ Onboard',
+    'col-worker-id': 'Worker ID',
     'col-name': 'Name',
     'col-trade': 'Trade',
     'col-lang': 'Lang',
@@ -650,7 +651,8 @@ const I18N = {
     'loading-projects': 'Cargando proyectos…',
     'p-workforce-title': 'Personal',
     'p-workforce-sub': 'Todos los trabajadores de la empresa. Agrega nuevos trabajadores aquí — se unirán al registro maestro y podrán ser asignados a cualquier proyecto.',
-    'btn-add-worker': '+ Agregar Trabajador',
+    'btn-onboard': '+ Incorporar',
+    'col-worker-id': 'ID del Trabajador',
     'col-name': 'Nombre',
     'col-trade': 'Oficio',
     'col-lang': 'Idioma',
@@ -924,7 +926,7 @@ applyLanguage();
       const rows = (resp && resp.data) || [];
       const tbody = $('#workforce-tbody');
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="10" style="padding:20px;text-align:center;color:#76777E;">No workers yet. Click <strong>+ Add Worker</strong> above.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="padding:20px;text-align:center;color:#76777E;">No workers yet. Click <strong>+ Onboard</strong> above.</td></tr>';
         return;
       }
       tbody.innerHTML = rows.map(r => {

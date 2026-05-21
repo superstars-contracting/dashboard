@@ -2381,7 +2381,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
       const tbody = document.getElementById('emp-roster-tbody');
 
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="8" style="padding:20px;text-align:center;color:#76777E;">No workers yet. Click <strong>+ Add Worker</strong> to start the intake.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="padding:20px;text-align:center;color:#76777E;">No workers yet. Use <strong>+ Onboard</strong> on the company dashboard to start the intake.</td></tr>';
       } else {
         tbody.innerHTML = rows.map(r => {
           let health = statusBadge('OK', '#2F7C57');
