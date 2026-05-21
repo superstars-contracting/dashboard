@@ -34,15 +34,16 @@ def _day_of_week(date_str):
 
 
 def _compute_hours(time_in, time_out):
-    """Paid hours (30-minute lunch deducted) — unified with the Weekly Hours
+    """Hours WORKED (30-minute lunch deducted) — unified with the Weekly Hours
     Log so the DCR labor section and payroll's grid can never drift apart.
+    "Worked" not "paid": pay-or-not is a separate downstream decision.
     Returns None when either time is missing (the DCR renders '—' for an
-    in-progress shift); payroll's compute_paid_hours returns 0.0 for the
-    same case, but the DCR semantics want a visual blank, not a zero."""
-    from payroll_hours import compute_paid_hours
+    in-progress shift); compute_worked_hours returns 0.0 for the same case,
+    but the DCR semantics want a visual blank, not a zero."""
+    from payroll_hours import compute_worked_hours
     if not time_in or not time_out:
         return None
-    return compute_paid_hours(time_in, time_out)
+    return compute_worked_hours(time_in, time_out)
 
 
 def _weather_from_log(row):

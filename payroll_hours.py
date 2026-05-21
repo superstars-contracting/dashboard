@@ -1,9 +1,16 @@
-"""Weekly payroll-hours computation, source-of-truth = sign_in_log.
+"""Weekly hours-worked computation, source-of-truth = sign_in_log.
 
-Single helper for paid hours used by both the DCR labor section and the
-weekly Hours Log so the two views can never drift apart. Lunch is
-ALWAYS subtracted — the operator confirmed every day gets a 30-minute
-deduction regardless of shift length (per HANDOFF_WEEKLY_HOURS_LOG).
+Single helper for hours WORKED (labor actually performed) used by both
+the DCR labor section and the weekly Hours Log so the two views can
+never drift apart. Lunch is ALWAYS subtracted — every day gets a
+30-minute deduction regardless of shift length (per
+HANDOFF_WEEKLY_HOURS_LOG).
+
+Naming note (intentional): we say "worked," not "paid." Whether
+those hours ultimately get paid is a downstream manual decision
+(an early-leave for "personal" may be unpaid; "sent home — weather"
+may be paid). The number is the same; the framing avoids implying
+the system makes pay-or-not calls.
 
 Forward note (task #64, NOT this commit): time_in / time_out are the
 BILLABLE in/out times. When the live PIN model lands, attendance
@@ -57,10 +64,16 @@ def _parse_hhmm(s):
         return None
 
 
-def compute_paid_hours(time_in, time_out, lunch_minutes=DEFAULT_LUNCH_MINUTES):
-    """Return paid hours as a float rounded to 2 decimals.
+def compute_worked_hours(time_in, time_out, lunch_minutes=DEFAULT_LUNCH_MINUTES):
+    """Return hours WORKED as a float rounded to 2 decimals.
 
     Formula:  max(0, (time_out - time_in) - lunch_minutes), in hours.
+
+    "Worked" not "paid": this is labor actually performed. Whether the
+    hours get paid is a separate, manual downstream decision (early-leave
+    for "personal" might be unpaid; "sent home — weather" might be paid).
+    The number is identical to the prior compute_paid_hours; only the
+    framing changed so the system isn't implying pay-or-not policy.
 
     Reused by the weekly Hours grid AND the DCR aggregator so the two
     surfaces never disagree. Returns 0.0 if either time is missing or
@@ -153,7 +166,7 @@ def build_week_grid(conn, monday):
                 # Sum hours across all projects for this (worker, date)
                 day_hours = 0.0
                 for r in day_rows:
-                    day_hours += compute_paid_hours(r["time_in"], r["time_out"])
+                    day_hours += compute_worked_hours(r["time_in"], r["time_out"])
                 # Primary row is the one most recently created (last id); show
                 # its times in the cell. Operator edits this primary row.
                 primary = day_rows[-1]

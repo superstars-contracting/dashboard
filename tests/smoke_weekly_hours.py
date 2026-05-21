@@ -112,20 +112,20 @@ clean_test_data()
 from datetime import date as _date
 
 sys.path.insert(0, str(D))
-from payroll_hours import last_completed_week, compute_paid_hours
+from payroll_hours import last_completed_week, compute_worked_hours
 
 mon, fri = last_completed_week(_date(2026, 5, 20))
 expect(f"helper: last_completed_week(2026-05-20) -> ({WEEK_START}, {WEEK_END})",
        (mon.isoformat(), fri.isoformat()) == (WEEK_START, WEEK_END),
        f"got ({mon.isoformat()}, {fri.isoformat()})")
-expect("helper: paid_hours(07:00, 15:30) == 8.00",
-       compute_paid_hours("07:00", "15:30") == 8.0)
-expect("helper: paid_hours(07:00, 12:00) == 4.50  (early leave)",
-       compute_paid_hours("07:00", "12:00") == 4.5)
-expect("helper: paid_hours(08:00, 16:30) == 8.00  (different shift, same length)",
-       compute_paid_hours("08:00", "16:30") == 8.0)
-expect("helper: paid_hours(07:00, None) == 0.00  (missing time_out)",
-       compute_paid_hours("07:00", None) == 0.0)
+expect("helper: worked_hours(07:00, 15:30) == 8.00",
+       compute_worked_hours("07:00", "15:30") == 8.0)
+expect("helper: worked_hours(07:00, 12:00) == 4.50  (early leave)",
+       compute_worked_hours("07:00", "12:00") == 4.5)
+expect("helper: worked_hours(08:00, 16:30) == 8.00  (different shift, same length)",
+       compute_worked_hours("08:00", "16:30") == 8.0)
+expect("helper: worked_hours(07:00, None) == 0.00  (missing time_out)",
+       compute_worked_hours("07:00", None) == 0.0)
 
 f = open(LOG, "w")
 proc = subprocess.Popen(
@@ -155,7 +155,7 @@ try:
     expect("5 date entries (Mon-Fri)", len(grid.get("dates", [])) == 5)
     expect("grid has workers list", isinstance(grid.get("workers"), list))
 
-    # ----- Step 2: seed paid-hours math (full day + early leave + absent) -----
+    # ----- Step 2: seed hours-worked math (full day + early leave + absent) -----
     print("\n--- Step 2: seed sign_in_log rows ---")
     # EMP_A: Mon full day (07:00-15:30 -> 8.00), Tue early leave (07:00-12:00 -> 4.50), Wed absent
     # EMP_B: Mon full day, Tue full day, Wed-Fri absent
@@ -242,7 +242,7 @@ try:
            f"got {len(body)} bytes")
 
     # ----- Step 6: edit a cell + assert DCR sees the same number -----
-    print("\n--- Step 6: edit cell -> DCR labor reflects same paid-hours ---")
+    print("\n--- Step 6: edit cell -> DCR labor reflects same worked-hours ---")
     # The seeded Mon EMP_A row has sign_in_id we can grab from the grid
     a_mon_sid = a["days"][0]["sign_in_id"]
     expect("EMP_A Mon has sign_in_id", a_mon_sid is not None)
@@ -257,7 +257,7 @@ try:
         a2 = find_worker(grid2, EMP_A)
         expect(f"after PUT: {EMP_A} Mon hours == 7.50", a2["days"][0]["hours"] == 7.5)
         # Now issue a DCR for that Monday and confirm the labor section uses the
-        # same paid-hours figure (the SHARED helper).
+        # same worked-hours figure (the SHARED helper).
         hit("POST", "/api/work-log", body={
             "project_code": PROJECT, "date": "2026-05-11",
             "trade_area": "test", "description": "hours-smoke",

@@ -338,8 +338,8 @@ def api_payroll_hours_csv():
     employee_id, name, trade, <Mon date>, <Tue>, <Wed>, <Thu>, <Fri>,
     weekly_total. A 'DAILY TOTAL' summary row follows the data rows.
 
-    Hours are paid hours (lunch deducted) so the CSV matches what the
-    operator hands to payroll.
+    Hours are hours WORKED (lunch deducted) so the CSV matches what the
+    operator hands to payroll. Pay-or-not is a downstream decision.
     """
     import csv
     import io
