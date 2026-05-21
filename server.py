@@ -2883,6 +2883,67 @@ def api_worker_delete_cert(employee_id, cert_id):
         return jsonify({"error": str(e)}), 400
 
 
+@app.route('/api/workers/<employee_id>/certs/<int:cert_id>', methods=['PATCH'])
+def api_worker_patch_cert(employee_id, cert_id):
+    """Edit fields on an existing certification row.
+
+    Editable: cert_type_id, date_obtained, expiration_date, status,
+    card_number, issuing_body, notes, scan_path. Mirrors the validation
+    in POST/import (dates ISO YYYY-MM-DD, expiration_date >= date_obtained
+    when both supplied). 404 if the cert id doesn't belong to the named
+    employee — prevents cross-worker edits via guessed ids."""
+    EDITABLE = {'cert_type_id', 'date_obtained', 'expiration_date', 'status',
+                'card_number', 'issuing_body', 'notes', 'scan_path'}
+    data = request.get_json(silent=True) or {}
+    updates = {}
+    for k in EDITABLE:
+        if k in data:
+            v = data[k]
+            if isinstance(v, str):
+                v = v.strip() or None
+            updates[k] = v
+    if not updates:
+        return jsonify({"error": "no editable fields in payload"}), 400
+    for df in ('date_obtained', 'expiration_date'):
+        if df in updates and updates[df]:
+            try:
+                datetime.strptime(updates[df], '%Y-%m-%d')
+            except ValueError:
+                return jsonify({"error": f"{df} must be ISO YYYY-MM-DD"}), 400
+
+    conn = db()
+    try:
+        existing = conn.execute(
+            "SELECT id, date_obtained, expiration_date FROM certifications "
+            "WHERE id = ? AND employee_id = ?",
+            (cert_id, employee_id)
+        ).fetchone()
+        if not existing:
+            return jsonify({"error": "certification not found"}), 404
+        # Cross-field validation against the post-merge state, not just the
+        # incoming payload — operator can update one half of the date pair.
+        merged_do = updates.get('date_obtained', existing['date_obtained'])
+        merged_exp = updates.get('expiration_date', existing['expiration_date'])
+        if merged_do and merged_exp and merged_exp < merged_do:
+            return jsonify({
+                "error": f"expiration_date ({merged_exp}) is before date_obtained ({merged_do})"
+            }), 400
+        set_clauses = [f"{k} = ?" for k in updates] + ["updated_at = CURRENT_TIMESTAMP"]
+        params = list(updates.values()) + [cert_id]
+        conn.execute(
+            f"UPDATE certifications SET {', '.join(set_clauses)} WHERE id = ?",
+            params
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM certifications WHERE id = ?", (cert_id,)).fetchone()
+        return response_wrapper(dict(row)), 200
+    except Exception as e:
+        logging.error(f"PATCH /api/workers/{employee_id}/certs/{cert_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
 @app.route('/api/workers/<employee_id>/certs', methods=['POST'])
 def api_worker_add_cert(employee_id):
     """Add a certification to a worker.
@@ -3324,6 +3385,74 @@ def api_employee_face_photo(employee_id):
         return jsonify({"error": str(e)}), 400
 
 
+@app.route('/api/employees/<employee_id>/face-photo', methods=['DELETE'])
+def api_employee_face_photo_delete(employee_id):
+    """Remove a worker's face photo. Clears employees.face_image_path and
+    unlinks face.* files from disk. After deletion the worker can't be
+    issued a new credential — POST /credential/issue hard-gates on
+    face_image_path — until a new face photo is uploaded.
+
+    404 if the worker doesn't exist. Idempotent — a worker who already has
+    no face photo returns 200 with {already_absent: true}. DB is the source
+    of truth; file unlink errors are logged but don't fail the response."""
+    conn = None
+    try:
+        conn = db()
+        emp = conn.execute(
+            "SELECT employee_id, face_image_path, folder_path "
+            "FROM employees WHERE employee_id = ?",
+            (employee_id,)
+        ).fetchone()
+        if not emp:
+            return jsonify({"error": "employee not found"}), 404
+        if not emp["face_image_path"]:
+            return response_wrapper({
+                "employee_id": employee_id,
+                "face_image_path": None,
+                "files_unlinked": 0,
+                "already_absent": True,
+            }), 200
+        conn.execute(
+            "UPDATE employees SET face_image_path = NULL, updated_at = CURRENT_TIMESTAMP "
+            "WHERE employee_id = ?",
+            (employee_id,)
+        )
+        conn.commit()
+
+        files_unlinked = 0
+        folder = emp["folder_path"]
+        if folder:
+            try:
+                fp = Path(folder).resolve()
+                if str(fp).startswith(str(WORKER_RECORDS_DIR.resolve())):
+                    for old in fp.glob("face.*"):
+                        try:
+                            old.unlink()
+                            files_unlinked += 1
+                        except OSError as e:
+                            app.logger.warning(
+                                f"face-photo unlink failed for {employee_id} {old}: {e}"
+                            )
+            except Exception as e:
+                app.logger.warning(
+                    f"face-photo dir cleanup failed for {employee_id}: {e}"
+                )
+
+        return response_wrapper({
+            "employee_id": employee_id,
+            "face_image_path": None,
+            "files_unlinked": files_unlinked,
+            "already_absent": False,
+        }), 200
+    except Exception as e:
+        logging.error(f"DELETE /api/employees/{employee_id}/face-photo: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
+
+
 @app.route('/api/cert-types', methods=['GET'])
 def api_cert_types():
     """List all cert types for autocomplete."""
@@ -3713,6 +3842,125 @@ def issue_employee_credential(emp_id):
                 conn.close()
             except Exception:
                 pass
+
+
+def _current_credential_row(conn, emp_id):
+    """Locate the worker's current credential — same dispatch as GET
+    /credential. Returns (table_name, dict-row) or (None, None). CoF
+    (status='issued') takes precedence over Company ID (status='active')."""
+    cof = conn.execute(
+        "SELECT * FROM cof_cards WHERE employee_id = ? AND status = 'issued' "
+        "ORDER BY issued_date DESC LIMIT 1",
+        (emp_id,)
+    ).fetchone()
+    if cof:
+        return ('cof_cards', dict(cof))
+    cid = conn.execute(
+        "SELECT * FROM company_id_cards WHERE employee_id = ? AND status = 'active' "
+        "ORDER BY issued_date DESC, created_at DESC LIMIT 1",
+        (emp_id,)
+    ).fetchone()
+    if cid:
+        return ('company_id_cards', dict(cid))
+    return (None, None)
+
+
+@app.route('/api/employees/<emp_id>/credential', methods=['PATCH'])
+def patch_employee_credential(emp_id):
+    """Edit the worker's CURRENT credential (same dispatch as GET).
+
+    Editable: notes, status (for both card types) + expires_date (CoF only).
+    Immutable post-issue: card_id, card_number_display, issued_date,
+    photo_snapshot_path, html_export_path, basis_certs_json, rigger_* —
+    those are properties of the physical card and must not drift after
+    print/handover.
+
+    404 if there's no current credential to edit; 400 if expires_date is
+    supplied for a Company ID (no such field on that card type)."""
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        conn = db()
+        table, card = _current_credential_row(conn, emp_id)
+        if not card:
+            return jsonify({"error": "no current credential to edit"}), 404
+        EDITABLE = {'notes', 'status'}
+        if table == 'cof_cards':
+            EDITABLE = EDITABLE | {'expires_date'}
+        elif 'expires_date' in data:
+            return jsonify({"error": "company_id cards have no expires_date"}), 400
+        updates = {}
+        for k in EDITABLE:
+            if k in data:
+                updates[k] = data[k]
+        if not updates:
+            return jsonify({"error": "no editable fields in payload"}), 400
+        if 'expires_date' in updates and updates['expires_date']:
+            try:
+                datetime.strptime(updates['expires_date'], '%Y-%m-%d')
+            except ValueError:
+                return jsonify({"error": "expires_date must be YYYY-MM-DD"}), 400
+        set_clauses = [f"{k} = ?" for k in updates] + ["updated_at = CURRENT_TIMESTAMP"]
+        params = list(updates.values()) + [card['card_id']]
+        conn.execute(
+            f"UPDATE {table} SET {', '.join(set_clauses)} WHERE card_id = ?",
+            params
+        )
+        conn.commit()
+        row = conn.execute(
+            f"SELECT * FROM {table} WHERE card_id = ?", (card['card_id'],)
+        ).fetchone()
+        payload = {
+            "type": 'cof' if table == 'cof_cards' else 'company_id',
+            "card_id": row['card_id'],
+            "card_number_display": row['card_number_display'],
+            "status": row['status'],
+            "notes": row['notes'],
+        }
+        if table == 'cof_cards':
+            payload["expires_date"] = row['expires_date']
+        return response_wrapper(payload), 200
+    except Exception as e:
+        logging.error(f"PATCH /api/employees/{emp_id}/credential: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
+
+
+@app.route('/api/employees/<emp_id>/credential', methods=['DELETE'])
+def delete_employee_credential(emp_id):
+    """Soft-revoke: status='revoked' on the worker's current credential.
+    The DB row is preserved (audit trail) and so are the rendered HTML/PDF
+    files on disk. After revocation, GET /credential reports no current
+    credential — the lookup only finds CoFs with status='issued' or
+    Company IDs with status='active' — so the worker becomes credential-
+    less and is eligible for re-issuance. 404 if no current credential."""
+    conn = None
+    try:
+        conn = db()
+        table, card = _current_credential_row(conn, emp_id)
+        if not card:
+            return jsonify({"error": "no current credential to revoke"}), 404
+        conn.execute(
+            f"UPDATE {table} SET status = 'revoked', updated_at = CURRENT_TIMESTAMP "
+            f"WHERE card_id = ?",
+            (card['card_id'],)
+        )
+        conn.commit()
+        return jsonify({
+            "revoked": True,
+            "type": 'cof' if table == 'cof_cards' else 'company_id',
+            "card_id": card['card_id'],
+        }), 200
+    except Exception as e:
+        logging.error(f"DELETE /api/employees/{emp_id}/credential: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
 
 
 @app.route('/worker-files/<path:filepath>', methods=['GET'])

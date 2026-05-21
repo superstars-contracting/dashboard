@@ -172,7 +172,11 @@ def test_workforce(real_emp_id):
     g2 = requests.get(f"{BASE}/api/workers/{syn_id}", timeout=10)
     r.edit = (p.status_code == 200 and g2.status_code == 200 and
               g2.json()["data"]["employee"]["trade"] == "SMOKE_CRUD_TRADE_B")
-    # DELETE — no public API. Verify by trying every reasonable verb.
+    # SHOWS — workforce list (intake-summary). Verify BEFORE delete so a
+    # working DELETE doesn't make SHOWS see the post-delete state.
+    ls = requests.get(f"{BASE}/api/workers/intake-summary", timeout=10)
+    r.shows = any(x.get("employee_id") == syn_id for x in ls.json()["data"])
+    # DELETE — try every reasonable verb.
     d = requests.delete(f"{BASE}/api/employees/{syn_id}", timeout=10)
     d2 = requests.delete(f"{BASE}/api/workers/{syn_id}", timeout=10)
     if d.status_code == 200 or d2.status_code == 200:
@@ -180,11 +184,7 @@ def test_workforce(real_emp_id):
     else:
         r.delete = False
         add_note(r, f"no public DELETE: /api/employees=>{d.status_code}, /api/workers=>{d2.status_code}")
-    # SHOWS IN REPORT — workforce shows in workforce list (intake-summary)
-    ls = requests.get(f"{BASE}/api/workers/intake-summary", timeout=10)
-    found = any(x.get("employee_id") == syn_id for x in ls.json()["data"])
-    r.shows = found
-    # Clean up via SQL (no API delete)
+    # Clean up any residue via SQL (idempotent against working+missing delete)
     conn = db()
     try:
         conn.execute("DELETE FROM project_assignments WHERE employee_id = ?", (syn_id,))
@@ -271,14 +271,15 @@ def test_face_photo(real_emp_id):
         timeout=15,
     )
     r.edit = (up2.status_code == 200)
-    # DELETE — no public endpoint
+    # SHOWS — face_image_path is referenced by /credential endpoint.
+    # Check BEFORE delete so a working DELETE doesn't make SHOWS see absent.
+    g3 = requests.get(f"{BASE}/api/employees/{real_emp_id}/credential", timeout=10)
+    r.shows = (g3.status_code == 200 and g3.json()["data"].get("face_image_path_present") is True)
+    # DELETE
     d = requests.delete(f"{BASE}/api/employees/{real_emp_id}/face-photo", timeout=10)
     r.delete = (d.status_code == 200)
     if not r.delete:
         add_note(r, f"no public DELETE for face-photo (status {d.status_code})")
-    # SHOWS — face_image_path is referenced by /api/workers/<id> and credential endpoints
-    g3 = requests.get(f"{BASE}/api/employees/{real_emp_id}/credential", timeout=10)
-    r.shows = (g3.status_code == 200 and g3.json()["data"].get("face_image_path_present") is True)
     # Restore prior face_image_path so we don't permanently overwrite a real worker
     conn = db()
     try:
@@ -370,21 +371,23 @@ def test_credential_issue(real_emp_id):
     has_current = bool(g.status_code == 200 and g.json()["data"].get("type"))
     r.create = (issued_ok and has_current)
     cred_type = g.json()["data"].get("type") if has_current else None
-    # EDIT — no public PATCH endpoint
-    p = requests.patch(f"{BASE}/api/employees/{real_emp_id}/credential", json={}, timeout=10)
-    r.edit = (p.status_code == 200)
-    if not r.edit:
-        add_note(r, f"no PATCH endpoint for credential (status {p.status_code})")
-    # DELETE — no public DELETE
-    d = requests.delete(f"{BASE}/api/employees/{real_emp_id}/credential", timeout=10)
-    r.delete = (d.status_code == 200)
-    if not r.delete:
-        add_note(r, f"no public DELETE for credential (status {d.status_code})")
-    # SHOWS — intake-summary surfaces current_credential
+    # SHOWS — intake-summary surfaces current_credential. Check BEFORE
+    # PATCH/DELETE so the soft-revoke from DELETE doesn't sabotage SHOWS.
     ls = requests.get(f"{BASE}/api/workers/intake-summary", timeout=10).json()["data"]
     row = next((x for x in ls if x["employee_id"] == real_emp_id), None)
     r.shows = bool(row and row.get("current_credential") and
                    row["current_credential"].get("type") == cred_type)
+    # EDIT — PATCH credential notes (non-empty body required)
+    p = requests.patch(f"{BASE}/api/employees/{real_emp_id}/credential",
+                       json={"notes": MARKER + "_CRED_NOTE"}, timeout=10)
+    r.edit = (p.status_code == 200)
+    if not r.edit:
+        add_note(r, f"PATCH credential failed (status {p.status_code})")
+    # DELETE
+    d = requests.delete(f"{BASE}/api/employees/{real_emp_id}/credential", timeout=10)
+    r.delete = (d.status_code == 200)
+    if not r.delete:
+        add_note(r, f"DELETE credential failed (status {d.status_code})")
     # Cleanup — retract the test issuance via direct SQL
     conn = db()
     try:
