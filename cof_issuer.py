@@ -392,12 +392,22 @@ def issue_cof(employee_id, rigger_id=None, project_code=None, today_override=Non
                 except Exception as e:
                     print(f"[cof_issuer] photo snapshot failed: {e}", file=sys.stderr)
 
-        # Mark any existing 'issued' card as 'replaced' so there's only
-        # ever one active card per worker (matches the same-type supersede
-        # behavior the route enforces).
+        # Mark any existing 'issued' CoF as 'replaced' (same-type supersede).
         conn.execute(
             "UPDATE cof_cards SET status='replaced', updated_at=CURRENT_TIMESTAMP "
             "WHERE employee_id = ? AND status = 'issued'",
+            (employee_id,)
+        )
+        # CoF supersedes Company ID (#98): if the worker has an active
+        # Company ID (e.g., issued earlier when they weren't CoF-eligible),
+        # mark it 'replaced' too. The CoF is the higher credential and the
+        # 'one active credential per worker' rule must hold across types.
+        # The reverse direction is NOT applied — issuing a Company ID does
+        # NOT touch an existing CoF (the operator must explicitly revoke
+        # the CoF first if they really want to downgrade).
+        conn.execute(
+            "UPDATE company_id_cards SET status='replaced', updated_at=CURRENT_TIMESTAMP "
+            "WHERE employee_id = ? AND status = 'active'",
             (employee_id,)
         )
 

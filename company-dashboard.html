@@ -985,25 +985,46 @@ applyLanguage();
   }
 
   function actionButtonHTML(r) {
+    // ONE coherent action per worker, computed fresh from server state
+    // (intake-summary recomputes eligibility + current_credential per
+    // request, and loadWorkforce is re-run on every cert add/delete and
+    // every credential issue — so no stale buttons).
+    //
+    // Policy (#98): CoF is the higher credential; Company ID is the
+    // fallback for non-CoF-eligible workers. Each worker holds exactly
+    // ONE active credential. CoF SUPERSEDES Company ID — never the
+    // other direction. If a worker somehow has both rows active (e.g.,
+    // legacy test issuances), the CoF wins and the Company ID is
+    // treated as superseded — not shown in the action.
     const elig = r.eligibility;
     const cur = r.current_credential;
     const baseStyle = 'background:none;border:1px solid #E8E4DD;color:#B11E2E;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;font-weight:600;';
+    const safeEmp = esc(r.employee_id);
     if (!elig) {
       // Defensive: missing eligibility (older data / schema lag)
       return `<button class="cred-btn" data-action="unknown" style="background:none;border:1px solid #E8E4DD;color:#76777E;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;font-weight:600;">—</button>`;
     }
-    const eligLabel = credLabel(elig);
-    const safeEmp = esc(r.employee_id);
-    if (!cur) {
-      return `<button class="cred-btn" data-action="issue" data-emp="${safeEmp}" data-elig="${elig}" data-supersede="false" style="${baseStyle}">Issue ${eligLabel}</button>`;
-    }
-    if (cur.type === elig) {
+    // 1. Active CoF wins regardless of current eligibility. If the worker
+    //    later loses the prereq, the existing CoF stays valid until the
+    //    operator manually revokes it via the profile / credential UI.
+    if (cur && cur.type === 'cof') {
       const urlEsc = esc(cur.html_url || '');
-      return `<button class="cred-btn" data-action="view" data-html-url="${urlEsc}" style="${baseStyle}">View ${eligLabel}</button>`;
+      return `<button class="cred-btn" data-action="view" data-html-url="${urlEsc}" style="${baseStyle}">View CoF</button>`;
     }
-    // Cross-type: eligibility changed since last issuance
-    const oldLabel = credLabel(cur.type);
-    return `<button class="cred-btn" data-action="issue" data-emp="${safeEmp}" data-elig="${elig}" data-supersede="true" data-old-type="${cur.type}" style="${baseStyle}">Issue ${eligLabel} (supersedes ${oldLabel})</button>`;
+    // 2. Active Company ID, worker is now CoF-eligible: offer to UPGRADE.
+    //    issue_cof on the server marks the existing Company ID as replaced
+    //    (CoF supersedes Company ID).
+    if (cur && cur.type === 'company_id' && elig === 'cof') {
+      return `<button class="cred-btn" data-action="issue" data-emp="${safeEmp}" data-elig="cof" data-supersede="true" data-old-type="company_id" style="${baseStyle}">Issue CoF</button>`;
+    }
+    // 3. Active Company ID, worker still not CoF-eligible.
+    if (cur && cur.type === 'company_id') {
+      const urlEsc = esc(cur.html_url || '');
+      return `<button class="cred-btn" data-action="view" data-html-url="${urlEsc}" style="${baseStyle}">View Company ID</button>`;
+    }
+    // 4. No active credential. Issue per eligibility.
+    const eligLabel = credLabel(elig);
+    return `<button class="cred-btn" data-action="issue" data-emp="${safeEmp}" data-elig="${elig}" data-supersede="false" style="${baseStyle}">Issue ${eligLabel}</button>`;
   }
 
   async function postIssueCredential(empId, workerName, elig, override) {
@@ -1040,8 +1061,9 @@ applyLanguage();
   function issueCredentialClick(empId, workerName, elig, supersede, oldType) {
     const eligLabel = credLabel(elig);
     let confirmMsg;
-    if (supersede) {
-      confirmMsg = `Issue ${eligLabel} for ${workerName}? This will supersede the current ${credLabel(oldType)}.`;
+    if (supersede && elig === 'cof' && oldType === 'company_id') {
+      // CoF supersedes Company ID — the only valid supersede direction.
+      confirmMsg = `Issue CoF for ${workerName}? CoF supersedes the current Company ID.`;
     } else {
       confirmMsg = `Issue ${eligLabel} for ${workerName}?`;
     }
