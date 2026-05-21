@@ -2816,6 +2816,23 @@ def api_certification_extract(employee_id):
         f.save(str(target_path))
         conn.close()
 
+        # AI extraction is OPTIONAL — the server boots without
+        # ANTHROPIC_API_KEY. When it's not configured (continuous-run Path A),
+        # the cert-card photo is still saved to the worker folder and the
+        # operator can fall back to manual cert entry. Return 503 with a clean
+        # "feature disabled" signal so the UI can show "AI unavailable — use
+        # manual entry" rather than treating it as an error.
+        relative = target_path.relative_to(WORKER_RECORDS_DIR.resolve())
+        image_url = "/worker-files/" + str(relative).replace("\\", "/")
+        if not os.environ.get('ANTHROPIC_API_KEY'):
+            return jsonify({
+                "error": "AI extraction disabled — ANTHROPIC_API_KEY not configured",
+                "ai_available": False,
+                "image_path": str(target_path),
+                "image_url": image_url,
+                "note": "Image saved. Use manual entry to record cert data.",
+            }), 503
+
         # Run extraction. If the API call fails, leave the image on disk so the
         # operator can retry or do manual entry — return 500 with the path.
         try:
@@ -2828,9 +2845,6 @@ def api_certification_extract(employee_id):
                 "image_path": str(target_path),
                 "note": "image saved on disk; operator can retry or use manual entry",
             }), 500
-
-        relative = target_path.relative_to(WORKER_RECORDS_DIR.resolve())
-        image_url = "/worker-files/" + str(relative).replace("\\", "/")
 
         return response_wrapper({
             "extracted": extracted,

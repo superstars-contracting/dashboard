@@ -15,6 +15,10 @@
 flask>=3.0
 flask-cors>=4.0
 
+# Production WSGI server for Windows (continuous-run task — see run_server.ps1).
+# Falls back to Flask's dev server if waitress isn't installed.
+waitress>=3.0
+
 # PDF generation (HTML → PDF)
 weasyprint>=60.0
 
