@@ -65,7 +65,7 @@ def render_timesheet_html(grid, generated_at=None):
                 cells.append('<td class="day-cell blank">—</td>')
         body_rows.append(
             f"<tr>"
-            f'<td class="emp-id">{_esc(w["employee_id"])}</td>'
+            f'<td class="emp-id">{_esc(w.get("worker_id") or w["employee_id"])}</td>'
             f'<td class="emp-name">{_esc(w["name"])}</td>'
             f'<td class="emp-trade">{_esc(w["trade"] or "")}</td>'
             + "".join(cells)
@@ -121,7 +121,7 @@ def render_timesheet_html(grid, generated_at=None):
     <div class="week-range">{_esc(week_start_long)} – {_esc(week_end_long)}, {_esc(grid["week_start"][:4])}</div>
     <table>
       <thead>
-        <tr><th>ID</th><th>Name</th><th>Trade</th>{day_headers}<th>Weekly Total</th></tr>
+        <tr><th>Worker ID</th><th>Name</th><th>Trade</th>{day_headers}<th>Weekly Total</th></tr>
       </thead>
       <tbody>
         {"".join(body_rows)}

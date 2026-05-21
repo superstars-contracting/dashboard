@@ -112,7 +112,7 @@ def build_week_grid(conn, monday):
     date_strs = [d.isoformat() for d in dates]
 
     workers = conn.execute(
-        """SELECT DISTINCT e.employee_id, e.name, e.trade
+        """SELECT DISTINCT e.employee_id, e.worker_id, e.name, e.trade
            FROM employees e
            JOIN project_assignments pa ON pa.employee_id = e.employee_id
            WHERE pa.status = 'active'
@@ -172,6 +172,7 @@ def build_week_grid(conn, monday):
             days.append(day)
         grid_workers.append({
             "employee_id": eid,
+            "worker_id": w["worker_id"],
             "name": w["name"],
             "trade": w["trade"],
             "days": days,

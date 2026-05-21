@@ -102,9 +102,15 @@ class DCRHTMLRenderer:
         rows = labor.get('rows', [])
         if not rows:
             return "<div class='section-header'>2. LABOR TRACKING</div><p>No sign-in data.</p>"
-        html = "<div class='section-header'>2. LABOR TRACKING</div><table><tr><th>Employee</th><th>Trade</th><th>Time In</th><th>Time Out</th><th>Hours</th><th>Area</th></tr>"
+        html = ("<div class='section-header'>2. LABOR TRACKING</div>"
+                "<table><tr><th>Worker ID</th><th>Name</th><th>Trade</th>"
+                "<th>Time In</th><th>Time Out</th><th>Hours</th><th>Area</th></tr>")
         for row in rows:
-            html += f"<tr><td>{row.get('name')}</td><td>{row.get('trade')}</td><td>{row.get('time_in')}</td><td>{row.get('time_out')}</td><td>{row.get('hours')}</td><td>{row.get('area', '')}</td></tr>"
+            wid = row.get('worker_id') or '—'
+            html += (f"<tr><td style='font-family:monospace;font-weight:600;'>{wid}</td>"
+                     f"<td>{row.get('name')}</td><td>{row.get('trade')}</td>"
+                     f"<td>{row.get('time_in')}</td><td>{row.get('time_out')}</td>"
+                     f"<td>{row.get('hours')}</td><td>{row.get('area', '')}</td></tr>")
         html += f"</table><p><strong>Headcount:</strong> {labor.get('headcount')} | <strong>Total Hours:</strong> {labor.get('total_hours')}</p>"
         return html
 

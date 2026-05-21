@@ -358,15 +358,19 @@ def api_payroll_hours_csv():
 
         buf = io.StringIO()
         w = csv.writer(buf)
-        w.writerow(["employee_id", "name", "trade",
+        # Worker ID (W-####) first — the human-facing identifier that
+        # payroll uses to match workers across systems. employee_id stays
+        # so the internal key is in the export for traceback.
+        w.writerow(["worker_id", "employee_id", "name", "trade",
                     *grid["dates"], "weekly_total"])
         for emp in grid["workers"]:
             w.writerow([
+                emp.get("worker_id") or "",
                 emp["employee_id"], emp["name"], emp["trade"] or "",
                 *[(d["hours"] if d["has_entry"] else "") for d in emp["days"]],
                 emp["weekly_total"],
             ])
-        w.writerow(["", "DAILY TOTAL", "",
+        w.writerow(["", "", "DAILY TOTAL", "",
                     *grid["totals_by_day"], grid["grand_total"]])
 
         csv_bytes = buf.getvalue().encode("utf-8")
@@ -1552,24 +1556,31 @@ def update_action_item_status(action_id):
 
 @app.route('/api/employees', methods=['POST'])
 def create_employee():
-    """Create new employee"""
+    """Create new employee. Allocates a fresh Worker ID (W-####) for the
+    human-facing display label — bulk-import in import_workers.py uses the
+    same allocator (worker_id.next_worker_id_sequence) so single-onboards
+    and CSV imports never collide. employee_id is still the internal PK."""
     try:
+        from worker_id import assign_worker_id
         data = request.get_json()
         employee_id = data.get('employee_id') or str(uuid.uuid4())[:8]
         name = data.get('name')
         trade = data.get('trade')
-        
+
         conn = db()
+        worker_id = assign_worker_id(conn)
         conn.execute(
-            "INSERT INTO employees (employee_id, name, trade, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-            (employee_id, name, trade, datetime.now().isoformat(), datetime.now().isoformat())
+            "INSERT INTO employees (employee_id, worker_id, name, trade, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (employee_id, worker_id, name, trade,
+             datetime.now().isoformat(), datetime.now().isoformat())
         )
         conn.commit()
-        
+
         row = conn.execute("SELECT * FROM employees WHERE employee_id = ?", (employee_id,)).fetchone()
         conn.close()
-        
-        return response_wrapper(dict(row) if row else {"employee_id": employee_id}), 201
+
+        return response_wrapper(dict(row) if row else {"employee_id": employee_id, "worker_id": worker_id}), 201
     except Exception as e:
         logging.error(f"POST /api/employees: {str(e)}")
         return jsonify({"error": str(e)}), 500
@@ -3143,7 +3154,8 @@ def api_workers_intake_summary():
         from cof_issuer import has_valid_prerequisite
         conn = db()
         emps = conn.execute(
-            "SELECT employee_id, name, trade, phone, language, intake_status, folder_path FROM employees ORDER BY name"
+            "SELECT employee_id, worker_id, name, trade, phone, language, intake_status, folder_path "
+            "FROM employees ORDER BY worker_id"
         ).fetchall()
 
         today = datetime.utcnow().date().isoformat()

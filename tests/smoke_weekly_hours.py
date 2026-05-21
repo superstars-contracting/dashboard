@@ -208,22 +208,27 @@ try:
     expect("CSV mimetype is text/csv", "text/csv" in (hdrs.get("Content-Type", "") or ""))
     text = body.decode("utf-8")
     rows = list(csv.reader(io.StringIO(text)))
-    expect("CSV header is correct shape", rows[0][:3] == ["employee_id", "name", "trade"]
-           and rows[0][-1] == "weekly_total" and len(rows[0]) == 9)
-    # Find our test rows by ID column only — no name printed
-    by_id = {r[0]: r for r in rows[1:-1]}  # exclude header and DAILY TOTAL summary
-    expect(f"CSV has {EMP_A} row", EMP_A in by_id)
-    expect(f"CSV has {EMP_B} row", EMP_B in by_id)
-    if EMP_A in by_id:
-        r = by_id[EMP_A]
-        # Columns: id, name, trade, Mon, Tue, Wed, Thu, Fri, weekly_total
-        expect(f"CSV {EMP_A} Mon == 8.0", float(r[3]) == 8.0)
-        expect(f"CSV {EMP_A} Tue == 4.5", float(r[4]) == 4.5)
-        expect(f"CSV {EMP_A} Wed blank (absent)", r[5] == "")
+    # New shape after Fix 1: worker_id is column 0, employee_id column 1.
+    expect("CSV header is correct shape (10 cols, worker_id first)",
+           rows[0][:4] == ["worker_id", "employee_id", "name", "trade"]
+           and rows[0][-1] == "weekly_total" and len(rows[0]) == 10)
+    # Find our test rows by employee_id (column 1) — synthetic + stable join key
+    by_eid = {r[1]: r for r in rows[1:-1]}
+    expect(f"CSV has {EMP_A} row", EMP_A in by_eid)
+    expect(f"CSV has {EMP_B} row", EMP_B in by_eid)
+    if EMP_A in by_eid:
+        r = by_eid[EMP_A]
+        # Cols: worker_id, employee_id, name, trade, Mon, Tue, Wed, Thu, Fri, weekly_total
+        import re as _re
+        expect(f"CSV {EMP_A} worker_id matches W-####", bool(_re.match(r"^W-\d{4}$", r[0] or "")),
+               extra=f"got {r[0]!r}")
+        expect(f"CSV {EMP_A} Mon == 8.0", float(r[4]) == 8.0)
+        expect(f"CSV {EMP_A} Tue == 4.5", float(r[5]) == 4.5)
+        expect(f"CSV {EMP_A} Wed blank (absent)", r[6] == "")
         expect(f"CSV {EMP_A} weekly_total == 12.5", float(r[-1]) == 12.5)
     # DAILY TOTAL summary row (last)
-    expect("CSV ends with DAILY TOTAL summary", rows[-1][1] == "DAILY TOTAL")
-    expect("CSV daily total Mon == 16.0", float(rows[-1][3]) == 16.0)
+    expect("CSV ends with DAILY TOTAL summary", rows[-1][2] == "DAILY TOTAL")
+    expect("CSV daily total Mon == 16.0", float(rows[-1][4]) == 16.0)
     expect("CSV grand total == 28.5", float(rows[-1][-1]) == 28.5)
 
     # ----- Step 5: PDF renders, non-empty, has letterhead -----

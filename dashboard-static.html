@@ -1878,7 +1878,11 @@
             for (const w of projectWorkers) {
               const opt = document.createElement('option');
               opt.value = w.employee_id;
-              opt.textContent = (w.name || w.employee_id) + ' (' + w.employee_id + ')';
+              // Display "W-#### — Name (E-#####)" so the operator sees the
+              // human-facing Worker ID first, then the name, then the internal
+              // employee_id in parens for disambiguation.
+              const wid = w.worker_id || '—';
+              opt.textContent = wid + ' — ' + (w.name || w.employee_id) + ' (' + w.employee_id + ')';
               sel.appendChild(opt);
             }
           }

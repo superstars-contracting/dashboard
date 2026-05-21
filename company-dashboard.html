@@ -253,6 +253,7 @@
       <table class="roster">
         <thead>
           <tr>
+            <th data-i18n="col-worker-id">Worker ID</th>
             <th data-i18n="col-name">Name</th>
             <th data-i18n="col-trade">Trade</th>
             <th data-i18n="col-lang">Lang</th>
@@ -265,7 +266,7 @@
           </tr>
         </thead>
         <tbody id="workforce-tbody">
-          <tr><td colspan="9" style="padding:20px;text-align:center;color:#76777E;" data-i18n="loading-roster">Loading roster…</td></tr>
+          <tr><td colspan="10" style="padding:20px;text-align:center;color:#76777E;" data-i18n="loading-roster">Loading roster…</td></tr>
         </tbody>
       </table>
     </div>
@@ -904,7 +905,7 @@ applyLanguage();
       const rows = (resp && resp.data) || [];
       const tbody = $('#workforce-tbody');
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="9" style="padding:20px;text-align:center;color:#76777E;">No workers yet. Click <strong>+ Add Worker</strong> above.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="padding:20px;text-align:center;color:#76777E;">No workers yet. Click <strong>+ Add Worker</strong> above.</td></tr>';
         return;
       }
       tbody.innerHTML = rows.map(r => {
@@ -914,6 +915,7 @@ applyLanguage();
         const status = (r.intake_status === 'complete') ? '<span class="badge-pill ok">Complete</span>' : '<span class="badge-pill mute">Pending</span>';
         const safeId = esc(r.employee_id);
         return `<tr data-emp="${safeId}" data-name="${esc(r.name || '')}">
+          <td style="font-family:monospace;font-weight:700;color:#B11E2E;">${esc(r.worker_id || '—')}</td>
           <td style="font-weight:600;">${esc(r.name || '—')}</td>
           <td>${esc(r.trade || '—')}</td>
           <td style="font-size:11px;text-transform:uppercase;color:#76777E;">${esc((r.language || '—').toUpperCase().slice(0,2))}</td>
@@ -1132,7 +1134,9 @@ applyLanguage();
       if (!d) return;
       const e = d.employee || {};
       currentProfile = e;  // Snapshot for the Edit form's change-detection
-      $('#pp-id').textContent = e.employee_id || '—';
+      // Worker ID (W-####) is the human-facing identifier — prominent.
+      // employee_id (E-#####) stays in the subtitle for the internal key.
+      $('#pp-id').textContent = (e.worker_id || '—') + (e.employee_id ? ' · ' + e.employee_id : '');
       $('#pp-name').textContent = e.name || '—';
       $('#pp-trade').textContent = e.trade || '—';
       $('#pp-lang').textContent = (e.language || '—').toUpperCase();
@@ -1863,6 +1867,7 @@ applyLanguage();
       }).join('');
       return `<tr>
         <td style="border:1px solid #E8E4DD;padding:6px 10px;">
+          <div style="font-size:10px;font-family:monospace;font-weight:700;color:#B11E2E;letter-spacing:0.04em;">${esc(w.worker_id || w.employee_id)}</div>
           <div style="font-weight:700;font-size:12px;">${esc(w.name)}</div>
           <div style="font-size:9px;color:#76777E;font-family:monospace;">${esc(w.employee_id)}
             <button type="button" data-hrs-row-full="${esc(w.employee_id)}" title="Fill Mon-Fri full days for this worker"

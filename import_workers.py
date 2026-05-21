@@ -194,8 +194,15 @@ def main():
         "FROM employees WHERE employee_id LIKE 'E-%'"
     ).fetchone()
     max_n = max_row["max_n"] if max_row and max_row["max_n"] is not None else 0
+    # Pre-allocate human-facing Worker IDs (W-####). Numbers are never
+    # reused; new onboards get max+1 across the whole table. The unique
+    # index on worker_id catches any race so this is safe even under
+    # concurrent imports.
+    from worker_id import next_worker_id_sequence, format_worker_id
+    next_wid_seq = next_worker_id_sequence(conn)
     for offset, p in enumerate(new_rows, start=1):
         p["employee_id"] = f"E-{max_n + offset:05d}"
+        p["worker_id"] = format_worker_id(next_wid_seq + offset - 1)
         p["folder_slug"] = slugify_name(p["name"])
         p["folder_path"] = str(WORKER_RECORDS_DIR / f"{p['employee_id']}_{p['folder_slug']}")
 
@@ -236,13 +243,13 @@ def main():
         for p in new_rows:
             conn.execute(
                 """INSERT INTO employees
-                   (employee_id, name, trade, dob, phone, email,
+                   (employee_id, worker_id, name, trade, dob, phone, email,
                     emergency_contact_name, emergency_contact_phone,
                     emergency_contact_relation, language, hire_date, pin,
                     folder_path, intake_status)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    p["employee_id"], p["name"], p["trade"], p["dob"], p["phone"],
+                    p["employee_id"], p["worker_id"], p["name"], p["trade"], p["dob"], p["phone"],
                     p["email"], p["emergency_contact_name"], p["emergency_contact_phone"],
                     p["emergency_contact_relation"], p["language"], p["hire_date"],
                     p["pin"], p["folder_path"], "pending",

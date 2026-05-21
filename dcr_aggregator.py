@@ -114,9 +114,12 @@ def aggregate_dcr(project_code, date_str, audience='internal'):
         'status': proj.get('status'),
     }
 
-    # Labor — auto from sign_in_log JOIN employees
+    # Labor — auto from sign_in_log JOIN employees. worker_id (W-####) is
+    # pulled so the DCR labor section can render "W-#### — Name" alongside
+    # the trade, matching the workforce list and Hours Log conventions.
     sign_ins = conn.execute(
-        """SELECT s.*, e.name AS emp_name, e.trade AS emp_trade
+        """SELECT s.*, e.name AS emp_name, e.trade AS emp_trade,
+                  e.worker_id AS emp_worker_id
            FROM sign_in_log s
            LEFT JOIN employees e ON s.employee_id = e.employee_id
            WHERE s.project_code = ? AND s.date = ?
@@ -138,7 +141,8 @@ def aggregate_dcr(project_code, date_str, audience='internal'):
         if r.get('time_in') and r.get('time_out') and r['time_out'] < r['time_in']:
             warnings.append(f"VAL-003: sign_in row {i}: time_out {r['time_out']} before time_in {r['time_in']}")
         labor_rows_full.append({
-            'n': i, 'employee_id': emp_id, 'name': r.get('emp_name'),
+            'n': i, 'employee_id': emp_id, 'worker_id': r.get('emp_worker_id'),
+            'name': r.get('emp_name'),
             'company': 'Superstars Contracting', 'trade': r.get('emp_trade'),
             'time_in': r.get('time_in'), 'time_out': r.get('time_out'),
             'hours': hours, 'area': None, 'notes': None,
