@@ -1730,6 +1730,55 @@ def update_employee(emp_id):
         app.logger.error(f"PATCH /api/employees/{emp_id} failed: {e}")
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/api/employees/<emp_id>/intake/complete', methods=['POST'])
+def complete_intake(emp_id):
+    """Guarded forward transition: intake_status 'pending' → 'done'.
+
+    intake_status is excluded from PATCH /api/employees' EDITABLE set so the
+    field can't be flipped by a generic worker edit. This is the ONLY endpoint
+    that moves a worker into intake-complete state. Forward-only — there is
+    no reverse route. Idempotent: an already-done worker returns 200 with
+    {already_done: true} so the operator's 'Complete Intake' button is safe
+    to re-click without producing a 409.
+
+    Intake completion is operator-driven (the operator decides when the work
+    is done); the server doesn't gate on which artifacts are on file."""
+    conn = None
+    try:
+        conn = db()
+        emp = conn.execute(
+            "SELECT employee_id, intake_status FROM employees WHERE employee_id = ?",
+            (emp_id,)
+        ).fetchone()
+        if not emp:
+            return jsonify({"error": "employee not found"}), 404
+        if emp["intake_status"] == "done":
+            return response_wrapper({
+                "employee_id": emp_id,
+                "intake_status": "done",
+                "already_done": True,
+            }), 200
+        conn.execute(
+            "UPDATE employees SET intake_status = 'done', updated_at = CURRENT_TIMESTAMP "
+            "WHERE employee_id = ?",
+            (emp_id,)
+        )
+        conn.commit()
+        return response_wrapper({
+            "employee_id": emp_id,
+            "intake_status": "done",
+            "already_done": False,
+        }), 200
+    except Exception as e:
+        logging.error(f"POST /api/employees/{emp_id}/intake/complete: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
+
+
 # ============= CERTIFICATION ENDPOINTS =============
 
 @app.route('/api/certifications', methods=['POST'])
