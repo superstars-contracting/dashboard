@@ -165,6 +165,7 @@ class DCRHTMLRenderer:
             self._section_signoff(),
             '</div>',  # /wrap
             self._footer(),
+            self._fit_one_page_script(),
             '</body></html>',
         ]
         return ''.join(body_parts)
@@ -734,6 +735,96 @@ class DCRHTMLRenderer:
 </div>"""
 
     # ---------- helpers ----------
+
+    def _fit_one_page_script(self) -> str:
+        """Print-time JS: if the report is JUST barely over one page (≤1.25×),
+        squeeze the .page wrapper down so it fits on a single page. If it's
+        a genuinely long report (>1.25×), do nothing — don't crush.
+
+        Implementation note (why `zoom`, not `transform: scale`):
+        Chromium's print engine paginates based on the LAYOUT box. CSS
+        `transform: scale()` only affects the paint, not the layout — so
+        a transform-shrunk report still emits an unscaled page 2 because
+        the layout flow math used the pre-scale height. CSS `zoom` (a
+        Chromium/IE-legacy property) DOES affect layout. Edge headless
+        and Ctrl+P from Edge/Chrome both honor it; that's our primary
+        target. transform: scale is kept as a paint fallback for browsers
+        without `zoom` (Firefox, Safari) — those rarely produce the
+        finalize PDF in this workflow anyway.
+
+        Runs on:
+          - browser Ctrl+P: window.beforeprint event
+          - headless Edge --print-to-pdf: print media kicks in only at
+            capture time, so matchMedia('print') is false while JS runs.
+            We instead listen to `beforeprint` (Chromium DOES fire it
+            for --print-to-pdf) and also try on window 'load' as a safety
+            net (the --virtual-time-budget=5000 in pdf_export.py covers it).
+        Reverts on afterprint so the screen view stays at 1:1.
+
+        Threshold + page-height constants are exposed at the top of the IIFE
+        so the operator can tune in render_dcr_html.py without spelunking.
+        """
+        return """
+<script>
+(function() {
+  // ----- tunables -----
+  // Reports up to SHRINK_LIMIT × one page get squeezed onto one page;
+  // beyond that, normal pagination. 1.25 = a 1-and-a-bit page report
+  // (footer/sign-off spills) snaps to one page without crushing a real
+  // 2-page report. Tweak if needed.
+  var SHRINK_LIMIT = 1.25;
+  // Letter portrait (11in) minus @page top+bottom margins (0.4in each)
+  // = 10.2in printable. Browsers use 96 CSS px per inch in print.
+  var PAGE_HEIGHT_PX = (11 - 0.4 - 0.4) * 96;  // 979.2
+  // Small safety so a borderline case doesn't fall one pixel over a page break.
+  var SAFETY = 0.98;
+  var ROOT_SEL = '.page';
+
+  function reset(root) {
+    if (!root) return;
+    root.style.zoom = '';
+    root.style.transform = '';
+    root.style.transformOrigin = '';
+  }
+
+  function fitIfClose() {
+    var root = document.querySelector(ROOT_SEL);
+    if (!root) return;
+    reset(root);                                // measure unscaled
+    var contentH = root.scrollHeight;
+    if (contentH <= PAGE_HEIGHT_PX) return;     // already fits
+    var ratio = contentH / PAGE_HEIGHT_PX;
+    if (ratio > SHRINK_LIMIT) return;           // genuinely long — let it paginate
+    var scale = (PAGE_HEIGHT_PX / contentH) * SAFETY;
+    // Primary: `zoom` (Chromium) — affects layout flow + pagination.
+    root.style.zoom = scale;
+    // Fallback for non-Chromium (paint-only): transform:scale. If both
+    // apply in Chromium, zoom wins; transform is a no-op there because
+    // zoom already shrank the layout box.
+    root.style.transform = 'scale(' + scale + ')';
+    root.style.transformOrigin = 'top center';
+  }
+
+  // Browser Ctrl+P: scale on beforeprint, restore on afterprint.
+  // Chromium headless --print-to-pdf ALSO fires beforeprint before the
+  // capture, so this single listener handles both paths.
+  window.addEventListener('beforeprint', fitIfClose);
+  window.addEventListener('afterprint', function() {
+    reset(document.querySelector(ROOT_SEL));
+  });
+
+  // Safety net for Edge headless in case beforeprint timing differs:
+  // also try at window 'load' under print media. matchMedia('print')
+  // typically reads false during the JS run window of --print-to-pdf
+  // (print media only activates at capture), so this is mostly a no-op
+  // — but harmless if true.
+  window.addEventListener('load', function() {
+    if (window.matchMedia && window.matchMedia('print').matches) {
+      fitIfClose();
+    }
+  });
+})();
+</script>"""
 
     def _sec_empty(self, n: int, title: str, meta: str, empty_text: str) -> str:
         meta_html = f'<span class="meta">{_esc(meta)}</span>' if meta else '<span></span>'
