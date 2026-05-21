@@ -310,10 +310,14 @@ class DCRHTMLRenderer:
     .sec        {{ break-inside:avoid; page-break-inside:avoid; }}
     .sec > h2   {{ break-after:avoid;  page-break-after:avoid; }}
     .sec .body  {{ break-before:avoid; page-break-before:avoid; }}
-    /* Side-by-side blocks (.two) stack vertically in print so neither
-       half gets sliced across a page. Each .sec still keeps itself whole. */
-    .two        {{ display:block; }}
-    .two > .sec {{ margin-bottom:12px; }}
+    /* Side-by-side blocks (.two) stay two-column in print so the report
+       looks identical to the screen layout — same tight, boxed pairing
+       for Materials/Equipment, Safety/Issues, Inspections/Visitors. The
+       break-inside:avoid on the wrapper moves the WHOLE paired row to
+       the next page if it doesn't fit, rather than slicing it mid-column.
+       Each child .sec also has break-inside:avoid (rule above) as a
+       second-line defense in case a single half is genuinely too tall. */
+    .two        {{ break-inside:avoid; page-break-inside:avoid; }}
     /* Table rows shouldn't split; repeat <thead> if a table wraps to next page. */
     thead       {{ display:table-header-group; }}
     tfoot       {{ display:table-footer-group; }}
