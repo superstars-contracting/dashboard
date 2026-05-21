@@ -2515,18 +2515,32 @@ def upload_photo():
 
 @app.route('/api/photos', methods=['GET'])
 def get_photos():
-    """Get photos for a date/project"""
+    """List photos for (project, date). Filters on the photos.date column
+    (the operator-meaningful 'photo taken on day X' value) AND project_code,
+    so cross-project photos can't leak into a single-project view.
+
+    Query params:
+      date         — ISO YYYY-MM-DD; defaults to today (local)
+      project_code — defaults to FR-BX-001. `project` is accepted as an
+                     alias for backwards compatibility with existing callers.
+
+    Prior bug: this endpoint filtered on DATE(created_at) (the row's INSERT
+    timestamp, which is in server TZ and unrelated to the photo's day) and
+    silently dropped the project_code filter altogether — both photos from
+    other projects AND photos for the requested project but uploaded on a
+    different day were mis-selected."""
     try:
         date_filter = request.args.get('date', date.today().isoformat())
-        project_code = request.args.get('project', 'FR-BX-001')
-        
+        project_code = (request.args.get('project_code')
+                        or request.args.get('project')
+                        or 'FR-BX-001')
         conn = db()
         rows = conn.execute(
-            "SELECT * FROM photos WHERE DATE(created_at) = ? ORDER BY created_at DESC",
-            (date_filter,)
+            "SELECT * FROM photos WHERE date = ? AND project_code = ? "
+            "ORDER BY created_at DESC",
+            (date_filter, project_code)
         ).fetchall()
         conn.close()
-        
         return response_wrapper(rows_to_dicts(rows) if rows else [])
     except Exception as e:
         return jsonify({"error": str(e)}), 400
