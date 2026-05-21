@@ -151,6 +151,25 @@ def aggregate_dcr(project_code, date_str, audience='internal'):
             'time_in': r.get('time_in'), 'time_out': r.get('time_out'),
             'hours': hours, 'area': None, 'notes': None,
         })
+    # Sort by Worker ID ascending so the DCR sign-in roster is consistent
+    # everywhere it renders (entry view + rendered/printed DCR). Per
+    # CLAUDE.md schema rule, sort the trailing digits NUMERICALLY — don't
+    # rely on the W-#### zero-padding holding up under future format
+    # changes. Rows with no worker_id (orphan sign-ins, already
+    # warning-tagged above) sort to the end. After sorting, re-number `n`
+    # so the visible row index matches the sorted order.
+    def _wid_sort_key(row):
+        wid = row.get('worker_id')
+        if not wid:
+            return (1, 0)
+        digits = ''.join(ch for ch in str(wid) if ch.isdigit())
+        try:
+            return (0, int(digits)) if digits else (1, 0)
+        except ValueError:
+            return (1, 0)
+    labor_rows_full.sort(key=_wid_sort_key)
+    for idx, row in enumerate(labor_rows_full, 1):
+        row['n'] = idx
     headcount = len(labor_rows_full)
     total_hours = round(total_hours, 2)
 
