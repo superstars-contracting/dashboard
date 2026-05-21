@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_from_directory, send_file
+from flask import Flask, jsonify, request, send_from_directory, send_file, Response
 from flask_cors import CORS
 import sqlite3
 from pathlib import Path
@@ -3643,40 +3643,42 @@ def api_workers_intake_summary():
             eligible, _ = has_valid_prerequisite(emp_id)
             eligibility = 'cof' if eligible else 'company_id'
             # Current credential — CoF (status='issued') takes precedence; fall back to Company ID (status='active').
-            # html_url is derived from html_export_path so the workforce-list View button
-            # has a direct link without a follow-up GET /credential round-trip.
+            # html_url points at the LIVE-render route (#90) — photo/PIN/name
+            # come from the worker's current record at view time so later
+            # edits (face-photo upload after issuance, phone-driven PIN
+            # change, name correction) reflect without re-issue. The
+            # frozen html_export_path stays on the row as the archival
+            # 'as issued' artifact.
             current_credential = None
             cof_row = conn.execute(
-                """SELECT card_id, card_number_display, issued_date, expires_date, status, html_export_path FROM cof_cards
+                """SELECT card_id, card_number_display, issued_date, expires_date, status FROM cof_cards
                    WHERE employee_id = ? AND status = 'issued'
                    ORDER BY issued_date DESC LIMIT 1""",
                 (emp_id,)
             ).fetchone()
             if cof_row:
-                cof_html = cof_row["html_export_path"]
                 current_credential = {
                     "type": "cof",
                     "card_number_display": cof_row["card_number_display"] or cof_row["card_id"],
                     "issued_date": cof_row["issued_date"],
                     "expires_date": cof_row["expires_date"],
                     "status": cof_row["status"],
-                    "html_url": ("/files/" + cof_html) if cof_html else None,
+                    "html_url": f"/api/cards/{emp_id}/cof/live",
                 }
             else:
                 cid_row = conn.execute(
-                    """SELECT card_id, card_number_display, issued_date, status, html_export_path FROM company_id_cards
+                    """SELECT card_id, card_number_display, issued_date, status FROM company_id_cards
                        WHERE employee_id = ? AND status = 'active'
                        ORDER BY issued_date DESC, created_at DESC LIMIT 1""",
                     (emp_id,)
                 ).fetchone()
                 if cid_row:
-                    cid_html = cid_row["html_export_path"]
                     current_credential = {
                         "type": "company_id",
                         "card_number_display": cid_row["card_number_display"],
                         "issued_date": cid_row["issued_date"],
                         "status": cid_row["status"],
-                        "html_url": ("/files/" + cid_html) if cid_html else None,
+                        "html_url": f"/api/cards/{emp_id}/company_id/live",
                     }
             out.append({
                 **dict(e),
@@ -3742,11 +3744,11 @@ def get_employee_credential(emp_id):
                 status_v = cid_row["status"]
                 html_export_path = cid_row["html_export_path"]
 
-        html_url = None
-        if html_export_path:
-            full = SCRIPT_DIR / html_export_path.lstrip("/")
-            if full.exists():
-                html_url = "/files/" + html_export_path
+        # html_url points at the LIVE-render route (#90) when a card is
+        # current — photo/PIN/name reflect the worker's current row at
+        # view time, not the issuance-time snapshot. NULL when no current
+        # credential exists for the worker.
+        html_url = f"/api/cards/{emp_id}/{current_type}/live" if current_type else None
 
         payload = {
             "type": current_type,
@@ -3768,6 +3770,123 @@ def get_employee_credential(emp_id):
                 conn.close()
             except Exception:
                 pass
+
+
+@app.route('/api/cards/<emp_id>/<cred_type>/live', methods=['GET'])
+def serve_card_live(emp_id, cred_type):
+    """Render the worker's card with LIVE data at request time.
+
+    Operator decision (#90, 'always show current'): the card's
+    NAME / PIN / PHOTO come from the worker's CURRENT employees row at
+    every view/print — not from the issuance-time snapshot. This auto-
+    repairs cards issued before the worker had a photo on file (e.g. an
+    empty-photo card from before face-photo upload landed) without
+    requiring a re-issue.
+
+    Identity fields (card_number_display, issued_date, expires_date,
+    issued_by, rigger_*, signature_path) stay FROZEN — they're properties
+    of the physical credential and must not drift once printed.
+
+    URL: /api/cards/<emp_id>/cof/live or /api/cards/<emp_id>/company_id/live.
+    Returns rendered HTML (text/html). 404 if the worker doesn't exist or
+    has no active card of the requested type.
+    """
+    import jinja2
+    if cred_type not in ('cof', 'company_id'):
+        return jsonify({"error": "type must be cof or company_id"}), 400
+    conn = None
+    try:
+        conn = db()
+        emp = conn.execute(
+            "SELECT employee_id, name, trade, pin, face_image_path "
+            "FROM employees WHERE employee_id = ?",
+            (emp_id,)
+        ).fetchone()
+        if not emp:
+            return jsonify({"error": "Worker not found"}), 404
+        emp = dict(emp)
+
+        if cred_type == 'cof':
+            card_row = conn.execute(
+                "SELECT card_id, card_number_display, issued_date, expires_date, "
+                "issued_by, rigger_name_snapshot, rigger_license_snapshot, signature_path "
+                "FROM cof_cards WHERE employee_id = ? AND status = 'issued' "
+                "ORDER BY issued_date DESC LIMIT 1",
+                (emp_id,)
+            ).fetchone()
+            template_name = 'cof_card_print.html'
+        else:
+            # company_id_cards has no signature_path / expires_date columns
+            # (those are CoF-only — Company ID has no attestation signature
+            # and no expiry).
+            card_row = conn.execute(
+                "SELECT card_id, card_number_display, issued_date, issued_by "
+                "FROM company_id_cards WHERE employee_id = ? AND status = 'active' "
+                "ORDER BY issued_date DESC, created_at DESC LIMIT 1",
+                (emp_id,)
+            ).fetchone()
+            template_name = 'company_id_card_print.html'
+        if not card_row:
+            return jsonify({"error": f"No active {cred_type} card for this worker"}), 404
+        card = dict(card_row)
+
+        # LIVE photo — read employees.face_image_path each request. Build a
+        # /worker-files/ URL if the file exists; empty string otherwise so
+        # the template's {% if %} falls back to its 'PHOTO' placeholder.
+        photo_url = ''
+        face_path = emp.get('face_image_path')
+        if face_path:
+            fp = Path(face_path)
+            if not fp.is_absolute():
+                fp = SCRIPT_DIR / fp
+            if fp.exists():
+                try:
+                    rel = fp.resolve().relative_to(WORKER_RECORDS_DIR.resolve())
+                    photo_url = '/worker-files/' + str(rel).replace('\\', '/')
+                except ValueError:
+                    photo_url = ''
+
+        # Signature stays FROZEN — it's the issuer's at issuance time, not
+        # the worker's. Same /files/ path logic as the static issuer code.
+        signature_url = ''
+        sig_path = card.get('signature_path')
+        if sig_path:
+            sig_full = SCRIPT_DIR / sig_path.lstrip('/')
+            if sig_full.exists():
+                signature_url = '/files/' + sig_path
+
+        cnd = card.get('card_number_display') or card.get('card_id') or ''
+        ctx = {
+            'NAME': emp.get('name') or '',
+            'EMPLOYEE_ID': emp_id,
+            'CARD_NUMBER_DISPLAY': cnd,
+            'ISSUED_DATE': card.get('issued_date') or '',
+            'ISSUED_BY': card.get('issued_by') or '',
+            'EXPIRES_DATE': card.get('expires_date') or '',
+            'TRADE': emp.get('trade') or '',
+            'PIN': emp.get('pin') or '----',
+            'PHOTO_URL_OR_BLANK': photo_url,
+            'RIGGER_NAME': card.get('rigger_name_snapshot') or '',
+            'RIGGER_LICENSE': card.get('rigger_license_snapshot') or '',
+            'SIGNATURE_URL': signature_url,
+        }
+        env = jinja2.Environment(
+            loader=jinja2.FileSystemLoader(str(SCRIPT_DIR)),
+            autoescape=True,
+        )
+        try:
+            html = env.get_template(template_name).render(**ctx)
+        except Exception as ex:
+            logging.error(f"GET /api/cards/{emp_id}/{cred_type}/live render: {ex}")
+            return jsonify({"error": f"Template render failed: {ex}"}), 500
+        return Response(html, mimetype='text/html; charset=utf-8')
+    except Exception as e:
+        logging.error(f"GET /api/cards/{emp_id}/{cred_type}/live: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
 
 
 @app.route('/api/employees/<emp_id>/credential/issue', methods=['POST'])
