@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
 <link rel="stylesheet" href="/files/static/fonts/typography.css">
+<script src="/files/static/js/datepicker.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Superstars Contracting - Project Console</title>
   <style>
@@ -2001,6 +2002,16 @@
             // Default state: archive list. Auto-fill data is fetched lazily
             // when showEntry() runs (saves a wasted call on every page load).
             showArchive();
+            // Replace the native date popup with the shared SSCDatePicker
+            // on every date field on this page — DCR entry date + the
+            // archive filter range — so the calendar UI is consistent
+            // with the company console.
+            if (window.SSCDatePicker) {
+              ['dcr-date', 'dcr-filter-from', 'dcr-filter-to'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) SSCDatePicker.wire(el);
+              });
+            }
           }
 
           if (document.readyState === 'loading') {

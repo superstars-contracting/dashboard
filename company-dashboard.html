@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="stylesheet" href="/files/static/fonts/typography.css">
+<script src="/files/static/js/datepicker.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Superstars Contracting · Office Console</title>
 <style>
@@ -812,72 +813,6 @@ applyLanguage();
 (function() {
   const $ = sel => document.querySelector(sel);
   const $$ = sel => document.querySelectorAll(sel);
-
-  // Year-jump <select> beside a native <input type="date">. The Chromium
-  // calendar popup has no year-jump UI of its own (the operator can only
-  // click prev-month repeatedly), which is painful for DOB and multi-year
-  // cert ranges. This adds a compact <select> beside the input — picking
-  // a year rewrites the input's value as Y-M-D using the existing month/day
-  // if present, else defaults to Jan 1. Stays LOCAL — never goes through
-  // toISOString (per CLAUDE.md dates rule, that's the #74 UTC bug).
-  // Idempotent: re-running on the same input is a no-op.
-  function wireYearJumper(input, opts) {
-    opts = opts || {};
-    if (!input || input.dataset.yjAttached === '1') return;
-    input.dataset.yjAttached = '1';
-    const minYear = opts.min || 1940;
-    const curYear = new Date().getFullYear();
-    const maxYear = opts.max || (curYear + 5);
-
-    const sel = document.createElement('select');
-    sel.className = 'year-jumper';
-    sel.title = 'Jump to year';
-    sel.setAttribute('aria-label', 'Year');
-    sel.style.cssText = 'padding:6px 4px;border:1px solid #E8E4DD;border-radius:4px;font-size:12px;font-family:inherit;background:white;color:#14161C;flex:0 0 auto;cursor:pointer;';
-    const opt0 = document.createElement('option');
-    opt0.value = '';
-    opt0.textContent = 'Year';
-    sel.appendChild(opt0);
-    for (let y = maxYear; y >= minYear; y--) {
-      const o = document.createElement('option');
-      o.value = String(y);
-      o.textContent = String(y);
-      sel.appendChild(o);
-    }
-
-    function syncFromInput() {
-      const v = input.value || '';
-      sel.value = /^\d{4}-/.test(v) ? v.slice(0, 4) : '';
-    }
-    syncFromInput();
-    input.addEventListener('change', syncFromInput);
-
-    sel.addEventListener('change', function() {
-      const y = sel.value;
-      if (!y) return;
-      let m = '01', d = '01';
-      const cv = input.value || '';
-      if (/^\d{4}-\d{2}-\d{2}$/.test(cv)) {
-        m = cv.slice(5, 7); d = cv.slice(8, 10);
-      }
-      input.value = y + '-' + m + '-' + d;
-      input.dispatchEvent(new Event('change', {bubbles: true}));
-    });
-
-    // Wrap the input + select in an inline-flex container so they sit
-    // cleanly side-by-side without breaking the input's existing width
-    // (often width:100% inside a form-grid cell).
-    const wrap = document.createElement('span');
-    wrap.style.cssText = 'display:flex;gap:6px;align-items:stretch;width:100%;';
-    input.parentNode.insertBefore(wrap, input);
-    wrap.appendChild(input);
-    wrap.appendChild(sel);
-    if (input.style.width === '100%') {
-      input.style.width = 'auto';
-      input.style.flex = '1 1 auto';
-      input.style.minWidth = '0';
-    }
-  }
 
   // Single display-side phone formatter: stored values are raw digits (or
   // any-format text from the edit form); UI surfaces format consistently as
@@ -1945,12 +1880,14 @@ applyLanguage();
       const saveBtn = q('save');
 
       // Cert dates can span multiple years (issued years ago, expiring
-      // years out). Attach the year-jumper so the operator doesn't have
-      // to month-click through the native picker.
+      // years out). Wire the shared custom date picker so the popup is
+      // the same brand-matched one used across every date field.
       const _certDO = q('date_obtained');
       const _certEX = q('expiration_date');
-      if (_certDO) wireYearJumper(_certDO);
-      if (_certEX) wireYearJumper(_certEX);
+      if (window.SSCDatePicker) {
+        if (_certDO) SSCDatePicker.wire(_certDO);
+        if (_certEX) SSCDatePicker.wire(_certEX);
+      }
 
       function close() { try { modal.remove(); } catch (_) {} resolve(); }
 
@@ -2191,11 +2128,19 @@ applyLanguage();
   });
 
   // Init
-  // Year-jumper on DOB inputs in the Onboard form + the profile Edit form.
-  ['in-dob', 'pp-edit-dob'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) wireYearJumper(el);
-  });
+  // Replace the native date popup with the shared SSCDatePicker on every
+  // date field on this page. DOB caps at today (no future birthdates);
+  // others use the default 1940..current+5 range.
+  if (window.SSCDatePicker) {
+    ['in-dob', 'pp-edit-dob'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) SSCDatePicker.wire(el, {max: 'today'});
+    });
+    ['in-hire-date', 'pp-edit-hire'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) SSCDatePicker.wire(el);
+    });
+  }
   Promise.all([loadMetrics(), loadProjects()]);
   setInterval(loadMetrics, 60000);
 })();
