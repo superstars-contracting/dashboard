@@ -176,14 +176,31 @@ def test_workforce(real_emp_id):
     # working DELETE doesn't make SHOWS see the post-delete state.
     ls = requests.get(f"{BASE}/api/workers/intake-summary", timeout=10)
     r.shows = any(x.get("employee_id") == syn_id for x in ls.json()["data"])
-    # DELETE — try every reasonable verb.
+    # DELETE — hard-delete path (no history was attached to this worker).
     d = requests.delete(f"{BASE}/api/employees/{syn_id}", timeout=10)
-    d2 = requests.delete(f"{BASE}/api/workers/{syn_id}", timeout=10)
-    if d.status_code == 200 or d2.status_code == 200:
-        r.delete = True
-    else:
-        r.delete = False
-        add_note(r, f"no public DELETE: /api/employees=>{d.status_code}, /api/workers=>{d2.status_code}")
+    hard_ok = (d.status_code == 200 and d.json().get("data", {}).get("deleted") == "hard")
+
+    # Also verify the SOFT-archive path: create another worker, add a sign-in
+    # so it has history, then DELETE → expect 'archived' (not 'hard').
+    syn_id2 = "SMK-" + uuid.uuid4().hex[:6].upper()
+    requests.post(f"{BASE}/api/workers/create", json={
+        "employee_id": syn_id2, "name": "SMOKE TestArchive", "trade": "Archive",
+    }, timeout=10)
+    requests.post(f"{BASE}/api/sign-ins", json={
+        "employee_id": syn_id2, "project_code": PROJECT,
+        "date": D_EARLY, "time_in": "07:00", "time_out": "15:30",
+    }, timeout=10)
+    d2 = requests.delete(f"{BASE}/api/employees/{syn_id2}", timeout=10)
+    soft_ok = (d2.status_code == 200 and d2.json().get("data", {}).get("deleted") == "archived")
+    # Archived worker must be hidden from default list, visible with flag.
+    default_ls = requests.get(f"{BASE}/api/workers/intake-summary", timeout=10).json()["data"]
+    incl_ls = requests.get(f"{BASE}/api/workers/intake-summary",
+                           params={"include_archived": "true"}, timeout=10).json()["data"]
+    filtered = (not any(x.get("employee_id") == syn_id2 for x in default_ls)
+                and any(x.get("employee_id") == syn_id2 for x in incl_ls))
+    r.delete = bool(hard_ok and soft_ok and filtered)
+    if not r.delete:
+        add_note(r, f"hard_ok={hard_ok} soft_ok={soft_ok} list_filtered={filtered}")
     # Clean up any residue via SQL (idempotent against working+missing delete)
     conn = db()
     try:

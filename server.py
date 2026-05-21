@@ -1913,6 +1913,101 @@ def complete_intake(emp_id):
             except Exception: pass
 
 
+def _worker_history_counts(conn, emp_id):
+    """Count rows that prevent hard-delete (preserves accuracy of historical
+    DCRs, Weekly Hours Log, and credential audit trail). Returns a dict
+    keyed by table for the operator-facing diagnostic, plus a `total`."""
+    counts = {}
+    for tbl in ('sign_in_log', 'certifications', 'worker_documents',
+                'cof_cards', 'company_id_cards'):
+        n = conn.execute(
+            f"SELECT COUNT(*) FROM {tbl} WHERE employee_id = ?", (emp_id,)
+        ).fetchone()[0]
+        counts[tbl] = n
+    counts['total'] = sum(v for k, v in counts.items() if k != 'total')
+    return counts
+
+
+@app.route('/api/employees/<emp_id>', methods=['DELETE'])
+def delete_employee(emp_id):
+    """Delete a worker. Auto-dispatches between hard-delete and soft-archive
+    based on whether the worker has any operational history:
+
+      - NO history (sign_in_log, certifications, worker_documents, cof_cards,
+        company_id_cards all empty for this employee) → hard-delete. Removes
+        the employees row plus its project_assignments. Safe to wipe; nothing
+        else references this worker.
+
+      - HAS history → soft-archive: sets employees.archived_at = NOW. The
+        sign-ins, certs, docs, and cards remain so historical DCRs and the
+        Weekly Hours Log stay accurate. project_assignments stays so the
+        archived worker can be re-activated later by clearing archived_at.
+
+    Archived workers are filtered out of the workforce list, the project
+    worker list, and the intake-summary list by default. Pass
+    ?include_archived=true on those GETs to see them.
+
+    Body: optional {reason}. 404 if worker doesn't exist; 409 if already
+    archived. Hard-delete returns 200 with {deleted: 'hard'}; archive
+    returns 200 with {deleted: 'archived'} + the history counts that
+    forced the soft path."""
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        reason = (data.get('reason') or '').strip() or None
+        conn = db()
+        emp = conn.execute(
+            "SELECT employee_id, archived_at FROM employees WHERE employee_id = ?",
+            (emp_id,)
+        ).fetchone()
+        if not emp:
+            return jsonify({"error": "employee not found"}), 404
+        if emp["archived_at"]:
+            return jsonify({"error": "employee already archived",
+                            "archived_at": emp["archived_at"]}), 409
+        counts = _worker_history_counts(conn, emp_id)
+        if counts["total"] == 0:
+            # Hard-delete: project_assignments first (no FK cascade configured),
+            # then the employees row. Worker folder on disk is left in place —
+            # it's the audit/intake artifact, and a re-onboard with the same
+            # name would reuse it.
+            conn.execute("DELETE FROM project_assignments WHERE employee_id = ?", (emp_id,))
+            conn.execute("DELETE FROM employees WHERE employee_id = ?", (emp_id,))
+            conn.commit()
+            return response_wrapper({
+                "employee_id": emp_id,
+                "deleted": "hard",
+                "history_counts": counts,
+            }), 200
+        else:
+            # Soft-archive: mark archived_at + reason. History rows stay.
+            conn.execute(
+                "UPDATE employees SET archived_at = CURRENT_TIMESTAMP, "
+                "archived_reason = ?, updated_at = CURRENT_TIMESTAMP "
+                "WHERE employee_id = ?",
+                (reason, emp_id)
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT archived_at, archived_reason FROM employees WHERE employee_id = ?",
+                (emp_id,)
+            ).fetchone()
+            return response_wrapper({
+                "employee_id": emp_id,
+                "deleted": "archived",
+                "archived_at": row["archived_at"],
+                "archived_reason": row["archived_reason"],
+                "history_counts": counts,
+            }), 200
+    except Exception as e:
+        logging.error(f"DELETE /api/employees/{emp_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn is not None:
+            try: conn.close()
+            except Exception: pass
+
+
 # ============= CERTIFICATION ENDPOINTS =============
 
 @app.route('/api/certifications', methods=['POST'])
@@ -1965,8 +2060,18 @@ def get_project(code):
 
 @app.route('/api/employees', methods=['GET'])
 def get_employees():
+    """List employees. Archived workers (archived_at IS NOT NULL) are
+    filtered out by default. Pass ?include_archived=true to include them
+    (e.g., for restore flows or a 'recently archived' view)."""
+    include_archived = (request.args.get('include_archived', '').lower()
+                        in ('1', 'true', 'yes'))
     conn = db()
-    rows = conn.execute("SELECT * FROM employees").fetchall()
+    if include_archived:
+        rows = conn.execute("SELECT * FROM employees").fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM employees WHERE archived_at IS NULL"
+        ).fetchall()
     conn.close()
     return response_wrapper(rows_to_dicts(rows), len(rows))
 
@@ -2451,14 +2556,19 @@ def api_projects_list():
 
 @app.route('/api/projects/<project_code>/workers', methods=['GET'])
 def api_project_workers(project_code):
-    """Workers ASSIGNED to a specific project (the filtered roster for the project dashboard)."""
+    """Workers ASSIGNED to a specific project (the filtered roster for the
+    project dashboard). Archived workers are filtered out — pass
+    ?include_archived=true to include them."""
     try:
+        include_archived = (request.args.get('include_archived', '').lower()
+                            in ('1', 'true', 'yes'))
         conn = db()
+        archive_clause = '' if include_archived else ' AND e.archived_at IS NULL'
         rows = conn.execute(
-            """SELECT e.*, pa.role_on_project, pa.start_date AS assignment_start, pa.status AS assignment_status
+            f"""SELECT e.*, pa.role_on_project, pa.start_date AS assignment_start, pa.status AS assignment_status
                FROM employees e
                JOIN project_assignments pa ON pa.employee_id = e.employee_id
-               WHERE pa.project_code = ? AND pa.status = 'active'
+               WHERE pa.project_code = ? AND pa.status = 'active'{archive_clause}
                ORDER BY e.name""",
             (project_code,)
         ).fetchall()
@@ -3473,16 +3583,27 @@ def api_workers_intake_summary():
     """List of all workers with intake status + cert health + doc count
     + credential eligibility + current_credential state. The two new
     fields let the workforce list render the Action button per row
-    without follow-up round-trips."""
+    without follow-up round-trips.
+
+    Archived workers are filtered out by default. Pass ?include_archived=true
+    to include them."""
     try:
+        include_archived = (request.args.get('include_archived', '').lower()
+                            in ('1', 'true', 'yes'))
         # Lazy import — cof_issuer needs the DB open and we want server.py
         # startup to stay light.
         from cof_issuer import has_valid_prerequisite
         conn = db()
-        emps = conn.execute(
-            "SELECT employee_id, worker_id, name, trade, phone, language, intake_status, folder_path "
-            "FROM employees ORDER BY worker_id"
-        ).fetchall()
+        if include_archived:
+            emps = conn.execute(
+                "SELECT employee_id, worker_id, name, trade, phone, language, intake_status, folder_path, archived_at "
+                "FROM employees ORDER BY worker_id"
+            ).fetchall()
+        else:
+            emps = conn.execute(
+                "SELECT employee_id, worker_id, name, trade, phone, language, intake_status, folder_path "
+                "FROM employees WHERE archived_at IS NULL ORDER BY worker_id"
+            ).fetchall()
 
         today = datetime.utcnow().date().isoformat()
         out = []
