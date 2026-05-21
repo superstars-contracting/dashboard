@@ -298,14 +298,17 @@ class DCRHTMLRenderer:
        imposes; width:auto + box-sizing:border-box ensures the .page
        container itself has zero width-overflow risk. */
     .page {{ box-shadow:none; margin:0; width:auto; max-width:none; min-height:auto; box-sizing:border-box; }}
-    /* DO NOT zero .head's horizontal padding — that put the right-aligned
-       doctype text right at the printable boundary, where the print driver
-       could clip the last character of "DAILY CONSTRUCTION REPORT". The
-       screen rule (padding:14px 0.55in) already gives breathing room
-       inside the @page margin; keep it explicit here so it's clear. */
-    .head {{ padding:14px 0.45in; box-sizing:border-box; }}
-    .wrap {{ padding:0.25in 0 0; }}
-    .foot {{ margin-left:0; margin-right:0; }}
+    /* Header/body/foot horizontal insets match the screen layout (0.55in)
+       so the PDF reads like the on-screen "boxed" report — framed inset
+       from the page edge, not edge-to-edge. Earlier override was zeroing
+       these and made the print look sparse + run to the paper edge. The
+       @page margin (0.4in) is OUTSIDE these insets, so the total gutter
+       from the physical paper edge to content is 0.4 + 0.55 = 0.95in
+       — comfortable and matches a typical printed report. */
+    .head {{ padding:14px 0.55in; box-sizing:border-box; }}
+    .wrap {{ padding:0.25in 0.55in 0; }}
+    /* .foot's horizontal margin: 0.55in carries through from the screen
+       rule — no print override needed. */
     /* Section pagination: keep title with body; never split mid-section. */
     .sec        {{ break-inside:avoid; page-break-inside:avoid; }}
     .sec > h2   {{ break-after:avoid;  page-break-after:avoid; }}
