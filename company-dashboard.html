@@ -1989,6 +1989,12 @@ applyLanguage();
             showToast('✓ Cert saved', 3000);
             await renderCertsForCurrentWorker();
             await loadMetrics();
+            // A qualifying cert (SCAFFOLD-16 / RIGGER-32) flips the worker's
+            // CoF eligibility. Re-fetch the workforce list so the per-row
+            // Action button shows 'Issue CoF' live, not stale 'Issue Company ID'.
+            if (typeof loadWorkforce === 'function') {
+              try { await loadWorkforce(); } catch (_) { /* best-effort */ }
+            }
           } else if (resp.status === 200) {
             // Idempotency hit — same 4-tuple already exists
             close();
@@ -2137,6 +2143,11 @@ applyLanguage();
     await fetch(`/api/workers/${encodeURIComponent(currentEmployeeId)}/certs/${certId}`, {method: 'DELETE'});
     await loadProfile();
     await loadMetrics();
+    // Removing a qualifying cert can drop the worker out of CoF eligibility —
+    // re-fetch the workforce list so the Action button updates live.
+    if (typeof loadWorkforce === 'function') {
+      try { await loadWorkforce(); } catch (_) { /* best-effort */ }
+    }
   };
 
   // Modal
