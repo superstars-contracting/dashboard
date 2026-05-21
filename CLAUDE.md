@@ -157,7 +157,80 @@ Use the `split_statements` pattern (see `apply_riggers_schema.py`) so re-running
 a migration is safe. Duplicate column errors are caught and counted as skipped.
 Never write a migration that fails on second run.
 
-## 6. Secrets rule: vault all authenticating API keys, never plaintext on disk
+## 6. Dates rule: LOCAL date, never `toISOString()`
+
+`new Date().toISOString().slice(0,10)` returns the **UTC** date. On this
+workstation (Eastern), UTC rolls over to "tomorrow" any time after ~7 PM
+local. Operator-entered rows under that "tomorrow" date silently mismatch
+the "today" they think they're entering — the bug behind #74 (backdated
+DCRs empty, real entries landed at UTC-tomorrow). Use the local-date
+helper in `dashboard-static.html`:
+
+```js
+function todayLocal(offsetDays) {
+  const d = new Date();
+  if (offsetDays) d.setDate(d.getDate() + offsetDays);
+  return d.getFullYear() + '-'
+       + String(d.getMonth()+1).padStart(2,'0') + '-'
+       + String(d.getDate()).padStart(2,'0');
+}
+```
+
+NEVER use `toISOString().slice(0,10)` for "today" / "today ± N days" /
+date-input defaults / date-comparison anchors. Python's `date.today()`
+is already local (safe). #77 swept the remaining UTC sites; future code
+should not reintroduce the pattern.
+
+## 7. Operational discipline rule: snapshot, kill orphans, loopback-only
+
+**Snapshot before any destructive DB op.** Targeted DELETE, schema
+migration, mass UPDATE, anything that mutates more than one operator-
+expected row:
+
+```bash
+cp superstars.db "data_room/db_backups/superstars-pre-<op-name>-$(date +%Y%m%d-%H%M%S).db"
+```
+
+The snapshot is the evidence + the recovery point. Already saved us
+once after a mid-cleanup DB went to 0 bytes; we want it again the next
+time something weird happens.
+
+**Kill orphan servers on 5050 before starting a new one** —
+`Stop-Process` and `Popen.terminate()` don't reliably kill Flask on
+Windows; they leave orphans behind that intercept smoke tests with
+stale code (caught me 5+ times this batch). Use the tree-kill:
+
+```powershell
+$c = Get-NetTCPConnection -LocalPort 5050 -State Listen -ErrorAction SilentlyContinue
+foreach ($conn in $c) { cmd /c "taskkill /F /T /PID $($conn.OwningProcess)" }
+```
+
+Smoke-test scripts in `tests/` use this pattern in their `finally`
+block. Ad-hoc `subprocess.Popen` diagnostics should too.
+
+**Flask binds to `127.0.0.1:5050` ONLY. NEVER `0.0.0.0`.** Tailscale
+serve proxies external traffic to the loopback. Binding to `0.0.0.0`
+would expose the dashboard to the LAN — and PII with it.
+
+## 8. Terminology rule: Worker ID, hours worked, SSC brand
+
+- **Worker ID = `W-####`** (literal `W-` + zero-padded 4-digit sequence).
+  Stable: once assigned, never changes. New onboards get `max + 1`,
+  never reuse a deleted number. Helpers live in `worker_id.py`.
+  Distinct from the internal `employee_id` (E-#####) primary key —
+  worker_id is for humans, employee_id is the FK target. Display as
+  "W-#### — Name" on every surface that identifies a worker.
+- **Hours = "worked", never "paid".** The 8.00 figure (07:00–15:30
+  minus 30-min lunch) is labor performed. Whether those hours get
+  paid is a separate manual downstream decision. Helper is
+  `payroll_hours.compute_worked_hours`; UI labels say "Worked Hours"
+  / "Hours Worked" / "hours worked" — never "Paid Hours".
+- **Brand: Superstars Contracting Inc. — "AMG" must never appear.**
+  AMG is a sister-org alias that has surfaced in mockups before; the
+  dashboard is SSC-branded across every operator surface, every
+  rendered report header, and every export filename.
+
+## 9. Secrets rule: vault all authenticating API keys, never plaintext on disk
 
 All API keys that authenticate as the company, are billed against the company's
 accounts, or grant access to non-public data live in 1Password Business under
@@ -173,6 +246,64 @@ Stripe publishable keys or domain-restricted Maps keys. For operational
 hygiene, every external service the dashboard depends on still gets a
 1Password vault item even with no credential — the vault doubles as the
 service inventory.
+
+## Deployment context (current — keep this current as the deploy evolves)
+
+The Flask server runs continuously under the Windows scheduled task
+**`SSC Dashboard Server`** (registered via `Register-ScheduledTask`,
+launches `run_server.ps1` at SSC-Admin logon, hidden, restarts 3×@1min
+on failure, no time cap). The launcher runs the app under **waitress**
+(production WSGI on Windows) bound to `127.0.0.1:5050`. Falls back to
+the Flask dev server if waitress isn't installed; same bind.
+
+Path A — `ANTHROPIC_API_KEY` is **optional**. Server boots without it.
+Cert-card AI extraction returns clean `503 {ai_available: false}` so
+the UI can show "AI scan unavailable — use manual entry" instead of
+treating it as an error. Path B (op-run injection of the vaulted key)
+is on the roadmap but not yet wired into the scheduled task.
+
+External access is via **Tailscale serve** (NOT funnel — private, not
+public) at `https://ssc-bkbase.tail55067c.ts.net/`. Field devices
+(operator phone, tablets) join the tailnet via auth key — no admin
+login on the device. The Tailscale daemon proxies TLS-terminated
+traffic to the local `127.0.0.1:5050`; the server itself never sees
+external connections directly.
+
+Operator commands:
+
+```powershell
+Start-ScheduledTask -TaskName "SSC Dashboard Server"   # start now
+Stop-ScheduledTask  -TaskName "SSC Dashboard Server"   # stop
+Get-ScheduledTask   -TaskName "SSC Dashboard Server"   # status
+# Per-day log:
+#   data_room/server_logs/server-YYYY-MM-DD.log
+```
+
+## Compensation / payroll data governance
+
+Pay rates, gross/net pay, deductions, tax withholdings, and any
+employer-cost-of-labor figures are **company-confidential** and have
+distinct handling rules above and beyond the PII rule:
+
+- **DB at rest:** the encrypted workstation drive is the only place
+  these values live. SQLCipher wrapper is a tracked roadmap item (#71
+  / #72) — until it lands, the BitLocker volume is the only encryption
+  layer.
+- **Surface restriction:** comp data appears **only on the company
+  console** (`company-dashboard.html`). NEVER on the per-project
+  dashboard (`dashboard-static.html`, which is field-reachable via
+  Tailscale), NEVER in the worker app, NEVER in any rendered DCR or
+  exported PDF.
+- **Field-reachable surfaces must be comp-free.** Anyone walking
+  on-site can be standing next to the operator looking at a tablet —
+  pay numbers must not be visible there.
+- **The Hours Log on the company console shows hours, not dollars.**
+  Pay-rate × hours math, if added, lives on a separate company-console
+  surface (the Labor Sheet, task #71) gated behind whatever auth model
+  ends up on top of company-only views.
+
+When in doubt: does this number tell someone what someone earns? If
+yes, it's comp data — keep it off field-reachable surfaces.
 
 ## Dependency security tooling (safety net, not a substitute for judgment)
 
