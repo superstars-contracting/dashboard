@@ -1184,13 +1184,19 @@
 
           <div style="margin-bottom:24px;">
             <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;border-bottom:2px solid #B11E2E;padding-bottom:6px;">11. Photos</h3>
+            <!-- Upload-first flow (#108): pick photo → see it → caption against
+                 the visible image → explicit Save. The two text inputs below
+                 are OPTIONAL defaults that pre-fill each new draft tile's
+                 location/caption (so a batch of "South elevation L7" photos
+                 still only requires typing the location once); per-tile inputs
+                 inside the draft override the defaults. -->
             <div style="background:white;border:1px solid #E8E4DD;border-radius:4px;padding:14px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
               <input type="file" id="dcr-photo-input" accept="image/*" multiple style="display:none;">
               <button type="button" id="dcr-photo-trigger" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:6px 14px;border:none;border-radius:4px;background:#B11E2E;color:white;cursor:pointer;">+ Upload photo(s)</button>
-              <input type="text" id="dcr-photo-location" placeholder="Location (e.g., South elevation L7)" style="flex:1;min-width:200px;padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
-              <input type="text" id="dcr-photo-description" placeholder="Caption (optional)" style="flex:1;min-width:200px;padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
+              <input type="text" id="dcr-photo-location" placeholder="Default location (optional — e.g., South elevation L7)" style="flex:1;min-width:200px;padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
+              <input type="text" id="dcr-photo-description" placeholder="Default caption (optional)" style="flex:1;min-width:200px;padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
             </div>
-            <div id="dcr-photo-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:12px;"></div>
+            <div id="dcr-photo-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:12px;"></div>
           </div>
 
           <!-- Action pair: Cancel (secondary) + Issue DCR (primary) -->
@@ -1597,53 +1603,146 @@
 
           // ---- Photos widget ----
 
+          // Upload-first DCR photo flow (#108): operator picks a file, the
+          // tile renders immediately as a *draft* — local blob preview + the
+          // location/caption inputs editable INLINE against the visible image
+          // — and nothing hits the server until the operator clicks the
+          // tile's Save. Cancel discards the draft (revokes the blob URL).
+          // Mirrors the cert/doc Save+toast pattern so every DCR-section
+          // edit commits the same way: preview → explicit Save → toast.
+          // The top "Default location/caption" inputs pre-fill new drafts
+          // (preserves the batch-upload ergonomics) but do not commit on
+          // their own; each tile's per-photo inputs are the ones POSTed.
           function setupPhotos() {
             const trigger = document.getElementById('dcr-photo-trigger');
             const input = document.getElementById('dcr-photo-input');
             const grid = document.getElementById('dcr-photo-grid');
             if (!trigger || !input || !grid) return;
             trigger.addEventListener('click', () => input.click());
-            input.addEventListener('change', async () => {
-              const locInput = document.getElementById('dcr-photo-location');
-              const descInput = document.getElementById('dcr-photo-description');
+            input.addEventListener('change', () => {
               for (const file of input.files) {
-                const tile = document.createElement('div');
-                tile.style.cssText = 'background:white;border:1px solid #E8E4DD;border-radius:4px;overflow:hidden;';
-                tile.innerHTML =
-                  '<div data-tile-thumb style="aspect-ratio:1;background:#F1EEE8;display:flex;align-items:center;justify-content:center;color:#76777E;font-size:11px;">Uploading…</div>' +
-                  '<div style="padding:8px;font-size:11px;">' +
-                    '<div data-tile-name style="font-weight:600;color:#14161C;word-break:break-all;">' + esc(file.name) + '</div>' +
-                    '<div data-tile-status style="color:#76777E;margin-top:2px;">Uploading…</div>' +
-                  '</div>';
-                grid.appendChild(tile);
-                try {
-                  const fd = new FormData();
-                  fd.append('photo', file);
-                  fd.append('project_code', PROJECT_CODE);
-                  fd.append('date', getCurrentDate());
-                  if (locInput && locInput.value.trim()) fd.append('location', locInput.value.trim());
-                  if (descInput && descInput.value.trim()) fd.append('description', descInput.value.trim());
-                  const resp = await fetch('/api/photos/upload', {method: 'POST', body: fd});
-                  const json = await resp.json();
-                  if (resp.status === 201 && json && json.data) {
-                    const thumb = tile.querySelector('[data-tile-thumb]');
-                    thumb.innerHTML = '<img src="' + esc(json.data.url) + '" style="width:100%;height:100%;object-fit:cover;display:block;">';
-                    thumb.style.background = '';
-                    tile.querySelector('[data-tile-status]').textContent = '✓ Saved · ' + (json.data.location || '');
-                    tile.querySelector('[data-tile-status]').style.color = '#2F7C57';
-                  } else {
-                    tile.querySelector('[data-tile-status]').textContent = 'Failed: ' + ((json && json.error) || resp.status);
-                    tile.querySelector('[data-tile-status]').style.color = '#B11E2E';
-                    tile.style.borderColor = '#B11E2E';
-                  }
-                } catch (e) {
-                  console.warn('[DCR] photo upload failed:', e);
-                  tile.querySelector('[data-tile-status]').textContent = 'Network error';
-                  tile.querySelector('[data-tile-status]').style.color = '#B11E2E';
-                }
+                grid.appendChild(buildDcrPhotoDraftTile(file));
               }
+              // Reset so picking the same file again still fires 'change'.
               input.value = '';
             });
+          }
+
+          // Build a draft (uncommitted) photo tile. Returns the DOM element.
+          // Local-only state: holds the File + a blob URL preview; the file is
+          // sent only when the operator clicks Save on this tile. Replace
+          // swaps in a different file (revokes the old blob URL); Cancel
+          // removes the tile entirely.
+          function buildDcrPhotoDraftTile(file) {
+            const defaultLoc = (document.getElementById('dcr-photo-location') || {}).value || '';
+            const defaultDesc = (document.getElementById('dcr-photo-description') || {}).value || '';
+            const tile = document.createElement('div');
+            tile.style.cssText = 'background:white;border:1px solid #E8E4DD;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;';
+            const blobUrl = URL.createObjectURL(file);
+            // Track the current file + blob URL on the tile itself so Replace
+            // and Save can pick them up without closure-over-let gymnastics.
+            tile._photo = {file, blobUrl, saved: false};
+
+            tile.innerHTML =
+              '<div data-tile-thumb style="aspect-ratio:1;background:#F1EEE8;display:block;cursor:zoom-in;">' +
+                '<img data-tile-img src="' + esc(blobUrl) + '" style="width:100%;height:100%;object-fit:cover;display:block;" alt="">' +
+              '</div>' +
+              '<div style="padding:8px;font-size:11px;display:flex;flex-direction:column;gap:6px;">' +
+                '<div data-tile-name style="font-weight:600;color:#14161C;word-break:break-all;">' + esc(file.name) + '</div>' +
+                '<input data-tile-loc type="text" placeholder="Location (e.g., South elevation L7)" style="padding:5px 8px;border:1px solid #E8E4DD;border-radius:3px;font-size:11px;font-family:inherit;">' +
+                '<input data-tile-desc type="text" placeholder="Caption (optional)" style="padding:5px 8px;border:1px solid #E8E4DD;border-radius:3px;font-size:11px;font-family:inherit;">' +
+                '<div data-tile-status style="color:#B68838;font-style:italic;">Draft — not saved yet</div>' +
+                '<div data-tile-actions style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;">' +
+                  '<label data-tile-replace style="font-size:10px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 10px;border:1px solid #E8E4DD;border-radius:3px;background:white;color:#76777E;cursor:pointer;">Replace<input data-tile-replace-input type="file" accept="image/*" style="display:none;"></label>' +
+                  '<button data-tile-cancel type="button" style="font-size:10px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 10px;border:1px solid #E8E4DD;border-radius:3px;background:white;color:#B11E2E;cursor:pointer;">Cancel</button>' +
+                  '<button data-tile-save type="button" style="font-size:10px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 12px;border:none;border-radius:3px;background:#B11E2E;color:white;cursor:pointer;">Save</button>' +
+                '</div>' +
+              '</div>';
+
+            const q = (sel) => tile.querySelector('[data-tile-' + sel + ']');
+            q('loc').value = defaultLoc;
+            q('desc').value = defaultDesc;
+
+            // Replace: swap the underlying file + thumbnail, keep typed text.
+            const replaceInput = q('replace-input');
+            replaceInput.addEventListener('change', () => {
+              const next = replaceInput.files && replaceInput.files[0];
+              if (!next) return;
+              try { URL.revokeObjectURL(tile._photo.blobUrl); } catch (_) {}
+              const nextUrl = URL.createObjectURL(next);
+              tile._photo = {file: next, blobUrl: nextUrl, saved: false};
+              const img = tile.querySelector('[data-tile-img]');
+              if (img) img.src = nextUrl;
+              const nameEl = q('name');
+              if (nameEl) nameEl.textContent = next.name;
+              replaceInput.value = '';
+            });
+
+            // Cancel: drop the draft (no network call). Revoke the blob URL.
+            q('cancel').addEventListener('click', () => {
+              try { URL.revokeObjectURL(tile._photo.blobUrl); } catch (_) {}
+              tile.remove();
+            });
+
+            // Save: explicit commit. POST the file + this tile's metadata,
+            // then lock the tile into a saved/read-only state with a toast.
+            q('save').addEventListener('click', async () => {
+              const saveBtn = q('save');
+              const statusEl = q('status');
+              const file = tile._photo && tile._photo.file;
+              if (!file) return;
+              saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+              statusEl.textContent = 'Saving…'; statusEl.style.color = '#76777E';
+              // 30s ceiling — same reasoning as the DCR fetches (#106):
+              // never leave the operator staring at "Saving…" forever.
+              const ctrl = new AbortController();
+              const timer = setTimeout(() => ctrl.abort(), 30000);
+              try {
+                const fd = new FormData();
+                fd.append('photo', file);
+                fd.append('project_code', PROJECT_CODE);
+                fd.append('date', getCurrentDate());
+                const locVal = (q('loc').value || '').trim();
+                const descVal = (q('desc').value || '').trim();
+                if (locVal) fd.append('location', locVal);
+                if (descVal) fd.append('description', descVal);
+                const resp = await fetch('/api/photos/upload', {method: 'POST', body: fd, signal: ctrl.signal});
+                const json = await resp.json().catch(() => ({}));
+                if (resp.status === 201 && json && json.data) {
+                  // Replace the draft UI with a committed (read-only) one.
+                  // Server URL is the canonical source — replace the blob
+                  // src so revoking the local blob URL doesn't break it.
+                  const img = tile.querySelector('[data-tile-img]');
+                  if (img && json.data.url) img.src = json.data.url;
+                  try { URL.revokeObjectURL(tile._photo.blobUrl); } catch (_) {}
+                  tile._photo = {file: null, blobUrl: null, saved: true, row_id: json.data.id};
+                  const locText = locVal || json.data.location || '';
+                  statusEl.textContent = '✓ Saved' + (locText ? ' · ' + locText : '');
+                  statusEl.style.color = '#2F7C57';
+                  statusEl.style.fontStyle = 'normal';
+                  // Lock the per-tile controls now that it's committed.
+                  q('loc').disabled = true;
+                  q('desc').disabled = true;
+                  const actions = q('actions');
+                  if (actions) actions.remove();
+                } else {
+                  saveBtn.disabled = false; saveBtn.textContent = 'Save';
+                  const msg = (json && json.error) || ('HTTP ' + resp.status);
+                  statusEl.textContent = 'Failed: ' + msg;
+                  statusEl.style.color = '#B11E2E';
+                }
+              } catch (e) {
+                console.warn('[DCR] photo upload failed:', e);
+                saveBtn.disabled = false; saveBtn.textContent = 'Save';
+                const label = (e && e.name === 'AbortError') ? 'Timed out — try Save again' : 'Network error — try Save again';
+                statusEl.textContent = label;
+                statusEl.style.color = '#B11E2E';
+              } finally {
+                clearTimeout(timer);
+              }
+            });
+
+            return tile;
           }
 
           // ---- Issue DCR ----
@@ -1741,9 +1840,19 @@
             // Operator-entry rows (all sections: work, deliveries, equipment,
             // toolbox, safety, issues, inspections, visitors).
             document.querySelectorAll('[data-dcr-rows]').forEach(c => { c.innerHTML = ''; });
-            // Photos grid + the location/caption inputs.
+            // Photos grid + the location/caption inputs. Revoke any
+            // outstanding draft-tile blob URLs first so cancelling the form
+            // (or finishing an Issue) doesn't strand them in browser memory.
             const photoGrid = document.getElementById('dcr-photo-grid');
-            if (photoGrid) photoGrid.innerHTML = '';
+            if (photoGrid) {
+              photoGrid.querySelectorAll('[data-tile-img]').forEach(img => {
+                const url = img.getAttribute('src') || '';
+                if (url.startsWith('blob:')) {
+                  try { URL.revokeObjectURL(url); } catch (_) {}
+                }
+              });
+              photoGrid.innerHTML = '';
+            }
             const photoLoc = document.getElementById('dcr-photo-location');
             if (photoLoc) photoLoc.value = '';
             const photoDesc = document.getElementById('dcr-photo-description');
