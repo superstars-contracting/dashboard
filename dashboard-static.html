@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+<link rel="stylesheet" href="/files/static/fonts/typography.css">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Superstars Contracting - Project Console</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html { font-size: 16px; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       background-color: #FAF7F1;
       color: #14161C;
       line-height: 1.6;
@@ -39,7 +40,7 @@
     }
     .sidebar-header svg { width: 24px; height: 24px; }
     .brand-name {
-      font-family: Georgia, serif;
+      font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
       font-weight: 700;
       color: #14161C;
       font-size: 16px;
@@ -113,7 +114,7 @@
       margin-bottom: 8px;
     }
     .topbar-title {
-      font-family: Georgia, serif;
+      font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
       font-weight: 600;
       font-size: 17px;
       color: #14161C;
@@ -140,14 +141,14 @@
       margin-bottom: 24px;
     }
     .hero h1 {
-      font-family: Georgia, serif;
+      font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
       font-size: 44px;
       font-weight: bold;
       color: #14161C;
       margin-bottom: 4px;
     }
     .hero-subtitle {
-      font-family: Georgia, serif;
+      font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
       font-style: italic;
       color: #B11E2E;
       font-size: 18px;
@@ -171,7 +172,7 @@
     }
     .stat-item { text-align: center; }
     .stat-number {
-      font-family: Georgia, serif;
+      font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
       font-size: 36px;
       font-weight: bold;
       color: #14161C;
@@ -186,7 +187,7 @@
     /* Section */
     .section { margin-bottom: 32px; }
     .section h2 {
-      font-family: Georgia, serif;
+      font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
       font-size: 28px;
       color: #14161C;
       margin-bottom: 24px;
@@ -216,7 +217,7 @@
     }
     .kpi-content { padding: 12px; text-align: center; }
     .kpi-stat {
-      font-family: Georgia, serif;
+      font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
       font-size: 24px;
       font-weight: bold;
       color: #14161C;
@@ -272,7 +273,7 @@
       margin-bottom: 4px;
     }
     .site-value {
-      font-family: Georgia, serif;
+      font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
       font-size: 18px;
       font-weight: bold;
       color: #14161C;
@@ -354,7 +355,7 @@
     }
     .category-name { font-size: 12px; font-weight: 600; color: #14161C; }
     .category-count {
-      font-family: Georgia, serif;
+      font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
       font-size: 28px;
       color: #B11E2E;
       margin-top: 8px;
@@ -1248,13 +1249,13 @@
             el.innerHTML =
               '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;align-items:center;">' +
                 '<div><div class="site-label" style="margin-bottom:4px;">AM</div>' +
-                '<div style="font-family:Georgia,serif;font-size:24px;color:#14161C;">' + fmtT(w.am && w.am.temp_f) + '</div>' +
+                '<div style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:24px;color:#14161C;">' + fmtT(w.am && w.am.temp_f) + '</div>' +
                 '<div style="font-size:11px;color:#76777E;">' + (esc(w.am && w.am.conditions) || '—') + '</div></div>' +
                 '<div><div class="site-label" style="margin-bottom:4px;">PM</div>' +
-                '<div style="font-family:Georgia,serif;font-size:24px;color:#14161C;">' + fmtT(w.pm && w.pm.temp_f) + '</div>' +
+                '<div style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:24px;color:#14161C;">' + fmtT(w.pm && w.pm.temp_f) + '</div>' +
                 '<div style="font-size:11px;color:#76777E;">' + (esc(w.pm && w.pm.conditions) || '—') + '</div></div>' +
                 '<div><div class="site-label" style="margin-bottom:4px;">Wind</div>' +
-                '<div style="font-family:Georgia,serif;font-size:18px;color:#14161C;">' + (esc(w.wind) || '—') + '</div></div>' +
+                '<div style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:18px;color:#14161C;">' + (esc(w.wind) || '—') + '</div></div>' +
               '</div>' +
               '<div style="margin-top:12px;padding-top:8px;border-top:1px solid #F1EEE8;font-size:10px;color:#76777E;text-align:right;">' + esc(sourceLabel) + '</div>';
           }
@@ -1765,7 +1766,7 @@
               ? '<button type="button" data-delete-seq="' + esc(seq) + '" data-display-id="' + esc(displayId) + '" data-report-date="' + esc(reportDate) + '" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 10px;border:1px solid #B11E2E;border-radius:4px;background:white;color:#B11E2E;cursor:pointer;margin-left:8px;">Delete</button>'
               : '';
             return '<tr>' +
-              '<td style="font-family:Georgia,serif;font-size:13px;font-weight:600;">' + esc(displayId) + '</td>' +
+              '<td style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:13px;font-weight:600;">' + esc(displayId) + '</td>' +
               '<td>' + esc(reportDate || '—') + '</td>' +
               '<td><span style="padding:3px 8px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;background:' + statusColor + ';color:white;">' + esc(r.status || '—') + '</span></td>' +
               '<td style="font-size:12px;color:#76777E;">' + esc(r.updated_at || r.created_at || '—') + '</td>' +

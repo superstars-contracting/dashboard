@@ -22,6 +22,7 @@ import json
 import sys
 from datetime import datetime
 from typing import Any, Dict, List
+from typography import get_inlined_style_tag
 
 # Placeholder star — inlined as a Python constant so the DCR HTML is fully
 # self-contained (the PDF render doesn't depend on a file path). Swap this
@@ -191,6 +192,7 @@ class DCRHTMLRenderer:
                  else "Daily Progress Report")
         return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
+    {get_inlined_style_tag()}
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>{_esc(title)}</title>
 <style>
@@ -204,7 +206,7 @@ class DCRHTMLRenderer:
   * {{ box-sizing: border-box; }}
   html, body {{ margin:0; padding:0; background:var(--cream); }}
   body {{
-    font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    font-family:"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     color:var(--ink); font-size:12px; line-height:1.42;
     -webkit-print-color-adjust:exact; print-color-adjust:exact;
   }}

@@ -1,0 +1,43 @@
+/* Single source of truth for the dashboard's typography:
+   Archivo (titles/headings) + Inter (body). Self-hosted from
+   static/fonts/. Web pages include this file via:
+     <link rel="stylesheet" href="/files/static/fonts/typography.css">
+
+   Generated documents that need to render offline (headless-Edge PDF,
+   archived/emailed copies) inline the equivalent base64-embedded version
+   via typography.get_inlined_style_tag() from typography.py.
+
+   Both woff2 files are VARIABLE fonts — one file per family covers the
+   100..900 weight axis. The @font-face declares the full range so any
+   font-weight in the document resolves to a real glyph (no synthesized
+   bold). Latin subset only — covers EN/ES, which is what the dashboard
+   needs. No CDN dependency. */
+
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/files/static/fonts/Archivo-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/files/static/fonts/Inter-latin.woff2') format('woff2');
+}
+
+/* Base typography. Body = Inter; headings + opt-in .archivo class = Archivo.
+   Fallback chain keeps the page readable if the woff2 fails to load.
+   Per-element font-family declarations elsewhere in the dashboard are
+   updated to use 'Inter' or 'Archivo' directly (no Playfair Display /
+   Calibri / DM Sans / Georgia stacks remain). */
+html, body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+h1, h2, h3, h4, h5, h6,
+.archivo, .title, .heading {
+  font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  letter-spacing: -0.01em;
+}

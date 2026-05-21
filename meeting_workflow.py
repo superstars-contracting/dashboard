@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 def generate_email_draft(meeting_id, recipient_name, recipient_email, summary, actions_for_recipient):
-    body = f"""<html><body style='font-family: sans-serif; font-size: 13px; color: #333;'>
+    body = f"""<html><body style='font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #333;'>
 <p>Hi {recipient_name},</p>
 
 <p>Please see the attached meeting minutes from {meeting_id}.</p>

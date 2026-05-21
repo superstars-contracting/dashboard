@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="stylesheet" href="/files/static/fonts/typography.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Superstars Contracting · Office Console</title>
 <style>
@@ -19,7 +20,7 @@
     --bad: #B11E2E;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { background: var(--cream); color: var(--ink); font-family: 'Calibri', 'Segoe UI', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+  html, body { background: var(--cream); color: var(--ink); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
   body { min-height: 100vh; }
 
   /* ==== HEADER ==== */
@@ -35,7 +36,7 @@
   .brand { display: flex; align-items: center; gap: 14px; }
   .brand-mark { width: 42px; height: 42px; }
   .brand-text { line-height: 1.1; }
-  .brand-name { font-family: 'Playfair Display', 'Georgia', serif; font-size: 18px; font-weight: 700; letter-spacing: 0.5px; color: var(--ink); text-transform: uppercase; }
+  .brand-name { font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 0.5px; color: var(--ink); text-transform: uppercase; }
   .brand-sub { font-size: 10px; color: var(--mute); letter-spacing: 1px; text-transform: uppercase; font-weight: 600; margin-top: 2px; }
   .topbar-right { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--mute); }
   .console-pill { background: var(--ink); color: white; font-size: 10px; padding: 6px 12px; border-radius: 99px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 700; }
@@ -72,14 +73,14 @@
   .container { max-width: 1400px; margin: 0 auto; padding: 32px; }
 
   .section { background: white; border-radius: 10px; padding: 24px 28px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(20,22,28,0.04), 0 0 0 1px var(--hairline); }
-  .section h2 { font-family: 'Playfair Display', 'Georgia', serif; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .section h2 { font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
   .section .h2-sub { font-size: 12px; color: var(--mute); margin-bottom: 18px; }
 
   /* ==== TOP METRICS ROW ==== */
   .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
   .metric { background: white; border-radius: 10px; padding: 20px 22px; box-shadow: 0 1px 3px rgba(20,22,28,0.04), 0 0 0 1px var(--hairline); position: relative; overflow: hidden; }
   .metric-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--mute); }
-  .metric-value { font-family: 'Playfair Display', 'Georgia', serif; font-size: 34px; font-weight: 700; margin-top: 8px; line-height: 1; color: var(--ink); }
+  .metric-value { font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 34px; font-weight: 700; margin-top: 8px; line-height: 1; color: var(--ink); }
   .metric-value.ok { color: var(--ok); }
   .metric-value.warn { color: var(--warn); }
   .metric-value.bad { color: var(--bad); }
@@ -101,7 +102,7 @@
   }
   .project-card:hover { border-color: var(--brand-red); box-shadow: 0 4px 14px rgba(177,30,46,0.08); transform: translateY(-1px); }
   .project-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
-  .project-card-name { font-family: 'Playfair Display', 'Georgia', serif; font-size: 17px; font-weight: 700; line-height: 1.2; }
+  .project-card-name { font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 17px; font-weight: 700; line-height: 1.2; }
   .project-card-code { font-family: 'Consolas', monospace; font-size: 10px; color: var(--mute); margin-top: 2px; }
   .project-card-addr { font-size: 12px; color: var(--mute); margin-top: 6px; line-height: 1.4; }
   .project-card-stats { display: flex; gap: 18px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hairline); font-size: 11px; color: var(--mute); }
@@ -282,7 +283,7 @@
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <button id="hrs-prev" type="button" style="background:white;border:1px solid #B11E2E;color:#B11E2E;padding:6px 12px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;">‹ Prev</button>
-          <div id="hrs-range" style="font-family:Georgia,serif;font-size:14px;font-weight:700;min-width:220px;text-align:center;">—</div>
+          <div id="hrs-range" style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:14px;font-weight:700;min-width:220px;text-align:center;">—</div>
           <button id="hrs-next" type="button" style="background:white;border:1px solid #B11E2E;color:#B11E2E;padding:6px 12px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;">Next ›</button>
           <button id="hrs-csv" type="button" style="background:#14161C;color:white;border:none;padding:6px 14px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;margin-left:14px;">⬇ CSV</button>
           <button id="hrs-pdf" type="button" style="background:#B11E2E;color:white;border:none;padding:6px 14px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;">⬇ PDF</button>
@@ -364,7 +365,7 @@
   <div style="padding:20px 28px;border-bottom:1px solid #E8E4DD;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:white;z-index:5;">
     <div>
       <div style="font-size:11px;color:#76777E;letter-spacing:1px;text-transform:uppercase;font-weight:700;" id="pp-id">—</div>
-      <h2 id="pp-name" style="font-family:'Playfair Display','Georgia',serif;font-size:24px;font-weight:700;margin-top:4px;">—</h2>
+      <h2 id="pp-name" style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:24px;font-weight:700;margin-top:4px;">—</h2>
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
       <button id="pp-edit-btn" style="background:#B11E2E;color:white;border:none;padding:6px 14px;border-radius:4px;font-size:12px;cursor:pointer;font-weight:600;letter-spacing:0.5px;">Edit</button>
@@ -508,7 +509,7 @@
 <div class="modal-bg" id="intake-modal">
   <div class="modal">
     <div class="modal-header">
-      <h2 style="font-family:'Playfair Display','Georgia',serif;" data-i18n="modal-title">New Worker Intake</h2>
+      <h2 style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;" data-i18n="modal-title">New Worker Intake</h2>
       <button class="modal-close" id="modal-close">×</button>
     </div>
 
@@ -1535,7 +1536,7 @@ applyLanguage();
       card.style.cssText = 'background:white;border-radius:12px;width:100%;max-width:680px;max-height:96vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.4);';
       card.innerHTML = `
         <div style="padding:14px 18px;border-bottom:1px solid #E8E4DD;display:flex;justify-content:space-between;align-items:center;">
-          <div style="font-family:'Playfair Display',Georgia,serif;font-size:18px;font-weight:700;color:#14161C;">${esc(title)}</div>
+          <div style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:18px;font-weight:700;color:#14161C;">${esc(title)}</div>
           <button data-role="cam-cancel" style="background:none;border:none;font-size:28px;color:#76777E;cursor:pointer;line-height:1;padding:0 4px;" aria-label="Close">×</button>
         </div>
         <div data-role="cam-body" style="position:relative;background:#000;min-height:240px;display:flex;align-items:center;justify-content:center;flex:1;">
@@ -1699,7 +1700,7 @@ applyLanguage();
       card.style.cssText = 'background:white;border-radius:12px;width:100%;max-width:460px;max-height:96vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.3);';
       card.innerHTML = `
         <div style="padding:14px 18px;border-bottom:1px solid #E8E4DD;display:flex;justify-content:space-between;align-items:center;">
-          <div style="font-family:'Playfair Display',Georgia,serif;font-size:18px;font-weight:700;color:#14161C;">Upload ${esc(docTypeLabel)}?</div>
+          <div style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:18px;font-weight:700;color:#14161C;">Upload ${esc(docTypeLabel)}?</div>
           <button data-role="x" style="background:none;border:none;font-size:26px;color:#76777E;cursor:pointer;line-height:1;padding:0 4px;" aria-label="Close">×</button>
         </div>
         <div style="padding:18px;overflow-y:auto;flex:1;">
@@ -1829,7 +1830,7 @@ applyLanguage();
       card.style.cssText = 'background:white;border-radius:12px;width:100%;max-width:560px;max-height:96vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.3);';
       card.innerHTML = `
         <div style="padding:14px 18px;border-bottom:1px solid #E8E4DD;display:flex;justify-content:space-between;align-items:center;">
-          <div style="font-family:'Playfair Display',Georgia,serif;font-size:18px;font-weight:700;color:#14161C;">Review & save certification</div>
+          <div style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:18px;font-weight:700;color:#14161C;">Review & save certification</div>
           <button data-role="x" style="background:none;border:none;font-size:26px;color:#76777E;cursor:pointer;line-height:1;padding:0 4px;" aria-label="Close">×</button>
         </div>
         <div style="padding:18px;overflow-y:auto;flex:1;">

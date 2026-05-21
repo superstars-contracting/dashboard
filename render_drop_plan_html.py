@@ -2,6 +2,7 @@
 import json
 import sys
 from datetime import datetime
+from typography import get_inlined_style_tag
 
 def render_html(json_path, output_path):
     with open(json_path) as f:
@@ -77,12 +78,13 @@ def render_html(json_path, output_path):
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    {get_inlined_style_tag()}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Drop Plan {data['drop_id']}</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: 'DM Sans', sans-serif; background: #FAF7F1; color: #14161C; line-height: 1.6; }}
+        body {{ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #FAF7F1; color: #14161C; line-height: 1.6; }}
         @page {{ margin: 0.5in; size: letter portrait; }}
         @media print {{
             body {{ background: white; }}
@@ -92,13 +94,13 @@ def render_html(json_path, output_path):
         .letterhead {{ display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #B11E2E; padding-bottom: 0.3in; margin-bottom: 0.3in; }}
         .letterhead-left {{ flex: 1; }}
         .letterhead-star {{ font-size: 24px; }}
-        .company-name {{ font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 700; color: #B11E2E; margin-top: 4px; }}
+        .company-name {{ font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; font-weight: 700; color: #B11E2E; margin-top: 4px; }}
         .company-addr {{ font-size: 9px; color: #666; margin-top: 4px; line-height: 1.3; }}
         .letterhead-right {{ text-align: right; }}
-        .doc-title {{ font-family: 'Playfair Display', serif; font-size: 24px; color: #B11E2E; }}
+        .doc-title {{ font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 24px; color: #B11E2E; }}
         .doc-subtitle {{ font-size: 13px; color: #666; margin-top: 4px; }}
         .status-badge {{ display: inline-block; padding: 4px 12px; border-radius: 3px; font-size: 11px; font-weight: 600; margin-top: 6px; background-color: {status_color}; color: white; }}
-        h2 {{ font-family: 'Playfair Display', serif; font-size: 20px; margin-top: 0.2in; margin-bottom: 0.15in; padding-bottom: 0.1in; border-bottom: 2px solid #E5E7EB; }}
+        h2 {{ font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 20px; margin-top: 0.2in; margin-bottom: 0.15in; padding-bottom: 0.1in; border-bottom: 2px solid #E5E7EB; }}
         h3 {{ font-size: 13px; font-weight: 600; color: #B11E2E; margin-top: 0.15in; margin-bottom: 0.08in; text-transform: uppercase; letter-spacing: 1px; }}
         .meta-strip {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.15in; margin-bottom: 0.2in; }}
         .meta-box {{ background: #F3F4F6; padding: 0.12in; border-left: 3px solid #B11E2E; }}
@@ -141,7 +143,7 @@ def render_html(json_path, output_path):
 
         <!-- Drop Header -->
         <div style="margin-bottom: 0.25in;">
-            <div style="font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 700; color: #14161C;">{data['drop_id']}</div>
+            <div style="font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 32px; font-weight: 700; color: #14161C;">{data['drop_id']}</div>
             <div style="font-size: 13px; color: #666; margin-top: 4px;">{data['elevation']} Elevation · Bay {data['bay_range']} · Floors {data['floor_range']}</div>
         </div>
 

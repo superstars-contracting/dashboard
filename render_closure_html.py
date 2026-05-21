@@ -3,6 +3,7 @@
 import argparse, json, sys
 from pathlib import Path
 from typing import Any, Dict, List
+from typography import get_inlined_style_tag
 
 class ClosureHTMLRenderer:
     BRAND_RED = "#B11E2E"
@@ -34,19 +35,20 @@ class ClosureHTMLRenderer:
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    {get_inlined_style_tag()}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Site Closure Record</title>
     <style>
         :root {{ color-scheme: light; }}
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: 'DM Sans', -apple-system, sans-serif; background: {self.CREAM}; padding: 40px 20px; color: {self.INK}; }}
+        body {{ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: {self.CREAM}; padding: 40px 20px; color: {self.INK}; }}
         .page {{ max-width: 900px; margin: 0 auto; background: {self.WHITE}; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }}
         .letterhead {{ background: {self.INK}; color: {self.WHITE}; padding: 24px 40px; display: flex; align-items: center; justify-content: space-between; border-bottom: 4px solid {self.BRAND_RED}; }}
         .letterhead-left {{ display: flex; align-items: center; gap: 12px; }}
         .star {{ font-size: 28px; color: {self.BRAND_RED}; }}
-        .brand-name {{ font-family: 'Playfair Display', serif; font-size: 20px; font-weight: bold; color: {self.WHITE}; }}
+        .brand-name {{ font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 20px; font-weight: bold; color: {self.WHITE}; }}
         .letterhead-right {{ text-align: right; }}
-        .doc-title {{ font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 600; color: {self.INK}; margin-bottom: 4px; }}
+        .doc-title {{ font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 600; color: {self.INK}; margin-bottom: 4px; }}
         .doc-id {{ font-size: 12px; color: {self.MUTE}; text-transform: uppercase; letter-spacing: 0.5px; }}
         .content {{ padding: 40px; }}
         .stats-row {{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin-bottom: 36px; padding-bottom: 24px; border-bottom: 1px solid #e5e2dd; }}
@@ -61,7 +63,7 @@ class ClosureHTMLRenderer:
         .info-value {{ font-size: 13px; color: {self.INK}; line-height: 1.4; }}
         .checklist-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 36px; }}
         .section {{ }}
-        .section-title {{ display: flex; align-items: center; gap: 8px; font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 600; color: {self.INK}; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 2px solid {self.BRAND_RED}; }}
+        .section-title {{ display: flex; align-items: center; gap: 8px; font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 600; color: {self.INK}; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 2px solid {self.BRAND_RED}; }}
         .rule-mark {{ width: 4px; height: 4px; background: {self.BRAND_RED}; border-radius: 2px; }}
         .section-warning {{ background: #FEF3C7; padding: 4px 8px; border-radius: 4px; font-size: 10px; color: #92400E; font-weight: 600; margin-left: auto; }}
         .checklist-item {{ display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-size: 12px; }}
@@ -72,7 +74,7 @@ class ClosureHTMLRenderer:
         .item-label {{ color: {self.INK}; }}
         .na-badge {{ display: inline-block; margin-left: 8px; padding: 2px 6px; background: {self.MUTE}; color: {self.WHITE}; border-radius: 3px; font-size: 10px; font-weight: 600; }}
         .equipment-section {{ margin-bottom: 36px; padding-bottom: 24px; border-bottom: 1px solid #e5e2dd; }}
-        .section-header {{ font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 600; color: {self.INK}; margin-bottom: 12px; }}
+        .section-header {{ font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 600; color: {self.INK}; margin-bottom: 12px; }}
         .equipment-text {{ font-size: 12px; color: {self.INK}; line-height: 1.6; white-space: pre-wrap; }}
         .notes-section {{ margin-bottom: 36px; padding-bottom: 24px; border-bottom: 1px solid #e5e2dd; }}
         .notes-text {{ font-size: 12px; color: {self.INK}; line-height: 1.6; white-space: pre-wrap; font-style: italic; color: {self.MUTE}; }}

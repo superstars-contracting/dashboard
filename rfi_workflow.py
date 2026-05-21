@@ -227,7 +227,7 @@ class RFIWorkflow:
     <meta charset="UTF-8">
     <title>{subject}</title>
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background-color:#f5f5f5; margin:0; padding:20px;">
+<body style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color:#f5f5f5; margin:0; padding:20px;">
 
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; margin:0 auto; background-color:#fff;">
 
@@ -254,7 +254,7 @@ class RFIWorkflow:
   <tr><td style="padding:0 20px 20px;">
     <table width="100%" cellpadding="16" cellspacing="0" style="border:1px solid #ddd; border-left:4px solid #B11E2E; background-color:#fafafa; border-radius:4px;">
       <tr><td>
-        <div style="font-family: 'Playfair Display', Georgia, serif; font-size:16px; font-weight:600; color:#1a1a1a; margin-bottom:8px;">
+        <div style="font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size:16px; font-weight:600; color:#1a1a1a; margin-bottom:8px;">
           {rfi['rfi_id']} — {rfi['title']}
         </div>
         <div style="margin-bottom:12px;">

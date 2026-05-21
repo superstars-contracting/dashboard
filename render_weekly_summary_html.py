@@ -6,6 +6,7 @@ Renders Weekly Progress Summary JSON to HTML using DCR letterhead protocol.
 import json
 import sys
 from datetime import datetime
+from typography import get_inlined_style_tag
 
 def render_html(json_path, output_path):
     with open(json_path) as f:
@@ -19,6 +20,7 @@ def render_html(json_path, output_path):
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    {get_inlined_style_tag()}
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Weekly Progress Summary - {data['project']['code']}</title>
     <style>
@@ -34,7 +36,7 @@ def render_html(json_path, output_path):
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         
         body {{
-            font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background: var(--cream);
             color: var(--ink);
             line-height: 1.5;
@@ -84,7 +86,7 @@ def render_html(json_path, output_path):
         .star-logo {{ font-size: 2rem; }}
         
         .letterhead-text h1 {{
-            font-family: "Playfair Display", serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 1.8rem;
             font-weight: 700;
             color: var(--ink);
@@ -104,7 +106,7 @@ def render_html(json_path, output_path):
         }}
         
         .letterhead-right h2 {{
-            font-family: "Playfair Display", serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 1.3rem;
             font-weight: 600;
             color: var(--red);
@@ -123,7 +125,7 @@ def render_html(json_path, output_path):
         }}
         
         .section-title {{
-            font-family: "Playfair Display", serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 1.1rem;
             font-weight: 600;
             color: var(--ink);
@@ -168,7 +170,7 @@ def render_html(json_path, output_path):
         }}
         
         .hero-number .number {{
-            font-family: "Playfair Display", serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 3rem;
             font-weight: 700;
             margin-bottom: 0.5rem;
@@ -229,7 +231,7 @@ def render_html(json_path, output_path):
             padding: 0.6rem;
             font-weight: 600;
             color: var(--ink);
-            font-family: "Playfair Display", serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
         }}
         
         td {{
@@ -276,7 +278,7 @@ def render_html(json_path, output_path):
         }}
         
         .stat-card .value {{
-            font-family: "Playfair Display", serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 1.8rem;
             font-weight: 700;
             color: var(--red);

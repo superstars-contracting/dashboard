@@ -1,6 +1,7 @@
 import json
 import sys
 from datetime import datetime
+from typography import get_inlined_style_tag
 
 def render_rfi(json_path, output_html):
     with open(json_path, 'r') as f:
@@ -44,7 +45,7 @@ def render_rfi(json_path, output_html):
 
     attachments_html = ''
     if data['attachments']['photo_count'] > 0 or data['attachments']['reference_documents']:
-        attachments_html = '<div style="margin-top: 16px;"><h4 style="font-family: \'Playfair Display\', serif; font-size: 14px; margin-bottom: 8px;">Attachments</h4>'
+        attachments_html = '<div style="margin-top: 16px;"><h4 style="font-family: \'Archivo\', -apple-system, BlinkMacSystemFont, \'Helvetica Neue\', Helvetica, Arial, sans-serif; font-size: 14px; margin-bottom: 8px;">Attachments</h4>'
         if data['attachments']['photo_count'] > 0:
             attachments_html += f'<p style="font-size: 12px; margin-bottom: 8px;"><strong>Photos:</strong> {data["attachments"]["photo_count"]} attached</p>'
         if data['attachments']['reference_documents']:
@@ -55,7 +56,7 @@ def render_rfi(json_path, output_html):
     if data['response']['received_date']:
         response_html = f'''
         <div style="margin-top: 24px; padding: 16px; background: #F5F5F5; border-left: 4px solid #4CAF50;">
-            <h3 style="font-family: 'Playfair Display', serif; font-size: 16px; margin-bottom: 8px; color: #4CAF50;">Response</h3>
+            <h3 style="font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; margin-bottom: 8px; color: #4CAF50;">Response</h3>
             <p style="font-size: 12px; margin-bottom: 8px;"><strong>Received:</strong> {data['response']['received_date']}</p>
             <p style="font-size: 13px; line-height: 1.6;">{data['response']['summary'] or 'Response received.'}</p>
         </div>
@@ -69,13 +70,14 @@ def render_rfi(json_path, output_html):
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    {get_inlined_style_tag()}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{data['rfi_id']} - Request for Information</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background-color: #FAF7F1;
             color: #14161C;
             line-height: 1.6;
@@ -97,7 +99,7 @@ def render_rfi(json_path, output_html):
             flex: 1;
         }}
         .letterhead-brand {{
-            font-family: 'Playfair Display', serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-weight: 700;
             font-size: 24px;
             margin-bottom: 4px;
@@ -112,7 +114,7 @@ def render_rfi(json_path, output_html):
             text-align: right;
         }}
         .letterhead-title {{
-            font-family: 'Playfair Display', serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 18px;
             font-weight: 700;
             margin-bottom: 8px;
@@ -125,14 +127,14 @@ def render_rfi(json_path, output_html):
             border-radius: 2px;
         }}
         h1 {{
-            font-family: 'Playfair Display', serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 36px;
             font-weight: 700;
             margin: 24px 0 12px 0;
             color: #14161C;
         }}
         h2 {{
-            font-family: 'Playfair Display', serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 18px;
             font-weight: 700;
             margin-top: 24px;
@@ -142,7 +144,7 @@ def render_rfi(json_path, output_html):
             color: #14161C;
         }}
         h3 {{
-            font-family: 'Playfair Display', serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 14px;
             font-weight: 700;
             margin-bottom: 8px;

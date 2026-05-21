@@ -1,6 +1,7 @@
 import json
 import sys
 from datetime import datetime
+from typography import get_inlined_style_tag
 
 def render_html(talk):
     category_colors = {
@@ -22,6 +23,7 @@ def render_html(talk):
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    {get_inlined_style_tag()}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{talk['title']} - Toolbox Talk</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -29,7 +31,7 @@ def render_html(talk):
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: 'DM Sans', sans-serif; line-height: 1.5; color: #14161C; background: #FAF7F1; }}
+        body {{ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; color: #14161C; background: #FAF7F1; }}
         @page {{ size: letter portrait; margin: 0.5in; }}
         @media print {{
             body {{ background: white; }}
@@ -41,13 +43,13 @@ def render_html(talk):
         .letterhead-right {{ text-align: right; font-size: 10px; }}
         .header {{ margin-bottom: 1in; }}
         .category-badge {{ display: inline-block; background: {badge_color}; color: white; padding: 0.25in 0.4in; font-size: 9px; font-weight: 600; letter-spacing: 1px; margin-bottom: 0.2in; border-radius: 3px; }}
-        .title {{ font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 700; color: #14161C; margin-bottom: 0.3in; line-height: 1.2; }}
+        .title {{ font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 26px; font-weight: 700; color: #14161C; margin-bottom: 0.3in; line-height: 1.2; }}
         .refs {{ font-size: 10px; color: #666; margin-bottom: 0.4in; }}
         .project-info {{ font-size: 10px; color: #666; }}
         .callout {{ background: #FFF8F0; border-left: 4px solid #B11E2E; padding: 0.4in; margin: 0.5in 0; border-radius: 3px; }}
         .callout-title {{ font-weight: 600; font-size: 9px; letter-spacing: 1px; color: #B11E2E; margin-bottom: 0.15in; }}
         .callout-text {{ font-style: italic; font-size: 11px; line-height: 1.6; }}
-        h3 {{ font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 700; margin: 0.4in 0 0.2in 0; color: #14161C; }}
+        h3 {{ font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 700; margin: 0.4in 0 0.2in 0; color: #14161C; }}
         .practices {{ counter-reset: practice; }}
         .practice {{ display: flex; margin-bottom: 0.2in; font-size: 11px; }}
         .practice-num {{ display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #B11E2E; color: white; border-radius: 50%; font-weight: 600; font-size: 11px; margin-right: 0.3in; flex-shrink: 0; }}

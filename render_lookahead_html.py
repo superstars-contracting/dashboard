@@ -2,6 +2,7 @@
 import json
 import sys
 from datetime import datetime
+from typography import get_inlined_style_tag
 
 def render_lookahead_html(json_path, output_path):
     with open(json_path, 'r') as f:
@@ -25,6 +26,7 @@ def build_html(data, prepared_by, prepared_role, reviewed_by, reviewed_role, sig
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    {get_inlined_style_tag()}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>2-Week Look Ahead — {data['project']['code']}</title>
     <style>
@@ -44,7 +46,7 @@ def build_html(data, prepared_by, prepared_role, reviewed_by, reviewed_role, sig
         }}
 
         body {{
-            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background: var(--cream-bg);
             color: var(--text);
             line-height: 1.5;
@@ -76,7 +78,7 @@ def build_html(data, prepared_by, prepared_role, reviewed_by, reviewed_role, sig
         }}
 
         .letterhead-brand {{
-            font-family: 'Playfair Display', serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 28px;
             font-weight: 700;
             letter-spacing: -1px;
@@ -93,7 +95,7 @@ def build_html(data, prepared_by, prepared_role, reviewed_by, reviewed_role, sig
         }}
 
         .letterhead-title {{
-            font-family: 'Playfair Display', serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 24px;
             font-weight: 600;
             margin-bottom: 0.1in;
@@ -122,7 +124,7 @@ def build_html(data, prepared_by, prepared_role, reviewed_by, reviewed_role, sig
         }}
 
         .section-title {{
-            font-family: 'Playfair Display', serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 16px;
             font-weight: 600;
             color: var(--text);
@@ -250,7 +252,7 @@ def build_html(data, prepared_by, prepared_role, reviewed_by, reviewed_role, sig
             position: relative;
             width: 968px;
             margin: 24px auto;
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }}
 
         .week-divider {{
@@ -295,7 +297,7 @@ def build_html(data, prepared_by, prepared_role, reviewed_by, reviewed_role, sig
             height: 64px;
             padding: 8px 0;
             text-align: center;
-            font-family: 'Playfair Display', serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 22px;
             font-weight: 600;
             color: var(--dark-ink);
@@ -311,7 +313,7 @@ def build_html(data, prepared_by, prepared_role, reviewed_by, reviewed_role, sig
 
         table.gantt tr.day-row th .dow {{
             display: block;
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             font-size: 9px;
             font-weight: 600;
             letter-spacing: 0.16em;
@@ -354,7 +356,7 @@ def build_html(data, prepared_by, prepared_role, reviewed_by, reviewed_role, sig
         }}
 
         table.gantt td.label .trade {{
-            font-family: 'Playfair Display', serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 13px;
             font-weight: 600;
             color: var(--dark-ink);

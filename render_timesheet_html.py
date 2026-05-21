@@ -11,6 +11,7 @@ Self-contained: inline CSS, no external assets, no fonts.googleapis. The
 block keeps it print-ready.
 """
 from datetime import datetime
+from typography import get_inlined_style_tag
 
 BRAND_RED = "#B11E2E"
 CREAM = "#FAF7F1"
@@ -81,12 +82,13 @@ def render_timesheet_html(grid, generated_at=None):
 <html>
 <head>
   <meta charset="UTF-8">
+    {get_inlined_style_tag()}
   <title>Weekly Hours — {_esc(grid["week_start"])} to {_esc(grid["week_end"])}</title>
   <style>
     @page {{ size: Letter landscape; margin: 0.5in 0.4in; }}
     :root {{ color-scheme: light; }}
     * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-    body {{ font-family: 'DM Sans', -apple-system, sans-serif; background: {CREAM}; padding: 24px 28px; color: #14161C; }}
+    body {{ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: {CREAM}; padding: 24px 28px; color: #14161C; }}
     @media print {{ body {{ background: white; padding: 0; }} .content {{ box-shadow: none; padding: 16px; }} }}
     .header {{ background: #1a1a1a; color: {CREAM}; padding: 14px 28px; text-align: center; font-size: 22px; font-weight: bold; margin-bottom: 18px; }}
     .header-star {{ color: {BRAND_RED}; }}

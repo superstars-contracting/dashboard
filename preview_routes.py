@@ -75,7 +75,7 @@ def index():
 <title>Preview · Superstars Ops</title>
 <style>
   body {{
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     max-width: 920px; margin: 2em auto; padding: 0 1em;
     color: #14161C; background: #FFFFFF;
   }}

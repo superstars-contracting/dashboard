@@ -2,6 +2,7 @@
 import json
 import sys
 from datetime import datetime
+from typography import get_inlined_style_tag
 
 def render_html(data):
     attendees_html = '\n'.join([
@@ -63,6 +64,7 @@ def render_html(data):
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    {get_inlined_style_tag()}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meeting Minutes - {data['meeting_id']}</title>
     <style>
@@ -74,7 +76,7 @@ def render_html(data):
             --text-light: #666;
         }}
         body {{
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             font-size: 13px;
             line-height: 1.6;
             color: var(--ink);
@@ -104,13 +106,13 @@ def render_html(data):
             text-align: right;
             font-size: 14px;
         }}
-        .letterhead-right .title {{ font-family: 'Playfair Display', serif; font-size: 18px; font-weight: bold; color: var(--ink); }}
+        .letterhead-right .title {{ font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: bold; color: var(--ink); }}
         .letterhead-right .meta {{ font-size: 12px; color: var(--text-light); margin-top: 4px; }}
         section {{
             margin-bottom: 28px;
         }}
         h2 {{
-            font-family: 'Playfair Display', serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 16px;
             font-weight: normal;
             color: var(--ink);
@@ -119,7 +121,7 @@ def render_html(data):
             padding-bottom: 8px;
         }}
         h3 {{
-            font-family: 'Playfair Display', serif;
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 14px;
             font-weight: normal;
             color: var(--ink);
