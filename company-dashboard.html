@@ -398,7 +398,25 @@
         <div style="grid-column:1 / span 2;"><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Email</label><input id="pp-edit-email" type="email" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
         <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Emergency Name</label><input id="pp-edit-ec-name" type="text" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
         <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Emergency Phone</label><input id="pp-edit-ec-phone" type="tel" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
-        <div style="grid-column:1 / span 2;"><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Emergency Relation</label><input id="pp-edit-ec-relation" type="text" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
+        <div style="grid-column:1 / span 2;">
+          <label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Emergency Relation</label>
+          <select id="pp-edit-ec-relation" data-relation-select="pp-edit-ec-relation-other"
+                  style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;background:white;">
+            <option value="" data-i18n="opt-rel-placeholder">Relation</option>
+            <option value="Spouse" data-i18n="opt-rel-spouse">Spouse</option>
+            <option value="Partner" data-i18n="opt-rel-partner">Partner</option>
+            <option value="Parent" data-i18n="opt-rel-parent">Parent</option>
+            <option value="Child" data-i18n="opt-rel-child">Child</option>
+            <option value="Sibling" data-i18n="opt-rel-sibling">Sibling</option>
+            <option value="Grandparent" data-i18n="opt-rel-grandparent">Grandparent</option>
+            <option value="Other relative" data-i18n="opt-rel-other-relative">Other relative</option>
+            <option value="Friend" data-i18n="opt-rel-friend">Friend</option>
+            <option value="Other" data-i18n="opt-rel-other">Other</option>
+          </select>
+          <input id="pp-edit-ec-relation-other" type="text" data-i18n-ph="ph-ec-relation-other"
+                 placeholder="Specify relation…"
+                 style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;margin-top:6px;display:none;">
+        </div>
       </div>
       <div id="pp-edit-error" style="color:#B11E2E;font-size:12px;margin-top:12px;display:none;font-weight:600;"></div>
       <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;">
@@ -513,7 +531,21 @@
     <div class="form-grid" style="grid-template-columns:2fr 1fr 1fr;">
       <input id="in-ec-name" type="text" data-i18n-ph="ph-ec-name" placeholder="Emergency Contact Name">
       <input id="in-ec-phone" type="tel" data-i18n-ph="ph-ec-phone" placeholder="Emergency Phone">
-      <input id="in-ec-relation" type="text" data-i18n-ph="ph-ec-relation" placeholder="Relation">
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <select id="in-ec-relation" data-relation-select="in-ec-relation-other">
+          <option value="" data-i18n="opt-rel-placeholder">Relation</option>
+          <option value="Spouse" data-i18n="opt-rel-spouse">Spouse</option>
+          <option value="Partner" data-i18n="opt-rel-partner">Partner</option>
+          <option value="Parent" data-i18n="opt-rel-parent">Parent</option>
+          <option value="Child" data-i18n="opt-rel-child">Child</option>
+          <option value="Sibling" data-i18n="opt-rel-sibling">Sibling</option>
+          <option value="Grandparent" data-i18n="opt-rel-grandparent">Grandparent</option>
+          <option value="Other relative" data-i18n="opt-rel-other-relative">Other relative</option>
+          <option value="Friend" data-i18n="opt-rel-friend">Friend</option>
+          <option value="Other" data-i18n="opt-rel-other">Other</option>
+        </select>
+        <input id="in-ec-relation-other" type="text" data-i18n-ph="ph-ec-relation-other" placeholder="Specify relation…" style="display:none;">
+      </div>
     </div>
     <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
       <input id="in-hire-date" type="date" data-i18n-ph="ph-hire-date" placeholder="Hire Date">
@@ -621,6 +653,17 @@ const I18N = {
     'ph-ec-name': 'Emergency Contact Name',
     'ph-ec-phone': 'Emergency Phone',
     'ph-ec-relation': 'Relation',
+    'ph-ec-relation-other': 'Specify relation…',
+    'opt-rel-placeholder': 'Relation',
+    'opt-rel-spouse': 'Spouse',
+    'opt-rel-partner': 'Partner',
+    'opt-rel-parent': 'Parent',
+    'opt-rel-child': 'Child',
+    'opt-rel-sibling': 'Sibling',
+    'opt-rel-grandparent': 'Grandparent',
+    'opt-rel-other-relative': 'Other relative',
+    'opt-rel-friend': 'Friend',
+    'opt-rel-other': 'Other',
     'ph-hire-date': 'Hire Date',
     'ph-pin': 'App PIN (4 digits)',
     'ph-email': 'Email (optional)',
@@ -701,6 +744,17 @@ const I18N = {
     'ph-ec-name': 'Contacto de Emergencia',
     'ph-ec-phone': 'Tel. de Emergencia',
     'ph-ec-relation': 'Relación',
+    'ph-ec-relation-other': 'Especifique relación…',
+    'opt-rel-placeholder': 'Relación',
+    'opt-rel-spouse': 'Cónyuge',
+    'opt-rel-partner': 'Pareja',
+    'opt-rel-parent': 'Padre/Madre',
+    'opt-rel-child': 'Hijo/a',
+    'opt-rel-sibling': 'Hermano/a',
+    'opt-rel-grandparent': 'Abuelo/a',
+    'opt-rel-other-relative': 'Otro familiar',
+    'opt-rel-friend': 'Amigo/a',
+    'opt-rel-other': 'Otro',
     'ph-hire-date': 'Fecha de Contratación',
     'ph-pin': 'PIN (4 dígitos)',
     'ph-email': 'Correo electrónico (opcional)',
@@ -1023,6 +1077,74 @@ applyLanguage();
   }
   window.openProfile = openProfile;
 
+  // ----- Emergency-contact relation dropdown (#13) -----
+  // The relation field is a <select> with a list of canonical relations plus
+  // an "Other" option that reveals a free-text input. Stored as a single
+  // TEXT column — the selected option, or the typed text when "Other".
+  // Migrates legacy free-text values gracefully: if the existing value isn't
+  // in the list, we preselect "Other" and prefill the text so nothing's lost.
+  const REL_OPTIONS = ['Spouse','Partner','Parent','Child','Sibling','Grandparent','Other relative','Friend','Other'];
+
+  function getEffectiveRelation(selectId) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return null;
+    const v = (sel.value || '').trim();
+    if (v !== 'Other') return v || null;
+    const otherId = sel.dataset.relationSelect;
+    const other = otherId ? document.getElementById(otherId) : null;
+    return (other && other.value.trim()) || null;
+  }
+
+  function setRelationFromStored(selectId, stored) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    const otherId = sel.dataset.relationSelect;
+    const other = otherId ? document.getElementById(otherId) : null;
+    const val = stored == null ? '' : String(stored).trim();
+    if (val && REL_OPTIONS.includes(val)) {
+      sel.value = val;
+      if (other) { other.value = ''; other.style.display = 'none'; }
+    } else if (val) {
+      // Legacy free-text value not in the canonical list — preserve via Other.
+      sel.value = 'Other';
+      if (other) { other.value = val; other.style.display = ''; }
+    } else {
+      sel.value = '';
+      if (other) { other.value = ''; other.style.display = 'none'; }
+    }
+  }
+
+  function clearRelationField(selectId) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    sel.value = '';
+    const otherId = sel.dataset.relationSelect;
+    const other = otherId ? document.getElementById(otherId) : null;
+    if (other) { other.value = ''; other.style.display = 'none'; }
+  }
+
+  function wireRelationSelect(selectId) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    const otherId = sel.dataset.relationSelect;
+    const other = otherId ? document.getElementById(otherId) : null;
+    if (!other) return;
+    sel.addEventListener('change', () => {
+      if (sel.value === 'Other') {
+        other.style.display = '';
+        other.focus();
+      } else {
+        other.style.display = 'none';
+        other.value = '';
+      }
+    });
+  }
+
+  // Wire both dropdowns once on script load. The selects + sibling Other
+  // inputs are present in the static HTML, so this runs before any open/edit.
+  wireRelationSelect('in-ec-relation');
+  wireRelationSelect('pp-edit-ec-relation');
+
   // ----- Edit-mode helpers -----
   // Maps each form input id to the schema column it edits. Used both to populate
   // the form on Edit and to diff against currentProfile on Save (only changed
@@ -1048,6 +1170,10 @@ applyLanguage();
       const val = currentProfile[field];
       if (field === 'language') {
         el.value = (val || 'EN').toUpperCase() === 'ES' ? 'ES' : 'EN';
+      } else if (domId === 'pp-edit-ec-relation') {
+        // Relation dropdown: select the matching option, or fall to Other +
+        // prefill the text input for legacy free-text values not in the list.
+        setRelationFromStored(domId, val);
       } else {
         el.value = val == null ? '' : val;
       }
@@ -1084,7 +1210,13 @@ applyLanguage();
     for (const [domId, field] of Object.entries(EDIT_FIELD_MAP)) {
       const el = document.getElementById(domId);
       if (!el) continue;
-      const newVal = (el.value || '').trim();
+      let newVal;
+      if (domId === 'pp-edit-ec-relation') {
+        // Effective value: select.value, OR the Other-input text if select=Other.
+        newVal = (getEffectiveRelation(domId) || '').trim();
+      } else {
+        newVal = (el.value || '').trim();
+      }
       const origVal = currentProfile[field] == null ? '' : String(currentProfile[field]).trim();
       if (newVal !== origVal) payload[field] = newVal;
     }
@@ -1787,7 +1919,7 @@ applyLanguage();
       email: $('#in-email').value || null,
       emergency_contact_name: $('#in-ec-name').value || null,
       emergency_contact_phone: $('#in-ec-phone').value || null,
-      emergency_contact_relation: $('#in-ec-relation').value || null,
+      emergency_contact_relation: getEffectiveRelation('in-ec-relation'),
       hire_date: $('#in-hire-date').value || null,
       pin: $('#in-pin').value || null,
       project_codes,
@@ -1799,7 +1931,9 @@ applyLanguage();
       }).then(r => r.json());
       if (resp.error) { alert('Save failed: ' + resp.error); return; }
       modal.classList.remove('active');
-      ['in-name','in-dob','in-trade','in-language','in-phone','in-ec-name','in-ec-phone','in-ec-relation','in-hire-date','in-pin','in-email'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+      ['in-name','in-dob','in-trade','in-language','in-phone','in-ec-name','in-ec-phone','in-hire-date','in-pin','in-email'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+      // Relation dropdown has a paired Other-text input — reset both via helper.
+      clearRelationField('in-ec-relation');
       await Promise.all([loadMetrics(), loadProjects(), loadWorkforce()]);
       alert(`✓ Worker created: ${name}\nID: ${resp.data.employee_id}\nAssigned to: ${resp.data.assigned_to.join(', ') || '(no projects)'}\nFolder: ${resp.data.folder_path}`);
     } catch (e) { alert('Network error: ' + e.message); }
