@@ -2267,52 +2267,58 @@
       <!-- RFI LOG -->
       <section class="view" data-view="rfis">
         <div class="section">
-          <h2>RFI Log</h2>
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+            <div>
+              <h2 style="margin-bottom:4px;">RFI Log</h2>
+              <div id="rfi-reg-summary" style="font-size:12px;color:#76777E;">Loading…</div>
+            </div>
+            <a href="/files/rfi_submission_form.html" target="_blank" style="font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:10px 18px;border:none;border-radius:4px;background:#B11E2E;color:white;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New RFI
+            </a>
+          </div>
           <!-- Live "on site today" header (#116) — same shared
                /api/projects/<code>/on-site source the Submit-RFI form
-               and the Workers-Today widget consume. Visual redesign is
-               Session 2; this is wiring only. -->
+               and the Workers-Today widget consume. -->
           <div id="rfi-onsite-card" style="background:white;border:1px solid #E8E4DD;border-left:3px solid #B11E2E;border-radius:3px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#14161C;line-height:1.5;">
             <div style="font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:#76777E;font-weight:600;margin-bottom:4px;">On Site Today</div>
             <div id="rfi-onsite-header">Loading…</div>
+          </div>
+          <!-- Filter bar — status (multi-select chips) + due-date range.
+               Filters pass through to /api/projects/<code>/rfis directly. -->
+          <div style="background:white;border:1px solid #E8E4DD;border-radius:4px;padding:14px 16px;margin-bottom:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+            <span style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Status</span>
+            <div id="rfi-reg-status-chips" style="display:flex;gap:6px;flex-wrap:wrap;">
+              <!-- chip buttons injected by JS — one per RFI_STATUS_SUBSET entry -->
+            </div>
+            <div style="flex-basis:100%;height:0;"></div>
+            <span style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Due Between</span>
+            <input type="date" id="rfi-reg-due-after" style="padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
+            <span style="font-size:11px;color:#76777E;">and</span>
+            <input type="date" id="rfi-reg-due-before" style="padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#14161C;cursor:pointer;">
+              <input type="checkbox" id="rfi-reg-sched-only" style="cursor:pointer;">
+              Schedule impact only
+            </label>
+            <button id="rfi-reg-reset" type="button" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:6px 12px;border:1px solid #E8E4DD;border-radius:4px;background:white;color:#76777E;cursor:pointer;margin-left:auto;">Reset</button>
           </div>
           <div class="table-wrapper">
             <table>
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Date</th>
+                  <th>RFI #</th>
                   <th>Subject</th>
-                  <th>Priority</th>
+                  <th>Location</th>
+                  <th>Sent To</th>
+                  <th>Submitted</th>
                   <th>Due</th>
+                  <th>Turnaround</th>
                   <th>Status</th>
+                  <th></th>
                 </tr>
               </thead>
-              <tbody>
-                <tr data-link="/RFI-001.html">
-                  <td>RFI-001</td>
-                  <td>May 1</td>
-                  <td>Spandrel Waterproofing Detail</td>
-                  <td><span class="badge badge-bad">High</span></td>
-                  <td>May 4</td>
-                  <td><span class="badge badge-bad">Overdue</span></td>
-                </tr>
-                <tr data-link="/RFI-002.html">
-                  <td>RFI-002</td>
-                  <td>May 3</td>
-                  <td>Coating Specification Clarification</td>
-                  <td><span class="badge badge-warn">Medium</span></td>
-                  <td>May 10</td>
-                  <td><span class="badge badge-ok">Submitted</span></td>
-                </tr>
-                <tr data-link="/RFI-003.html">
-                  <td>RFI-003</td>
-                  <td>May 5</td>
-                  <td>Lintel Extents & Connection Details</td>
-                  <td><span class="badge badge-bad">Urgent</span></td>
-                  <td>May 7</td>
-                  <td><span class="badge badge-bad">Pending</span></td>
-                </tr>
+              <tbody id="rfi-reg-tbody">
+                <tr><td colspan="9" style="padding:24px;text-align:center;color:#76777E;">Loading…</td></tr>
               </tbody>
             </table>
           </div>
@@ -3088,6 +3094,194 @@ document.querySelectorAll('.nav-link').forEach(link => {
     loaded = true;
     loadAll();
   }
+})();
+
+// =====================================================================
+// RFI Log register (Phase 2D) — live, sortable, filterable.
+// Source: /api/projects/<code>/rfis (server returns status_derived,
+// turnaround_days, and the default spec sort). Filters pass through to
+// the same endpoint via query params.
+// =====================================================================
+(function() {
+  const PROJECT = 'FR-BX-001';
+  const STATUSES = ['Open', 'Overdue', 'Answered', 'Closed', 'Void'];
+  let activeStatuses = new Set();  // empty = no filter (all rows)
+
+  function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function statusBadge(status) {
+    const color = {
+      Overdue:   '#B11E2E',
+      Open:      '#B68838',
+      Answered:  '#2F7C57',
+      Closed:    '#76777E',
+      Void:      '#76777E',
+    }[status] || '#76777E';
+    return '<span style="background:' + color + ';color:white;font-size:10px;padding:3px 8px;border-radius:99px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;">' + esc(status) + '</span>';
+  }
+
+  function flagBadge(label) {
+    return '<span style="background:#F1EEE8;color:#14161C;font-size:9px;padding:2px 6px;border-radius:3px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-left:4px;">' + esc(label) + '</span>';
+  }
+
+  function renderChips() {
+    const wrap = document.getElementById('rfi-reg-status-chips');
+    if (!wrap) return;
+    wrap.innerHTML = STATUSES.map(s => {
+      const on = activeStatuses.has(s);
+      const bg = on ? '#B11E2E' : 'white';
+      const fg = on ? 'white' : '#14161C';
+      const bd = on ? '#B11E2E' : '#E8E4DD';
+      return '<button type="button" data-rfi-chip="' + s + '" style="background:' + bg + ';color:' + fg + ';border:1px solid ' + bd + ';font-size:11px;font-weight:600;padding:5px 12px;border-radius:99px;cursor:pointer;letter-spacing:0.05em;text-transform:uppercase;">' + s + '</button>';
+    }).join('');
+    wrap.querySelectorAll('[data-rfi-chip]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const s = btn.getAttribute('data-rfi-chip');
+        if (activeStatuses.has(s)) activeStatuses.delete(s);
+        else activeStatuses.add(s);
+        renderChips();
+        loadRegister();
+      });
+    });
+  }
+
+  function renderRow(r) {
+    const loc = (r.location_unit || r.location_id)
+      ? (r.location_unit ? esc(r.location_unit) : '') +
+        (r.location_unit && r.location_id ? ' / ' : '') +
+        (r.location_id ? esc(r.location_id) : '')
+      : '<span style="color:#76777E;">—</span>';
+    const turnaround = (r.turnaround_days == null)
+      ? '<span style="color:#76777E;">—</span>'
+      : String(r.turnaround_days) + 'd';
+    const flags = [];
+    if (r.schedule_impact_flag) flags.push(flagBadge('Sched'));
+    if (r.cost_impact_flag)     flags.push(flagBadge('Cost'));
+    const subjectCell = '<strong>' + esc(r.subject_title || '(no subject)') + '</strong>' + flags.join('');
+    // The render endpoint (Phase 2E) opens the formal RFI doc in a new tab.
+    const docLink = '<a href="/api/rfis/' + encodeURIComponent(r.rfi_number) + '/render" target="_blank" style="font-size:11px;color:#B11E2E;font-weight:600;text-decoration:none;">View →</a>';
+    const delBtn = '<button type="button" data-rfi-del="' + esc(r.rfi_number) + '" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:4px 10px;border:1px solid #E8E4DD;border-radius:3px;background:white;color:#B11E2E;cursor:pointer;margin-left:8px;">Delete</button>';
+    return '<tr>' +
+      '<td style="font-family:monospace;font-size:12px;font-weight:600;">' + esc(r.rfi_number) + '</td>' +
+      '<td style="max-width:320px;">' + subjectCell + '</td>' +
+      '<td style="font-size:12px;">' + loc + '</td>' +
+      '<td style="font-size:12px;">' + esc(r.sent_to || '—') + '</td>' +
+      '<td style="font-size:12px;color:#76777E;">' + esc(r.date_submitted || '—') + '</td>' +
+      '<td style="font-size:12px;color:#76777E;">' + esc(r.date_response_required || '—') + '</td>' +
+      '<td style="font-size:12px;color:#76777E;">' + turnaround + '</td>' +
+      '<td>' + statusBadge(r.status_derived || 'Open') + '</td>' +
+      '<td style="white-space:nowrap;">' + docLink + delBtn + '</td>' +
+    '</tr>';
+  }
+
+  async function loadRegister() {
+    const tbody = document.getElementById('rfi-reg-tbody');
+    const summary = document.getElementById('rfi-reg-summary');
+    if (!tbody) return;
+    const params = new URLSearchParams();
+    activeStatuses.forEach(s => params.append('status', s));
+    const da = (document.getElementById('rfi-reg-due-after') || {}).value;
+    const db = (document.getElementById('rfi-reg-due-before') || {}).value;
+    if (da) params.set('due_after', da);
+    if (db) params.set('due_before', db);
+    if ((document.getElementById('rfi-reg-sched-only') || {}).checked) {
+      params.set('schedule_impact_only', '1');
+    }
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10000);
+    try {
+      const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT) + '/rfis?' + params.toString(), {signal: ctrl.signal});
+      const json = await resp.json();
+      const rows = (json && json.data) || [];
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="9" style="padding:32px;text-align:center;color:#76777E;">No RFIs match the current filters. Click <strong>+ New RFI</strong> above to file one.</td></tr>';
+      } else {
+        tbody.innerHTML = rows.map(renderRow).join('');
+      }
+      const open = rows.filter(r => r.status_derived === 'Open').length;
+      const overdue = rows.filter(r => r.status_derived === 'Overdue').length;
+      const total = rows.length;
+      if (summary) summary.textContent = total + ' RFI(s) — ' + overdue + ' overdue, ' + open + ' open';
+    } catch (e) {
+      console.warn('[RFI Log] register load failed:', e);
+      const label = (e && e.name === 'AbortError') ? 'Timed out — try Reset' : 'Network error — try Reset';
+      tbody.innerHTML = '<tr><td colspan="9" style="padding:24px;text-align:center;color:#B11E2E;">' + label + '</td></tr>';
+      if (summary) { summary.textContent = label; summary.style.color = '#B11E2E'; }
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // Event delegation on the tbody for Delete clicks.
+  document.addEventListener('DOMContentLoaded', () => {
+    renderChips();
+    const tbody = document.getElementById('rfi-reg-tbody');
+    if (tbody) {
+      tbody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-rfi-del]');
+        if (!btn) return;
+        const rfiNum = btn.getAttribute('data-rfi-del');
+        if (!confirm('Delete ' + rfiNum + '? This cannot be undone.')) return;
+        btn.disabled = true; btn.textContent = '…';
+        try {
+          const r = await fetch('/api/rfis/' + encodeURIComponent(rfiNum), {method: 'DELETE'});
+          if (r.ok) {
+            loadRegister();
+          } else {
+            const b = await r.json().catch(() => ({}));
+            alert('Delete failed: ' + (b.error || r.status));
+            btn.disabled = false; btn.textContent = 'Delete';
+          }
+        } catch (err) {
+          alert('Delete failed: ' + err.message);
+          btn.disabled = false; btn.textContent = 'Delete';
+        }
+      });
+    }
+    ['rfi-reg-due-after', 'rfi-reg-due-before', 'rfi-reg-sched-only'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('change', loadRegister);
+    });
+    const reset = document.getElementById('rfi-reg-reset');
+    if (reset) {
+      reset.addEventListener('click', () => {
+        activeStatuses = new Set();
+        const da = document.getElementById('rfi-reg-due-after');
+        const db = document.getElementById('rfi-reg-due-before');
+        const so = document.getElementById('rfi-reg-sched-only');
+        if (da) da.value = '';
+        if (db) db.value = '';
+        if (so) so.checked = false;
+        renderChips();
+        loadRegister();
+      });
+    }
+    // Lazy load — only when the RFI view is first opened
+    const rfiTab = document.querySelector('.nav-link[data-view="rfis"]');
+    if (rfiTab) {
+      let loaded = false;
+      rfiTab.addEventListener('click', () => {
+        if (loaded) return;
+        loaded = true;
+        loadRegister();
+      });
+      // Also load if landing directly on the RFI view (e.g. hash route)
+      if (document.querySelector('section[data-view="rfis"].active')) {
+        loaded = true;
+        loadRegister();
+      }
+    }
+    // Wire SSCDatePicker on the due-date filter inputs if available
+    if (window.SSCDatePicker) {
+      ['rfi-reg-due-after', 'rfi-reg-due-before'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) SSCDatePicker.wire(el);
+      });
+    }
+  });
 })();
 
 // Live data sync - fetches every 30 seconds
