@@ -56,6 +56,7 @@ fails), update the Result and Notes columns — do not silently drop the row.
 | `tests/smoke_crud_data_integrity.py` | Per-section CRUD + visibility audit (17 sections — workforce, intake, face photo, certs, credentials, sign-ins, all 10 DCR sub-sections, Weekly Hours Log). ~60 s. | After any server.py / issuer / aggregator change; must stay 17/17 all-PASS. |
 | `tests/smoke_card_propagation.py` | LIVE-render verification: baseline + photo-change + PIN-change propagate to the rendered card; existing worker + new worker × CoF + Company ID = 4 cohorts × 13 checks. ~30 s. | After any change to the credential issuer, the live-render route (`/api/cards/<id>/<type>/live`), the card templates, or face-photo/PIN derivation. |
 | `tests/stress_100_workers.py` | Bulk-creates 100 synthetic workers + face photos + 50 prereq certs + 20 CoF + 20 Company ID + 100 sign-ins, then times the three operator-facing aggregator endpoints. ~20 s. Cleans back to 8-worker baseline. | Before any change that affects bulk-create / intake-summary / DCR aggregator / Weekly Hours Log under load. |
+| `tests/stress_200_dcrs.py` | Bulk-issues 200 synthetic DCRs across 2099-01-01..2099-07-19, each with 2 sign-ins + 2 work_log rows + 1 photo. Exercises the FULL operator lifecycle (issue, archive open + date filter, single-DCR open, add/remove labor row, add/remove work row, add/remove photo) and records pass/fail per control. Times each endpoint (p50/p95/max). ~9 min. Cleans back to baseline (prior DCR count + 8-worker roster intact, no orphan files). | Before any change that affects the DCR issuance path / aggregator / archive endpoint / photo upload / per-section CRUD at volume. Records a fresh `### YYYY-MM-DD - 200-DCR stress` section in this file. |
 
 Run each manually as needed:
 
@@ -65,6 +66,7 @@ python tests/smoke_dcr_backdated_30day.py
 python tests/smoke_crud_data_integrity.py
 python tests/smoke_card_propagation.py
 python tests/stress_100_workers.py
+python tests/stress_200_dcrs.py
 ```
 
 Both scripts manage their own server lifecycle, clean up everything they create, and exit non-zero on any assertion failure.
@@ -92,3 +94,18 @@ Synthetic cohort: **100 workers**, 20 CoF + 20 Company ID issued, sign-ins recor
 | `GET /api/payroll/hours?week_start=2026-05-11` | 23 ms | 53 ms | 53 ms | 23 ms | 10 |
 
 DB returned to 8-worker baseline after run (expected 8). Cleanup via direct SQL on test-marked rows; no real worker rows touched.
+
+### 2026-05-21 - 200-DCR stress (run DCR200_51DF3A)
+
+Synthetic cohort: **200 DCRs** across 2099-01-01 -> 2099-07-19 (200 dates), each with 2 sign-ins + 2 work_log rows + 1 photo. Sequences issued: 001..200. Lifecycle controls: 1626 PASS / 0 FAIL (all-PASS).
+
+| Endpoint | p50 | p95 | max | mean | iters |
+|---|---|---|---|---|---|
+| POST /api/projects/FR-BX-001/daily/&lt;date&gt;/issue | 2315 ms | 2425 ms | 11970 ms | 2693 ms | 200 |
+| GET  /api/projects/FR-BX-001/reports (filtered) | 21 ms | 24 ms | 24 ms | 21 ms | 2 |
+| GET  /api/projects/FR-BX-001/daily/&lt;date&gt; | 565 ms | 565 ms | 565 ms | 565 ms | 1 |
+| POST /api/sign-ins (save labor row) | 15 ms | 31 ms | 42 ms | 17 ms | 400 |
+| POST /api/work-log (save work row) | 13 ms | 28 ms | 35 ms | 15 ms | 400 |
+| POST /api/photos/upload (save photo) | 16 ms | 33 ms | 41 ms | 18 ms | 200 |
+
+DB returned to 0-report baseline (pre=0) and 8-worker roster (pre=8) after cleanup. Snapshot: `superstars-pre-dcr-200-stress-20260521-200853.db`.
