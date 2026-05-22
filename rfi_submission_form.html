@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
 <link rel="stylesheet" href="/files/static/fonts/typography.css">
+  <script src="/files/static/js/datepicker.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RFI Submission Form</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
@@ -340,6 +341,8 @@
     </div>
 
     <form id="rfiForm">
+      <!-- Section 1 — Project Information (rfi_number assigned server-side
+           on submit; date_submitted defaults to LOCAL today via SSCDatePicker) -->
       <div class="section">
         <div class="section-header expanded" data-section="project">
           <div>
@@ -351,132 +354,116 @@
         <div class="section-content expanded">
           <div class="form-group">
             <label>RFI Number</label>
-            <input type="text" id="rfiNumber" value="RFI-004" readonly class="readonly-display">
+            <input type="text" id="rfiNumber" value="auto-assigned on submit" readonly class="readonly-display">
           </div>
           <div class="form-group">
-            <label>Date Submitted</label>
-            <input type="date" id="dateSubmitted" readonly class="readonly-display">
+            <label class="required">Date Submitted</label>
+            <input type="text" id="dateSubmitted" required placeholder="YYYY-MM-DD">
           </div>
           <div class="form-group">
             <label class="required">Submitted By</label>
-            <select id="submittedBy" required>
-              <option value="">Select employee...</option>
-              <option value="E-001|John Doe">John Doe (E-001)</option>
-              <option value="E-005|Susan Park">Susan Park (E-005)</option>
-            </select>
+            <input type="text" id="submittedBy" required placeholder="GC / sub / EOR name">
+          </div>
+          <div class="form-group">
+            <label class="required">Sent To</label>
+            <input type="text" id="sentTo" required placeholder="Architect / Engineer / Owner's rep">
           </div>
         </div>
       </div>
 
+      <!-- Section 2 — Subject + the question itself (spec: subject_title +
+           question_description). Title is the scannable register column. -->
       <div class="section">
-        <div class="section-header" data-section="details">
+        <div class="section-header" data-section="subject">
           <div>
             <span class="eyebrow">Section 2</span>
-            <h3>RFI Details</h3>
+            <h3>Subject &amp; Question</h3>
           </div>
           <span class="chevron">▼</span>
         </div>
         <div class="section-content">
           <div class="form-group">
-            <label class="required">Title</label>
-            <input type="text" id="title" maxlength="100" placeholder="Short title" required>
+            <label class="required">Subject (short, scannable)</label>
+            <input type="text" id="subjectTitle" maxlength="120" required placeholder="e.g. Lintel detail at North L7">
           </div>
           <div class="form-group">
-            <label class="required">Description</label>
-            <textarea id="description" placeholder="Describe the issue..." required></textarea>
+            <label class="required">Question</label>
+            <textarea id="questionDescription" required placeholder="What are you asking? Include the spec or sheet number if relevant."></textarea>
           </div>
           <div class="form-group">
-            <label class="required">Category</label>
-            <select id="category" required>
-              <option value="">Select...</option>
-              <option value="Architectural">Architectural</option>
-              <option value="Structural">Structural</option>
-              <option value="MEP">MEP</option>
-              <option value="Facade">Facade</option>
-              <option value="Site Condition">Site Condition</option>
-              <option value="Other">Other</option>
-            </select>
+            <label>Drawing / Spec Reference</label>
+            <input type="text" id="drawingSpecReference" placeholder="e.g. A-501 detail 3 / Spec 04 21 13 §2.2">
           </div>
           <div class="form-group">
-            <label class="required">Location on Site</label>
-            <input type="text" id="location" placeholder="e.g. South elev L7-L8" required>
+            <label>Related Documents (link or note)</label>
+            <input type="text" id="relatedDocuments" placeholder="Change orders, submittals, prior RFIs…">
           </div>
         </div>
       </div>
 
+      <!-- Section 3 — Location (the shared spine). location_unit options
+           are populated from /api/projects/<code>/project-config so the
+           dropdown auto-adapts when the project type changes (Phase 1). -->
       <div class="section">
-        <div class="section-header" data-section="question">
+        <div class="section-header" data-section="location">
           <div>
             <span class="eyebrow">Section 3</span>
-            <h3>The Question</h3>
+            <h3>Location on Site</h3>
           </div>
           <span class="chevron">▼</span>
         </div>
         <div class="section-content">
           <div class="form-group">
-            <label class="required">Primary Question</label>
-            <textarea id="primaryQuestion" placeholder="What are you asking?" required></textarea>
-          </div>
-          <div class="form-group">
-            <label>Impact</label>
-            <div class="checkbox-group">
-              <div class="checkbox-item">
-                <input type="checkbox" id="impact-schedule" name="impact" value="Schedule delay">
-                <label for="impact-schedule">Schedule delay</label>
-              </div>
-              <div class="checkbox-item">
-                <input type="checkbox" id="impact-cost" name="impact" value="Cost impact">
-                <label for="impact-cost">Cost impact</label>
-              </div>
-              <div class="checkbox-item">
-                <input type="checkbox" id="impact-quality" name="impact" value="Quality risk">
-                <label for="impact-quality">Quality risk</label>
-              </div>
-              <div class="checkbox-item">
-                <input type="checkbox" id="impact-safety" name="impact" value="Safety issue">
-                <label for="impact-safety">Safety issue</label>
-              </div>
-              <div class="checkbox-item">
-                <input type="checkbox" id="impact-stoppage" name="impact" value="Work stoppage">
-                <label for="impact-stoppage">Work stoppage</label>
-              </div>
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="required">Priority</label>
-            <select id="priority" required>
-              <option value="">Select...</option>
-              <option value="Low">Low</option>
-              <option value="Medium" selected>Medium</option>
-              <option value="High">High</option>
-              <option value="Urgent">Urgent</option>
+            <label>Location Unit</label>
+            <select id="locationUnit">
+              <option value="">— select —</option>
+              <!-- options injected from /api/projects/<code>/project-config -->
             </select>
+          </div>
+          <div class="form-group">
+            <label class="required">Location ID</label>
+            <input type="text" id="locationId" required placeholder="e.g. North Elevation Drop 3">
+          </div>
+          <div class="form-group">
+            <label>Scope Category</label>
+            <input type="text" id="scopeCategory" list="scopeCategoryList" placeholder="Pick from typical scopes or type a custom one">
+            <!-- datalist populated from /api/projects/<code>/project-config -->
+            <datalist id="scopeCategoryList"></datalist>
           </div>
         </div>
       </div>
 
+      <!-- Section 4 — Response window + impact flags (the linkage_rules
+           spine). date_response_required drives Auto-Overdue + turnaround. -->
       <div class="section">
-        <div class="section-header" data-section="distribution">
+        <div class="section-header" data-section="impact">
           <div>
-            <span class="eyebrow">Section 5</span>
-            <h3>Distribution</h3>
+            <span class="eyebrow">Section 4</span>
+            <h3>Response &amp; Impact</h3>
           </div>
           <span class="chevron">▼</span>
         </div>
         <div class="section-content">
-          <div class="checkbox-group">
-            <div class="checkbox-item">
-              <input type="checkbox" id="dist-architect" name="distribution" value="Architect" checked>
-              <label for="dist-architect">Architect</label>
+          <div class="form-group">
+            <label class="required">Response Required By</label>
+            <input type="text" id="dateResponseRequired" required placeholder="YYYY-MM-DD">
+          </div>
+          <div class="form-group">
+            <label>Impact Flags</label>
+            <div class="checkbox-group">
+              <div class="checkbox-item">
+                <input type="checkbox" id="scheduleImpact">
+                <label for="scheduleImpact">Schedule impact (Open RFIs with this flag become Look-Ahead constraints)</label>
+              </div>
+              <div class="checkbox-item">
+                <input type="checkbox" id="costImpact">
+                <label for="costImpact">Cost impact</label>
+              </div>
             </div>
-            <div class="checkbox-item">
-              <input type="checkbox" id="dist-engineer" name="distribution" value="Engineer" checked>
-              <label for="dist-engineer">Engineer</label>
-            </div>
-            <div class="checkbox-item">
-              <input type="checkbox" id="dist-pm" name="distribution" value="Project Manager" checked>
-              <label for="dist-pm">Project Manager</label>
-            </div>
+          </div>
+          <div class="form-group">
+            <label>Impact Magnitude Note</label>
+            <textarea id="impactMagnitudeNote" placeholder="Why does this affect schedule / cost? (e.g. 'gates demo at L7 start')"></textarea>
           </div>
         </div>
       </div>
@@ -497,13 +484,33 @@
   </div>
 
   <script>
+    // ---- Project context. Project-prefixed rfi_number assignment + every
+    // option-list lookup is scoped to this project. Hard-coded today
+    // because the operator only has FR-BX-001; if the form is ever served
+    // for a different project, lift this from the URL.
+    const PROJECT_CODE = 'FR-BX-001';
+
+    // ---- LOCAL date helper (the dates rule #74). Form fields store
+    // YYYY-MM-DD via the SSCDatePicker; never UTC.
+    function rfiTodayLocal() {
+      const d = new Date();
+      return d.getFullYear() + '-'
+           + String(d.getMonth() + 1).padStart(2, '0') + '-'
+           + String(d.getDate()).padStart(2, '0');
+    }
+
     const form = document.getElementById('rfiForm');
     const modal = document.getElementById('confirmModal');
-    const dateInput = document.getElementById('dateSubmitted');
-    const submittedBySelect = document.getElementById('submittedBy');
 
-    dateInput.value = new Date().toISOString().split('T')[0];
+    // Wire SSCDatePicker on both date fields. Default date_submitted to
+    // local today; leave date_response_required blank — the operator picks.
+    document.getElementById('dateSubmitted').value = rfiTodayLocal();
+    if (window.SSCDatePicker) {
+      SSCDatePicker.wire(document.getElementById('dateSubmitted'));
+      SSCDatePicker.wire(document.getElementById('dateResponseRequired'));
+    }
 
+    // Accordion behavior — unchanged.
     document.querySelectorAll('.section-header').forEach(header => {
       header.addEventListener('click', () => {
         const section = header.closest('.section');
@@ -513,49 +520,93 @@
       });
     });
 
+    // ---- Populate location_unit + scope_category from the shared
+    // project-config endpoint (Phase 1). Single source — every list the
+    // form offers must come from project_type_config.py via this endpoint.
+    async function loadProjectConfig() {
+      try {
+        const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/project-config').then(r => r.json());
+        const cfg = (resp && resp.data) || null;
+        if (!cfg) return;
+        const luSel = document.getElementById('locationUnit');
+        if (luSel && Array.isArray(cfg.location_unit_options)) {
+          for (const opt of cfg.location_unit_options) {
+            const o = document.createElement('option');
+            o.value = opt; o.textContent = opt;
+            luSel.appendChild(o);
+          }
+        }
+        const scList = document.getElementById('scopeCategoryList');
+        if (scList && Array.isArray(cfg.typical_scopes)) {
+          for (const opt of cfg.typical_scopes) {
+            const o = document.createElement('option');
+            o.value = opt;
+            scList.appendChild(o);
+          }
+        }
+      } catch (e) {
+        console.warn('[RFI] project-config load failed:', e);
+      }
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const submitBtn = document.querySelector('.submit-button');
       submitBtn.disabled = true;
       submitBtn.textContent = 'Submitting...';
 
+      // Build the spec-shaped payload. All field names match
+      // construction_builds_spec.json rfi_log.fields verbatim.
+      const payload = {
+        project_code:           PROJECT_CODE,
+        subject_title:          document.getElementById('subjectTitle').value.trim(),
+        submitted_by:           document.getElementById('submittedBy').value.trim(),
+        sent_to:                document.getElementById('sentTo').value.trim(),
+        date_submitted:         document.getElementById('dateSubmitted').value.trim() || rfiTodayLocal(),
+        date_response_required: document.getElementById('dateResponseRequired').value.trim(),
+        question_description:   document.getElementById('questionDescription').value.trim(),
+        drawing_spec_reference: document.getElementById('drawingSpecReference').value.trim() || null,
+        related_documents:      document.getElementById('relatedDocuments').value.trim() || null,
+        location_unit:          document.getElementById('locationUnit').value || null,
+        location_id:            document.getElementById('locationId').value.trim(),
+        scope_category:         document.getElementById('scopeCategory').value.trim() || null,
+        schedule_impact_flag:   document.getElementById('scheduleImpact').checked,
+        cost_impact_flag:       document.getElementById('costImpact').checked,
+        impact_magnitude_note:  document.getElementById('impactMagnitudeNote').value.trim() || null,
+      };
+
       try {
-        const distribution = Array.from(document.querySelectorAll('input[name="distribution"]:checked'))
-          .map(cb => cb.value);
-
-        const payload = {
-          project_code: "BR-2024",
-          submitted_by: submittedBySelect.value.split('|')[1],
-          discipline: document.getElementById('category').value,
-          description: document.getElementById('description').value,
-          priority: document.getElementById('priority').value
-        };
-
-        const response = await fetch('http://localhost:5000/api/rfis', {
+        const response = await fetch('/api/rfis', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload),
         });
-
-        if (response.ok) {
-          const result = await response.json();
-          const rfiNum = result.data?.rfi_number || 'RFI-NEW';
-          document.getElementById('modalTitle').textContent = rfiNum + ' submitted';
-          document.getElementById('modalText').innerHTML = `
-            <strong>Success!</strong><br>
-            RFI Number: <strong>${rfiNum}</strong><br>
-            Distribution: ${distribution.join(', ')}<br>
-            <em>Status: Submitted</em>
-          `;
+        const body = await response.json().catch(() => ({}));
+        if (response.status === 201 && body.data && body.data.rfi_number) {
+          const d = body.data;
+          document.getElementById('modalTitle').textContent = d.rfi_number + ' submitted';
+          const locText = (d.location_unit || d.location_id)
+            ? (d.location_unit || '') + (d.location_unit && d.location_id ? ' / ' : '') + (d.location_id || '')
+            : '—';
+          document.getElementById('modalText').innerHTML =
+            '<strong>RFI saved.</strong><br>' +
+            '<strong>' + d.rfi_number + '</strong> — ' + (d.subject_title || '') + '<br>' +
+            'Sent to: ' + (d.sent_to || '—') + ' · Response due: ' + (d.date_response_required || '—') + '<br>' +
+            'Location: ' + locText +
+            (d.schedule_impact_flag ? ' · <em style="color:#B11E2E;">Schedule impact</em>' : '') +
+            (d.cost_impact_flag ? ' · <em style="color:#B11E2E;">Cost impact</em>' : '');
           document.getElementById('jsonDisplay').textContent = '';
+          // Update the disabled rfi_number field so the operator sees the assignment
+          document.getElementById('rfiNumber').value = d.rfi_number;
         } else {
-          const error = await response.json();
-          document.getElementById('modalTitle').textContent = 'Submission Failed';
-          document.getElementById('modalText').innerHTML = '<strong>Error:</strong> ' + (error.error || 'Server error');
+          document.getElementById('modalTitle').textContent = 'Submission failed';
+          document.getElementById('modalText').innerHTML =
+            '<strong>Error:</strong> ' + (body.error || ('HTTP ' + response.status));
         }
       } catch (err) {
-        document.getElementById('modalTitle').textContent = 'Connection Error';
-        document.getElementById('modalText').innerHTML = '<strong>Error:</strong> Unable to reach server at localhost:5000';
+        document.getElementById('modalTitle').textContent = 'Connection error';
+        document.getElementById('modalText').innerHTML =
+          '<strong>Error:</strong> ' + (err.message || String(err));
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Submit RFI';
@@ -565,24 +616,13 @@
 
     document.getElementById('submitAnotherBtn').addEventListener('click', () => {
       form.reset();
-      document.getElementById('dateSubmitted').value = new Date().toISOString().split('T')[0];
+      document.getElementById('dateSubmitted').value = rfiTodayLocal();
+      document.getElementById('rfiNumber').value = 'auto-assigned on submit';
       modal.classList.remove('active');
     });
 
-    // ---- Live on-site header (#116). Reads the shared
-    // /api/projects/<code>/on-site endpoint that also feeds the project
-    // dashboard's Workers-Today widget — single source of truth. Refreshes
-    // on a 30s interval so a sign-in/-out elsewhere in the system shows
-    // up here without a manual reload.
-    // Uses LOCAL date (the dates rule) — UTC would mismatch sign-ins
-    // entered after ~7pm Eastern.
-    function rfiTodayLocal() {
-      const d = new Date();
-      return d.getFullYear() + '-'
-           + String(d.getMonth() + 1).padStart(2, '0') + '-'
-           + String(d.getDate()).padStart(2, '0');
-    }
-    const PROJECT_CODE = 'FR-BX-001';
+    // ---- Live on-site header (#116). Reads /api/projects/<code>/on-site,
+    // refreshes every 30s. Independent of the form submission path.
     async function loadOnSiteHeader() {
       const hdr = document.getElementById('rfi-onsite-header');
       if (!hdr) return;
@@ -610,6 +650,9 @@
         console.warn('[RFI] on-site header load failed:', e);
       }
     }
+
+    // Kickoff
+    loadProjectConfig();
     loadOnSiteHeader();
     setInterval(loadOnSiteHeader, 30 * 1000);
   </script>
