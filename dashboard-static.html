@@ -569,8 +569,14 @@
             <div class="kpi-header">Weather</div>
             <div class="kpi-content" style="position:relative;">
               <div style="display:flex;align-items:center;gap:10px;">
-                <div id="wx-icon" style="width:42px;height:42px;flex-shrink:0;color:#B11E2E;">
-                  <!-- icon injected by JS based on condition -->
+                <div id="wx-icon" style="width:42px;height:42px;flex-shrink:0;">
+                  <!-- modern multi-tone weather SVG injected by JS based on
+                       Open-Meteo WMO condition_code. Each icon ships its own
+                       fill/stroke colors (sun=amber, cloud=slate, rain=blue,
+                       storm=slate+amber, etc.) — no currentColor inheritance
+                       from this container, so a stray parent color (e.g. the
+                       brand-red leak that turned the cloud red, #114) can
+                       never re-tint the glyph. -->
                 </div>
                 <div style="flex:1;min-width:0;">
                   <div class="kpi-stat" id="wx-temp" style="font-size:28px;line-height:1;">—°</div>
@@ -579,7 +585,11 @@
               </div>
               <div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid #F1EEE8;font-size:11px;color:#76777E;">
                 <span><strong style="color:#14161C;font-weight:700;" id="wx-hilo">—°/—°</strong> hi/lo</span>
-                <span>💨 <strong style="color:#14161C;font-weight:700;" id="wx-wind">— mph</strong> <span id="wx-wind-dir">—</span></span>
+                <span style="display:inline-flex;align-items:center;gap:5px;">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h11a3 3 0 1 0-3-3"/><path d="M3 13h17a3 3 0 1 1-3 3"/><path d="M3 18h9"/></svg>
+                  <strong style="color:#14161C;font-weight:700;" id="wx-wind">— mph</strong>
+                  <span id="wx-wind-dir">—</span>
+                </span>
               </div>
             </div>
           </div>
@@ -2715,28 +2725,112 @@ document.querySelectorAll('.nav-link').forEach(link => {
 // Live Weather Widget — Open-Meteo via /api/weather
 // =====================================================================
 (function() {
-  // SVG icons — single-color, scale to fill parent
-  const ICONS = {
-    sun: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="32" cy="32" r="10" fill="currentColor" stroke="none"/><path d="M32 6v8M32 50v8M6 32h8M50 32h8M14 14l5.5 5.5M44.5 44.5L50 50M14 50l5.5-5.5M44.5 19.5L50 14"/></svg>',
-    partly: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="22" cy="22" r="7" fill="currentColor" stroke="none"/><path d="M22 8v4M22 32v4M8 22h4M32 22h4M12 12l3 3M29 29l3 3M12 32l3-3M29 15l3-3"/><path d="M48 50H22a10 10 0 0 1 0-20 13 13 0 0 1 25 4h1a8 8 0 0 1 0 16Z" fill="currentColor" stroke="none" opacity=".85"/></svg>',
-    cloud: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M48 52H18a12 12 0 0 1 0-24 14 14 0 0 1 27 4h3a10 10 0 0 1 0 20Z"/></svg>',
-    rain: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M48 38H18a12 12 0 0 1 0-24 14 14 0 0 1 27 4h3a10 10 0 0 1 0 20Z" fill="currentColor"/><path d="M22 46l-3 8M32 46l-3 8M42 46l-3 8" stroke-width="3.5"/></svg>',
-    snow: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M48 38H18a12 12 0 0 1 0-24 14 14 0 0 1 27 4h3a10 10 0 0 1 0 20Z" fill="currentColor"/><g stroke-width="2.5"><path d="M22 46v8M19 50h6M32 46v8M29 50h6M42 46v8M39 50h6"/></g></svg>',
-    storm: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M48 38H18a12 12 0 0 1 0-24 14 14 0 0 1 27 4h3a10 10 0 0 1 0 20Z" fill="currentColor"/><path d="M30 42l-6 10h7l-2 8 9-12h-7l3-6z" fill="#F5C518" stroke="#F5C518"/></svg>',
-    fog: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M8 28h48M8 36h48M8 44h48M14 52h36"/></svg>',
-    wind: '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 24h38a8 8 0 1 0-8-8M6 36h44M6 48h26a8 8 0 1 1-8 8"/></svg>'
+  // Modern multi-tone weather icon set (#114). Each icon hard-codes its own
+  // fill/stroke colors — sun in amber, cloud in slate, rain in blue, etc. —
+  // so no parent `color:` can re-tint the glyph (that's what made the cloud
+  // brand-red before). Consistent 64x64 viewBox, 2.5px stroke, line+fill
+  // hybrid so the outline reads cleanly on white.
+  const COLOR = {
+    sunFill:    '#F5B82E', sunStroke:  '#D29412',  // amber/gold
+    cloudFill:  '#E5E7EB', cloudStroke:'#6B7280',  // soft slate body, darker outline
+    rainStroke: '#3B82F6',                          // mid blue
+    snowFill:   '#DBEAFE',                          // very light blue dots
+    boltFill:   '#F5B82E', boltStroke:'#D29412',    // amber
+    fogStroke:  '#6B7280',                          // slate
+    windStroke: '#6B7280',                          // slate
+    nightFill:  '#1E293B', nightStroke:'#0F172A',   // deep slate-blue (clear night)
   };
 
+  // Helper to keep the inline SVG strings readable.
+  function wrap(inner) {
+    return '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+  }
+
+  // Reusable cloud body (slate fill + darker outline). Used by cloud/rain/
+  // snow/storm so the silhouette stays consistent across precipitation types.
+  function cloudBody(opts) {
+    opts = opts || {};
+    const yShift = opts.yShift || 0;   // -ve = nudges cloud up for precip variants
+    const d = `M48 ${52+yShift}H18a12 12 0 0 1 0-24 14 14 0 0 1 27 4h3a10 10 0 0 1 0 20Z`;
+    return `<path d="${d}" fill="${COLOR.cloudFill}" stroke="${COLOR.cloudStroke}" stroke-width="2.5"/>`;
+  }
+
+  const ICONS = {
+    // Sun — amber disc + amber rays.
+    sun: wrap(
+      '<g stroke="' + COLOR.sunStroke + '" stroke-width="3">' +
+        '<path d="M32 4v10M32 50v10M4 32h10M50 32h10M11.5 11.5l7 7M45.5 45.5l7 7M11.5 52.5l7-7M45.5 18.5l7-7"/>' +
+      '</g>' +
+      '<circle cx="32" cy="32" r="12" fill="' + COLOR.sunFill + '" stroke="' + COLOR.sunStroke + '" stroke-width="2.5"/>'
+    ),
+    // Partly cloudy — small sun behind slate cloud.
+    partly: wrap(
+      '<g stroke="' + COLOR.sunStroke + '" stroke-width="2.5">' +
+        '<path d="M22 6v6M22 32v3M6 22h6M32 22h4M11 11l4 4M29.5 29.5l3 3M11 33l4-4M29.5 14.5l3-3"/>' +
+      '</g>' +
+      '<circle cx="22" cy="22" r="8" fill="' + COLOR.sunFill + '" stroke="' + COLOR.sunStroke + '" stroke-width="2.5"/>' +
+      '<path d="M50 54H22a11 11 0 0 1 0-22 13 13 0 0 1 25 3h2a9.5 9.5 0 0 1 0 19Z" fill="' + COLOR.cloudFill + '" stroke="' + COLOR.cloudStroke + '" stroke-width="2.5"/>'
+    ),
+    // Overcast / cloud — slate cloud with outline so it reads on white.
+    cloud: wrap(cloudBody()),
+    // Rain — slate cloud + 3 blue droplets.
+    rain: wrap(
+      cloudBody({yShift: -6}) +
+      '<g stroke="' + COLOR.rainStroke + '" stroke-width="3.5">' +
+        '<path d="M22 50l-3 8M32 50l-3 8M42 50l-3 8"/>' +
+      '</g>'
+    ),
+    // Snow — slate cloud + small star-flake dots.
+    snow: wrap(
+      cloudBody({yShift: -6}) +
+      '<g fill="' + COLOR.snowFill + '" stroke="' + COLOR.rainStroke + '" stroke-width="1.5">' +
+        '<circle cx="22" cy="54" r="2.5"/>' +
+        '<circle cx="32" cy="56" r="2.5"/>' +
+        '<circle cx="42" cy="54" r="2.5"/>' +
+      '</g>'
+    ),
+    // Thunderstorm — slate cloud + amber lightning bolt.
+    storm: wrap(
+      cloudBody({yShift: -6}) +
+      '<path d="M30 44l-6 10h6l-2 8 10-12h-6l3-6z" fill="' + COLOR.boltFill + '" stroke="' + COLOR.boltStroke + '" stroke-width="2"/>'
+    ),
+    // Fog/mist — three stacked slate horizontal lines.
+    fog: wrap(
+      '<g stroke="' + COLOR.fogStroke + '" stroke-width="3.5">' +
+        '<path d="M8 24h48M4 36h56M12 48h44"/>' +
+      '</g>'
+    ),
+    // Wind — slate flowing lines.
+    wind: wrap(
+      '<g stroke="' + COLOR.windStroke + '" stroke-width="3" fill="none">' +
+        '<path d="M6 22h38a8 8 0 1 0-8-8"/>' +
+        '<path d="M6 34h46"/>' +
+        '<path d="M6 46h28a8 8 0 1 1-8 8"/>' +
+      '</g>'
+    ),
+    // Clear night — deep slate moon (used when an explicit night code arrives
+    // from the source — Open-Meteo's WMO does not distinguish day/night
+    // directly, but the function below could be extended via is_day later).
+    nightClear: wrap(
+      '<path d="M44 36a18 18 0 1 1-22-22 14 14 0 0 0 22 22Z" fill="' + COLOR.nightFill + '" stroke="' + COLOR.nightStroke + '" stroke-width="2.5"/>'
+    ),
+  };
+
+  // Map every WMO weather code Open-Meteo can return (0..99) to an icon.
+  // Codes: https://open-meteo.com/en/docs#weathervariables
   function iconFor(code) {
     if (code == null) return ICONS.cloud;
-    if (code === 0) return ICONS.sun;
-    if ([1, 2].includes(code)) return ICONS.partly;
-    if (code === 3) return ICONS.cloud;
-    if ([45, 48].includes(code)) return ICONS.fog;
-    if ([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)) return ICONS.rain;
-    if ([71,73,75,77,85,86].includes(code)) return ICONS.snow;
-    if ([95,96,99].includes(code)) return ICONS.storm;
-    return ICONS.cloud;
+    if (code === 0) return ICONS.sun;                                            // clear sky
+    if (code === 1 || code === 2) return ICONS.partly;                           // mainly clear / partly cloudy
+    if (code === 3) return ICONS.cloud;                                          // overcast
+    if (code === 45 || code === 48) return ICONS.fog;                            // fog / depositing rime
+    if ([51, 53, 55, 56, 57].includes(code)) return ICONS.rain;                  // drizzle (incl. freezing)
+    if ([61, 63, 65, 66, 67].includes(code)) return ICONS.rain;                  // rain (incl. freezing)
+    if ([71, 73, 75, 77].includes(code)) return ICONS.snow;                      // snow fall / snow grains
+    if ([80, 81, 82].includes(code)) return ICONS.rain;                          // rain showers
+    if ([85, 86].includes(code)) return ICONS.snow;                              // snow showers
+    if ([95, 96, 99].includes(code)) return ICONS.storm;                         // thunderstorm (incl. hail)
+    return ICONS.cloud;                                                          // safe default — never fall through to red
   }
 
   function fmtTemp(n) { return n == null ? '—°' : Math.round(n) + '°'; }
