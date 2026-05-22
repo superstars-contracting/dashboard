@@ -116,7 +116,22 @@ def preflight():
 
 
 def cleanup_marker():
-    """Remove any debris from earlier interrupted runs (matches MARKER prefix)."""
+    """Remove any debris from earlier interrupted runs (matches MARKER prefix).
+
+    Also sweeps `sign_in_log` defensively (#111): test_sign_ins and
+    test_weekly_hours POST sign-ins against REAL workers (emps[1] /
+    emps[2]) on the test dates D_EARLY / D_MID / D_LATE — if the smoke
+    aborts mid-test (timeout, network blip, ctrl-c) the explicit
+    requests.delete() call is skipped, and a row at the test default
+    `time_in='07:00', time_out='15:30'` accumulates against a real
+    worker. The DCR labor scoping (project_code + date) then surfaces
+    it as a phantom sign-in on a freshly-created DCR.
+
+    Filter is intentionally tight — only deletes rows whose date has NO
+    issued DCR in report_index (orphan), AND match the exact test time
+    pattern, AND are on the smoke's own test dates. A real sign-in at
+    07:00-15:30 that's referenced by a real DCR is preserved.
+    """
     conn = db()
     try:
         cur = conn.cursor()
@@ -143,6 +158,22 @@ def cleanup_marker():
         cur.execute("DELETE FROM company_id_cards   WHERE employee_id LIKE 'SMK-%'")
         cur.execute("DELETE FROM sign_in_log        WHERE employee_id LIKE 'SMK-%'")
         cur.execute("DELETE FROM employees          WHERE employee_id LIKE 'SMK-%'")
+        # Defensive sweep of REAL-worker orphan sign-ins on the smoke's own
+        # test dates. Triple-locked filter (project + test time pattern +
+        # no parent DCR) so no real labor row can be touched.
+        cur.execute(
+            """DELETE FROM sign_in_log
+               WHERE project_code = ?
+                 AND time_in = '07:00' AND time_out = '15:30'
+                 AND date IN (?, ?, ?)
+                 AND NOT EXISTS (
+                   SELECT 1 FROM report_index r
+                   WHERE r.project_code = sign_in_log.project_code
+                     AND r.report_type = 'DCR'
+                     AND r.report_date = sign_in_log.date
+                 )""",
+            (PROJECT, D_EARLY, D_MID, D_LATE),
+        )
         conn.commit()
     finally:
         conn.close()
