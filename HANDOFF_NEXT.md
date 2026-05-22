@@ -10,7 +10,7 @@
 
 A continuous-run, single-project ops platform for **Superstars
 Contracting Inc.** (NYC facade restoration). Single active project:
-**FR-BX-001 / 890 E 135th Street, Bronx** (client: Auers Moving). 8-worker
+**FR-BX-001 / 890 E 135th Street, Bronx** (client: Compass Point, LLC). 8-worker
 real roster. Server runs unattended under a Windows scheduled task and is
 exposed to the operator's phone/tablet via Tailscale (private serve, not
 public funnel).
