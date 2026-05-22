@@ -127,15 +127,34 @@ def today():
 # ============= WRITE HELPERS =============
 
 def get_next_rfi_number(conn, project_code):
-    """Auto-generate next RFI number (e.g., RFI-004)"""
-    row = conn.execute(
-        "SELECT rfi_number FROM rfi_log WHERE project_code = ? ORDER BY rfi_number DESC LIMIT 1",
-        (project_code,)
-    ).fetchone()
-    if not row:
-        return "RFI-001"
-    last_num = int(row['rfi_number'].split('-')[1])
-    return f"RFI-{str(last_num + 1).zfill(3)}"
+    """Auto-generate next project-prefixed sequential RFI number per Phase-2
+    handoff: <project_code>-RFI-NNNN, zero-padded to 4 digits.
+    Example: FR-BX-001-RFI-0001.
+
+    Allocates the SMALLEST positive integer not currently in use for this
+    project (gap-fill — matches the DCR sequence convention). Robust to
+    legacy short-form 'RFI-XXX' rows: the regex scans every numeric suffix
+    on the project's rows and picks max+1 in single-pass, ignoring rows
+    that don't parse.
+    """
+    import re
+    rows = conn.execute(
+        "SELECT rfi_number FROM rfi_log WHERE project_code = ?",
+        (project_code,),
+    ).fetchall()
+    used = set()
+    for r in rows:
+        wid = r['rfi_number'] or ''
+        m = re.search(r'(?:^|-)(\d{1,6})$', wid)
+        if m:
+            try:
+                used.add(int(m.group(1)))
+            except ValueError:
+                pass
+    n = 1
+    while n in used:
+        n += 1
+    return f"{project_code}-RFI-{n:04d}"
 
 def validate_employee_exists(conn, employee_id):
     """Validate employee exists"""
@@ -441,72 +460,243 @@ def api_payroll_hours_pdf():
 
 # ============= RFI ENDPOINTS =============
 
+# ---------------------------------------------------------------------------
+# RFI Log — Phase 2 endpoints (handoff HANDOFF_REPORTS_PHASE2_RFI_LOG.md)
+# ---------------------------------------------------------------------------
+# Field set follows construction_builds_spec.json rfi_log.fields. Status
+# values pulled from project_type_config.RFI_STATUS_SUBSET (the spec's
+# RFI-specific enum: Open / Answered / Closed / Overdue / Void).
+# ---------------------------------------------------------------------------
+
+# Spec-defined writable fields. The "_mirror" map writes the new spec
+# names into the legacy columns (description / response / due_date /
+# response_date / discipline) too, so a downstream consumer reading
+# either set sees the same payload while Phase 2 is rolling out.
+_RFI_WRITABLE_FIELDS = (
+    'subject_title', 'submitted_by', 'sent_to',
+    'date_submitted', 'date_response_required', 'date_response_received',
+    'status', 'question_description', 'response_answer',
+    'scope_category', 'location_unit', 'location_id',
+    'drawing_spec_reference', 'schedule_impact_flag', 'cost_impact_flag',
+    'impact_magnitude_note', 'related_documents',
+)
+_RFI_LEGACY_MIRROR = {
+    'question_description': 'description',
+    'response_answer':       'response',
+    'date_response_required': 'due_date',
+    'date_response_received': 'response_date',
+    'scope_category':        'discipline',
+}
+
+
+def _coerce_bool(v):
+    if isinstance(v, bool):
+        return 1 if v else 0
+    if v in (1, '1', 'true', 'True', True):
+        return 1
+    return 0
+
+
+def _derive_rfi_status(row, today_iso):
+    """Auto-Overdue derivation per spec: status flips to 'Overdue' when
+    current_date > date_response_required AND date_response_received is
+    empty. Persisted status wins for non-Open cases — only Open + past-due
+    promotes to Overdue.
+    """
+    stored = (row.get('status') or 'Open')
+    if stored == 'Open':
+        drr = row.get('date_response_required')
+        drcv = row.get('date_response_received')
+        if drr and not drcv and drr < today_iso:
+            return 'Overdue'
+    return stored
+
+
+def _rfi_turnaround_days(row):
+    """date_response_received - date_submitted in days, or None."""
+    sub = row.get('date_submitted')
+    rcv = row.get('date_response_received')
+    if not sub or not rcv:
+        return None
+    try:
+        d1 = datetime.strptime(sub, '%Y-%m-%d').date()
+        d2 = datetime.strptime(rcv, '%Y-%m-%d').date()
+        return (d2 - d1).days
+    except (ValueError, TypeError):
+        return None
+
+
+def _rfi_row_to_dict(row, today_iso):
+    """Shape an rfi_log row for the API: includes status_derived + turnaround_days.
+    Maps legacy columns into the spec names for callers that only know the
+    new names (e.g. when an old RFI was written via the legacy POST)."""
+    d = dict(row)
+    d.setdefault('question_description', d.get('description'))
+    d.setdefault('response_answer',      d.get('response'))
+    d.setdefault('date_response_required', d.get('due_date'))
+    d.setdefault('date_response_received', d.get('response_date'))
+    d.setdefault('scope_category',       d.get('discipline'))
+    d['status_derived'] = _derive_rfi_status(d, today_iso)
+    d['turnaround_days'] = _rfi_turnaround_days(d)
+    # Booleans normalize to JSON true/false for the UI
+    d['schedule_impact_flag'] = bool(d.get('schedule_impact_flag'))
+    d['cost_impact_flag']     = bool(d.get('cost_impact_flag'))
+    return d
+
+
 @app.route('/api/rfis', methods=['POST'])
 def create_rfi():
-    """Create new RFI"""
+    """Create an RFI with the full spec field set.
+
+    Body keys (all optional except project_code; sensible defaults applied):
+      project_code (required)
+      subject_title, submitted_by, sent_to
+      date_submitted (defaults to LOCAL today),
+      date_response_required, date_response_received
+      status (defaults to 'Open'; restricted to RFI_STATUS_SUBSET)
+      question_description, response_answer
+      scope_category, location_unit, location_id, drawing_spec_reference
+      schedule_impact_flag, cost_impact_flag, impact_magnitude_note,
+      related_documents
+    Server auto-assigns project-prefixed sequential rfi_number.
+    """
+    from project_type_config import RFI_STATUS_SUBSET
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         project_code = data.get('project_code')
-        
+        if not project_code:
+            return jsonify({"error": "project_code required"}), 400
         conn = db()
         if not validate_project_exists(conn, project_code):
             conn.close()
-            return jsonify({"error": "Project not found"}), 400
-        
-        # Generate RFI number
+            return jsonify({"error": "Project not found"}), 404
+        status = data.get('status') or 'Open'
+        if status not in RFI_STATUS_SUBSET:
+            conn.close()
+            return jsonify({
+                "error": f"status must be one of {RFI_STATUS_SUBSET}"
+            }), 400
         rfi_number = get_next_rfi_number(conn, project_code)
-        
-        # Calculate due date based on priority
-        priority = data.get('priority', 'Standard')
-        due_days = {'Urgent': 2, 'High': 5, 'Standard': 10}.get(priority, 10)
-        due_date = (date.today() + timedelta(days=due_days)).isoformat()
-        
-        # Insert
+        # LOCAL today per the dates rule (#74). Python's date.today() is local.
+        today_iso = date.today().isoformat()
+        date_submitted = data.get('date_submitted') or today_iso
+
+        # Build the insert payload — write each field by its spec name AND
+        # mirror into the legacy column so a Phase-1 reader sees the same.
+        cols = {
+            'rfi_number':              rfi_number,
+            'project_code':            project_code,
+            'subject_title':           data.get('subject_title'),
+            'submitted_by':            data.get('submitted_by'),
+            'sent_to':                 data.get('sent_to'),
+            'date_submitted':          date_submitted,
+            'date_response_required':  data.get('date_response_required'),
+            'date_response_received':  data.get('date_response_received'),
+            'status':                  status,
+            'question_description':    data.get('question_description'),
+            'response_answer':         data.get('response_answer'),
+            'scope_category':          data.get('scope_category'),
+            'location_unit':           data.get('location_unit'),
+            'location_id':             data.get('location_id'),
+            'drawing_spec_reference':  data.get('drawing_spec_reference'),
+            'schedule_impact_flag':    _coerce_bool(data.get('schedule_impact_flag')),
+            'cost_impact_flag':        _coerce_bool(data.get('cost_impact_flag')),
+            'impact_magnitude_note':   data.get('impact_magnitude_note'),
+            'related_documents':       data.get('related_documents'),
+            # Legacy mirrors — keep Phase-1 readers happy
+            'description':             data.get('question_description'),
+            'response':                data.get('response_answer'),
+            'due_date':                data.get('date_response_required'),
+            'response_date':           data.get('date_response_received'),
+            'discipline':              data.get('scope_category'),
+            'created_at':              datetime.now().isoformat(),
+            'updated_at':              datetime.now().isoformat(),
+        }
+        cols_sql = ', '.join(cols.keys())
+        placeholders = ', '.join(['?'] * len(cols))
         conn.execute(
-            "INSERT INTO rfi_log (rfi_number, project_code, date_submitted, submitted_by, discipline, "
-            "description, status, due_date, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, 'Open', ?, ?, ?)",
-            (rfi_number, project_code, date.today().isoformat(), data.get('submitted_by'),
-             data.get('discipline'), data.get('description'), due_date,
-             datetime.now().isoformat(), datetime.now().isoformat())
+            f"INSERT INTO rfi_log ({cols_sql}) VALUES ({placeholders})",
+            list(cols.values()),
         )
         conn.commit()
-        
         row = conn.execute("SELECT * FROM rfi_log WHERE rfi_number = ?", (rfi_number,)).fetchone()
-        result = dict(row) if row else {"rfi_number": rfi_number}
         conn.close()
-        
-        return response_wrapper(result), 201
+        if not row:
+            return jsonify({"error": "Insert failed"}), 500
+        return response_wrapper(_rfi_row_to_dict(row, today_iso)), 201
     except Exception as e:
         logging.error(f"POST /api/rfis: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+
 @app.route('/api/rfis/<rfi_id>', methods=['PATCH'])
 def update_rfi(rfi_id):
-    """Update RFI status/response"""
+    """Patch an RFI by rfi_number. Accepts any subset of _RFI_WRITABLE_FIELDS.
+    Mirrors spec names into legacy columns so concurrent readers stay
+    consistent during the Phase-2 rollout window."""
+    from project_type_config import RFI_STATUS_SUBSET
     try:
-        data = request.get_json()
-        updates = []
-        params = []
-        
-        for key in ['status', 'response', 'response_date']:
-            if key in data:
-                updates.append(f"{key} = ?")
-                params.append(data[key])
-        
+        data = request.get_json(silent=True) or {}
+        # Whitelist + boolean coercion
+        updates, params = [], []
+        for key, value in data.items():
+            if key not in _RFI_WRITABLE_FIELDS:
+                continue
+            if key == 'status' and value not in RFI_STATUS_SUBSET:
+                return jsonify({
+                    "error": f"status must be one of {RFI_STATUS_SUBSET}"
+                }), 400
+            if key in ('schedule_impact_flag', 'cost_impact_flag'):
+                value = _coerce_bool(value)
+            updates.append(f"{key} = ?")
+            params.append(value)
+            # Mirror to legacy column
+            if key in _RFI_LEGACY_MIRROR:
+                updates.append(f"{_RFI_LEGACY_MIRROR[key]} = ?")
+                params.append(value)
+        if not updates:
+            return jsonify({"error": "no writable fields in payload"}), 400
         updates.append("updated_at = ?")
         params.append(datetime.now().isoformat())
         params.append(rfi_id)
-        
         conn = db()
-        conn.execute(f"UPDATE rfi_log SET {', '.join(updates)} WHERE rfi_number = ?", params)
-        conn.commit()
-        
-        row = conn.execute("SELECT * FROM rfi_log WHERE rfi_number = ?", (rfi_id,)).fetchone()
-        conn.close()
-        
-        return response_wrapper(dict(row) if row else {}), 200
+        try:
+            row_before = conn.execute(
+                "SELECT 1 FROM rfi_log WHERE rfi_number = ?", (rfi_id,)
+            ).fetchone()
+            if not row_before:
+                return jsonify({"error": "RFI not found"}), 404
+            conn.execute(
+                f"UPDATE rfi_log SET {', '.join(updates)} WHERE rfi_number = ?",
+                params,
+            )
+            conn.commit()
+            row = conn.execute("SELECT * FROM rfi_log WHERE rfi_number = ?", (rfi_id,)).fetchone()
+        finally:
+            conn.close()
+        return response_wrapper(_rfi_row_to_dict(row, date.today().isoformat()))
     except Exception as e:
+        logging.error(f"PATCH /api/rfis/{rfi_id}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/rfis/<rfi_id>', methods=['DELETE'])
+def delete_rfi(rfi_id):
+    """Hard-delete an RFI by rfi_number. Used by the register's Delete
+    affordance and by the smoke test."""
+    try:
+        conn = db()
+        try:
+            row = conn.execute("SELECT 1 FROM rfi_log WHERE rfi_number = ?", (rfi_id,)).fetchone()
+            if not row:
+                return jsonify({"error": "RFI not found"}), 404
+            conn.execute("DELETE FROM rfi_log WHERE rfi_number = ?", (rfi_id,))
+            conn.commit()
+        finally:
+            conn.close()
+        return response_wrapper({"rfi_number": rfi_id, "deleted": True})
+    except Exception as e:
+        logging.error(f"DELETE /api/rfis/{rfi_id}: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 # ============= SITE CLOSURE ENDPOINTS =============
@@ -2117,10 +2307,16 @@ def get_sign_ins():
 
 @app.route('/api/rfis', methods=['GET'])
 def get_rfis():
+    """Cross-project RFI list. Each row carries status_derived (Auto-Overdue)
+    + turnaround_days. Use /api/projects/<code>/rfis for the
+    register-shaped per-project payload + the default sort."""
     conn = db()
     rows = conn.execute("SELECT * FROM rfi_log ORDER BY date_submitted DESC").fetchall()
     conn.close()
-    return response_wrapper(rows_to_dicts(rows), len(rows))
+    today_iso = date.today().isoformat()
+    out = [_rfi_row_to_dict(r, today_iso) for r in rows]
+    return response_wrapper(out, len(out))
+
 
 @app.route('/api/rfis/<rfi_id>', methods=['GET'])
 def get_rfi(rfi_id):
@@ -2129,7 +2325,131 @@ def get_rfi(rfi_id):
     conn.close()
     if not row:
         return jsonify({"error": "RFI not found"}), 404
-    return response_wrapper(dict(row))
+    return response_wrapper(_rfi_row_to_dict(row, date.today().isoformat()))
+
+
+@app.route('/api/projects/<project_code>/rfis', methods=['GET'])
+def api_project_rfis(project_code):
+    """RFI Log register payload for a project.
+
+    Query params:
+      status                   filter (multi-value supported via ?status=Open&status=Overdue)
+      due_before / due_after   bound date_response_required (YYYY-MM-DD)
+      schedule_impact_only=1   only schedule-impacting rows
+      include_legacy_unprefixed=1
+                               include legacy rfi_numbers like 'RFI-001'
+                               (without the project_code prefix). Default off.
+
+    Default sort (per spec): status_derived='Open' or 'Overdue' first
+    (Overdue ranks higher than Open), then date_response_required ASC,
+    nulls last.
+    """
+    try:
+        conn = db()
+        if not validate_project_exists(conn, project_code):
+            conn.close()
+            return jsonify({"error": "Project not found"}), 404
+        # Pull every row for the project — register-grade volume, server-side
+        # filter+sort below. (For very large RFI counts, pagination would
+        # move into SQL; volumes today don't warrant it.)
+        rows = conn.execute(
+            "SELECT * FROM rfi_log WHERE project_code = ?",
+            (project_code,),
+        ).fetchall()
+        conn.close()
+        today_iso = date.today().isoformat()
+        out = [_rfi_row_to_dict(r, today_iso) for r in rows]
+
+        # Filters
+        status_filter = [s for s in request.args.getlist('status') if s]
+        if status_filter:
+            sset = set(status_filter)
+            out = [r for r in out if r.get('status_derived') in sset]
+        due_before = request.args.get('due_before')
+        due_after  = request.args.get('due_after')
+        if due_before:
+            out = [r for r in out
+                   if (r.get('date_response_required') or '9999-12-31') <= due_before]
+        if due_after:
+            out = [r for r in out
+                   if (r.get('date_response_required') or '0000-01-01') >= due_after]
+        if request.args.get('schedule_impact_only') in ('1', 'true', 'yes'):
+            out = [r for r in out if r.get('schedule_impact_flag')]
+
+        # Default sort: Overdue=0, Open=1, Answered/Closed/Void=2, then
+        # date_response_required ASC nulls last.
+        def _sort_key(r):
+            s = r.get('status_derived') or 'Open'
+            rank = 2
+            if s == 'Overdue':
+                rank = 0
+            elif s == 'Open':
+                rank = 1
+            return (rank, r.get('date_response_required') or '9999-12-31',
+                    r.get('rfi_number') or '')
+        out.sort(key=_sort_key)
+        return response_wrapper(out, len(out))
+    except Exception as e:
+        logging.error(f"GET /api/projects/{project_code}/rfis: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/projects/<project_code>/rfi-constraints', methods=['GET'])
+def api_project_rfi_constraints(project_code):
+    """CONSTRAINT FEED for Phase 3 Two-Week Look-Ahead.
+
+    Per construction_builds_spec.json linkage_rules.rfi_to_lookahead:
+    'An open RFI with schedule_impact_flag=true and a location_reference
+    becomes a CONSTRAINT on that location in the Two-Week Look-Ahead.'
+
+    Returns RFIs where:
+      status_derived IN ('Open', 'Overdue')
+      AND schedule_impact_flag = 1
+    Each row carries rfi_number, subject_title, sent_to,
+    date_response_required (the 'needed by' date for the constraint),
+    location_unit, location_id, status_derived, and turnaround context.
+
+    Phase-3 Look-Ahead consumes this to render gating constraints on
+    each location's row.
+    """
+    try:
+        conn = db()
+        if not validate_project_exists(conn, project_code):
+            conn.close()
+            return jsonify({"error": "Project not found"}), 404
+        rows = conn.execute(
+            "SELECT * FROM rfi_log WHERE project_code = ? "
+            "AND schedule_impact_flag = 1",
+            (project_code,),
+        ).fetchall()
+        conn.close()
+        today_iso = date.today().isoformat()
+        out = []
+        for r in rows:
+            d = _rfi_row_to_dict(r, today_iso)
+            if d.get('status_derived') not in ('Open', 'Overdue'):
+                continue
+            # Slim payload — only what the Look-Ahead needs
+            out.append({
+                'rfi_number':              d.get('rfi_number'),
+                'subject_title':           d.get('subject_title'),
+                'sent_to':                 d.get('sent_to'),
+                'date_submitted':          d.get('date_submitted'),
+                'date_response_required':  d.get('date_response_required'),
+                'status_derived':          d.get('status_derived'),
+                'location_unit':           d.get('location_unit'),
+                'location_id':             d.get('location_id'),
+                'scope_category':          d.get('scope_category'),
+                'schedule_impact_flag':    d.get('schedule_impact_flag'),
+                'cost_impact_flag':        d.get('cost_impact_flag'),
+                'impact_magnitude_note':   d.get('impact_magnitude_note'),
+            })
+        # Sort by date_response_required ASC (nearest constraint first)
+        out.sort(key=lambda x: x.get('date_response_required') or '9999-12-31')
+        return response_wrapper(out, len(out))
+    except Exception as e:
+        logging.error(f"GET /api/projects/{project_code}/rfi-constraints: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/drops', methods=['GET'])
 def get_drops():
