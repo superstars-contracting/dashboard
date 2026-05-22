@@ -2268,6 +2268,14 @@
       <section class="view" data-view="rfis">
         <div class="section">
           <h2>RFI Log</h2>
+          <!-- Live "on site today" header (#116) — same shared
+               /api/projects/<code>/on-site source the Submit-RFI form
+               and the Workers-Today widget consume. Visual redesign is
+               Session 2; this is wiring only. -->
+          <div id="rfi-onsite-card" style="background:white;border:1px solid #E8E4DD;border-left:3px solid #B11E2E;border-radius:3px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#14161C;line-height:1.5;">
+            <div style="font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:#76777E;font-weight:600;margin-bottom:4px;">On Site Today</div>
+            <div id="rfi-onsite-header">Loading…</div>
+          </div>
           <div class="table-wrapper">
             <table>
               <thead>

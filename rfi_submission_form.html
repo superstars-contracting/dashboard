@@ -329,6 +329,16 @@
     <h1 class="form-title">Request for Information</h1>
     <p class="form-subtitle">RFI Submission</p>
 
+    <!-- Live "on site today" header (#116). Reads from the shared
+         /api/projects/<code>/on-site endpoint that also feeds the
+         project dashboard's Workers-Today widget — single source of
+         truth. Visual redesign comes in Session 2; this is just the
+         wiring. -->
+    <div id="rfi-onsite-card" style="background:white;border:1px solid #E8E4DD;border-left:3px solid #B11E2E;border-radius:3px;padding:12px 14px;margin-bottom:18px;font-size:12px;color:#14161C;line-height:1.5;">
+      <div style="font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:#76777E;font-weight:600;margin-bottom:4px;">On Site Today</div>
+      <div id="rfi-onsite-header">Loading…</div>
+    </div>
+
     <form id="rfiForm">
       <div class="section">
         <div class="section-header expanded" data-section="project">
@@ -558,6 +568,50 @@
       document.getElementById('dateSubmitted').value = new Date().toISOString().split('T')[0];
       modal.classList.remove('active');
     });
+
+    // ---- Live on-site header (#116). Reads the shared
+    // /api/projects/<code>/on-site endpoint that also feeds the project
+    // dashboard's Workers-Today widget — single source of truth. Refreshes
+    // on a 30s interval so a sign-in/-out elsewhere in the system shows
+    // up here without a manual reload.
+    // Uses LOCAL date (the dates rule) — UTC would mismatch sign-ins
+    // entered after ~7pm Eastern.
+    function rfiTodayLocal() {
+      const d = new Date();
+      return d.getFullYear() + '-'
+           + String(d.getMonth() + 1).padStart(2, '0') + '-'
+           + String(d.getDate()).padStart(2, '0');
+    }
+    const PROJECT_CODE = 'FR-BX-001';
+    async function loadOnSiteHeader() {
+      const hdr = document.getElementById('rfi-onsite-header');
+      if (!hdr) return;
+      try {
+        const today = rfiTodayLocal();
+        const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/on-site?date=' + today).then(r => r.json());
+        const d = (resp && resp.data) || null;
+        if (!d) { hdr.textContent = 'On-site roster unavailable.'; return; }
+        if (d.headcount === 0) {
+          hdr.textContent = 'No workers currently signed in (' + today + ').';
+          return;
+        }
+        const names = (d.workers || []).map(w => {
+          const wid = w.worker_id ? (w.worker_id + ' ') : '';
+          return wid + (w.name || '—');
+        });
+        const foremanLabel = d.foreman
+          ? ' · Foreman: ' + (d.foreman.worker_id || '') + ' ' + (d.foreman.name || '')
+          : '';
+        hdr.textContent =
+          d.headcount + ' on site today (' + today + '): ' +
+          names.join(', ') + foremanLabel;
+      } catch (e) {
+        hdr.textContent = 'On-site roster unavailable.';
+        console.warn('[RFI] on-site header load failed:', e);
+      }
+    }
+    loadOnSiteHeader();
+    setInterval(loadOnSiteHeader, 30 * 1000);
   </script>
 </body>
 </html>
