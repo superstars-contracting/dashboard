@@ -2609,6 +2609,60 @@ def api_project_workers(project_code):
         return jsonify({"error": str(e)}), 400
 
 
+# ---------------------------------------------------------------------------
+# Reports Phase 1 — shared spine endpoints (read-only)
+# ---------------------------------------------------------------------------
+# Both endpoints below serve `project_type_config.py` — the single source
+# that mirrors construction_builds_spec.json. Every future Weekly Summary /
+# Two-Week Look-Ahead / RFI Log build (Phases 2-4) reads project_type-
+# specific lists from THIS endpoint, never from a local copy. Read
+# REPORTS_PHASE1_SHARED_SPINE.md for the consumer guide.
+# ---------------------------------------------------------------------------
+
+@app.route('/api/project-types', methods=['GET'])
+def api_project_types():
+    """All project_type definitions + shared field schema, in one shot.
+
+    Phase-2/3/4 consumers that need to render a project-type picker (or
+    iterate every type's option lists for option pre-population) call this.
+    Single-project consumers should prefer /api/projects/<code>/project-config
+    which resolves the project_code -> exactly one type's payload.
+    """
+    from project_type_config import (
+        PROJECT_TYPES, STATUS_ENUM, RFI_STATUS_SUBSET,
+        SHARED_FIELD_DEFS, LOCATION_REFERENCE_SCHEMA, SPINE_VERSION,
+    )
+    return response_wrapper({
+        "spine_version": SPINE_VERSION,
+        "project_types": PROJECT_TYPES,
+        "status_enum": STATUS_ENUM,
+        "rfi_status_subset": RFI_STATUS_SUBSET,
+        "shared_fields": SHARED_FIELD_DEFS,
+        "location_reference": LOCATION_REFERENCE_SCHEMA,
+    })
+
+
+@app.route('/api/projects/<project_code>/project-config', methods=['GET'])
+def api_project_config(project_code):
+    """Resolved project-type config for a specific project.
+
+    Looks up `project_code` -> projects.project_type, then returns that
+    type's `location_unit_options`, `typical_scopes`, `typical_inspections`,
+    `typical_long_lead`, plus the shared field defs + location_reference
+    shape. This is the endpoint Phase-2 RFI Log / Look-Ahead UIs hit when
+    rendering option dropdowns + flag controls for a single project.
+    """
+    from project_type_config import get_project_config_for
+    conn = db()
+    try:
+        cfg = get_project_config_for(conn, project_code)
+    finally:
+        conn.close()
+    if cfg is None:
+        return jsonify({"error": "Project not found"}), 404
+    return response_wrapper(cfg)
+
+
 @app.route('/api/projects/<project_code>/on-site', methods=['GET'])
 def api_project_on_site(project_code):
     """SHARED 'who is on site now' source (#115/#116).
