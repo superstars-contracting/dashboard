@@ -671,21 +671,24 @@
 
         <div class="section">
           <h2>Today on Site</h2>
+          <!-- Live from the shared /on-site endpoint (#115). Foreman + signed-in
+               + hours update on the same refresh loop as the KPI strip; refreshes
+               every 30s plus on every dashboard load. -->
           <div class="site-card">
             <div class="site-item">
               <div class="site-label">Foreman</div>
-              <div class="site-value">John Doe</div>
-              <div style="font-size: 12px; color: #76777E; margin-top: 4px;">E-001</div>
+              <div class="site-value" id="tos-foreman-name">—</div>
+              <div style="font-size: 12px; color: #76777E; margin-top: 4px;" id="tos-foreman-id">Loading…</div>
             </div>
             <div class="site-item">
               <div class="site-label">Workers Signed In</div>
-              <div class="site-value">10 of 12</div>
-              <div style="font-size: 12px; color: #76777E; margin-top: 4px;">25.5 hrs</div>
+              <div class="site-value" id="tos-signed-in">—</div>
+              <div style="font-size: 12px; color: #76777E; margin-top: 4px;" id="tos-hours">— hrs</div>
             </div>
             <div class="site-item">
               <div class="site-label">Working Zone</div>
-              <div class="site-value">South Elevation</div>
-              <div style="font-size: 12px; color: #76777E; margin-top: 4px;">Weather: 58°/68° · 12mph NW</div>
+              <div class="site-value">—</div>
+              <div style="font-size: 12px; color: #76777E; margin-top: 4px;">Zone tagging on sign-ins · pending Phase 2B</div>
             </div>
           </div>
           <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px;">
@@ -3083,6 +3086,18 @@ document.querySelectorAll('.nav-link').forEach(link => {
 (async function() {
   const API = '';
 
+  // Local-date helper — this IIFE is a separate closure from the DCR and
+  // compliance ones, which each have their own todayLocal(). Re-defining
+  // here avoids a "ReferenceError: todayLocal is not defined" when the
+  // refresh loop runs. Per CLAUDE.md dates rule: never UTC.
+  function todayLocal(offsetDays) {
+    const d = new Date();
+    if (offsetDays) d.setDate(d.getDate() + offsetDays);
+    return d.getFullYear() + '-'
+         + String(d.getMonth() + 1).padStart(2, '0') + '-'
+         + String(d.getDate()).padStart(2, '0');
+  }
+
   const updateText = (selector, value) => {
     const el = document.querySelector(selector);
     if (el && value != null) el.textContent = value;
@@ -3133,21 +3148,87 @@ document.querySelectorAll('.nav-link').forEach(link => {
       // Local today — server stores rows under local date; UTC would miss
       // today's sign-ins during evening Eastern hours (#77).
       const today = todayLocal();
-      const [signins, latestDcr] = await Promise.all([
-        fetch(API + '/api/sign-ins?project=FR-BX-001&date=' + today).then(r => r.json()).catch(() => null),
+      // SHARED on-site source (#115/#116): the same endpoint feeds the
+      // KPI Workers-Today card, the "Today on Site" detail block, AND
+      // the Submit-RFI on-site header. /workers gives per-worker cert
+      // counts which we sum for the Cert Alerts KPI.
+      const [onSite, certWorkers, latestDcr] = await Promise.all([
+        fetch(API + '/api/projects/FR-BX-001/on-site?date=' + today).then(r => r.json()).catch(() => null),
+        fetch(API + '/api/projects/FR-BX-001/workers').then(r => r.json()).catch(() => null),
         fetch(API + '/api/projects/FR-BX-001/reports/latest?audience=internal&on_date=' + today).then(r => r.json()).catch(() => null),
       ]);
 
-      if (signins?.data) {
-        const headcount = signins.data.length;
-        const totalHours = signins.data.reduce((sum, s) => sum + (parseFloat(s.hours) || 0), 0);
-        updateText('[data-stat="workers-today"]', headcount > 0 ? headcount + ' / 12' : '10 / 12');
-        updateText('[data-stat="total-hours"]', totalHours > 0 ? totalHours.toFixed(2) : '82.25');
+      // ---- Workers-Today / Today-on-Site widgets (#115) ----
+      // No more hardcoded "10 / 12" / "82.25" fallback (#33). When nothing
+      // is signed in, render 0 — that's the truth.
+      const site = (onSite && onSite.data) || {headcount: 0, total_hours: 0, workers: [], foreman: null};
+      const rosterSize = (certWorkers && certWorkers.data) ? certWorkers.data.length : 0;
+      const headcountTxt = rosterSize > 0
+        ? site.headcount + ' of ' + rosterSize
+        : site.headcount.toString();
+      // The hero "On Site" stat-number reads "N of M" (matches the
+      // pre-existing copy). The KPI tile reads "N/M" (compact).
+      const heroEl = document.querySelector('.stat-number[data-stat="workers-today"]');
+      if (heroEl) heroEl.textContent = headcountTxt;
+      const kpiEl = document.querySelector('.kpi-stat[data-stat="workers-today"]');
+      if (kpiEl) kpiEl.textContent = rosterSize > 0
+        ? site.headcount + '/' + rosterSize
+        : site.headcount.toString();
+      updateText('[data-stat="total-hours"]', Number(site.total_hours || 0).toFixed(2));
+
+      // ---- "Today on Site" detail block (#115) ----
+      // Replaces the demo-stub "John Doe / South Elevation" content with
+      // live values. We update what we can derive — foreman + signed-in /
+      // hours; the static "Working Zone" tile stays a layout placeholder
+      // until the operator has a structured zone field on sign-ins.
+      const tosForemanName = document.getElementById('tos-foreman-name');
+      const tosForemanId = document.getElementById('tos-foreman-id');
+      if (tosForemanName) tosForemanName.textContent = site.foreman ? site.foreman.name : '—';
+      if (tosForemanId)   tosForemanId.textContent   = site.foreman ? (site.foreman.worker_id || '') : 'No foreman signed in';
+      const tosSignedIn = document.getElementById('tos-signed-in');
+      const tosHours = document.getElementById('tos-hours');
+      if (tosSignedIn) tosSignedIn.textContent = rosterSize > 0
+        ? site.headcount + ' of ' + rosterSize
+        : site.headcount.toString();
+      if (tosHours) tosHours.textContent = Number(site.total_hours || 0).toFixed(1) + ' hrs';
+
+      // ---- Cert Alerts KPI (#115) ----
+      // Live count = expiring (<=30d) + expired across all assigned workers.
+      // Source is the same per-worker cert payload the lower Cert Health
+      // panel already consumes — no second pass over the DB.
+      let expiringSum = 0, expiredSum = 0;
+      if (certWorkers && Array.isArray(certWorkers.data)) {
+        for (const w of certWorkers.data) {
+          expiringSum += (w.certs_expiring_30d || 0);
+          expiredSum  += (w.certs_expired || 0);
+        }
+      }
+      const certAlertsEl = document.querySelector('[data-stat="cert-alerts"]');
+      if (certAlertsEl) certAlertsEl.textContent = String(expiringSum + expiredSum);
+
+      // ---- Submit-RFI on-site header (#116) ----
+      // Same shared source — never duplicate the "who is on site" logic.
+      const rfiHdr = document.getElementById('rfi-onsite-header');
+      if (rfiHdr) {
+        if (site.headcount === 0) {
+          rfiHdr.textContent = 'No workers currently signed in on ' + today + '.';
+        } else {
+          const names = site.workers.map(w => {
+            const wid = w.worker_id ? (w.worker_id + ' ') : '';
+            return wid + (w.name || '—');
+          });
+          const foremanLabel = site.foreman
+            ? ' · Foreman: ' + (site.foreman.worker_id || '') + ' ' + (site.foreman.name || '')
+            : '';
+          rfiHdr.textContent =
+            site.headcount + (rosterSize > 0 ? ' of ' + rosterSize : '') +
+            ' on site today (' + today + '): ' + names.join(', ') + foremanLabel;
+        }
       }
 
       renderTodayDcr(latestDcr?.data || null);
     } catch (e) {
-      console.warn('[Dashboard] API not reachable, using static data');
+      console.warn('[Dashboard] live-data refresh failed:', e);
     }
   }
 

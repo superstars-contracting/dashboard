@@ -2609,6 +2609,116 @@ def api_project_workers(project_code):
         return jsonify({"error": str(e)}), 400
 
 
+@app.route('/api/projects/<project_code>/on-site', methods=['GET'])
+def api_project_on_site(project_code):
+    """SHARED 'who is on site now' source (#115/#116).
+
+    Returns the current on-site roster for `project_code` on `date` (defaults
+    to LOCAL today per the dates rule — never UTC). The project-dashboard
+    Workers-Today / Today-on-Site widgets and the Submit-RFI on-site header
+    both consume this — single source of truth, sorted by Worker ID
+    ascending (matches the DCR labor section after #107).
+
+    Query params:
+      date=YYYY-MM-DD   default = local today
+
+    Response shape:
+      {data: {
+        project_code, date,
+        headcount,            # total workers signed in today
+        total_hours,          # sum of hours from rows with time_in+time_out
+        still_on_site,        # rows with time_in but no time_out
+        foreman,              # the foreman's name + worker_id (or null)
+        workers: [{
+          employee_id, worker_id, name, trade,
+          time_in, time_out, hours, still_in
+        }, ...]
+      }}
+    """
+    from payroll_hours import compute_worked_hours
+    try:
+        # LOCAL date — server-side is Eastern, matches the operator's clock
+        # and the existing sign-in storage convention (#77 dates rule).
+        date_str = request.args.get('date') or date.today().isoformat()
+        try:
+            datetime.strptime(date_str, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+        conn = db()
+        try:
+            if not validate_project_exists(conn, project_code):
+                return jsonify({"error": "Project not found"}), 404
+            rows = conn.execute(
+                """SELECT s.employee_id, s.time_in, s.time_out,
+                          e.name AS emp_name, e.trade AS emp_trade,
+                          e.worker_id AS emp_worker_id
+                   FROM sign_in_log s
+                   LEFT JOIN employees e ON s.employee_id = e.employee_id
+                   WHERE s.project_code = ? AND s.date = ?
+                   ORDER BY s.time_in, s.id""",
+                (project_code, date_str)
+            ).fetchall()
+        finally:
+            conn.close()
+        workers = []
+        total_hours = 0.0
+        still_on_site = 0
+        foreman = None
+        for r in rows:
+            t_in = r['time_in']
+            t_out = r['time_out']
+            hours = compute_worked_hours(t_in, t_out) if t_in and t_out else None
+            if hours is not None:
+                total_hours += hours
+            if t_in and not t_out:
+                still_on_site += 1
+            trade = r['emp_trade'] or ''
+            entry = {
+                'employee_id': r['employee_id'],
+                'worker_id': r['emp_worker_id'],
+                'name': r['emp_name'],
+                'trade': trade,
+                'time_in': t_in,
+                'time_out': t_out,
+                'hours': hours,
+                'still_in': bool(t_in and not t_out),
+            }
+            workers.append(entry)
+            # First foreman in the cohort (by time_in order) gets the slot.
+            if foreman is None and isinstance(trade, str) and 'foreman' in trade.lower():
+                foreman = {
+                    'employee_id': r['employee_id'],
+                    'worker_id': r['emp_worker_id'],
+                    'name': r['emp_name'],
+                }
+        # Sort by Worker ID ascending (numeric trailing digits per CLAUDE.md
+        # schema rule). Rows without worker_id sort to the end. Mirrors the
+        # DCR labor section sort from #107 — every roster surface reads
+        # in the same order.
+        def _wid_key(row):
+            wid = row.get('worker_id')
+            if not wid:
+                return (1, 0)
+            digits = ''.join(ch for ch in str(wid) if ch.isdigit())
+            try:
+                return (0, int(digits)) if digits else (1, 0)
+            except ValueError:
+                return (1, 0)
+        workers.sort(key=_wid_key)
+        return response_wrapper({
+            'project_code': project_code,
+            'date': date_str,
+            'headcount': len(workers),
+            'total_hours': round(total_hours, 2),
+            'still_on_site': still_on_site,
+            'foreman': foreman,
+            'workers': workers,
+        })
+    except Exception as e:
+        logging.error(f"GET /api/projects/{project_code}/on-site: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/projects/<project_code>/assign', methods=['POST'])
 def api_project_assign(project_code):
     """Assign an existing worker to a project. Body: {employee_id, role_on_project}."""
