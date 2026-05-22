@@ -680,6 +680,41 @@ def update_rfi(rfi_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/rfis/<rfi_id>/render', methods=['GET'])
+def render_rfi(rfi_id):
+    """Render the formal RFI doc (Phase 2E) in the DCR design language.
+
+    Returns the standalone HTML for the operator to send to the architect/
+    EOR/owner's rep. Same print contract as the DCR — @page Letter @
+    0.4in margins, sections never split, headings never strand. Browser
+    Ctrl+P -> Save as PDF gives a clean, paginated multi-page document.
+    """
+    from render_rfi_html import render_rfi_html
+    try:
+        conn = db()
+        try:
+            row = conn.execute(
+                "SELECT * FROM rfi_log WHERE rfi_number = ?", (rfi_id,)
+            ).fetchone()
+            if not row:
+                conn.close()
+                return jsonify({"error": "RFI not found"}), 404
+            rfi = _rfi_row_to_dict(row, date.today().isoformat())
+            project_row = conn.execute(
+                "SELECT * FROM projects WHERE project_code = ?",
+                (rfi.get('project_code'),),
+            ).fetchone()
+            project = dict(project_row) if project_row else {}
+        finally:
+            conn.close()
+        html = render_rfi_html(rfi, project)
+        from flask import Response
+        return Response(html, mimetype='text/html; charset=utf-8')
+    except Exception as e:
+        logging.error(f"GET /api/rfis/{rfi_id}/render: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/rfis/<rfi_id>', methods=['DELETE'])
 def delete_rfi(rfi_id):
     """Hard-delete an RFI by rfi_number. Used by the register's Delete
