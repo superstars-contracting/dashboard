@@ -1193,6 +1193,17 @@ applyLanguage();
   ppBg.addEventListener('click', closeProfile);
 
   async function openProfile(employeeId) {
+    // WF-2: clear the face photo INSTANTLY — synchronously, before any
+    // await — so switching from worker A's panel to worker B's row never
+    // shows A's photo lingering while B's loadProfile() is in-flight. The
+    // ?v=Date.now() cache-bust on the new image masked this before:
+    // the <img> kept rendering the stale cached pixels until the new
+    // request finished, briefly flashing the prior worker. Now we drop
+    // src + show the placeholder, then loadProfile() repopulates with
+    // the new worker's face_image_path.
+    if (typeof renderFacePhoto === 'function') {
+      renderFacePhoto(null);
+    }
     currentEmployeeId = employeeId;
     ppBg.style.display = 'block';
     ppPanel.style.display = 'block';
