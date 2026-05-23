@@ -3238,7 +3238,16 @@ def next_employee_id():
 
 @app.route('/api/workers/create', methods=['POST'])
 def api_worker_create():
-    """Create a new worker record + worker folder. Returns the new employee_id + folder path."""
+    """Create a new worker record + worker folder. Returns the new employee_id,
+    auto-assigned worker_id (W-####), and folder path.
+
+    WF-1 fix: every new onboard now allocates the next sequential W-####
+    via worker_id.assign_worker_id (same allocator used by /api/employees
+    POST + bulk CSV import — single source of truth). Before this fix the
+    INSERT here omitted the worker_id column entirely, leaving every
+    post-baseline worker with NULL and silently breaking the DCR roster /
+    workforce list / credentials downstream."""
+    from worker_id import assign_worker_id
     try:
         data = request.get_json(silent=True) or {}
         name = (data.get("name") or "").strip()
@@ -3252,15 +3261,18 @@ def api_worker_create():
         (folder / "certs").mkdir(parents=True, exist_ok=True)
 
         conn = db()
+        # Allocate the next W-#### inside the transaction so concurrent
+        # onboards can't race (UNIQUE index on worker_id catches stragglers).
+        worker_id = assign_worker_id(conn)
         # Try INSERT — fails silently if employee_id already exists
         cursor = conn.execute(
             """INSERT OR IGNORE INTO employees
-               (employee_id, name, trade, dob, phone, email,
+               (employee_id, worker_id, name, trade, dob, phone, email,
                 emergency_contact_name, emergency_contact_phone, emergency_contact_relation,
                 language, hire_date, pin, folder_path, intake_status)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                employee_id, name, data.get("trade"),
+                employee_id, worker_id, name, data.get("trade"),
                 data.get("dob"), data.get("phone"), data.get("email"),
                 data.get("emergency_contact_name"), data.get("emergency_contact_phone"),
                 data.get("emergency_contact_relation"),
