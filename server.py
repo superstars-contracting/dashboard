@@ -4847,7 +4847,14 @@ def fetch_open_meteo_weather(lat, lng, date_str=None):
         params["current"] = "temperature_2m,wind_speed_10m,wind_direction_10m,weather_code"
 
     url = endpoint + "?" + urllib.parse.urlencode(params)
-    with urllib.request.urlopen(url, timeout=10) as resp:
+    # 5s ceiling — fail fast when Open-Meteo is unreachable. The DCR
+    # aggregator catches the timeout and degrades to source='unavailable'
+    # (the UI renders "Weather data unavailable for this date"). At 10s
+    # the smoke + the operator both waited a full 10s on every backdated
+    # DCR during a provider outage; 5s is more than enough for a healthy
+    # response (~200-500ms typical) and tight enough that the aggregator
+    # stays comfortably inside the smoke's 15s ceiling.
+    with urllib.request.urlopen(url, timeout=5) as resp:
         data = json.loads(resp.read().decode("utf-8"))
 
     cur = data.get("current", {}) or {}
