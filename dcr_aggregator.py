@@ -95,8 +95,17 @@ def aggregate_dcr(project_code, date_str, audience='internal'):
         raise KeyError(f"Unknown project_code: {project_code}")
     proj = dict(proj_row)
 
-    address_parts = [p for p in [proj.get('address'), proj.get('city_zip')] if p]
-    address = ', '.join(address_parts)
+    # DCR-1: build a deduped one-line address. If projects.address already
+    # contains city_zip (e.g. older rows store the full address on the
+    # street-line field), don't append it a second time. Match is case-
+    # insensitive substring so a "Bronx, NY 10454" / "BRONX, NY 10454"
+    # mismatch still de-dupes. Also collapses any "X, X" residue.
+    addr = (proj.get('address') or '').strip()
+    czip = (proj.get('city_zip') or '').strip()
+    if addr and czip and czip.lower() in addr.lower():
+        address = addr
+    else:
+        address = ', '.join([p for p in [addr, czip] if p])
 
     warnings = []
     target = datetime.strptime(date_str, '%Y-%m-%d').date()
