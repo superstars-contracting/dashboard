@@ -1332,17 +1332,34 @@
             populateLaborAddDropdown();
           }
 
+          // DCR-5/6: race-guard counter. Every loadDcr call bumps
+          // _loadDcrSeq; the local copy captured at the top of each call
+          // is compared against the latest counter after the fetch lands.
+          // If a newer loadDcr started while this one was in flight (the
+          // operator hit New / Cancel / changed dates), we DROP the stale
+          // response so it can't paint the prior date's photos + labor
+          // onto the new view. This is the root cause of the intermittent
+          // "previous DCR's photos / sign-ins carried over" report.
+          let _loadDcrSeq = 0;
+
           // 10s ceiling on the aggregator fetch — better to surface an error
           // toast than leave the operator staring at "Loading…" forever (#106).
           // AbortController fires after the timeout; the catch sets a clear
           // status. Without this, a server hang would silently brick the form.
           async function loadDcr(dateStr) {
+            const seq = ++_loadDcrSeq;
             setStatus('Loading…', '#76777E');
             const ctrl = new AbortController();
             const timer = setTimeout(() => ctrl.abort(), 10000);
             try {
               const url = '/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/daily/' + encodeURIComponent(dateStr) + '?audience=internal';
               const resp = await fetch(url, {signal: ctrl.signal}).then(r => r.json());
+              // DCR-5/6: drop stale responses. If the operator clicked
+              // Cancel / New / changed the date while this fetch was in
+              // flight, _loadDcrSeq has advanced and a newer loadDcr is
+              // already painting. Returning here prevents the prior date's
+              // photos + labor from leaking into the new view.
+              if (seq !== _loadDcrSeq) return;
               if (resp && resp.error) {
                 setStatus('Error: ' + resp.error, '#B11E2E');
                 return;
@@ -1910,6 +1927,15 @@
           // inputs, issue status, and optionally resets the date + auto-fill.
           function clearDcrFormState(opts) {
             opts = opts || {};
+            // DCR-5/6: cancel any in-flight loadDcr first. The seq bump
+            // makes any pending response drop on arrival (see loadDcr's
+            // race guard) so a stale response can't repaint the just-
+            // cleared photo grid + labor table with the prior date's
+            // data. Without this, the "Cancel → New DCR shows previous
+            // sign-ins/photos" intermittency happens whenever the
+            // previous loadDcr hadn't finished yet.
+            _loadDcrSeq++;
+
             // Operator-entry rows (all sections: work, deliveries, equipment,
             // toolbox, safety, issues, inspections, visitors).
             document.querySelectorAll('[data-dcr-rows]').forEach(c => { c.innerHTML = ''; });
@@ -1932,17 +1958,41 @@
             if (photoDesc) photoDesc.value = '';
             const photoFile = document.getElementById('dcr-photo-input');
             if (photoFile) photoFile.value = '';
+            // DCR-5/6: synchronously wipe every read-only renderer too —
+            // labor table, summary, project info, weather. loadDcr will
+            // repaint them on the next response, but until it does the
+            // operator should see a CLEAN slate, not the prior date's
+            // rows still on screen.
+            const laborTbody = document.getElementById('dcr-labor-tbody');
+            if (laborTbody) laborTbody.innerHTML = '';
+            const laborSummary = document.getElementById('dcr-labor-summary');
+            if (laborSummary) laborSummary.textContent = '';
+            const projInfo = document.getElementById('dcr-project-info');
+            if (projInfo) projInfo.innerHTML = '';
+            const weather = document.getElementById('dcr-weather');
+            if (weather) weather.innerHTML = '';
+            // DCR-5/6: also wipe the labor add-form's in-progress inputs.
+            // The "fast multi-add" convenience (keep time-in/out between
+            // sign-ins) only makes sense WITHIN one DCR session — across
+            // Cancel/New the operator wants a true blank slate.
+            const laborWorker = document.getElementById('dcr-labor-add-worker');
+            if (laborWorker) laborWorker.value = '';
+            const laborIn = document.getElementById('dcr-labor-add-in');
+            if (laborIn) laborIn.value = '';
+            const laborOut = document.getElementById('dcr-labor-add-out');
+            if (laborOut) laborOut.value = '';
+            const laborStatus = document.getElementById('dcr-labor-add-status');
+            if (laborStatus) { laborStatus.textContent = ''; laborStatus.style.color = '#76777E'; }
+            // Also reset the labor exclusion set — the dropdown can't
+            // filter against rows that no longer exist on screen.
+            if (typeof currentLaborEmployeeIds !== 'undefined') {
+              currentLaborEmployeeIds = new Set();
+            }
             // Issue status line — clear unless caller wants to keep a message.
             if (!opts.preserveStatus) {
               const issueStatus = document.getElementById('dcr-issue-status');
               if (issueStatus) { issueStatus.textContent = ''; issueStatus.style.color = '#76777E'; }
             }
-            // Reset the manual-labor-add controls so a fresh DCR doesn't show
-            // stale "Added ✓" status or a previously-picked worker.
-            const laborWorker = document.getElementById('dcr-labor-add-worker');
-            if (laborWorker) laborWorker.value = '';
-            const laborStatus = document.getElementById('dcr-labor-add-status');
-            if (laborStatus) { laborStatus.textContent = ''; laborStatus.style.color = '#76777E'; }
             // Issued banner — caller decides (issueDcr success keeps it visible
             // briefly so the operator sees the confirmation).
             if (!opts.preserveBanner) {
