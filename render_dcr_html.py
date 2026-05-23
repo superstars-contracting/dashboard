@@ -166,6 +166,7 @@ class DCRHTMLRenderer:
             self._section_signoff(),
             '</div>',  # /wrap
             self._footer(),
+            self._lightbox_block(),
             self._fit_one_page_script(),
             '</body></html>',
         ]
@@ -702,7 +703,16 @@ class DCRHTMLRenderer:
             if desc: cap.append(_esc(desc))
             cap_html = ' — '.join(cap) if cap else '&nbsp;'
             if url:
-                tiles.append(f'<div class="photo"><img src="{_esc(url)}" alt="{_esc(loc or "site photo")}"><div class="cap">{cap_html}</div></div>')
+                # DCR-3: each photo's <img> carries data-zoom-src so the
+                # rendered/issued DCR's inline lightbox script (injected
+                # in _head's @media print fence) opens it full-screen on
+                # click. data-zoom-src is ignored by the print stylesheet
+                # so paginated PDFs are unchanged.
+                tiles.append(
+                    f'<div class="photo"><img src="{_esc(url)}" '
+                    f'data-zoom-src="{_esc(url)}" alt="{_esc(loc or "site photo")}">'
+                    f'<div class="cap">{cap_html}</div></div>'
+                )
             else:
                 tiles.append(f'<div class="photo"><div class="ph">[ Site photo ]</div><div class="cap">{cap_html}</div></div>')
         meta = f'{len(photos)} attached'
@@ -737,6 +747,46 @@ class DCRHTMLRenderer:
 </div>"""
 
     # ---------- helpers ----------
+
+    def _lightbox_block(self) -> str:
+        """Inline image lightbox for the rendered/issued DCR (DCR-3).
+
+        Each photo's <img> in _section_photos carries a `data-zoom-src`
+        attribute; clicking opens the image full-screen. Esc or click on
+        the overlay dismisses. Self-contained — no external script, no
+        coupling to the dashboard's lightbox.
+
+        Print-safe: the overlay starts at display:none and the @media
+        print stylesheet keeps it that way, so PDF generation is
+        untouched. cursor:zoom-in on the photo <img> is screen-only
+        (print stylesheet resets cursor).
+        """
+        return """
+<div id="dcr-img-lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9000;align-items:center;justify-content:center;cursor:zoom-out;">
+  <img id="dcr-img-lightbox-content" src="" alt="" style="max-width:92vw;max-height:92vh;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.5);">
+</div>
+<style>
+  .photo img { cursor:zoom-in; }
+  @media print { #dcr-img-lightbox { display:none !important; } .photo img { cursor:default; } }
+</style>
+<script>
+(function(){
+  var lb  = document.getElementById('dcr-img-lightbox');
+  var img = document.getElementById('dcr-img-lightbox-content');
+  if (!lb || !img) return;
+  function open(src) { if (!src) return; img.src = src; lb.style.display = 'flex'; }
+  function close() { lb.style.display = 'none'; img.src = ''; }
+  lb.addEventListener('click', close);
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && lb.style.display !== 'none') close(); });
+  document.addEventListener('click', function(e) {
+    var t = e.target;
+    if (!t || !t.closest) return;
+    var z = t.closest('[data-zoom-src]');
+    if (z) { e.preventDefault(); e.stopPropagation(); open(z.getAttribute('data-zoom-src')); }
+  });
+})();
+</script>
+"""
 
     def _fit_one_page_script(self) -> str:
         """Print-time JS: if the report is JUST barely over one page (≤1.25×),

@@ -1746,7 +1746,15 @@
                   // Server URL is the canonical source — replace the blob
                   // src so revoking the local blob URL doesn't break it.
                   const img = tile.querySelector('[data-tile-img]');
-                  if (img && json.data.url) img.src = json.data.url;
+                  if (img && json.data.url) {
+                    img.src = json.data.url;
+                    // DCR-3: saved tiles get data-zoom-src so the lightbox
+                    // delegation in the global handler picks them up.
+                    // Draft tiles (blob URLs, still editable) intentionally
+                    // don't — those previews are mid-edit, not final.
+                    img.setAttribute('data-zoom-src', json.data.url);
+                    img.style.cursor = 'zoom-in';
+                  }
                   try { URL.revokeObjectURL(tile._photo.blobUrl); } catch (_) {}
                   tile._photo = {file: null, blobUrl: null, saved: true, row_id: json.data.id};
                   const locText = locVal || json.data.location || '';
@@ -3508,6 +3516,50 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     }
   });
 });
+
+// =====================================================================
+// DCR-3: shared image lightbox (zoom). Matches the worker-ID lightbox
+// pattern on the company console. Click any DCR photo (entry view OR
+// rendered) -> full-screen overlay; click anywhere to dismiss.
+// =====================================================================
+(function() {
+  if (document.getElementById('img-lightbox')) return;
+  const lb = document.createElement('div');
+  lb.id = 'img-lightbox';
+  lb.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9000;align-items:center;justify-content:center;cursor:zoom-out;';
+  lb.innerHTML = '<img id="img-lightbox-content" src="" style="max-width:92vw;max-height:92vh;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.5);" alt="">';
+  document.body.appendChild(lb);
+  lb.addEventListener('click', () => window.closeLightbox());
+  window.showLightbox = function(url) {
+    if (!url) return;
+    const el = document.getElementById('img-lightbox-content');
+    if (el) el.src = url;
+    lb.style.display = 'flex';
+  };
+  window.closeLightbox = function() {
+    lb.style.display = 'none';
+    const el = document.getElementById('img-lightbox-content');
+    if (el) el.src = '';
+  };
+  // Esc dismisses.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && lb.style.display !== 'none') window.closeLightbox();
+  });
+  // Event delegation: any <img data-zoom-src="..."> tile inside the DCR
+  // photo grid opens the lightbox. Tiles in the SAVED state set
+  // data-zoom-src; draft tiles intentionally don't (the blob URL is
+  // mid-edit, not the final image the operator should preview).
+  document.addEventListener('click', (e) => {
+    const tgt = e.target;
+    if (!(tgt instanceof Element)) return;
+    const zoomEl = tgt.closest('[data-zoom-src]');
+    if (zoomEl) {
+      e.preventDefault();
+      e.stopPropagation();
+      window.showLightbox(zoomEl.getAttribute('data-zoom-src'));
+    }
+  });
+})();
 </script>
 
 </body>
