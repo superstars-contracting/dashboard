@@ -4165,12 +4165,23 @@ def api_employee_face_photo_delete(employee_id):
 
 @app.route('/api/cert-types', methods=['GET'])
 def api_cert_types():
-    """List all cert types for autocomplete."""
+    """List all cert types for autocomplete + the Cert Library UI.
+
+    Returns category + reference_url so the company-console grouped
+    library view can render section headers per category and a
+    DOB-PDF link per row. Non-DOB entries (CPR, OSHA-30) have a
+    NULL reference_url and render without a link.
+
+    Order: category, then name — natural reading order for the
+    grouped table; consumers that need a different sort can re-sort
+    client-side.
+    """
     try:
         conn = db()
         rows = conn.execute(
-            "SELECT cert_type_id, name, description, validity_months, is_cof_prerequisite "
-            "FROM cert_types ORDER BY name"
+            "SELECT cert_type_id, name, description, validity_months, "
+            "       is_cof_prerequisite, category, reference_url "
+            "FROM cert_types ORDER BY category, name"
         ).fetchall()
         conn.close()
         return response_wrapper(rows_to_dicts(rows))

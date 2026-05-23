@@ -329,7 +329,7 @@
       <div class="h2-sub" data-i18n="p-cert-lib-sub">Catalog of cert types the system recognizes. New ones get added automatically when workers bring in unfamiliar certs.</div>
       <table class="roster">
         <thead>
-          <tr><th data-i18n="col-code">Code</th><th data-i18n="col-name">Name</th><th data-i18n="col-validity">Validity</th><th data-i18n="col-cof-prereq">CoF Prereq</th></tr>
+          <tr><th data-i18n="col-code">Code</th><th data-i18n="col-name">Name</th><th data-i18n="col-cof-prereq">CoF Prereq</th><th data-i18n="col-reference">Reference</th></tr>
         </thead>
         <tbody id="cert-lib-tbody">
           <tr><td colspan="4" style="padding:20px;text-align:center;color:#76777E;" data-i18n="loading-library">Loading library…</td></tr>
@@ -649,6 +649,7 @@ const I18N = {
     'col-code': 'Code',
     'col-validity': 'Validity',
     'col-cof-prereq': 'CoF Prereq',
+    'col-reference': 'Reference',
     'loading-roster': 'Loading roster…',
     'loading-library': 'Loading library…',
     'p-cert-health-title': 'Certification Health',
@@ -740,6 +741,7 @@ const I18N = {
     'col-code': 'Código',
     'col-validity': 'Validez',
     'col-cof-prereq': 'Req. CoF',
+    'col-reference': 'Referencia',
     'loading-roster': 'Cargando lista…',
     'loading-library': 'Cargando catálogo…',
     'p-cert-health-title': 'Estado de Certificaciones',
@@ -1161,15 +1163,33 @@ applyLanguage();
       const rows = (resp && resp.data) || [];
       const tbody = $('#cert-lib-tbody');
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="4" style="padding:20px;text-align:center;color:#76777E;">No cert types. Run apply_worker_intake_schema.py to seed the library.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" style="padding:20px;text-align:center;color:#76777E;">No cert types. Run apply_cert_library_replace.py to seed the library.</td></tr>';
         return;
       }
-      tbody.innerHTML = rows.map(c => `<tr>
-        <td style="font-family:monospace;font-size:11px;">${c.cert_type_id}</td>
-        <td style="font-weight:600;">${c.name}</td>
-        <td style="font-size:11px;color:#76777E;">${c.validity_months ? c.validity_months + ' mo' : '—'}</td>
-        <td>${c.is_cof_prerequisite ? '<span class="badge-pill ok">Yes</span>' : '<span style="color:#76777E;">—</span>'}</td>
-      </tr>`).join('');
+      // Group by category — the server returns ORDER BY category, name, so
+      // rows are already sorted; just emit a section header each time the
+      // category changes. The reference link opens the DOB-published PDF
+      // for the course; non-DOB rows (CPR, OSHA-30) show an em-dash.
+      const escAttr = (s) => esc(s);
+      let html = '';
+      let prevCat = null;
+      for (const c of rows) {
+        const cat = c.category || 'Uncategorized';
+        if (cat !== prevCat) {
+          html += `<tr><td colspan="4" style="background:#FAF7F1;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#B11E2E;border-top:2px solid #B11E2E;">${esc(cat)}</td></tr>`;
+          prevCat = cat;
+        }
+        const refCell = c.reference_url
+          ? `<a href="${escAttr(c.reference_url)}" target="_blank" rel="noopener" style="color:#B11E2E;font-weight:600;text-decoration:none;">DOB PDF →</a>`
+          : `<span style="color:#76777E;">—</span>`;
+        html += `<tr>
+          <td style="font-family:monospace;font-size:11px;">${esc(c.cert_type_id)}</td>
+          <td style="font-weight:600;">${esc(c.name)}</td>
+          <td>${c.is_cof_prerequisite ? '<span class="badge-pill ok">Yes</span>' : '<span style="color:#76777E;">—</span>'}</td>
+          <td style="font-size:11px;">${refCell}</td>
+        </tr>`;
+      }
+      tbody.innerHTML = html;
     } catch (e) { console.warn(e); }
   }
 
