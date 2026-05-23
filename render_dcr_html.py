@@ -523,12 +523,12 @@ class DCRHTMLRenderer:
   </table></div>
 </div>"""
 
-    # ---------- 5. Equipment on Site ----------
+    # ---------- 5. Equipment Delivered to Site ----------
 
     def _section_equipment(self) -> str:
         equip = self.dcr.get('equipment') or []
         if not equip:
-            return self._sec_empty(5, "Equipment on Site", "", "None.")
+            return self._sec_empty(5, "Equipment Delivered to Site", "", "None.")
         tr = []
         for e in equip:
             label = e.get('equipment_type') or e.get('equipment') or '—'
@@ -539,9 +539,9 @@ class DCRHTMLRenderer:
                 f'<td class="num">{_esc(e.get("hours_used") or "—")}</td></tr>'
             )
         return f"""<div class="sec">
-  <h2><span><span class="n">5</span>Equipment on Site</span></h2>
+  <h2><span><span class="n">5</span>Equipment Delivered to Site</span></h2>
   <div class="body"><table>
-    <thead><tr><th>Equipment</th><th class="num">Hrs</th></tr></thead>
+    <thead><tr><th>Item</th><th class="num">Qty/Hrs</th></tr></thead>
     <tbody>{''.join(tr)}</tbody>
   </table></div>
 </div>"""
