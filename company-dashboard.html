@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <link rel="stylesheet" href="/files/static/fonts/typography.css">
 <script src="/files/static/js/datepicker.js"></script>
+<script src="/files/static/js/timepicker.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Superstars Contracting · Office Console</title>
 <style>
@@ -2587,7 +2588,22 @@ applyLanguage();
     td.style.cursor = 'default';
     const ti = td.querySelector('.hrs-edit-in');
     const to = td.querySelector('.hrs-edit-out');
-    td.querySelector('.hrs-edit-full').addEventListener('click', (e) => { e.stopPropagation(); ti.value = STD_IN; to.value = STD_OUT; });
+    // Replace the native scroll picker with the typed HH:MM + AM/PM
+    // component. The hidden input keeps the canonical 24h "HH:MM" on
+    // .value so the existing save / 8h / clear paths read it unchanged.
+    if (window.SSCTimePicker) {
+      SSCTimePicker.wire(ti);
+      SSCTimePicker.wire(to);
+    }
+    td.querySelector('.hrs-edit-full').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (window.SSCTimePicker) {
+        SSCTimePicker.set(ti, STD_IN);
+        SSCTimePicker.set(to, STD_OUT);
+      } else {
+        ti.value = STD_IN; to.value = STD_OUT;
+      }
+    });
     td.querySelector('.hrs-edit-save').addEventListener('click', async (e) => {
       e.stopPropagation();
       await saveCell(empId, dateStr, sid, ti.value, to.value);

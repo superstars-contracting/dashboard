@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
 <link rel="stylesheet" href="/files/static/fonts/typography.css">
 <script src="/files/static/js/datepicker.js"></script>
+<script src="/files/static/js/timepicker.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Superstars Contracting - Project Console</title>
   <style>
@@ -1979,10 +1980,16 @@
             // Cancel/New the operator wants a true blank slate.
             const laborWorker = document.getElementById('dcr-labor-add-worker');
             if (laborWorker) laborWorker.value = '';
-            const laborIn = document.getElementById('dcr-labor-add-in');
-            if (laborIn) laborIn.value = '';
-            const laborOut = document.getElementById('dcr-labor-add-out');
-            if (laborOut) laborOut.value = '';
+            // Reset both the canonical hidden value AND the visible
+            // SSCTimePicker UI; a bare .value='' would clear the hidden
+            // input but leave the visible HH/MM/AMPM still populated.
+            const _resetTime = (el) => {
+              if (!el) return;
+              if (window.SSCTimePicker) SSCTimePicker.set(el, '');
+              else el.value = '';
+            };
+            _resetTime(document.getElementById('dcr-labor-add-in'));
+            _resetTime(document.getElementById('dcr-labor-add-out'));
             const laborStatus = document.getElementById('dcr-labor-add-status');
             if (laborStatus) { laborStatus.textContent = ''; laborStatus.style.color = '#76777E'; }
             // Also reset the labor exclusion set — the dropdown can't
@@ -2359,6 +2366,17 @@
           function setupLaborManualAdd() {
             const btn = document.getElementById('dcr-labor-add-btn');
             if (!btn) return;
+            // Replace the native time scroll-wheel on the time-in / time-out
+            // inputs with the typed HH:MM + AM/PM component. The picker
+            // mirrors its visible state into the hidden input's .value as
+            // canonical 24h "HH:MM" — consumers below keep reading .value
+            // and the backend keeps receiving the same shape.
+            if (window.SSCTimePicker) {
+              ['dcr-labor-add-in', 'dcr-labor-add-out'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) SSCTimePicker.wire(el);
+              });
+            }
             btn.addEventListener('click', async () => {
               const sel = document.getElementById('dcr-labor-add-worker');
               const inEl = document.getElementById('dcr-labor-add-in');
