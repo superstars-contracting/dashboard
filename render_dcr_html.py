@@ -83,13 +83,32 @@ def _fmt_long_date(iso: str) -> str:
 
 
 def _fmt_short_date(iso: str) -> str:
-    """'2026-05-04' -> 'Mon · 05/04/2026'. Falls back to raw on bad input."""
+    """'2026-05-04' -> 'Mon · 05-04-2026'. MM-DD-YYYY is the operator's
+    preferred read form (per the display-format rule); the leading day-of-week
+    abbreviation stays for the at-a-glance "what day was that?" check on
+    rendered DCRs. Falls back to raw on bad input."""
     if not iso:
         return '—'
     try:
         d = datetime.strptime(iso, '%Y-%m-%d').date()
         wkd = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d.weekday()]
-        return f"{wkd} · {d.strftime('%m/%d/%Y')}"
+        return f"{wkd} · {d.strftime('%m-%d-%Y')}"
+    except (ValueError, TypeError):
+        return str(iso)
+
+
+def _fmt_mdy(iso: str) -> str:
+    """'2026-05-04' (or 'YYYY-MM-DDTHH:MM:SS') -> '05-04-2026'. Date-only
+    MM-DD-YYYY display formatter — the single source of truth on the
+    Python side, mirroring SSCDatePicker.fmtMDY on the client. The
+    "Issued at" header path drops the time per the display rule; the
+    full datetime stays stored on the report for audit."""
+    if not iso:
+        return ''
+    s = str(iso)[:10]
+    try:
+        d = datetime.strptime(s, '%Y-%m-%d').date()
+        return d.strftime('%m-%d-%Y')
     except (ValueError, TypeError):
         return str(iso)
 
@@ -354,7 +373,7 @@ class DCRHTMLRenderer:
   <div class="docmeta">
     <div class="doctype">{_esc(doctype)}</div>
     <div class="rid">{_esc(display_id)}</div>
-    <div class="rid">{_esc(_fmt_long_date(proj.get('date')))}</div>
+    <div class="rid">{_esc(_fmt_mdy(proj.get('date')))}</div>
   </div>
 </div>
 <div class="redbar"></div>"""
@@ -373,7 +392,7 @@ class DCRHTMLRenderer:
         code = _esc(proj.get('code') or '')
         return f"""{warn_html}<div class="foot">
   <div><span style="color:var(--red);">★</span> Superstars Contracting Inc. · Facade Restoration · New York City</div>
-  <div>Project {code} · Generated {_esc(datetime.now().strftime('%Y-%m-%d %H:%M'))}</div>
+  <div>Project {code} · Generated {_esc(datetime.now().strftime('%m-%d-%Y %H:%M'))}</div>
 </div></div>"""
 
     # ---------- 1. Project Information ----------

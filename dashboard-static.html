@@ -1524,7 +1524,9 @@
 
           function getCurrentDate() {
             const el = document.getElementById('dcr-date');
-            return (el && el.value) || todayLocal();
+            // Canonical YYYY-MM-DD (.value is MM-DD-YYYY post-wiring).
+            const iso = (el && window.SSCDatePicker) ? SSCDatePicker.getISO(el) : (el && el.value);
+            return iso || todayLocal();
           }
 
           function buildFieldHTML(f) {
@@ -2003,8 +2005,10 @@
             if (!opts.preserveDate) {
               const dateInput = document.getElementById('dcr-date');
               if (dateInput) {
-                dateInput.value = todayLocal();
-                loadDcr(dateInput.value);
+                const iso = todayLocal();
+                if (window.SSCDatePicker) SSCDatePicker.setISO(dateInput, iso);
+                else dateInput.value = iso;
+                loadDcr(iso);
               }
             }
           }
@@ -2033,11 +2037,20 @@
             const deleteBtn = (seq !== undefined && seq !== null)
               ? '<button type="button" data-delete-seq="' + esc(seq) + '" data-display-id="' + esc(displayId) + '" data-report-date="' + esc(reportDate) + '" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 10px;border:1px solid #B11E2E;border-radius:4px;background:white;color:#B11E2E;cursor:pointer;margin-left:8px;">Delete</button>'
               : '';
+            // Display dates as MM-DD-YYYY everywhere (the operator's preferred
+            // read form). The "Issued At" column drops the HH:MM:SS — the
+            // full datetime stays stored on the row for audit, only the
+            // rendered surface is date-only. fmtDate lives in a sibling
+            // IIFE so call the shared SSCDatePicker.fmtMDY directly.
+            const _fmt = (s) => (window.SSCDatePicker ? (SSCDatePicker.fmtMDY(s) || '—') : (String(s || '').slice(0, 10) || '—'));
+            const reportDateDisplay = reportDate ? _fmt(reportDate) : '—';
+            const issuedAtRaw = r.updated_at || r.created_at;
+            const issuedAtDisplay = issuedAtRaw ? _fmt(issuedAtRaw) : '—';
             return '<tr>' +
               '<td style="font-family:\'Archivo\', -apple-system, BlinkMacSystemFont, \'Helvetica Neue\', Helvetica, Arial, sans-serif;font-size:13px;font-weight:600;">' + esc(displayId) + '</td>' +
-              '<td>' + esc(reportDate || '—') + '</td>' +
+              '<td>' + esc(reportDateDisplay) + '</td>' +
               '<td><span style="padding:3px 8px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;background:' + statusColor + ';color:white;">' + esc(r.status || '—') + '</span></td>' +
-              '<td style="font-size:12px;color:#76777E;">' + esc(r.updated_at || r.created_at || '—') + '</td>' +
+              '<td style="font-size:12px;color:#76777E;">' + esc(issuedAtDisplay) + '</td>' +
               '<td style="white-space:nowrap;">' + viewLink + editBtn + deleteBtn + '</td>' +
             '</tr>';
           }
@@ -2092,8 +2105,12 @@
             }
             const params = new URLSearchParams();
             params.set('report_type', 'DCR');
-            if (fromInput && fromInput.value) params.set('from_date', fromInput.value);
-            if (toInput && toInput.value) params.set('to_date', toInput.value);
+            // Date inputs are wired by SSCDatePicker — read canonical
+            // YYYY-MM-DD via getISO (the visible .value is MM-DD-YYYY).
+            const fromIso = window.SSCDatePicker ? SSCDatePicker.getISO(fromInput) : (fromInput && fromInput.value);
+            const toIso = window.SSCDatePicker ? SSCDatePicker.getISO(toInput) : (toInput && toInput.value);
+            if (fromIso) params.set('from_date', fromIso);
+            if (toIso) params.set('to_date', toIso);
             if (status) { status.textContent = 'Loading…'; status.style.color = '#76777E'; }
             // 10s ceiling — same reasoning as loadDcr (#106): never hang on "Loading…".
             const ctrl = new AbortController();
@@ -2124,12 +2141,15 @@
             const toInput = document.getElementById('dcr-filter-to');
             const newBtn = document.getElementById('dcr-new-btn');
             const applyBtn = document.getElementById('dcr-filter-apply');
-            if (fromInput && !fromInput.value) {
-              fromInput.value = todayLocal(-30);
-            }
-            if (toInput && !toInput.value) {
-              toInput.value = todayLocal();
-            }
+            // Defaults: last 30 days. Seed via setISO so the visible value
+            // is MM-DD-YYYY while dataset.iso carries the canonical
+            // YYYY-MM-DD for getISO callers.
+            const _setSeed = (el, iso) => {
+              if (window.SSCDatePicker) SSCDatePicker.setISO(el, iso);
+              else if (el) el.value = iso;
+            };
+            if (fromInput && !fromInput.value) _setSeed(fromInput, todayLocal(-30));
+            if (toInput && !toInput.value) _setSeed(toInput, todayLocal());
             if (applyBtn) applyBtn.addEventListener('click', () => loadArchive());
             if (newBtn) newBtn.addEventListener('click', () => showEntry());
           }
@@ -2237,7 +2257,11 @@
             // want it pointed at reportDate).
             clearDcrFormState({preserveDate: true, preserveBanner: true});
             const dateInput = document.getElementById('dcr-date');
-            if (dateInput) dateInput.value = reportDate;
+            if (dateInput) {
+              // reportDate is canonical YYYY-MM-DD from the archive row.
+              if (window.SSCDatePicker) SSCDatePicker.setISO(dateInput, reportDate);
+              else dateInput.value = reportDate;
+            }
             // Set re-issue context + banner
             _reissueContext = {seq, displayId, date: reportDate};
             const banner = document.getElementById('dcr-reissue-banner');
@@ -2421,10 +2445,15 @@
               // Local today — not UTC. Same fix as the #74 clearDcrFormState
               // path; this init runs once on page load (its sibling code
               // path) and was missed in the first sweep.
+              // Note: wire() runs AFTER this seeding, so it'll promote the
+              // YYYY-MM-DD .value into (dataset.iso, MM-DD-YYYY .value).
               if (!dateInput.value) dateInput.value = todayLocal();
-              dateInput.addEventListener('change', () => loadDcr(dateInput.value));
+              const _dateISO = () => window.SSCDatePicker
+                ? SSCDatePicker.getISO(dateInput)
+                : dateInput.value;
+              dateInput.addEventListener('change', () => loadDcr(_dateISO()));
               const refreshBtn = document.getElementById('dcr-refresh');
-              if (refreshBtn) refreshBtn.addEventListener('click', () => loadDcr(dateInput.value));
+              if (refreshBtn) refreshBtn.addEventListener('click', () => loadDcr(_dateISO()));
               const cancelBtn = document.getElementById('dcr-cancel');
               if (cancelBtn) cancelBtn.addEventListener('click', () => cancelDcr());
             }
@@ -2950,18 +2979,25 @@ document.querySelectorAll('.nav-link').forEach(link => {
   if (saveBtn) saveBtn.addEventListener('click', async () => {
     const name = document.getElementById('in-name').value.trim();
     if (!name) { alert('Name is required'); return; }
+    // Date inputs are wired by SSCDatePicker — read canonical YYYY-MM-DD
+    // via getISO (the visible .value is MM-DD-YYYY).
+    const _v = (id) => document.getElementById(id).value;
+    const _iso = (id) => {
+      const el = document.getElementById(id);
+      return window.SSCDatePicker ? SSCDatePicker.getISO(el) : (el && el.value);
+    };
     const payload = {
       name,
-      dob: document.getElementById('in-dob').value || null,
-      trade: document.getElementById('in-trade').value || null,
-      language: document.getElementById('in-language').value || null,
-      phone: document.getElementById('in-phone').value || null,
-      email: document.getElementById('in-email').value || null,
-      emergency_contact_name: document.getElementById('in-ec-name').value || null,
-      emergency_contact_phone: document.getElementById('in-ec-phone').value || null,
-      emergency_contact_relation: document.getElementById('in-ec-relation').value || null,
-      hire_date: document.getElementById('in-hire-date').value || null,
-      pin: document.getElementById('in-pin').value || null,
+      dob: _iso('in-dob') || null,
+      trade: _v('in-trade') || null,
+      language: _v('in-language') || null,
+      phone: _v('in-phone') || null,
+      email: _v('in-email') || null,
+      emergency_contact_name: _v('in-ec-name') || null,
+      emergency_contact_phone: _v('in-ec-phone') || null,
+      emergency_contact_relation: _v('in-ec-relation') || null,
+      hire_date: _iso('in-hire-date') || null,
+      pin: _v('in-pin') || null,
     };
     try {
       const resp = await fetch('/api/workers/create', {
@@ -3177,10 +3213,15 @@ document.querySelectorAll('.nav-link').forEach(link => {
     if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'});
   };
 
+  // MM-DD-YYYY display formatter — single source of truth (delegates to
+  // SSCDatePicker.fmtMDY) so the date format is consistent everywhere and
+  // there's one place to change it. Drops any time portion: an "Issued at"
+  // timestamp ('2026-05-21 14:33:09') renders as '05-21-2026'. Returns '—'
+  // for empty/missing input so the table column never collapses.
   function fmtDate(s) {
     if (!s) return '—';
-    const d = (s || '').slice(0, 10);
-    return d || '—';
+    if (window.SSCDatePicker) return SSCDatePicker.fmtMDY(s) || '—';
+    return (String(s).slice(0, 10)) || '—';
   }
 
   function fmtMoney(n) {
@@ -3448,8 +3489,8 @@ document.querySelectorAll('.nav-link').forEach(link => {
       '<td style="max-width:320px;">' + subjectCell + '</td>' +
       '<td style="font-size:12px;">' + loc + '</td>' +
       '<td style="font-size:12px;">' + esc(r.sent_to || '—') + '</td>' +
-      '<td style="font-size:12px;color:#76777E;">' + esc(r.date_submitted || '—') + '</td>' +
-      '<td style="font-size:12px;color:#76777E;">' + esc(r.date_response_required || '—') + '</td>' +
+      '<td style="font-size:12px;color:#76777E;">' + esc(fmtDate(r.date_submitted)) + '</td>' +
+      '<td style="font-size:12px;color:#76777E;">' + esc(fmtDate(r.date_response_required)) + '</td>' +
       '<td style="font-size:12px;color:#76777E;">' + turnaround + '</td>' +
       '<td>' + statusBadge(r.status_derived || 'Open') + '</td>' +
       '<td style="white-space:nowrap;">' + docLink + delBtn + '</td>' +

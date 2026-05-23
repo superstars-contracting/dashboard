@@ -41,22 +41,26 @@ def _esc(v) -> str:
 
 
 def _fmt_short(iso: str) -> str:
+    # 'Mon · MM-DD-YYYY' — MM-DD-YYYY is the operator's preferred read form
+    # (matches the dashboard / DCR / cert surfaces); the weekday abbreviation
+    # is kept for at-a-glance "what day was that?" on rendered RFIs.
     if not iso:
         return '—'
     try:
         d = datetime.strptime(iso, '%Y-%m-%d').date()
         wkd = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d.weekday()]
-        return f"{wkd} · {d.strftime('%m/%d/%Y')}"
+        return f"{wkd} · {d.strftime('%m-%d-%Y')}"
     except (ValueError, TypeError):
         return str(iso)
 
 
 def _fmt_long(iso: str) -> str:
+    # MM-DD-YYYY date display — same shared form as _fmt_mdy in render_dcr_html.
     if not iso:
         return '—'
     try:
         d = datetime.strptime(iso, '%Y-%m-%d').date()
-        return f"{MONTHS_LONG[d.month-1]} {d.day}, {d.year}"
+        return d.strftime('%m-%d-%Y')
     except (ValueError, TypeError):
         return str(iso)
 

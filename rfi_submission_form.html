@@ -504,6 +504,8 @@
 
     // Wire SSCDatePicker on both date fields. Default date_submitted to
     // local today; leave date_response_required blank — the operator picks.
+    // Seed before wiring; wire() will promote the YYYY-MM-DD .value into
+    // (dataset.iso=YYYY-MM-DD, .value=MM-DD-YYYY).
     document.getElementById('dateSubmitted').value = rfiTodayLocal();
     if (window.SSCDatePicker) {
       SSCDatePicker.wire(document.getElementById('dateSubmitted'));
@@ -557,13 +559,20 @@
 
       // Build the spec-shaped payload. All field names match
       // construction_builds_spec.json rfi_log.fields verbatim.
+      // Date inputs are wired by SSCDatePicker — canonical YYYY-MM-DD lives
+      // on dataset.iso (the visible .value is MM-DD-YYYY). Use getISO so
+      // the spec-shaped payload stays YYYY-MM-DD regardless of display.
+      const _iso = (id) => {
+        const el = document.getElementById(id);
+        return window.SSCDatePicker ? SSCDatePicker.getISO(el) : ((el && el.value || '').trim());
+      };
       const payload = {
         project_code:           PROJECT_CODE,
         subject_title:          document.getElementById('subjectTitle').value.trim(),
         submitted_by:           document.getElementById('submittedBy').value.trim(),
         sent_to:                document.getElementById('sentTo').value.trim(),
-        date_submitted:         document.getElementById('dateSubmitted').value.trim() || rfiTodayLocal(),
-        date_response_required: document.getElementById('dateResponseRequired').value.trim(),
+        date_submitted:         _iso('dateSubmitted') || rfiTodayLocal(),
+        date_response_required: _iso('dateResponseRequired'),
         question_description:   document.getElementById('questionDescription').value.trim(),
         drawing_spec_reference: document.getElementById('drawingSpecReference').value.trim() || null,
         related_documents:      document.getElementById('relatedDocuments').value.trim() || null,
@@ -588,10 +597,11 @@
           const locText = (d.location_unit || d.location_id)
             ? (d.location_unit || '') + (d.location_unit && d.location_id ? ' / ' : '') + (d.location_id || '')
             : '—';
+          const _fmt = (s) => (window.SSCDatePicker ? (SSCDatePicker.fmtMDY(s) || '—') : (s || '—'));
           document.getElementById('modalText').innerHTML =
             '<strong>RFI saved.</strong><br>' +
             '<strong>' + d.rfi_number + '</strong> — ' + (d.subject_title || '') + '<br>' +
-            'Sent to: ' + (d.sent_to || '—') + ' · Response due: ' + (d.date_response_required || '—') + '<br>' +
+            'Sent to: ' + (d.sent_to || '—') + ' · Response due: ' + (d.date_response_required ? _fmt(d.date_response_required) : '—') + '<br>' +
             'Location: ' + locText +
             (d.schedule_impact_flag ? ' · <em style="color:#B11E2E;">Schedule impact</em>' : '') +
             (d.cost_impact_flag ? ' · <em style="color:#B11E2E;">Cost impact</em>' : '');
@@ -616,7 +626,12 @@
 
     document.getElementById('submitAnotherBtn').addEventListener('click', () => {
       form.reset();
-      document.getElementById('dateSubmitted').value = rfiTodayLocal();
+      // Reseed dateSubmitted via setISO so the wired input picks up both
+      // dataset.iso (YYYY-MM-DD) and .value (MM-DD-YYYY display).
+      const _ds = document.getElementById('dateSubmitted');
+      if (window.SSCDatePicker) SSCDatePicker.setISO(_ds, rfiTodayLocal());
+      else _ds.value = rfiTodayLocal();
+      if (window.SSCDatePicker) SSCDatePicker.setISO(document.getElementById('dateResponseRequired'), '');
       document.getElementById('rfiNumber').value = 'auto-assigned on submit';
       modal.classList.remove('active');
     });

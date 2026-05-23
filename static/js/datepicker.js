@@ -112,6 +112,62 @@
     return dt;
   }
 
+  // Display formatter: 'YYYY-MM-DD' or 'YYYY-MM-DDTHH:MM:SS' / 'YYYY-MM-DD HH:MM:SS'
+  // -> 'MM-DD-YYYY'. The date-only output is the operator's preferred read form;
+  // the "Issued at" surfaces drop the time per the display rule. Falls back to
+  // returning the input verbatim if it doesn't look like an ISO date.
+  function fmtMDY(s) {
+    if (s == null || s === '') return '';
+    var str = String(s);
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
+    if (!m) return str;
+    return m[2] + '-' + m[3] + '-' + m[1];
+  }
+
+  // Reverse formatter: 'MM-DD-YYYY' or 'MM/DD/YYYY' -> 'YYYY-MM-DD'. Used when
+  // a wired input's `value` carries the displayed form but the canonical
+  // dataset.iso is missing (e.g., the operator pasted a date by hand).
+  function parseMDY(s) {
+    if (!s) return null;
+    var m = /^(\d{2})[-\/](\d{2})[-\/](\d{4})$/.exec(String(s).trim());
+    if (!m) return null;
+    return m[3] + '-' + m[1] + '-' + m[2];
+  }
+
+  // Canonical YYYY-MM-DD value for a wired input. Prefer dataset.iso (set by
+  // the popup or by wire()), fall back to parsing the visible value as either
+  // MM-DD-YYYY or YYYY-MM-DD. Empty string when the input is blank.
+  function getISO(input) {
+    if (!input) return '';
+    if (input.dataset && input.dataset.iso) return input.dataset.iso;
+    var v = (input.value || '').trim();
+    if (!v) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+    var mdy = parseMDY(v);
+    return mdy || v;
+  }
+
+  // Set a wired input from a canonical YYYY-MM-DD (or empty). Writes both
+  // dataset.iso (canonical) and value (display MM-DD-YYYY).
+  //
+  // Defensive: `<input type="date">` silently rejects any value that isn't
+  // YYYY-MM-DD (so writing "MM-DD-YYYY" leaves .value empty). Some callers
+  // run setISO BEFORE the input is wired (and switched to text), so flip
+  // the type here too — idempotent with wire().
+  function setISO(input, iso) {
+    if (!input) return;
+    if (input.type === 'date') {
+      try { input.type = 'text'; } catch (_) {}
+    }
+    if (!iso) {
+      input.dataset.iso = '';
+      input.value = '';
+      return;
+    }
+    input.dataset.iso = iso;
+    input.value = fmtMDY(iso);
+  }
+
   // Today as a local-midnight Date (so date comparisons via > / < work).
   function todayLocal() {
     var d = new Date();
@@ -134,8 +190,11 @@
     var viewYear, viewMonth, selected;
 
     function init() {
-      var cur = parseYMD(input.value) || todayLocal();
-      selected = parseYMD(input.value);
+      // The visible input.value is MM-DD-YYYY after wire(); the canonical
+      // YYYY-MM-DD lives in input.dataset.iso. Use the canonical first.
+      var iso = getISO(input);
+      var cur = parseYMD(iso) || todayLocal();
+      selected = parseYMD(iso);
       viewYear = cur.getFullYear();
       viewMonth = cur.getMonth();
       // Clamp the initial view into the allowed year range
@@ -157,7 +216,10 @@
       var dt = new Date(y, m, d);
       if (maxDate && dt > maxDate) return;
       selected = dt;
-      input.value = toYMD(dt);
+      // Canonical YYYY-MM-DD on dataset.iso, display MM-DD-YYYY on .value.
+      // Storage/API submission paths read dataset.iso via getISO(); only
+      // the operator-facing surface reads the display string.
+      setISO(input, toYMD(dt));
       input.dispatchEvent(new Event('change', {bubbles: true}));
       close();
     }
@@ -261,7 +323,7 @@
       clearBtn.textContent = 'Clear';
       clearBtn.addEventListener('click', function(e) {
         e.preventDefault();
-        input.value = '';
+        setISO(input, '');
         selected = null;
         input.dispatchEvent(new Event('change', {bubbles: true}));
         close();
@@ -330,15 +392,24 @@
   function wire(input, opts) {
     if (!input || input.dataset.sscDpWired === '1') return;
     input.dataset.sscDpWired = '1';
-    // Switch off native picker — keep YYYY-MM-DD as the stored value.
+    // Switch off native picker — the canonical YYYY-MM-DD lives on
+    // dataset.iso; .value carries the MM-DD-YYYY display form for the
+    // operator. Form submission paths must read via SSCDatePicker.getISO(el).
     try { input.type = 'text'; } catch (_) {}
     input.setAttribute('data-ssc-dp', '1');
     input.setAttribute('readonly', '');           // operator must use the popup
     if (!input.getAttribute('placeholder')) {
-      input.setAttribute('placeholder', 'YYYY-MM-DD');
+      input.setAttribute('placeholder', 'MM-DD-YYYY');
     }
     input.setAttribute('autocomplete', 'off');
     input.style.cursor = 'pointer';
+    // If the input was pre-seeded with a YYYY-MM-DD (the common case — code
+    // sets el.value = todayLocal()), promote it to (dataset.iso, MM-DD-YYYY
+    // .value). Already-MM-DD-YYYY values pass through via getISO+setISO.
+    var preset = (input.value || '').trim();
+    if (preset) {
+      setISO(input, getISO(input));
+    }
 
     var live = null;
     function toggle(e) {
@@ -364,5 +435,18 @@
     for (var i = 0; i < nodes.length; i++) wire(nodes[i], opts);
   }
 
-  global.SSCDatePicker = { wire: wire, wireAll: wireAll, parseYMD: parseYMD, toYMD: toYMD };
+  global.SSCDatePicker = {
+    wire: wire,
+    wireAll: wireAll,
+    parseYMD: parseYMD,
+    toYMD: toYMD,
+    // Shared display + canonical-value helpers. Every surface that
+    // renders a date to the operator goes through fmtMDY; every
+    // submission/storage path reads getISO. Keep this the single source
+    // of truth for the YYYY-MM-DD <-> MM-DD-YYYY transform.
+    fmtMDY: fmtMDY,
+    parseMDY: parseMDY,
+    getISO: getISO,
+    setISO: setISO,
+  };
 })(window);

@@ -98,6 +98,25 @@ def _redact_pii(body):
         return body
     return {k: ('XXXX' if (k in _PIN_BEARING_FIELDS and v) else v) for k, v in body.items()}
 
+
+def _fmt_mdy(value) -> str:
+    """'2026-05-21' (or 'YYYY-MM-DDTHH:MM:SS', 'YYYY-MM-DD HH:MM:SS') -> '05-21-2026'.
+
+    Single Python-side date-display helper, mirroring SSCDatePicker.fmtMDY
+    on the client + _fmt_mdy in render_dcr_html. Date-only output — the
+    "Issued at" / cert / RFI surfaces drop the time portion per the
+    display rule. Returns '' for empty input so template fields render
+    blank rather than 'None'.
+    """
+    if not value:
+        return ''
+    s = str(value)[:10]
+    try:
+        d = datetime.strptime(s, '%Y-%m-%d').date()
+        return d.strftime('%m-%d-%Y')
+    except (ValueError, TypeError):
+        return str(value)
+
 @app.before_request
 def log_request():
     body = request.get_json(silent=True) if request.is_json else request.data
@@ -4423,13 +4442,15 @@ def serve_card_live(emp_id, cred_type):
                 signature_url = '/files/' + sig_path
 
         cnd = card.get('card_number_display') or card.get('card_id') or ''
+        # ISSUED_DATE / EXPIRES_DATE rendered as MM-DD-YYYY (the display rule);
+        # the full datetime stays in the cof_cards row for audit.
         ctx = {
             'NAME': emp.get('name') or '',
             'EMPLOYEE_ID': emp_id,
             'CARD_NUMBER_DISPLAY': cnd,
-            'ISSUED_DATE': card.get('issued_date') or '',
+            'ISSUED_DATE': _fmt_mdy(card.get('issued_date')),
             'ISSUED_BY': card.get('issued_by') or '',
-            'EXPIRES_DATE': card.get('expires_date') or '',
+            'EXPIRES_DATE': _fmt_mdy(card.get('expires_date')),
             'TRADE': emp.get('trade') or '',
             'PIN': emp.get('pin') or '----',
             'PHOTO_URL_OR_BLANK': photo_url,
@@ -4602,9 +4623,10 @@ def issue_employee_credential(emp_id):
             'NAME': emp['name'] or '',
             'EMPLOYEE_ID': emp_id,
             'CARD_NUMBER_DISPLAY': cnd or '',
-            'ISSUED_DATE': card.get('issued_date') or '',
+            # MM-DD-YYYY display per the date-format rule; storage unchanged.
+            'ISSUED_DATE': _fmt_mdy(card.get('issued_date')),
             'ISSUED_BY': card.get('issued_by') or issued_by,
-            'EXPIRES_DATE': expires_str,
+            'EXPIRES_DATE': _fmt_mdy(expires_str),
             'TRADE': emp['trade'] or '',
             'PIN': emp['pin'] or '----',
             'PHOTO_URL_OR_BLANK': photo_url,

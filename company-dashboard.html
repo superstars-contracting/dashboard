@@ -1318,6 +1318,11 @@ applyLanguage();
         // so format before setting .value (programmatic .value doesn't fire
         // the input handler that the mask is wired to).
         el.value = val == null ? '' : formatPhoneDigits(val);
+      } else if (field === 'dob' || field === 'hire_date') {
+        // Date fields wired by SSCDatePicker — store canonical YYYY-MM-DD
+        // on dataset.iso while .value carries the MM-DD-YYYY display.
+        if (window.SSCDatePicker) SSCDatePicker.setISO(el, val || '');
+        else el.value = val == null ? '' : val;
       } else {
         el.value = val == null ? '' : val;
       }
@@ -1364,6 +1369,11 @@ applyLanguage();
         // ('212-555-0142') doesn't diff against the stored raw ('2125550142').
         newVal = rawPhoneDigits(el.value) || '';
         origForCompare = rawPhoneDigits(currentProfile[field]) || '';
+      } else if (field === 'dob' || field === 'hire_date') {
+        // Date fields: canonical YYYY-MM-DD via SSCDatePicker.getISO
+        // (.value is MM-DD-YYYY post-wire).
+        newVal = window.SSCDatePicker ? (SSCDatePicker.getISO(el) || '') : ((el.value || '').trim());
+        origForCompare = currentProfile[field] == null ? '' : String(currentProfile[field]).trim();
       } else {
         newVal = (el.value || '').trim();
         origForCompare = currentProfile[field] == null ? '' : String(currentProfile[field]).trim();
@@ -1445,9 +1455,11 @@ applyLanguage();
       $('#pp-trade').textContent = e.trade || '—';
       $('#pp-lang').textContent = (e.language || '—').toUpperCase();
       $('#pp-phone').textContent = formatPhone(e.phone);
-      $('#pp-dob').textContent = e.dob || '—';
+      // Display dates as MM-DD-YYYY (shared formatter via SSCDatePicker.fmtMDY).
+      const _fmtMDY = (s) => (window.SSCDatePicker ? (SSCDatePicker.fmtMDY(s) || '—') : (s || '—'));
+      $('#pp-dob').textContent = e.dob ? _fmtMDY(e.dob) : '—';
       $('#pp-ec').textContent = (e.emergency_contact_name || '—') + (e.emergency_contact_phone ? ' · ' + formatPhone(e.emergency_contact_phone) : '');
-      $('#pp-hire').textContent = e.hire_date || '—';
+      $('#pp-hire').textContent = e.hire_date ? _fmtMDY(e.hire_date) : '—';
 
       // Documents
       const docs = d.documents || [];
@@ -1528,8 +1540,10 @@ applyLanguage();
     const statusColor = statusColors[sd] || statusColors.unknown;
     const statusLabel = statusLabels[sd] || statusLabels.unknown;
 
+    // Display dates as MM-DD-YYYY (shared formatter via SSCDatePicker.fmtMDY).
+    const _fmt = (s) => (window.SSCDatePicker ? (SSCDatePicker.fmtMDY(s) || '—') : (s || '—'));
     const datesLine = (c.date_obtained || c.expiration_date)
-      ? `${esc(c.date_obtained || '—')} → ${esc(c.expiration_date || 'no exp')}`
+      ? `${esc(_fmt(c.date_obtained))} → ${esc(c.expiration_date ? _fmt(c.expiration_date) : 'no exp')}`
       : 'no dates recorded';
 
     const thumb = c.scan_url
@@ -2093,11 +2107,17 @@ applyLanguage();
       // (intentional: photos are evidence, never silently deleted on cancel).
 
       saveBtn.addEventListener('click', async () => {
+        // Date inputs are wired by SSCDatePicker — canonical YYYY-MM-DD via
+        // getISO (the visible .value is MM-DD-YYYY).
+        const _iso = (k) => {
+          const el = q(k);
+          return window.SSCDatePicker ? SSCDatePicker.getISO(el) : (el && el.value);
+        };
         const payload = {
           cert_type_id: q('cert_type_id').value.trim(),
           card_number: q('card_number').value.trim() || null,
-          date_obtained: q('date_obtained').value || null,
-          expiration_date: q('expiration_date').value || null,
+          date_obtained: _iso('date_obtained') || null,
+          expiration_date: _iso('expiration_date') || null,
           issuing_body: q('issuing_body').value.trim() || null,
           notes: q('notes').value.trim() || null,
           scan_path: imagePath,
@@ -2387,9 +2407,15 @@ applyLanguage();
     const name = $('#in-name').value.trim();
     if (!name) { alert('Name is required'); return; }
     const project_codes = Array.from($$('.project-check:checked')).map(c => c.value);
+    // Date inputs are wired by SSCDatePicker — canonical YYYY-MM-DD via
+    // getISO (the visible .value is MM-DD-YYYY).
+    const _iso = (sel) => {
+      const el = $(sel);
+      return window.SSCDatePicker ? SSCDatePicker.getISO(el) : (el && el.value);
+    };
     const payload = {
       name,
-      dob: $('#in-dob').value || null,
+      dob: _iso('#in-dob') || null,
       trade: $('#in-trade').value || null,
       language: $('#in-language').value || null,
       phone: rawPhoneDigits($('#in-phone').value),
@@ -2397,7 +2423,7 @@ applyLanguage();
       emergency_contact_name: $('#in-ec-name').value || null,
       emergency_contact_phone: rawPhoneDigits($('#in-ec-phone').value),
       emergency_contact_relation: getEffectiveRelation('in-ec-relation'),
-      hire_date: $('#in-hire-date').value || null,
+      hire_date: _iso('#in-hire-date') || null,
       // WF-3: PIN derived server-side from phone last-4 in /api/workers/create.
       // (Same derivation runs on PATCH /api/employees when phone changes.)
       project_codes,
