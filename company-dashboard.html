@@ -1865,6 +1865,12 @@ applyLanguage();
       // No backdrop-click close — too easy to lose the selected file by accident.
 
       saveBtn.addEventListener('click', async () => {
+        // WF-4a: defense-in-depth against the "circular reference"-type
+        // error reported in the field. Re-entrancy guard via the button's
+        // disabled state was already here; reinforce by checking it
+        // FIRST so an already-saving click is a no-op (some pointer-event
+        // configurations can fire click twice on touch).
+        if (saveBtn.disabled) return;
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving…';
         errEl.style.display = 'none';
@@ -1872,7 +1878,12 @@ applyLanguage();
           const fd = new FormData();
           fd.append('file', file);
           fd.append('doc_type', docType);
-          fd.append('doc_label', file.name);
+          // Plain string fields only — never serialize a File or Blob
+          // into the body besides via FormData's File slot. (FormData
+          // handles the multipart encoding; JSON.stringify on a File
+          // returns "{}", which would surface as a bogus empty filename
+          // server-side and was a candidate root cause for "circular".)
+          fd.append('doc_label', String(file.name || ''));
           const resp = await fetch(
             '/api/workers/' + encodeURIComponent(currentEmployeeId) + '/upload',
             {method: 'POST', body: fd}
@@ -1881,13 +1892,21 @@ applyLanguage();
           if (resp.ok && (body.data || !body.error)) {
             close({ok: true, docTypeLabel});
           } else {
-            errEl.textContent = (body && body.error) || `Upload failed (${resp.status})`;
+            // Always coerce to a string — never echo `body` directly.
+            const msg = (body && typeof body.error === 'string' && body.error)
+              ? body.error : ('Upload failed (' + resp.status + ')');
+            errEl.textContent = msg;
             errEl.style.display = 'block';
             saveBtn.disabled = false;
             saveBtn.textContent = 'Save';
           }
         } catch (err) {
-          errEl.textContent = 'Network error: ' + (err.message || String(err));
+          // Coerce error to a plain string — never concat the raw err
+          // object whose nested fields (TypeError chains, Response refs)
+          // could read as "circular reference" when toString-ed.
+          const msg = (err && typeof err.message === 'string')
+            ? err.message : String(err || 'unknown error');
+          errEl.textContent = 'Network error: ' + msg;
           errEl.style.display = 'block';
           saveBtn.disabled = false;
           saveBtn.textContent = 'Save';
@@ -1898,17 +1917,58 @@ applyLanguage();
 
   // File-input handler: stage the selected file in the confirm modal, then
   // the modal's Save button actually uploads. Toast on success.
+  //
+  // WF-4a hardening (ID scan/upload):
+  // - Re-entrancy guard: each <input> tracks _uploadBusy so a rapid second
+  //   file-pick while the modal is still open can't stack a second
+  //   instance on top of the first (the previously-reported "circular
+  //   reference"-type error matched a re-entrant-handler symptom — two
+  //   awaiting promises sharing the same input reference).
+  // - try/catch around the whole async body so an exception inside the
+  //   modal-resolve chain or loadProfile() can't surface as an unhandled
+  //   promise rejection (which the browser logs with a circular-looking
+  //   "Promise <pending>" reference graph). loadProfile() is also
+  //   independently wrapped: a post-upload load failure should never
+  //   look like an upload failure.
+  // - error-shape coercion in the catch: never concat the raw error object,
+  //   only its `.message` (string). Same defense as in openDocUploadConfirmModal.
   document.querySelectorAll('.upload-input').forEach(inp => {
     inp.addEventListener('change', async (e) => {
       if (!currentEmployeeId) return;
       const file = e.target.files[0];
       if (!file) return;
+      // Re-entrancy guard — flip BEFORE any await so a rapid second change
+      // (e.g. operator double-clicks the label) bounces off cleanly.
+      if (inp._uploadBusy) {
+        // Caller already has a modal open. Silently drop the second pick
+        // and reset the value so the operator can re-pick after the
+        // current modal closes.
+        e.target.value = '';
+        return;
+      }
+      inp._uploadBusy = true;
       const docType = e.target.getAttribute('data-doc-type');
       e.target.value = '';   // reset early so the same file can be re-selected after cancel
-      const result = await openDocUploadConfirmModal({file, docType});
-      if (result && result.ok) {
-        showToast(`✓ ${result.docTypeLabel} saved`, 3500);
-        await loadProfile();
+      try {
+        const result = await openDocUploadConfirmModal({file, docType});
+        if (result && result.ok) {
+          showToast(`✓ ${result.docTypeLabel} saved`, 3500);
+          // Wrap the refresh independently so a load error doesn't bubble
+          // up looking like the upload failed.
+          try { await loadProfile(); }
+          catch (loadErr) {
+            console.warn('[doc-upload] post-save loadProfile failed:', loadErr && loadErr.message);
+          }
+        }
+      } catch (err) {
+        // Coerce to a plain string message — never echo a complex error
+        // object through alert/console where its prototype chain or
+        // child structures could surface as "circular reference".
+        const msg = (err && err.message) ? err.message : String(err || 'unknown error');
+        console.warn('[doc-upload] handler error:', msg);
+        showToast('Upload failed: ' + msg, 5000);
+      } finally {
+        inp._uploadBusy = false;
       }
     });
   });
