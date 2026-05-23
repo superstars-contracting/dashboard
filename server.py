@@ -3264,6 +3264,42 @@ def api_worker_create():
         # Allocate the next W-#### inside the transaction so concurrent
         # onboards can't race (UNIQUE index on worker_id catches stragglers).
         worker_id = assign_worker_id(conn)
+
+        # WF-3: derive PIN from last-4 of phone server-side — never accept a
+        # hand-entered PIN from the onboard form (the input was removed).
+        # PATCH /api/employees on phone change does the same derivation +
+        # collision check; mirror that contract here so single-onboard
+        # / edit / bulk-import all produce the same PIN for the same phone.
+        # PII rule: PIN is derived, not stored from user input — and never
+        # echoed back to logs (CLAUDE.md PII rule line 38).
+        phone_raw = data.get("phone") or ""
+        phone_digits = re.sub(r'\D', '', phone_raw)
+        derived_pin = phone_digits[-4:] if len(phone_digits) >= 4 else None
+        if derived_pin:
+            # Collision check — phone last-4 must be unique across employees.
+            # Active operating cohort is ~10 workers so collisions are rare,
+            # but the worker app's PIN lookup keys on this so a collision
+            # would silently send the operator to the wrong worker.
+            collision = conn.execute(
+                "SELECT employee_id FROM employees WHERE pin = ? AND employee_id != ?",
+                (derived_pin, employee_id)
+            ).fetchone()
+            if collision:
+                conn.close()
+                return jsonify({
+                    "error": (f"PIN collision (phone last-4 = {derived_pin}) "
+                              f"with an existing worker — please use a phone "
+                              f"with different last-4 digits")
+                }), 409
+        # If caller explicitly passed a 'pin' (legacy CSV import path), let it
+        # win as a safety valve; otherwise the derived value goes in.
+        if not data.get("pin"):
+            data = dict(data)
+            data["pin"] = derived_pin
+        # Mirror the digits-only normalization the PATCH path uses, so the
+        # stored phone format is consistent regardless of how it was entered.
+        if phone_digits:
+            data["phone"] = phone_digits
         # Try INSERT — fails silently if employee_id already exists
         cursor = conn.execute(
             """INSERT OR IGNORE INTO employees

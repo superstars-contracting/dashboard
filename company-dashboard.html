@@ -571,9 +571,12 @@
         <input id="in-ec-relation-other" type="text" data-i18n-ph="ph-ec-relation-other" placeholder="Specify relation…" style="display:none;">
       </div>
     </div>
-    <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
+    <!-- WF-3: PIN field removed — PIN is now derived server-side from the
+         last 4 digits of the phone number on save. The /api/workers/create
+         + PATCH /api/employees endpoints both run the same derivation, so
+         single-onboards / edits / bulk imports stay consistent. -->
+    <div class="form-grid" style="grid-template-columns:1fr 1fr;">
       <input id="in-hire-date" type="date" data-i18n-ph="ph-hire-date" placeholder="Onboard Date">
-      <input id="in-pin" type="text" data-i18n-ph="ph-pin" placeholder="App PIN (4 digits)" maxlength="4" style="font-family:monospace;">
       <input id="in-email" type="email" data-i18n-ph="ph-email" placeholder="Email (optional)">
     </div>
 
@@ -2335,7 +2338,8 @@ applyLanguage();
       emergency_contact_phone: rawPhoneDigits($('#in-ec-phone').value),
       emergency_contact_relation: getEffectiveRelation('in-ec-relation'),
       hire_date: $('#in-hire-date').value || null,
-      pin: $('#in-pin').value || null,
+      // WF-3: PIN derived server-side from phone last-4 in /api/workers/create.
+      // (Same derivation runs on PATCH /api/employees when phone changes.)
       project_codes,
     };
     try {
@@ -2345,7 +2349,7 @@ applyLanguage();
       }).then(r => r.json());
       if (resp.error) { alert('Save failed: ' + resp.error); return; }
       modal.classList.remove('active');
-      ['in-name','in-dob','in-trade','in-language','in-phone','in-ec-name','in-ec-phone','in-hire-date','in-pin','in-email'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+      ['in-name','in-dob','in-trade','in-language','in-phone','in-ec-name','in-ec-phone','in-hire-date','in-email'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
       // Relation dropdown has a paired Other-text input — reset both via helper.
       clearRelationField('in-ec-relation');
       await Promise.all([loadMetrics(), loadProjects(), loadWorkforce()]);
