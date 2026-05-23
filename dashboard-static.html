@@ -1286,26 +1286,40 @@
               '<div style="margin-top:12px;padding-top:8px;border-top:1px solid #F1EEE8;font-size:10px;color:#76777E;text-align:right;">' + esc(sourceLabel) + '</div>';
           }
 
+          // DCR-2: track which employee_ids are already in today's labor so
+          // the add-dropdown can exclude them. Set is rebuilt on every
+          // renderLabor (which loadDcr calls on every fetch). When a sign-in
+          // is removed (via any path) the next loadDcr -> renderLabor ->
+          // populateLaborAddDropdown re-includes that worker automatically.
+          let currentLaborEmployeeIds = new Set();
+
           function renderLabor(labor) {
             const summary = document.getElementById('dcr-labor-summary');
             const tbody = document.getElementById('dcr-labor-tbody');
             if (!summary || !tbody) return;
-            if (!labor || !labor.rows || !labor.rows.length) {
+            const rows = (labor && labor.rows) || [];
+            // Rebuild the exclusion set BEFORE rendering the dropdown — the
+            // dropdown is the dependent consumer.
+            currentLaborEmployeeIds = new Set(rows.map(r => r.employee_id).filter(Boolean));
+            if (!rows.length) {
               summary.textContent = '';
               tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:#76777E;">No sign-ins recorded for this date. Workers must sign in via the worker app for their hours to land here.</td></tr>';
-              return;
+            } else {
+              summary.innerHTML = '<strong style="color:#14161C;">' + labor.headcount + '</strong> worker(s) · <strong style="color:#14161C;">' + labor.total_hours + '</strong> total hours';
+              tbody.innerHTML = rows.map(r =>
+                '<tr>' +
+                  '<td>' + r.n + '</td>' +
+                  '<td>' + (esc(r.name) || '—') + ' <span style="color:#76777E;font-size:11px;font-family:monospace;">' + (esc(r.worker_id) || '') + '</span></td>' +
+                  '<td>' + (esc(r.trade) || '—') + '</td>' +
+                  '<td>' + (esc(r.time_in) || '—') + '</td>' +
+                  '<td>' + (esc(r.time_out) || '—') + '</td>' +
+                  '<td>' + (r.hours != null ? r.hours : '—') + '</td>' +
+                '</tr>'
+              ).join('');
             }
-            summary.innerHTML = '<strong style="color:#14161C;">' + labor.headcount + '</strong> worker(s) · <strong style="color:#14161C;">' + labor.total_hours + '</strong> total hours';
-            tbody.innerHTML = labor.rows.map(r =>
-              '<tr>' +
-                '<td>' + r.n + '</td>' +
-                '<td>' + (esc(r.name) || '—') + ' <span style="color:#76777E;font-size:11px;font-family:monospace;">' + (esc(r.worker_id) || '') + '</span></td>' +
-                '<td>' + (esc(r.trade) || '—') + '</td>' +
-                '<td>' + (esc(r.time_in) || '—') + '</td>' +
-                '<td>' + (esc(r.time_out) || '—') + '</td>' +
-                '<td>' + (r.hours != null ? r.hours : '—') + '</td>' +
-              '</tr>'
-            ).join('');
+            // Re-populate the add-dropdown so already-added workers are
+            // filtered out, and any that have since been removed reappear.
+            populateLaborAddDropdown();
           }
 
           // 10s ceiling on the aggregator fetch — better to surface an error
@@ -2038,11 +2052,10 @@
           // ---- Manual labor entry (backdated DCRs) ----
 
           async function loadProjectWorkers() {
-            // One-shot fetch; the assigned-worker list rarely changes during a
-            // session, so we cache. If the operator just added a worker in the
-            // Workforce tab and wants them in the dropdown without a page
-            // reload, they can hit the Refresh button next to the date picker
-            // (which triggers loadDcr) — for now we don't force-refetch.
+            // One-shot fetch of every project-assigned worker. Cached in
+            // `projectWorkers`; the dropdown filter (DCR-2) runs against
+            // currentLaborEmployeeIds at render time so the workforce list
+            // itself doesn't need to be re-fetched after every Add.
             try {
               const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/workers').then(r => r.json());
               projectWorkers = (resp && resp.data) || [];
@@ -2050,10 +2063,28 @@
               console.warn('[DCR] loadProjectWorkers failed:', e);
               projectWorkers = [];
             }
+            populateLaborAddDropdown();
+          }
+
+          // DCR-2: build the labor add-dropdown excluding any worker already
+          // in today's labor. Called from loadProjectWorkers (initial fetch)
+          // and from renderLabor (after every DCR refresh). When the
+          // currentLaborEmployeeIds set is missing a worker, they're listed;
+          // when present, they're filtered out. No "blocked" message ever
+          // surfaces because the operator can't pick someone who's already
+          // signed in.
+          function populateLaborAddDropdown() {
             const sel = document.getElementById('dcr-labor-add-worker');
             if (!sel) return;
+            // Preserve the operator's in-progress selection across rebuilds.
+            // (If their choice has since been added to labor, the value
+            // resets to '' naturally because the option disappears.)
+            const prior = sel.value;
             sel.innerHTML = '<option value="">— Select worker —</option>';
-            for (const w of projectWorkers) {
+            const list = (projectWorkers || []).filter(
+              w => !currentLaborEmployeeIds.has(w.employee_id)
+            );
+            for (const w of list) {
               const opt = document.createElement('option');
               opt.value = w.employee_id;
               // Display "W-#### — Name" — the Worker ID is the human-facing
@@ -2063,6 +2094,17 @@
               const wid = w.worker_id || '—';
               opt.textContent = wid + ' — ' + (w.name || wid);
               sel.appendChild(opt);
+            }
+            if (list.length === 0 && (projectWorkers || []).length > 0) {
+              // Empty state — every assigned worker is already in today's
+              // labor. Replace the placeholder with a clearer note.
+              sel.innerHTML = '<option value="">All assigned workers already signed in</option>';
+              sel.disabled = true;
+            } else {
+              sel.disabled = false;
+              if (prior && list.some(w => w.employee_id === prior)) {
+                sel.value = prior;
+              }
             }
           }
 
@@ -2109,9 +2151,17 @@
                   // but clear the worker pick so operator must select the next one.
                   if (sel) sel.value = '';
                   setStatus('Added ✓', '#2F7C57');
-                  loadDcr(dateStr);  // refresh labor table from sign_in_log
+                  // DCR-2: after Add, loadDcr re-renders labor which
+                  // re-renders the dropdown — the just-added worker is
+                  // filtered out automatically.
+                  loadDcr(dateStr);
                 } else if (resp.status === 409) {
-                  setStatus('Already added for this date', '#B68838');
+                  // Defensive only — DCR-2's dropdown filter prevents
+                  // this. If we still hit it (concurrent operator action,
+                  // or a sign-in coming in from the worker app), refresh
+                  // the labor table to re-sync the dropdown rather than
+                  // showing a "blocked" message.
+                  loadDcr(dateStr);
                 } else {
                   setStatus('Failed: ' + (json.error || ('HTTP ' + resp.status)), '#B11E2E');
                 }
