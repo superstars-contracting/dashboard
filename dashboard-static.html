@@ -1103,6 +1103,16 @@
         <div id="dcr-entry-view" class="section" style="display:none;">
           <h2>Daily Report</h2>
 
+          <!-- DCR-4: re-issue banner. Shown when the operator opens the
+               entry form via "Edit" on an already-issued DCR (Phase 4D).
+               Hidden by default; reopenDcr() populates the displayId
+               text and reveals it. When set, the section-level Issue
+               button auto-passes override_active=true so the existing
+               sequence is preserved on re-issue. -->
+          <div id="dcr-reissue-banner" style="display:none;background:#FFF3DD;border-left:3px solid #B68838;padding:10px 14px;border-radius:4px;margin-bottom:14px;font-size:12px;color:#14161C;line-height:1.5;">
+            <strong>Re-issuing</strong> <span id="dcr-reissue-id">—</span> — any changes you make below will replace the issued report. The report number + date are preserved.
+          </div>
+
           <!-- Controls bar: date picker + refresh + status -->
           <div style="display:flex;gap:16px;align-items:center;background:white;border:1px solid #E8E4DD;border-radius:4px;padding:14px 16px;margin-bottom:24px;flex-wrap:wrap;">
             <label for="dcr-date" style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Date</label>
@@ -1345,6 +1355,10 @@
               renderProjectInfo(dcr.project);
               renderWeather(dcr.weather);
               renderLabor(dcr.labor);
+              // DCR-4: render existing photos as saved tiles so the
+              // operator can see + remove them during edit. New uploads
+              // go into the same grid via the upload-first flow (#108).
+              renderExistingPhotos(dcr.photos || []);
               const warns = (dcr.metadata && dcr.metadata.warnings) || [];
               if (warns.length) {
                 setStatus('Loaded · ' + warns.length + ' warning(s)', '#B68838');
@@ -1797,11 +1811,24 @@
 
           async function issueDcr(override) {
             const dateStr = getCurrentDate();
+            // DCR-4: when the entry view was opened via Edit (re-issue
+            // context set), short-circuit the confirm prompts and pass
+            // override_active=true automatically. The banner already
+            // shows the operator what they're doing; double-prompting
+            // is friction. For a fresh New DCR (no reissue context),
+            // the original confirm flow stays intact.
+            const reissuing = !!_reissueContext && _reissueContext.date === dateStr;
+            if (reissuing && !override) override = true;
             const unsavedRows = document.querySelectorAll('.dcr-row[data-saved="0"]');
             if (!override && unsavedRows.length > 0) {
               if (!confirm(unsavedRows.length + ' row(s) in this DCR are unsaved and will NOT be included in the report. Issue anyway?')) return;
             }
             if (!override && !confirm('Issue DCR for ' + dateStr + '? Generates internal and client versions.')) return;
+            // If re-issuing, give the operator ONE explicit confirm so the
+            // overwrite isn't silent.
+            if (reissuing) {
+              if (!confirm('Re-issue ' + (_reissueContext.displayId || ('DCR-' + _reissueContext.seq)) + '? This regenerates the PDF; the report number + date stay the same.')) return;
+            }
             const issueBtn = document.getElementById('dcr-issue');
             if (issueBtn) { issueBtn.disabled = true; issueBtn.style.opacity = '0.6'; issueBtn.style.cursor = 'wait'; }
             try {
@@ -1853,6 +1880,11 @@
                 // showEntry() also calls clearDcrFormState(); both paths are
                 // idempotent.
                 clearDcrFormState({preserveBanner: true});
+                // DCR-4: clear the re-issue context + banner so a
+                // subsequent New DCR doesn't carry over the marker.
+                _reissueContext = null;
+                const reissueBanner = document.getElementById('dcr-reissue-banner');
+                if (reissueBanner) reissueBanner.style.display = 'none';
                 showArchive();
               } else if (resp.status === 409 && json && json.existing_sequence !== undefined) {
                 const existing = json.existing_display_id || ('DCR-' + PROJECT_CODE + '-' + String(json.existing_sequence).padStart(3, '0'));
@@ -1937,6 +1969,15 @@
             const displayId = r.display_id || r.report_id || '—';
             const reportDate = r.report_date || '';
             const seq = r.dcr_sequence;
+            // DCR-4: per-row Edit reopens the entry view scoped to this
+            // DCR's date. The operator can fix labor / add+remove photos /
+            // edit text rows, then click Issue DCR to re-issue. The
+            // re-issue path preserves report number + date via
+            // override_active=true (handled in issueDcr's 409 confirm
+            // flow, which the reissue banner short-circuits).
+            const editBtn = (seq !== undefined && seq !== null && reportDate)
+              ? '<button type="button" data-edit-seq="' + esc(seq) + '" data-edit-date="' + esc(reportDate) + '" data-edit-display-id="' + esc(displayId) + '" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 10px;border:1px solid #14161C;border-radius:4px;background:white;color:#14161C;cursor:pointer;margin-left:8px;">Edit</button>'
+              : '';
             // Delete acts on the whole DCR (both audiences for this sequence),
             // not just the visible internal row — see /by-sequence/<seq> route.
             const deleteBtn = (seq !== undefined && seq !== null)
@@ -1947,7 +1988,7 @@
               '<td>' + esc(reportDate || '—') + '</td>' +
               '<td><span style="padding:3px 8px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;background:' + statusColor + ';color:white;">' + esc(r.status || '—') + '</span></td>' +
               '<td style="font-size:12px;color:#76777E;">' + esc(r.updated_at || r.created_at || '—') + '</td>' +
-              '<td style="white-space:nowrap;">' + viewLink + deleteBtn + '</td>' +
+              '<td style="white-space:nowrap;">' + viewLink + editBtn + deleteBtn + '</td>' +
             '</tr>';
           }
 
@@ -1980,11 +2021,22 @@
             const tbody = document.getElementById('dcr-archive-tbody');
             const status = document.getElementById('dcr-archive-status');
             if (!tbody) return;
-            // One-time event delegation: any Delete button inside the tbody routes here.
+            // One-time event delegation: any Delete or Edit button inside
+            // the tbody routes here. Edit (DCR-4) reopens the entry view
+            // for the row's date; Delete hands off to handleArchiveDelete.
             if (!tbody.dataset.deleteWired) {
               tbody.addEventListener('click', (e) => {
-                const btn = e.target.closest('[data-delete-seq]');
-                if (btn) handleArchiveDelete(btn);
+                const editBtn = e.target.closest('[data-edit-seq]');
+                if (editBtn) {
+                  reopenDcr(
+                    editBtn.dataset.editDate,
+                    editBtn.dataset.editSeq,
+                    editBtn.dataset.editDisplayId
+                  );
+                  return;
+                }
+                const delBtn = e.target.closest('[data-delete-seq]');
+                if (delBtn) handleArchiveDelete(delBtn);
               });
               tbody.dataset.deleteWired = '1';
             }
@@ -2040,11 +2092,125 @@
             loadArchive();
           }
 
+          // DCR-4: render existing photos (from the aggregator's
+          // dcr.photos array) as committed/read-only tiles in the photo
+          // grid. Each tile gets:
+          //   - thumbnail with data-zoom-src (DCR-3 lightbox)
+          //   - read-only location + caption
+          //   - status "✓ Saved"
+          //   - Remove button (DELETE /api/photos/<id> + reload)
+          // Idempotent: builds a marker set so a subsequent loadDcr call
+          // re-renders cleanly without duplicating existing tiles.
+          let _renderedPhotoIds = new Set();
+          function renderExistingPhotos(photos) {
+            const grid = document.getElementById('dcr-photo-grid');
+            if (!grid) return;
+            // Drop any prior saved/server-rendered tiles (preserve draft
+            // tiles the operator may still be editing — their _photo.saved
+            // is false). This makes loadDcr safe to re-run.
+            Array.from(grid.children).forEach(t => {
+              if (t.dataset && t.dataset.serverPhotoId) {
+                t.remove();
+              }
+            });
+            _renderedPhotoIds = new Set();
+            for (const p of photos) {
+              if (!p || !p.id) continue;
+              _renderedPhotoIds.add(p.id);
+              const tile = document.createElement('div');
+              tile.dataset.serverPhotoId = String(p.id);
+              tile.style.cssText = 'background:white;border:1px solid #E8E4DD;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;';
+              const url = p.url || (p.file_path ? ('/files' + (p.file_path.split('worker_records')[0] || '').replace(/\\/g,'/')) : '');
+              const safeUrl = esc(url);
+              const safeLoc = esc(p.location || '');
+              const safeDesc = esc(p.description || '');
+              tile.innerHTML =
+                '<div style="aspect-ratio:1;background:#F1EEE8;display:block;cursor:zoom-in;">' +
+                  '<img src="' + safeUrl + '" data-zoom-src="' + safeUrl + '" style="width:100%;height:100%;object-fit:cover;display:block;" alt="">' +
+                '</div>' +
+                '<div style="padding:8px;font-size:11px;display:flex;flex-direction:column;gap:6px;">' +
+                  (safeLoc ? '<div style="font-weight:600;color:#14161C;">' + safeLoc + '</div>' : '') +
+                  (safeDesc ? '<div style="color:#76777E;">' + safeDesc + '</div>' : '') +
+                  '<div style="color:#2F7C57;font-weight:600;">✓ Saved</div>' +
+                  '<div style="display:flex;gap:6px;justify-content:flex-end;">' +
+                    '<button data-server-photo-remove="' + esc(p.id) + '" type="button" style="font-size:10px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 10px;border:1px solid #E8E4DD;border-radius:3px;background:white;color:#B11E2E;cursor:pointer;">Remove</button>' +
+                  '</div>' +
+                '</div>';
+              grid.appendChild(tile);
+            }
+            // One-time delegation on the grid for Remove clicks.
+            if (!grid.dataset.removeWired) {
+              grid.addEventListener('click', async (e) => {
+                const btn = e.target.closest('[data-server-photo-remove]');
+                if (!btn) return;
+                const pid = btn.getAttribute('data-server-photo-remove');
+                if (!confirm('Remove this photo? It will be deleted from the report.')) return;
+                btn.disabled = true; btn.textContent = '…';
+                try {
+                  const r = await fetch('/api/photos/' + encodeURIComponent(pid), {method: 'DELETE'});
+                  if (r.ok) {
+                    // Reload the DCR to pull a fresh photo list (and the
+                    // labor table + everything else, as a side benefit).
+                    loadDcr(getCurrentDate());
+                  } else {
+                    btn.disabled = false; btn.textContent = 'Remove';
+                    const j = await r.json().catch(() => ({}));
+                    alert('Remove failed: ' + (j.error || r.status));
+                  }
+                } catch (err) {
+                  btn.disabled = false; btn.textContent = 'Remove';
+                  alert('Network error: ' + (err && err.message || err));
+                }
+              });
+              grid.dataset.removeWired = '1';
+            }
+          }
+
+          // DCR-4: re-issue state. Tracks whether the entry view is open
+          // for an already-issued DCR. issueDcr() short-circuits the
+          // confirm prompt + passes override_active=true automatically
+          // when this flag is set.
+          let _reissueContext = null;  // {seq, displayId, date}
+
+          // DCR-4: reopen an issued DCR for edit. Switches to entry view,
+          // sets the date, reveals the re-issue banner, and triggers
+          // loadDcr (which now renders existing photos as saved tiles).
+          // The text-row sections (work / deliveries / equipment / etc.)
+          // accept new add-row inserts that the operator can save; the
+          // aggregator stitches everything together on re-issue.
+          async function reopenDcr(reportDate, seq, displayId) {
+            const archive = document.getElementById('dcr-archive-view');
+            const entry = document.getElementById('dcr-entry-view');
+            if (archive) archive.style.display = 'none';
+            if (entry) entry.style.display = '';
+            // Reset rows + photo grid first (don't reset the date — we
+            // want it pointed at reportDate).
+            clearDcrFormState({preserveDate: true, preserveBanner: true});
+            const dateInput = document.getElementById('dcr-date');
+            if (dateInput) dateInput.value = reportDate;
+            // Set re-issue context + banner
+            _reissueContext = {seq, displayId, date: reportDate};
+            const banner = document.getElementById('dcr-reissue-banner');
+            const idSpan = document.getElementById('dcr-reissue-id');
+            if (idSpan) idSpan.textContent = displayId || ('DCR-' + (seq || '???'));
+            if (banner) banner.style.display = 'block';
+            // Load the DCR (renders project info + weather + labor +
+            // existing photos).
+            await loadDcr(reportDate);
+          }
+
           function showEntry() {
             const archive = document.getElementById('dcr-archive-view');
             const entry = document.getElementById('dcr-entry-view');
             if (archive) archive.style.display = 'none';
             if (entry) entry.style.display = '';
+            // DCR-4: a New DCR must NOT inherit the re-issue banner /
+            // context from a previously-aborted Edit. Clear both first
+            // so the operator never sees a yellow re-issue marker on
+            // a brand-new sheet.
+            _reissueContext = null;
+            const reissueBanner = document.getElementById('dcr-reissue-banner');
+            if (reissueBanner) reissueBanner.style.display = 'none';
             // Defensive: every entry into the form starts from a known-clean
             // state. The eager reset in issueDcr() success already clears
             // most of this on the way out, but we re-do it here so paths that
@@ -2189,6 +2355,11 @@
             }
             // Eager clear on cancel too — same hygiene as issue-success path.
             clearDcrFormState();
+            // DCR-4: drop the re-issue context so the next New DCR or
+            // navigation doesn't carry a stale banner.
+            _reissueContext = null;
+            const reissueBanner = document.getElementById('dcr-reissue-banner');
+            if (reissueBanner) reissueBanner.style.display = 'none';
             showArchive();
           }
 

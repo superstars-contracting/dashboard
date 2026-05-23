@@ -255,6 +255,10 @@ def aggregate_dcr(project_code, date_str, audience='internal'):
     for r in photo_rows:
         r = dict(r)
         photos.append({
+            # DCR-4: expose photos.id so the entry-view edit flow can
+            # build a working Remove button (DELETE /api/photos/<id>).
+            # Renderer + downstream consumers ignore extra keys.
+            'id': r.get('id'),
             'filename': r.get('filename'),
             'url': r.get('url'),
             'location': r.get('location'),
