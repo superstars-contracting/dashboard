@@ -109,3 +109,37 @@ Synthetic cohort: **200 DCRs** across 2099-01-01 -> 2099-07-19 (200 dates), each
 | POST /api/photos/upload (save photo) | 16 ms | 33 ms | 41 ms | 18 ms | 200 |
 
 DB returned to 0-report baseline (pre=0) and 8-worker roster (pre=8) after cleanup. Snapshot: `superstars-pre-dcr-200-stress-20260521-200853.db`.
+
+### 2026-05-23 - 200-worker stress (run S200W_9EBC08)
+
+Tests the WF-1 W-#### allocator at scale via the REAL onboard
+path (POST /api/workers/create). Two sub-runs:
+
+- **CLEAN** (collision-free phones): 200 workers onboarded, W-#### range W-0012..W-0211, NULL count = 0, duplicate count = 0.
+- **RANDOM** (collision-quantifying): 196 onboarded + 4 PIN-409 collisions (2.0% of 200 attempts) -> evidence for #133 urgency. Half-create check: synthetic employees row count = 196 (equals successful onboards = 196 — 409s leave NO residue).
+
+| Endpoint | p50 | p95 | max | mean | iters |
+|---|---|---|---|---|---|
+| `POST /api/workers/create` (clean phones) | 24 ms | 28 ms | 40 ms | 20 ms | 200 |
+| `POST /api/workers/create` (random phones) | 27 ms | 29 ms | 33 ms | 23 ms | 200 |
+| `GET /api/workers/intake-summary` (@~407 workers) | 256 ms | 278 ms | 278 ms | 259 ms | 10 |
+
+DB returned to baseline (pre 11 employees, max W-0011; post 11 employees, max W-0011). Snapshot: `superstars-pre-200w-stress-20260523-175635.db`.
+
+### 2026-05-23 - 300-DCR stress (run S300DCR_5638A2)
+
+Synthetic cohort: **300 DCRs** across 2098-01-01 - 2098-10-27 (300 dates), each with 2 sign-ins + 2 work_log rows + 1 photo. Plus 50 synthetic RFIs across mixed statuses (Open / Overdue / Answered). Lifecycle + new-flow controls: 2424 PASS / 0 FAIL (all-PASS). Sequences issued: 005..304.
+
+| Endpoint | p50 | p95 | max | mean | iters |
+|---|---|---|---|---|---|
+| POST /api/projects/FR-BX-001/daily/&lt;date&gt;/issue | 2379 ms | 2633 ms | 8670 ms | 2552 ms | 300 |
+| GET  /api/projects/FR-BX-001/reports (filtered @300) | 21 ms | 21 ms | 21 ms | 21 ms | 1 |
+| GET  /api/projects/FR-BX-001/daily/&lt;date&gt; | 544 ms | 544 ms | 544 ms | 544 ms | 1 |
+| POST /api/sign-ins (save labor row) | 16 ms | 31 ms | 49 ms | 18 ms | 600 |
+| POST /api/work-log (save work row) | 16 ms | 29 ms | 42 ms | 18 ms | 600 |
+| POST /api/photos/upload (save photo) | 18 ms | 30 ms | 43 ms | 19 ms | 300 |
+| POST /api/rfis (create RFI) | 15 ms | 33 ms | 48 ms | 16 ms | 50 |
+| GET  /api/projects/FR-BX-001/rfis (register @50) | 17 ms | 17 ms | 17 ms | 17 ms | 1 |
+| GET  /api/projects/FR-BX-001/rfi-constraints | 17 ms | 17 ms | 17 ms | 17 ms | 1 |
+
+DB returned to 8-report baseline (pre=8), 11-worker roster, and 0-RFI count (pre=0). sign_in_log returned to 58 (pre=58). Snapshot: `superstars-pre-300dcr-stress-20260523-175950.db`.
