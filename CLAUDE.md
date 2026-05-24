@@ -229,6 +229,17 @@ would expose the dashboard to the LAN — and PII with it.
   AMG is a sister-org alias that has surfaced in mockups before; the
   dashboard is SSC-branded across every operator surface, every
   rendered report header, and every export filename.
+- **ID / code columns in tables and lists use the row's sans (Inter),
+  never `font-family:monospace`.** Worker IDs (W-####), cert codes,
+  and similar internal identifiers belong with the row — switching
+  to a different typeface reads as a styling bug, not as emphasis.
+  The row's `font-weight:700` + `color:#B11E2E` is enough to make
+  the identifier prominent without changing the typeface. This
+  applies to every list/table surface — workforce, DCR labor roster
+  (entry view + rendered DCR), cert library, hours log. Document /
+  regulatory numbers issued by an external authority (NYC DOB
+  permit numbers, FDNY violations) may stay monospace where digit
+  alignment helps reading; the rule targets *internal* identifiers.
 
 ## 9. Secrets rule: vault all authenticating API keys, never plaintext on disk
 

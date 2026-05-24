@@ -1116,7 +1116,7 @@ applyLanguage();
         const status = (r.intake_status === 'complete') ? '<span class="badge-pill ok">Complete</span>' : '<span class="badge-pill mute">Pending</span>';
         const safeId = esc(r.employee_id);
         return `<tr data-emp="${safeId}" data-name="${esc(r.name || '')}">
-          <td style="font-family:monospace;font-weight:700;color:#B11E2E;">${esc(r.worker_id || '—')}</td>
+          <td style="font-weight:700;color:#B11E2E;">${esc(r.worker_id || '—')}</td>
           <td style="font-weight:600;">${esc(r.name || '—')}</td>
           <td>${esc(r.trade || '—')}</td>
           <td style="font-size:11px;text-transform:uppercase;color:#76777E;">${esc((r.language || '—').toUpperCase().slice(0,2))}</td>
@@ -2560,7 +2560,7 @@ applyLanguage();
       }).join('');
       return `<tr>
         <td style="border:1px solid #E8E4DD;padding:6px 10px;">
-          <div style="font-size:10px;font-family:monospace;font-weight:700;color:#B11E2E;letter-spacing:0.04em;">${esc(w.worker_id || '—')}</div>
+          <div style="font-size:10px;font-weight:700;color:#B11E2E;letter-spacing:0.04em;">${esc(w.worker_id || '—')}</div>
           <div style="font-weight:700;font-size:12px;">${esc(w.name)}</div>
           <div style="font-size:9px;color:#76777E;">
             <button type="button" data-hrs-row-full="${esc(w.employee_id)}" title="Fill Mon-Fri full days for this worker"
