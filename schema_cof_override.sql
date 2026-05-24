@@ -1,0 +1,17 @@
+-- =====================================================================
+-- CoF eligibility admin override
+-- =====================================================================
+-- Adds employees.cof_override — a per-worker admin override that lets
+-- the operator issue a CoF card BEFORE the worker's real prerequisite
+-- certs (RIGGER-32 or SCAFFOLD-16) have been entered. Default 0 — only
+-- the operator explicitly flips it for a specific worker. New onboards
+-- never get an override; the override is reversible and visible in the
+-- DB so it can be audited and removed once real certs land.
+--
+-- Eligibility logic (see cof_issuer.has_valid_prerequisite):
+--   CoF-eligible := holds a currently-valid CoF-prereq cert
+--                   OR cof_override = 1
+-- Either path issues; when real certs are later added, the OR keeps
+-- eligibility true without any extra step.
+-- =====================================================================
+ALTER TABLE employees ADD COLUMN cof_override INTEGER NOT NULL DEFAULT 0;

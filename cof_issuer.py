@@ -41,6 +41,17 @@ CREDENTIALS_DIR = SCRIPT_DIR / "data_room" / "credentials" / "cof"
 # Renewal warning threshold
 RENEWAL_WARN_DAYS = 30
 
+# Default validity (days) for a CoF card issued under the admin override
+# path — i.e. the operator flipped employees.cof_override=1 because real
+# prerequisite certs haven't been entered yet. 1 year is a deliberate
+# short anchor: the override is a bootstrap, not a permanent issuance
+# path; the card forces a refresh once real certs land or 12 months
+# pass, whichever comes first. When real prereq certs ARE on file, the
+# normal expiry path (earliest cert expiry, see calculate_cof_expiry)
+# wins — the override default is only consulted when there are no certs
+# to anchor expiry to.
+COF_OVERRIDE_VALIDITY_DAYS = 365
+
 
 # =====================================================================
 # DB helpers
@@ -103,32 +114,74 @@ def is_cert_currently_valid(cert):
     return exp >= today
 
 
+def employee_has_cof_override(employee_id):
+    """True iff employees.cof_override = 1 for this worker. The override is
+    an admin-set escape hatch (added 2026-05) for the bootstrap roster
+    whose real prerequisite certs haven't been entered yet. New onboards
+    default to 0; the override is reversible (UPDATE ... SET cof_override
+    = 0) and visible in the DB so it can be audited."""
+    conn = db_conn()
+    row = conn.execute(
+        "SELECT cof_override FROM employees WHERE employee_id = ?",
+        (employee_id,)
+    ).fetchone()
+    conn.close()
+    return bool(row and row["cof_override"])
+
+
 def has_valid_prerequisite(employee_id):
-    """Returns (bool, msg) — True if employee holds a currently-valid CoF prerequisite cert."""
+    """Returns (bool, msg) — True if employee holds a currently-valid CoF
+    prerequisite cert OR has the admin cof_override flag set.
+
+    The override path returns a distinctive reason ('admin override') so
+    downstream surfaces can render it differently from real-cert eligibility
+    if they want; today both paths just light up the same "Issue CoF" action.
+    """
     certs = employee_certs(employee_id)
     prereq_certs = [c for c in certs if c.get("is_cof_prerequisite")]
+    valid_prereqs = [c for c in prereq_certs if is_cert_currently_valid(c)]
+    if valid_prereqs:
+        return True, "OK"
+    # No valid prereq cert. Check the admin override before declining —
+    # the OR path keeps eligibility true even after real certs are added
+    # (the cert path takes precedence; expiry comes from cert dates).
+    if employee_has_cof_override(employee_id):
+        return True, "admin override"
     if not prereq_certs:
         return False, "No 16-hr Suspended Scaffold cert on file."
-    valid_prereqs = [c for c in prereq_certs if is_cert_currently_valid(c)]
-    if not valid_prereqs:
-        # Find the most recent expiry to give a useful message
-        exp_dates = [c["expiration_date"] for c in prereq_certs if c.get("expiration_date")]
-        last_exp = max(exp_dates) if exp_dates else "(unknown)"
-        return False, f"16-hr Suspended Scaffold cert expired (last expiry: {last_exp})."
-    return True, "OK"
+    # Had a prereq cert at some point but it expired.
+    exp_dates = [c["expiration_date"] for c in prereq_certs if c.get("expiration_date")]
+    last_exp = max(exp_dates) if exp_dates else "(unknown)"
+    return False, f"16-hr Suspended Scaffold cert expired (last expiry: {last_exp})."
 
 
-def calculate_cof_expiry(employee_id):
-    """Earliest expiration across all currently-valid tracked certs."""
+def calculate_cof_expiry(employee_id, today_override=None):
+    """Earliest expiration across all currently-valid tracked certs. When
+    no tracked cert has an expiration date but cof_override=1 (admin
+    bootstrap), fall back to today + COF_OVERRIDE_VALIDITY_DAYS so a card
+    can still be issued — short anchor on purpose, forces a refresh once
+    real certs land. Returns None only when the worker is genuinely
+    ineligible (no override, no certs with expiry).
+
+    today_override (optional ISO date string or date) lets callers
+    deterministically anchor the override-default expiry — useful for
+    tests / batch backfills that want the issued and expires dates to
+    line up with a specific issue date.
+    """
     certs = employee_certs(employee_id)
     valid_with_expiry = [
         c for c in certs
         if is_cert_currently_valid(c) and c.get("expiration_date")
     ]
-    if not valid_with_expiry:
-        return None
-    earliest = min(c["expiration_date"] for c in valid_with_expiry)
-    return earliest
+    if valid_with_expiry:
+        return min(c["expiration_date"] for c in valid_with_expiry)
+    if employee_has_cof_override(employee_id):
+        if isinstance(today_override, str):
+            anchor = date.fromisoformat(today_override)
+        else:
+            anchor = today_override or date.today()
+        return (anchor + timedelta(days=COF_OVERRIDE_VALIDITY_DAYS)).isoformat()
+    return None
 
 
 def cof_status_for_employee(employee_id):
@@ -304,14 +357,16 @@ def issue_cof(employee_id, rigger_id=None, project_code=None, today_override=Non
         wid = worker_id_for_display(employee_id) or "(unknown worker)"
         raise RuntimeError(f"Cannot issue CoF for {wid}: {reason}")
 
-    expiry = calculate_cof_expiry(employee_id)
+    issued_date = (today_override or date.today()).isoformat() if not isinstance(today_override, str) else today_override
+
+    # Anchor the override-default expiry to the issued date (not date.today())
+    # so a backdated test / batch issuance produces consistent dates.
+    expiry = calculate_cof_expiry(employee_id, today_override=issued_date)
     if not expiry:
         wid = worker_id_for_display(employee_id) or "(unknown worker)"
         raise RuntimeError(
             f"Cannot calculate expiry for {wid}: no certifications with expiration dates."
         )
-
-    issued_date = (today_override or date.today()).isoformat() if not isinstance(today_override, str) else today_override
 
     # ----- Resolve rigger -----
     # If caller didn't specify, use the project's default rigger.
