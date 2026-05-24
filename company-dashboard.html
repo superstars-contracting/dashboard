@@ -1183,7 +1183,7 @@ applyLanguage();
           ? `<a href="${escAttr(c.reference_url)}" target="_blank" rel="noopener" style="color:#B11E2E;font-weight:600;text-decoration:none;">DOB PDF →</a>`
           : `<span style="color:#76777E;">—</span>`;
         html += `<tr>
-          <td style="font-family:monospace;font-size:11px;">${esc(c.cert_type_id)}</td>
+          <td style="font-size:11px;">${esc(c.cert_type_id)}</td>
           <td style="font-weight:600;">${esc(c.name)}</td>
           <td>${c.is_cof_prerequisite ? '<span class="badge-pill ok">Yes</span>' : '<span style="color:#76777E;">—</span>'}</td>
           <td style="font-size:11px;">${refCell}</td>
