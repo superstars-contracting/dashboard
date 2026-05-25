@@ -229,6 +229,7 @@
     <div class="nav-tab" data-panel="compliance" data-i18n="tab-compliance">Compliance</div>
     <div class="nav-tab" data-panel="bid" data-i18n="tab-bid">Bid Tracker</div>
     <div class="nav-tab" data-panel="labor-rate" data-i18n="tab-labor-rate">Labor Rate</div>
+    <div class="nav-tab" data-panel="specs" data-i18n="tab-specs">Specs Library</div>
     <div class="nav-tab" data-panel="settings" data-i18n="tab-settings">Settings</div>
   </div>
 
@@ -356,6 +357,191 @@
       <div class="placeholder" data-i18n="p-bid-placeholder">Bid pipeline — coming in Phase C.</div>
     </div>
   </div>
+
+  <!-- SPECS LIBRARY (manufacturer-agnostic specifications catalog) -->
+  <div class="panel" data-panel="specs">
+    <div class="section">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px;flex-wrap:wrap;gap:12px;">
+        <div>
+          <h2 data-i18n="p-specs-title">Specifications Library</h2>
+          <div class="h2-sub" data-i18n="p-specs-sub">Manufacturer specs catalog. Each row links to the official TDS; the "Attach to Project" action puts the spec under that project's Project Documents (Specifications subsection).</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="specs-mfr" style="padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;background:white;">
+            <option value="Sika" selected>Sika</option>
+            <option value="">All manufacturers</option>
+          </select>
+          <select id="specs-category" style="padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;background:white;min-width:220px;">
+            <option value="">All categories</option>
+          </select>
+          <input type="text" id="specs-search" placeholder="Search name / code…" style="padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;min-width:200px;">
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.04em;font-weight:600;cursor:pointer;">
+            <input type="checkbox" id="specs-core-only"> 890-core only
+          </label>
+        </div>
+      </div>
+      <div id="specs-status" style="font-size:12px;color:#76777E;min-height:18px;margin-bottom:8px;"></div>
+      <table class="roster">
+        <thead>
+          <tr><th>Manufacturer</th><th>Category</th><th>Line</th><th>Product</th><th>Tags</th><th>TDS</th><th>Attach to project</th></tr>
+        </thead>
+        <tbody id="specs-tbody">
+          <tr><td colspan="7" style="padding:20px;text-align:center;color:#76777E;">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <script>
+  (function() {
+    // ---- Specs Library — browse / search / attach ------------------
+    const $  = (id) => document.getElementById(id);
+    const esc = (s) => (s == null ? '' : String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'));
+    let _categoriesLoaded = false;
+    let _projectsList = [];
+
+    async function loadProjects() {
+      // Project list for the per-row attach dropdown. Cached.
+      if (_projectsList.length) return _projectsList;
+      try {
+        const r = await fetch('/api/projects');
+        const j = await r.json();
+        _projectsList = (j && j.data) || [];
+      } catch (_) { _projectsList = []; }
+      return _projectsList;
+    }
+
+    function setStatus(msg, color) {
+      const el = $('specs-status'); if (!el) return;
+      el.textContent = msg || ''; el.style.color = color || '#76777E';
+    }
+
+    function rowHTML(s, projects) {
+      const tds = s.spec_url
+        ? `<a href="${esc(s.spec_url)}" target="_blank" rel="noopener" style="color:#B11E2E;font-weight:600;text-decoration:none;">TDS →</a>`
+        : '<span style="color:#76777E;">—</span>';
+      const tagBadge = s.tags
+        ? `<span class="badge-pill warn" style="font-size:9px;">${esc(s.tags)}</span>`
+        : '<span style="color:#76777E;">—</span>';
+      const projOpts = projects.map(p =>
+        `<option value="${esc(p.project_code)}">${esc(p.project_code)}</option>`
+      ).join('');
+      const attach = `
+        <span style="display:inline-flex;gap:4px;align-items:center;">
+          <select class="specs-attach-proj" data-spec-id="${s.id}" style="font-size:11px;padding:3px 6px;border:1px solid #E8E4DD;border-radius:3px;">
+            <option value="">— project —</option>${projOpts}
+          </select>
+          <button type="button" class="specs-attach-btn" data-spec-id="${s.id}"
+                  style="font-size:10px;font-weight:700;padding:3px 8px;border:none;border-radius:3px;background:#B11E2E;color:white;cursor:pointer;letter-spacing:0.04em;">ATTACH</button>
+        </span>
+      `;
+      return `<tr data-spec-id="${s.id}">
+        <td style="font-weight:600;">${esc(s.manufacturer)}</td>
+        <td style="font-size:11px;color:#76777E;">${esc(s.category)}</td>
+        <td style="font-size:11px;">${esc(s.product_line || '—')}</td>
+        <td style="font-weight:600;">${esc(s.product_name)}</td>
+        <td>${tagBadge}</td>
+        <td>${tds}</td>
+        <td>${attach}</td>
+      </tr>`;
+    }
+
+    function loadCategoriesOnce(items) {
+      // Build the category dropdown once from the first payload so the
+      // filter reflects what's actually in the catalog (no hard-coded list).
+      if (_categoriesLoaded) return;
+      _categoriesLoaded = true;
+      const sel = $('specs-category');
+      const cats = Array.from(new Set(items.map(s => s.category))).sort();
+      sel.innerHTML = '<option value="">All categories</option>' +
+        cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    }
+
+    async function load() {
+      setStatus('Loading…');
+      const params = new URLSearchParams();
+      const mfr = $('specs-mfr').value;
+      const cat = $('specs-category').value;
+      const search = $('specs-search').value.trim();
+      const coreOnly = $('specs-core-only').checked;
+      params.set('manufacturer', mfr || '');
+      if (cat)    params.set('category', cat);
+      if (search) params.set('search', search);
+      if (coreOnly) params.set('tag', '890-core');
+      try {
+        const [resp, projects] = await Promise.all([
+          fetch('/api/spec-products?' + params.toString()).then(r => r.json()),
+          loadProjects(),
+        ]);
+        const data = (resp && resp.data) || null;
+        if (!data) { setStatus('No data', '#B11E2E'); return; }
+        const items = data.items || [];
+        loadCategoriesOnce(items);
+        const tbody = $('specs-tbody');
+        if (!items.length) {
+          tbody.innerHTML = '<tr><td colspan="7" style="padding:18px;text-align:center;color:#76777E;">No specs match the current filter.</td></tr>';
+        } else {
+          tbody.innerHTML = items.map(s => rowHTML(s, projects)).join('');
+        }
+        setStatus(`${items.length} product(s)`, '#2F7C57');
+      } catch (e) {
+        console.warn('[specs] load failed:', e);
+        setStatus('Network error', '#B11E2E');
+      }
+    }
+
+    document.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.specs-attach-btn');
+      if (!btn) return;
+      const specId = btn.dataset.specId;
+      const row = btn.closest('tr');
+      const projSel = row.querySelector('.specs-attach-proj');
+      const project = projSel.value;
+      if (!project) { alert('Pick a project first.'); return; }
+      btn.disabled = true; btn.textContent = '…';
+      try {
+        const resp = await fetch('/api/projects/' + encodeURIComponent(project) + '/document-specs', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({spec_product_id: parseInt(specId, 10)}),
+        });
+        if (resp.status === 201) {
+          btn.textContent = 'ATTACHED';
+          btn.style.background = '#2F7C57';
+        } else if (resp.status === 200) {
+          btn.textContent = 'ALREADY';
+          btn.style.background = '#B68838';
+        } else {
+          const j = await resp.json().catch(() => ({}));
+          btn.textContent = 'FAILED';
+          alert('Attach failed: ' + ((j && j.error) || ('HTTP ' + resp.status)));
+        }
+      } catch (err) {
+        btn.textContent = 'ERR';
+        alert('Network error: ' + (err && err.message));
+      }
+      setTimeout(() => {
+        btn.disabled = false; btn.textContent = 'ATTACH';
+        btn.style.background = '#B11E2E';
+      }, 2500);
+    });
+
+    ['specs-mfr', 'specs-category', 'specs-core-only'].forEach(id => {
+      $(id).addEventListener('change', load);
+    });
+    let _searchTimer = null;
+    $('specs-search').addEventListener('input', () => {
+      clearTimeout(_searchTimer);
+      _searchTimer = setTimeout(load, 200);
+    });
+
+    // Lazy-load on first nav into the Specs tab
+    const navTab = document.querySelector('.nav-tab[data-panel="specs"]');
+    if (navTab) navTab.addEventListener('click', load);
+    // Also expose for the tab-click handler at the top of the file
+    window.SPECS_loadCatalog = load;
+  })();
+  </script>
 
   <!-- LABOR RATE TRACKER (check-cutting sheet) -->
   <!--
@@ -707,6 +893,9 @@ const I18N = {
     'tab-compliance': 'Compliance',
     'tab-bid': 'Bid Tracker',
     'tab-labor-rate': 'Labor Rate',
+    'tab-specs': 'Specs Library',
+    'p-specs-title': 'Specifications Library',
+    'p-specs-sub': 'Manufacturer specs catalog. Each row links to the official TDS; the "Attach to Project" action puts the spec under that project\'s Project Documents (Specifications subsection).',
     'tab-settings': 'Settings',
     'p-active-projects-title': 'Active Projects',
     'p-active-projects-sub': 'Click any project to drill into its dashboard.',
@@ -811,6 +1000,9 @@ const I18N = {
     'tab-compliance': 'Cumplimiento',
     'tab-bid': 'Seguimiento de Ofertas',
     'tab-labor-rate': 'Tarifa Laboral',
+    'tab-specs': 'Especificaciones',
+    'p-specs-title': 'Biblioteca de Especificaciones',
+    'p-specs-sub': 'Catálogo de especificaciones del fabricante. Cada fila enlaza a la TDS oficial; la acción "Adjuntar a Proyecto" añade la especificación a los Documentos del Proyecto.',
     'tab-settings': 'Ajustes',
     'p-active-projects-title': 'Proyectos Activos',
     'p-active-projects-sub': 'Haz clic en cualquier proyecto para ver su tablero.',
@@ -1058,6 +1250,7 @@ applyLanguage();
     if (target === 'workforce') loadWorkforce();
     if (target === 'cert-library') loadCertLibrary();
     if (target === 'labor-rate' && typeof window.LRT_loadGrid === 'function') window.LRT_loadGrid(null);
+    if (target === 'specs' && typeof window.SPECS_loadCatalog === 'function') window.SPECS_loadCatalog();
   }));
 
   // Load company summary metrics
