@@ -422,7 +422,13 @@
           </div>
           <div class="form-group">
             <label class="required">Location ID</label>
-            <input type="text" id="locationId" required placeholder="e.g. North Elevation Drop 3">
+            <!-- When location_unit='Drop' is selected, the input is backed
+                 by a datalist of the project's canonical drops (DP-001..,
+                 grouped via the option's data-elevation). The free-text
+                 input stays so non-Drop locations (Bay/Floor/etc.) can be
+                 typed by hand without rewriting the spine schema. -->
+            <input type="text" id="locationId" required placeholder="e.g. DP-003 — pick from the list when unit = Drop" list="locationIdList" autocomplete="off">
+            <datalist id="locationIdList"></datalist>
           </div>
           <div class="form-group">
             <label>Scope Category</label>
@@ -549,6 +555,32 @@
       } catch (e) {
         console.warn('[RFI] project-config load failed:', e);
       }
+      // Drops from the new /locations endpoint — populates the datalist
+      // backing the Location ID input when the operator picks
+      // location_unit='Drop'. Free-text entry still works for non-Drop
+      // units (Bay/Floor/Elevation/etc.) without rewriting the spine.
+      await loadProjectDrops();
+    }
+
+    async function loadProjectDrops() {
+      const dlist = document.getElementById('locationIdList');
+      if (!dlist) return;
+      try {
+        const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/locations').then(r => r.json());
+        const data = (resp && resp.data) || null;
+        if (!data || !Array.isArray(data.flat)) return;
+        dlist.innerHTML = data.flat.map(d => {
+          // value = the canonical location_id (DP-NNN); label hints
+          // elevation + status so the operator picks confidently.
+          const label = d.label + (d.status && d.status !== 'pending' ? ' · ' + d.status : '');
+          return '<option value="' + esc(d.location_id) + '">' + esc(label) + '</option>';
+        }).join('');
+      } catch (e) {
+        console.warn('[RFI] /locations load failed:', e);
+      }
+    }
+    function esc(s) {
+      return s == null ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
     form.addEventListener('submit', async (e) => {

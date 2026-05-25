@@ -3037,6 +3037,102 @@ def api_project_config(project_code):
     return response_wrapper(cfg)
 
 
+@app.route('/api/projects/<project_code>/locations', methods=['GET'])
+def api_project_locations(project_code):
+    """Canonical location_reference catalog for a project.
+
+    Returns the project's drops from `drop_plan` shaped for the spine
+    (location_unit / location_id) so RFI / DCR / Look-Ahead pickers can
+    offer real drops instead of free-text. Grouped by elevation in the
+    order the operator works the building (the drop_plan_890.md layout
+    for FR-BX-001: North → West → South → East).
+
+    Response:
+      {data: {
+        project_code, project_type, location_unit,  # 'Drop' for facade
+        groups: [
+          {elevation: 'North (East 135th St)',
+           drops: [{location_id:'DP-001', label:'DP-001 · North 1', step_count:6, status:'pending'}, ...]
+          }, ...
+        ],
+        flat: [{location_unit:'Drop', location_id:'DP-001', elevation:'...', label:'...', status:'pending'}, ...],
+        count
+      }}
+
+    The flat array is what writes need (location_unit + location_id
+    pair); the groups array is for the dropdown render. Both come from
+    the same `drop_plan` query so they can't drift.
+    """
+    try:
+        conn = db()
+        if not validate_project_exists(conn, project_code):
+            conn.close()
+            return jsonify({"error": "Project not found"}), 404
+        # drop_plan is the source — sort by the numeric tail of drop_id
+        # (DP-002 before DP-010) so the UI reads building-walk order.
+        rows = conn.execute(
+            "SELECT drop_id, elevation, status, notes "
+            "FROM drop_plan WHERE project_code = ? "
+            "ORDER BY CAST(SUBSTR(drop_id, 4) AS INTEGER)",
+            (project_code,)
+        ).fetchall()
+        # Step counts per drop for the UI badge ("DP-001 · 6 steps").
+        steps_by_drop = {
+            r["drop_id"]: r["n"] for r in conn.execute(
+                "SELECT drop_id, COUNT(*) AS n FROM drop_activities "
+                "WHERE drop_id IN (SELECT drop_id FROM drop_plan WHERE project_code = ?) "
+                "GROUP BY drop_id",
+                (project_code,)
+            ).fetchall()
+        }
+        # project_type — usually 'facade' for FR-BX-001 → location_unit='Drop'
+        # is the most natural pick; the spine's location_unit_options
+        # remain available via /api/projects/<code>/project-config.
+        ptype = conn.execute(
+            "SELECT project_type FROM projects WHERE project_code = ?",
+            (project_code,)
+        ).fetchone()
+        conn.close()
+        groups_map = {}
+        flat = []
+        for r in rows:
+            elev = r["elevation"] or "Unassigned"
+            n_tail = r["drop_id"].split("-")[-1].lstrip("0") or "0"
+            label = f'{r["drop_id"]} · {elev.split(" ")[0]} {n_tail}'
+            entry = {
+                "location_unit": "Drop",
+                "location_id": r["drop_id"],
+                "elevation": elev,
+                "label": label,
+                "status": r["status"] or "pending",
+                "step_count": steps_by_drop.get(r["drop_id"], 0),
+            }
+            flat.append(entry)
+            groups_map.setdefault(elev, []).append({
+                "location_id": entry["location_id"],
+                "label": entry["label"],
+                "step_count": entry["step_count"],
+                "status": entry["status"],
+            })
+        # Preserve elevation order = first appearance in drop_id order.
+        elev_order = []
+        for e in flat:
+            if e["elevation"] not in elev_order:
+                elev_order.append(e["elevation"])
+        groups = [{"elevation": e, "drops": groups_map[e]} for e in elev_order]
+        return response_wrapper({
+            "project_code": project_code,
+            "project_type": ptype["project_type"] if ptype else None,
+            "location_unit": "Drop",
+            "groups": groups,
+            "flat": flat,
+            "count": len(flat),
+        })
+    except Exception as e:
+        logging.error(f"GET /api/projects/{project_code}/locations: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/projects/<project_code>/on-site', methods=['GET'])
 def api_project_on_site(project_code):
     """SHARED 'who is on site now' source (#115/#116).
