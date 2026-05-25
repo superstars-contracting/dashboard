@@ -1535,20 +1535,124 @@ def lookup_existing_dcr_sequence(conn, project_code, report_date):
     return row['dcr_sequence'] if row else None
 
 
-def next_dcr_sequence(conn, project_code):
-    """Return the next DCR sequence number for a project — the smallest positive
-    integer not currently in use. Gap-filling allocation so a deleted sequence
-    becomes available again (matches operator mental model: 'delete and re-issue
-    reuses the same number'). Per-project counter; tracks ISSUANCE order."""
-    used = {row[0] for row in conn.execute(
-        "SELECT DISTINCT dcr_sequence FROM report_index "
+def next_dcr_sequence(conn, project_code, report_date=None):
+    """Return the next DCR sequence for a project, in DATE order.
+
+    A DCR's sequence reflects its position chronologically across the
+    project: earliest date = 1, next = 2, etc. When called with
+    `report_date` set, returns (count of existing DCR dates < report_date)
+    + 1 — so a backdated entry slots in BEFORE later-dated ones (call
+    `shift_dcrs_for_backdate` first to push the laters up).
+
+    Backward-compat: callers that omit report_date get max(seq)+1 (append
+    at the tail). The Phase-2 RFI allocator + a couple of legacy code
+    paths use the no-arg shape.
+    """
+    if report_date:
+        n = conn.execute(
+            "SELECT COUNT(DISTINCT report_date) FROM report_index "
+            "WHERE project_code = ? AND report_type = 'DCR' "
+            "AND dcr_sequence IS NOT NULL AND report_date < ?",
+            (project_code, report_date)
+        ).fetchone()[0]
+        return n + 1
+    # Legacy fallback: max+1 (tail-append). Used by callers that didn't
+    # yet adopt the date-ordered allocator.
+    row = conn.execute(
+        "SELECT COALESCE(MAX(dcr_sequence), 0) FROM report_index "
         "WHERE project_code = ? AND report_type = 'DCR' AND dcr_sequence IS NOT NULL",
         (project_code,)
-    )}
-    n = 1
-    while n in used:
-        n += 1
-    return n
+    ).fetchone()
+    return int(row[0]) + 1
+
+
+# Trailing -NNN-{audience} matcher — used by shift_dcrs_for_backdate
+# to rewrite report_id strings without colliding with an inner
+# project_code "-NNN-" (the bug renumber_dcrs_by_date.py hit on FR-BX-001).
+import re as _re  # local-alias to avoid touching the top-of-file imports
+_DCR_SEQ_TAIL_RE = _re.compile(r"-(\d{3})-(internal|client)$")
+
+
+def shift_dcrs_for_backdate(conn, project_code, threshold_seq):
+    """Push every existing DCR with dcr_sequence >= `threshold_seq` up by 1.
+
+    Updates report_index (sequence + report_id string) and renames the
+    on-disk sequence dirs (data_room/reports/dcr/<project>/<NNN>/) to
+    match. Uses the standard two-step negative-temp swap so a
+    (project_code, sequence) collision can't happen mid-shift.
+
+    Called from issue_dcr when a backdated date wants a seq <= an
+    existing seq, so the chronological order stays intact.
+
+    Re-run-safe in the sense that calling it with a threshold no row
+    matches is a no-op. NOT transactional with the on-disk renames —
+    if a rename fails partway, the DB still commits; the operator gets
+    a warning and can re-sync via renumber_dcrs_by_date.py.
+    """
+    impacted = conn.execute(
+        "SELECT id, dcr_sequence, report_id FROM report_index "
+        "WHERE project_code = ? AND report_type = 'DCR' "
+        "AND dcr_sequence IS NOT NULL AND dcr_sequence >= ? "
+        "ORDER BY dcr_sequence DESC",  # DESC so renames happen high→low and don't collide
+        (project_code, threshold_seq),
+    ).fetchall()
+    if not impacted:
+        return 0
+    # Step A — DB: bump each impacted row to its negative twin
+    for r in impacted:
+        conn.execute(
+            "UPDATE report_index SET dcr_sequence = ? WHERE id = ?",
+            (-int(r["dcr_sequence"]), r["id"]),
+        )
+    # Step B — DB: write the new positive seq + new report_id string
+    for r in impacted:
+        old_seq = int(r["dcr_sequence"])
+        new_seq = old_seq + 1
+        old_rid = r["report_id"] or ""
+        m = _DCR_SEQ_TAIL_RE.search(old_rid)
+        if m:
+            audience = m.group(2)
+            new_rid = _DCR_SEQ_TAIL_RE.sub(f"-{new_seq:03d}-{audience}", old_rid)
+        else:
+            audience = "internal" if old_rid.endswith("internal") else (
+                "client" if old_rid.endswith("client") else "internal"
+            )
+            new_rid = f"DCR-{project_code}-{new_seq:03d}-{audience}"
+        conn.execute(
+            "UPDATE report_index SET dcr_sequence = ?, report_id = ?, "
+            "       updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (new_seq, new_rid, r["id"]),
+        )
+    # On-disk dirs — same two-step (NNN → .tmp_NNN → MMM). Walk
+    # DESC-by-old-seq so existing high dirs free up their target slot
+    # before a lower seq tries to take it.
+    project_root = SCRIPT_DIR / "data_room" / "reports" / "dcr" / project_code
+    if project_root.exists():
+        # Unique old_seqs to move (impacted has 1 row per audience but
+        # the dir is per-sequence)
+        seen_old = []
+        for r in impacted:
+            o = int(r["dcr_sequence"])  # this was the OLD seq before the bump
+            if o not in seen_old:
+                seen_old.append(o)
+        # Step A: to .tmp_NNN
+        for o in seen_old:
+            src = project_root / f"{o:03d}"
+            if src.exists():
+                src.rename(project_root / f".tmp_{o:03d}")
+        # Step B: to (o+1)
+        for o in seen_old:
+            tmp = project_root / f".tmp_{o:03d}"
+            dst = project_root / f"{o+1:03d}"
+            if tmp.exists():
+                if dst.exists():
+                    logging.warning(
+                        f"shift_dcrs_for_backdate: target {dst} exists; "
+                        f"left {tmp.name} in place — operator should re-sync."
+                    )
+                    continue
+                tmp.rename(dst)
+    return len(impacted)
 
 
 def _issue_one_dcr(conn, project_code, report_date, audience, seq):
@@ -1684,7 +1788,22 @@ def issue_dcr(project_code, report_date):
                 "existing_display_id": display_id,
                 "hint": "Pass override_active=true to re-issue (sequence stays the same)",
             }), 409
-        seq = existing_seq if existing_seq is not None else next_dcr_sequence(conn, project_code)
+        if existing_seq is not None:
+            # Re-issue path — sequence is preserved.
+            seq = existing_seq
+        else:
+            # NEW DCR: place it by chronological position. If the date
+            # isn't the latest, push later DCRs up by 1 first so the
+            # whole chain stays date-ordered (5-04 must be -001 even if
+            # 5-18..5-21 already exist as -001..-004 — they become
+            # -002..-005 and the new 5-04 slots in as -001).
+            seq = next_dcr_sequence(conn, project_code, report_date)
+            shifted = shift_dcrs_for_backdate(conn, project_code, seq)
+            if shifted:
+                logging.info(
+                    f"issue_dcr: backdate {report_date} got seq {seq} — "
+                    f"shifted {shifted} later-dated audience rows up by 1."
+                )
         display_id = f"DCR-{project_code}-{seq:03d}"
         generated_at = datetime.utcnow().isoformat() + 'Z'
         if audience == 'both':
