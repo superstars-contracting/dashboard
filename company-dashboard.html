@@ -228,6 +228,7 @@
     <div class="nav-tab" data-panel="cert-library" data-i18n="tab-cert-library">Cert Library</div>
     <div class="nav-tab" data-panel="compliance" data-i18n="tab-compliance">Compliance</div>
     <div class="nav-tab" data-panel="bid" data-i18n="tab-bid">Bid Tracker</div>
+    <div class="nav-tab" data-panel="labor-rate" data-i18n="tab-labor-rate">Labor Rate</div>
     <div class="nav-tab" data-panel="settings" data-i18n="tab-settings">Settings</div>
   </div>
 
@@ -355,6 +356,86 @@
       <div class="placeholder" data-i18n="p-bid-placeholder">Bid pipeline — coming in Phase C.</div>
     </div>
   </div>
+
+  <!-- LABOR RATE TRACKER (check-cutting sheet) -->
+  <!--
+    Hours = real (from /api/payroll/hours, same source as the Weekly
+            Hours Log — they can never disagree).
+    Rates = SAMPLE PLACEHOLDERS ONLY this build. The handoff says:
+            do NOT store real pay, do NOT build real rate entry, do
+            NOT display real pay. Real rates + the server-side role
+            gate land with the auth/governance phase (#48 / #72).
+
+    Sensitive region: the Rate and Amount Owed columns are the only
+    comp surface here. They live inside the `<colgroup class="lrt-comp">`
+    + every cell carries `class="lrt-comp"` + the wrapping <th>/<td>
+    nodes between the `LRT-GATE` BEGIN/END comments below. Future
+    server-side gate (see "Server-side gate wrap" in the IIFE at the
+    bottom of this file) drops every node carrying that class — one
+    place to wrap, no spread responsibility.
+  -->
+  <div class="panel" data-panel="labor-rate">
+    <div class="section">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;flex-wrap:wrap;gap:12px;">
+        <div>
+          <h2 data-i18n="p-labor-rate-title">Labor Rate Tracker</h2>
+          <div class="h2-sub" data-i18n="p-labor-rate-sub">Check-cutting sheet: weekly hours worked × hourly rate. Hours auto-populate from the daily reports — same source as the Hours Log.</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button id="lrt-prev" type="button" style="background:white;border:1px solid var(--brand-red);color:var(--brand-red);padding:6px 12px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;">‹ Prev</button>
+          <div id="lrt-range" style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:14px;font-weight:700;min-width:220px;text-align:center;">—</div>
+          <button id="lrt-next" type="button" style="background:white;border:1px solid var(--brand-red);color:var(--brand-red);padding:6px 12px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;">Next ›</button>
+        </div>
+      </div>
+      <!-- SAMPLE-data banner: amber/gold matches the warn palette used
+           on the Cert Health + Compliance widgets. This must stay until
+           the auth/governance phase replaces the placeholder rates with
+           real, server-gated values. Do not remove without a real role
+           check in front of the gated columns. -->
+      <div id="lrt-sample-banner" style="background:#FFF4D6;border:1px solid #E8C76A;border-left:4px solid #B68838;color:#7A5E1E;font-size:12px;font-weight:600;padding:8px 12px;border-radius:4px;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+        <span style="font-size:14px;line-height:1;">⚠</span>
+        <span data-i18n="p-labor-rate-sample">SAMPLE DATA — placeholder rates only. Real rate entry + secure storage arrive with the auth/governance phase. Do not use these numbers for payroll.</span>
+      </div>
+      <div id="lrt-status" style="font-size:12px;color:var(--mute);min-height:18px;margin-bottom:8px;"></div>
+      <div id="lrt-grid-wrap">
+        <table id="lrt-grid" style="width:100%;border-collapse:collapse;font-size:12px;">
+          <!-- colgroup is the upstream visual hook for the gated columns.
+               The two LRT-GATE columns get a subtle tinted background so
+               the operator sees at a glance which cells are sensitive. -->
+          <colgroup id="lrt-colgroup">
+            <col><col><col><col><col><col><col>
+            <!-- LRT-GATE BEGIN: Rate + Amount Owed cols -->
+            <col class="lrt-comp"><col class="lrt-comp">
+            <!-- LRT-GATE END -->
+          </colgroup>
+          <thead id="lrt-thead"></thead>
+          <tbody id="lrt-tbody">
+            <tr><td colspan="9" style="padding:20px;text-align:center;color:var(--mute);" data-i18n="lrt-loading">Loading…</td></tr>
+          </tbody>
+          <tfoot id="lrt-tfoot"></tfoot>
+        </table>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:var(--mute);">
+        <span data-i18n="p-labor-rate-help">Straight wages — Amount Owed = Total Hours × Rate. Not burdened (no taxes / comp / insurance). The Hours Log is the editable source — daily hours appear here automatically once a worker has signed in.</span>
+      </div>
+    </div>
+  </div>
+  <style>
+    /* Subtle tint on the two gated columns so the comp region reads
+       as visually distinct. Future server-side gate drops everything
+       with class="lrt-comp" — both the colgroup hook and the
+       individual <th>/<td> nodes that JS adds. */
+    #lrt-grid col.lrt-comp { background: rgba(177, 30, 46, 0.04); }
+    #lrt-grid th.lrt-comp, #lrt-grid td.lrt-comp { border-left: 1px dashed var(--hairline); }
+    #lrt-grid th.lrt-comp:first-of-type, #lrt-grid td.lrt-comp:first-of-type { border-left: 2px dashed var(--brand-red); }
+    #lrt-grid .lrt-amount { color: #2F7C57; font-weight: 700; font-variant-numeric: tabular-nums; }
+    #lrt-grid .lrt-rate { color: var(--ink-soft, #4A4A4A); font-variant-numeric: tabular-nums; }
+    #lrt-grid .lrt-num { font-variant-numeric: tabular-nums; text-align: right; }
+    #lrt-grid thead th { background: var(--cream); font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--mute); padding: 8px 6px; border-bottom: 2px solid var(--brand-red); text-align: left; font-weight: 700; }
+    #lrt-grid thead th.lrt-num { text-align: right; }
+    #lrt-grid tbody td { padding: 8px 6px; border-bottom: 1px solid var(--hairline); vertical-align: middle; }
+    #lrt-grid tfoot td { padding: 10px 6px; font-weight: 700; border-top: 2px solid var(--ink); background: #fbfbfc; }
+  </style>
 
   <!-- SETTINGS -->
   <div class="panel" data-panel="settings">
@@ -625,6 +706,7 @@ const I18N = {
     'tab-cert-library': 'Cert Library',
     'tab-compliance': 'Compliance',
     'tab-bid': 'Bid Tracker',
+    'tab-labor-rate': 'Labor Rate',
     'tab-settings': 'Settings',
     'p-active-projects-title': 'Active Projects',
     'p-active-projects-sub': 'Click any project to drill into its dashboard.',
@@ -663,6 +745,17 @@ const I18N = {
     'p-bid-title': 'Bid Tracker',
     'p-bid-sub': 'Opportunities, estimates, and proposals.',
     'p-bid-placeholder': 'Bid pipeline — coming soon.',
+    'p-labor-rate-title': 'Labor Rate Tracker',
+    'p-labor-rate-sub': 'Check-cutting sheet: weekly hours worked × hourly rate. Hours auto-populate from the daily reports — same source as the Hours Log.',
+    'p-labor-rate-sample': 'SAMPLE DATA — placeholder rates only. Real rate entry + secure storage arrive with the auth/governance phase. Do not use these numbers for payroll.',
+    'p-labor-rate-help': 'Straight wages — Amount Owed = Total Hours × Rate. Not burdened (no taxes / comp / insurance). The Hours Log is the editable source — daily hours appear here automatically once a worker has signed in.',
+    'lrt-loading': 'Loading…',
+    'col-worker': 'Worker',
+    'col-total-hrs': 'Total Hrs',
+    'col-rate': 'Rate',
+    'col-amount-owed': 'Amount Owed',
+    'lrt-grand-total': 'GRAND TOTAL',
+    'lrt-daily-totals': 'DAILY TOTALS',
     'p-settings-title': 'Settings',
     'p-settings-sub': 'Company info, issuer signature, integrations.',
     'p-settings-placeholder': 'Settings UI — coming next. Today, edit api-keys.txt directly.',
@@ -717,6 +810,7 @@ const I18N = {
     'tab-cert-library': 'Catálogo de Cert.',
     'tab-compliance': 'Cumplimiento',
     'tab-bid': 'Seguimiento de Ofertas',
+    'tab-labor-rate': 'Tarifa Laboral',
     'tab-settings': 'Ajustes',
     'p-active-projects-title': 'Proyectos Activos',
     'p-active-projects-sub': 'Haz clic en cualquier proyecto para ver su tablero.',
@@ -755,6 +849,17 @@ const I18N = {
     'p-bid-title': 'Seguimiento de Ofertas',
     'p-bid-sub': 'Oportunidades, estimaciones y propuestas.',
     'p-bid-placeholder': 'Cartera de ofertas — próximamente.',
+    'p-labor-rate-title': 'Seguimiento de Tarifa Laboral',
+    'p-labor-rate-sub': 'Hoja de pagos: horas trabajadas semanales × tarifa por hora. Las horas se completan automáticamente desde los reportes diarios.',
+    'p-labor-rate-sample': 'DATOS DE MUESTRA — tarifas ficticias solamente. La entrada real de tarifas + almacenamiento seguro llega con la fase de autenticación. No usar estos números para nómina.',
+    'p-labor-rate-help': 'Salarios directos — Monto Adeudado = Horas Totales × Tarifa. Sin cargas (impuestos / seguro). El Registro de Horas es la fuente editable — las horas diarias aparecen aquí automáticamente.',
+    'lrt-loading': 'Cargando…',
+    'col-worker': 'Trabajador',
+    'col-total-hrs': 'Horas Tot.',
+    'col-rate': 'Tarifa',
+    'col-amount-owed': 'Monto Adeudado',
+    'lrt-grand-total': 'TOTAL GENERAL',
+    'lrt-daily-totals': 'TOTALES DIARIOS',
     'p-settings-title': 'Ajustes',
     'p-settings-sub': 'Información de la empresa, firma del emisor, integraciones.',
     'p-settings-placeholder': 'Interfaz de ajustes — próximamente. Por ahora, edita api-keys.txt directamente.',
@@ -952,6 +1057,7 @@ applyLanguage();
     $$('.panel').forEach(p => p.classList.toggle('active', p.getAttribute('data-panel') === target));
     if (target === 'workforce') loadWorkforce();
     if (target === 'cert-library') loadCertLibrary();
+    if (target === 'labor-rate' && typeof window.LRT_loadGrid === 'function') window.LRT_loadGrid(null);
   }));
 
   // Load company summary metrics
@@ -2755,6 +2861,189 @@ applyLanguage();
 
   // Init: load the default week (server resolves to last_completed_week)
   loadGrid(null);
+})();
+</script>
+
+<!-- Labor Rate Tracker (check-cutting sheet) — shell only.
+     Hours pulled from /api/payroll/hours (the same source the Weekly
+     Hours Log reads, so the two views can never drift apart). Rates
+     are SAMPLE PLACEHOLDERS only — see SAMPLE_RATES_PLACEHOLDER below
+     for the gate-out point that the auth/governance phase replaces
+     with a server-rendered, role-checked source. -->
+<script>
+(function() {
+  const PROJECT_CODE = 'FR-BX-001';  // single active project for now
+  const DAY_LABELS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  const DAY_LABELS_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'];
+
+  // =====================================================================
+  // PLACEHOLDER RATES — DO NOT SHIP REAL PAY DATA THROUGH THIS PATH.
+  // =====================================================================
+  // The auth/governance phase (#48 + #72) replaces this entire constant
+  // with a server-rendered, role-gated values source. Specifically:
+  //
+  //   - Server adds /api/payroll/rates (or merges rates into
+  //     /api/payroll/hours behind an auth check) that returns rates
+  //     ONLY to authenticated users with the comp-data role.
+  //   - For non-authorized callers the API omits the rate field
+  //     entirely (NOT returning 0 or "—" — omission so a sniffed
+  //     payload reveals nothing about real pay).
+  //   - This client-side SAMPLE_RATES_PLACEHOLDER constant goes away
+  //     completely; rates come from the response or not at all.
+  //
+  // Visual gate (this build): every rate / amount cell carries
+  // class="lrt-comp"; the <colgroup> has matching <col class="lrt-comp">.
+  // Dropping those nodes on the server side is the single-place gate.
+  // =====================================================================
+  const SAMPLE_RATES_PLACEHOLDER = {
+    // Deterministic but fake — varies by employee_id so the math is
+    // demonstrable. Numbers chosen to be obviously round / not real.
+    // ANY change here is cosmetic; storage/auth is NOT involved.
+    'E-00001': 35.00, 'E-00002': 32.00, 'E-00003': 30.00,
+    'E-00004': 30.00, 'E-00005': 32.00, 'E-00006': 35.00,
+    'E-00007': 38.00, 'E-00008': 30.00, 'E-00009': 32.00,
+    'E-00010': 30.00, 'E-00011': 35.00,
+  };
+  const FALLBACK_SAMPLE_RATE = 30.00;
+  function sampleRateFor(emp) {
+    return SAMPLE_RATES_PLACEHOLDER[emp] != null ? SAMPLE_RATES_PLACEHOLDER[emp] : FALLBACK_SAMPLE_RATE;
+  }
+
+  const $  = (id) => document.getElementById(id);
+  const esc = (s) => (s == null ? '' : String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'));
+
+  function fmtMoney(n) {
+    if (n == null || isNaN(n)) return '—';
+    return '$' + Number(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+  function fmtRange(mondayIso) {
+    // Mirror the Hours Log range label so the two surfaces read alike.
+    const m = new Date(mondayIso + 'T00:00:00');
+    const f = new Date(m); f.setDate(f.getDate() + 4);
+    const mo = (d) => d.toLocaleString('en-US', {month: 'short'});
+    return `${mo(m)} ${m.getDate()} – ${mo(f)} ${f.getDate()}, ${f.getFullYear()}`;
+  }
+  function setStatus(t, color) {
+    const el = $('lrt-status');
+    if (!el) return;
+    el.textContent = t || '';
+    el.style.color = color || 'var(--mute)';
+  }
+
+  // Days of week labels — language-aware so the EN/ES toggle works.
+  function dayLabels() {
+    const lang = (localStorage.getItem('dashboard_lang') || 'en').toLowerCase();
+    return lang === 'es' ? DAY_LABELS_ES : DAY_LABELS_EN;
+  }
+
+  let currentMonday = null;
+
+  function renderHead(dates) {
+    const labels = dayLabels();
+    const dayCells = dates.map((d, i) => {
+      const dayNum = (new Date(d + 'T00:00:00')).getDate();
+      return `<th class="lrt-num">${esc(labels[i])} ${dayNum}</th>`;
+    }).join('');
+    // The two LRT-GATE <th>s carry class="lrt-comp" so a future
+    // server-side gate can drop them in one place. See SAMPLE_RATES
+    // comment block above.
+    $('lrt-thead').innerHTML = `<tr>
+      <th data-i18n="col-worker">Worker</th>
+      ${dayCells}
+      <th class="lrt-num" data-i18n="col-total-hrs">Total Hrs</th>
+      <!-- LRT-GATE BEGIN: Rate + Amount Owed are comp data -->
+      <th class="lrt-num lrt-comp" data-i18n="col-rate">Rate</th>
+      <th class="lrt-num lrt-comp" data-i18n="col-amount-owed">Amount Owed</th>
+      <!-- LRT-GATE END -->
+    </tr>`;
+  }
+
+  function renderBody(workers) {
+    if (!workers || !workers.length) {
+      $('lrt-tbody').innerHTML = '<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--mute);">No active workers.</td></tr>';
+      return;
+    }
+    const rows = workers.map(w => {
+      const dayCells = w.days.map(d => {
+        const h = d.hours;
+        const cell = (h && h > 0) ? h.toFixed(2) : '<span style="color:var(--mute);">—</span>';
+        return `<td class="lrt-num">${cell}</td>`;
+      }).join('');
+      const total = w.weekly_total || 0;
+      const rate = sampleRateFor(w.employee_id);
+      const amount = total * rate;
+      // worker_id (W-####) in the row's sans font per the
+      // ID/code-column convention (CLAUDE.md terminology rule).
+      return `<tr>
+        <td>
+          <div style="font-size:11px;color:var(--brand-red);font-weight:700;letter-spacing:0.04em;">${esc(w.worker_id || '—')}</div>
+          <div style="font-weight:600;">${esc(w.name || '—')}</div>
+          <div style="font-size:10px;color:var(--mute);">${esc(w.trade || '')}</div>
+        </td>
+        ${dayCells}
+        <td class="lrt-num"><strong>${total.toFixed(2)}</strong></td>
+        <!-- LRT-GATE: rate + amount cells get class="lrt-comp"; the
+             future server-side gate drops every node carrying it. -->
+        <td class="lrt-num lrt-comp lrt-rate">${fmtMoney(rate)}<span style="color:var(--mute);font-size:9px;letter-spacing:0.5px;margin-left:4px;">SAMPLE</span></td>
+        <td class="lrt-num lrt-comp lrt-amount">${fmtMoney(amount)}</td>
+      </tr>`;
+    }).join('');
+    $('lrt-tbody').innerHTML = rows;
+  }
+
+  function renderFoot(grid) {
+    const dailyTotals = grid.totals_by_day || [];
+    const dailyCells = dailyTotals.map(t => `<td class="lrt-num">${(t || 0).toFixed(2)}</td>`).join('');
+    // Grand-total amount owed across the whole roster — sum each
+    // worker's (weekly_total × sampleRateFor).
+    let grandAmount = 0;
+    for (const w of (grid.workers || [])) {
+      grandAmount += (w.weekly_total || 0) * sampleRateFor(w.employee_id);
+    }
+    $('lrt-tfoot').innerHTML = `<tr>
+      <td style="text-align:right;" data-i18n="lrt-daily-totals">DAILY TOTALS</td>
+      ${dailyCells}
+      <td class="lrt-num">${(grid.grand_total || 0).toFixed(2)}</td>
+      <!-- LRT-GATE: grand-total amount is comp data -->
+      <td class="lrt-num lrt-comp" style="color:var(--mute);">—</td>
+      <td class="lrt-num lrt-comp lrt-amount">${fmtMoney(grandAmount)}</td>
+    </tr>`;
+  }
+
+  async function loadGrid(weekStartIso) {
+    setStatus('Loading…');
+    try {
+      const url = '/api/payroll/hours' + (weekStartIso ? ('?week_start=' + encodeURIComponent(weekStartIso)) : '');
+      const resp = await fetch(url);
+      const json = await resp.json();
+      const grid = json && json.data;
+      if (!grid) { setStatus('No data for this week', 'var(--mute)'); return; }
+      currentMonday = grid.week_start;
+      $('lrt-range').textContent = fmtRange(grid.week_start);
+      renderHead(grid.dates);
+      renderBody(grid.workers);
+      renderFoot(grid);
+      setStatus('');
+    } catch (e) {
+      console.warn('[LRT] load failed:', e);
+      setStatus('Network error — retry', '#B11E2E');
+    }
+  }
+  // Expose for the nav-tab click handler — the panel only loads when
+  // its tab is clicked, not on every page load (cheap enough but no
+  // reason to ping the API when the panel isn't visible).
+  window.LRT_loadGrid = loadGrid;
+
+  function shiftWeek(deltaDays) {
+    if (!currentMonday) { loadGrid(null); return; }
+    const d = new Date(currentMonday + 'T00:00:00');
+    d.setDate(d.getDate() + deltaDays);
+    const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
+    loadGrid(`${y}-${m}-${dd}`);
+  }
+  $('lrt-prev').addEventListener('click', () => shiftWeek(-7));
+  $('lrt-next').addEventListener('click', () => shiftWeek(7));
 })();
 </script>
 </body>
