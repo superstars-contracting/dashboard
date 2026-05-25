@@ -3037,6 +3037,48 @@ def api_project_config(project_code):
     return response_wrapper(cfg)
 
 
+@app.route('/api/projects/<project_code>/lookahead/render', methods=['GET'])
+def api_project_lookahead_render(project_code):
+    """LIVE-render the Two-Week Look-Ahead for `project_code` (Phase 3).
+
+    Query params:
+      start         (optional) ISO YYYY-MM-DD; default = LOCAL today
+      working_days  (optional) int; default = 10 (the 2-week window)
+
+    Returns HTML (Content-Type text/html). Mirrors the live-render pattern
+    /api/rfis/<rfi_id>/render uses for Phase 2 — read DB now, render now,
+    no on-disk staging files. Per linkage_rules.rfi_to_lookahead, the
+    Constraints section reads open / overdue schedule-impact RFIs (the
+    same set /api/projects/<code>/rfi-constraints returns) and joins
+    them to drops by location_id.
+    """
+    from render_lookahead_v2 import render_lookahead_html
+    start = (request.args.get('start') or '').strip() or None
+    try:
+        working_days = int(request.args.get('working_days') or 10)
+    except ValueError:
+        return jsonify({"error": "working_days must be an integer"}), 400
+    if working_days < 1 or working_days > 20:
+        return jsonify({"error": "working_days must be 1..20"}), 400
+    if start:
+        try:
+            datetime.strptime(start, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({"error": "start must be YYYY-MM-DD"}), 400
+    try:
+        conn = db()
+        if not validate_project_exists(conn, project_code):
+            conn.close()
+            return jsonify({"error": "Project not found"}), 404
+        html = render_lookahead_html(conn, project_code, start_iso=start,
+                                     working_days=working_days)
+        conn.close()
+        return Response(html, mimetype='text/html')
+    except Exception as e:
+        logging.error(f"GET /api/projects/{project_code}/lookahead/render: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/projects/<project_code>/locations', methods=['GET'])
 def api_project_locations(project_code):
     """Canonical location_reference catalog for a project.
