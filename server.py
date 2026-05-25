@@ -3037,6 +3037,50 @@ def api_project_config(project_code):
     return response_wrapper(cfg)
 
 
+@app.route('/api/projects/<project_code>/weekly/render', methods=['GET'])
+def api_project_weekly_render(project_code):
+    """LIVE-render the Weekly Summary Report for `project_code` (Phase 4).
+
+    Per construction_builds_spec.json weekly_summary_report, this is an
+    AGGREGATION of the week's daily reports — no independent data entry.
+    Pulls live RFI counts (linkage_rules.rfi_to_reports) and references
+    the Look-Ahead.
+
+    Query params:
+      week_ending  (optional) ISO YYYY-MM-DD; defaults to the most
+                   recent completed Friday (mirrors the Hours Log's
+                   last_completed_week semantics).
+      audience     'internal' (default) | 'owner' — toggles section set.
+
+    Returns HTML (Content-Type text/html). Matches the Phase-3 Look-Ahead
+    + Phase-2 RFI live-render shape.
+    """
+    from render_weekly_summary_v2 import render_weekly_summary_html
+    week_ending = (request.args.get('week_ending') or '').strip() or None
+    audience = (request.args.get('audience') or 'internal').strip().lower()
+    if audience not in ('internal', 'owner'):
+        return jsonify({"error": "audience must be 'internal' or 'owner'"}), 400
+    if week_ending:
+        try:
+            datetime.strptime(week_ending, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({"error": "week_ending must be YYYY-MM-DD"}), 400
+    try:
+        conn = db()
+        if not validate_project_exists(conn, project_code):
+            conn.close()
+            return jsonify({"error": "Project not found"}), 404
+        html = render_weekly_summary_html(
+            conn, project_code,
+            week_ending_iso=week_ending, audience=audience,
+        )
+        conn.close()
+        return Response(html, mimetype='text/html')
+    except Exception as e:
+        logging.error(f"GET /api/projects/{project_code}/weekly/render: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/projects/<project_code>/lookahead/render', methods=['GET'])
 def api_project_lookahead_render(project_code):
     """LIVE-render the Two-Week Look-Ahead for `project_code` (Phase 3).

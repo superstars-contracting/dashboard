@@ -467,6 +467,7 @@
       <div class="nav-group">
         <div class="nav-group-label">Daily Ops</div>
         <a class="nav-link" data-view="daily-report">Daily Report</a>
+        <a class="nav-link" data-view="weekly-summary">Weekly Summary</a>
         <a class="nav-link" data-view="site-closure">Site Closure</a>
         <a class="nav-link" data-view="materials">Materials & Deliveries</a>
         <a class="nav-link" data-view="meetings">Meeting Minutes</a>
@@ -2555,6 +2556,70 @@
         })();
         </script>
       </section>
+
+      <!-- WEEKLY SUMMARY -->
+      <section class="view" data-view="weekly-summary">
+        <div class="section">
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;gap:12px;">
+            <div>
+              <h2 style="margin-bottom:0;">Weekly Summary Report</h2>
+              <div style="font-size:12px;color:#76777E;margin-top:4px;">13-section roll-up of the week's daily reports. Live RFI counts. References the Two-Week Look-Ahead.</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <label style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Week ending</label>
+              <input type="date" id="ws-week" style="padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
+              <select id="ws-audience" style="padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;background:white;">
+                <option value="internal">Internal</option>
+                <option value="owner">Owner-facing</option>
+              </select>
+              <button id="ws-refresh" type="button" style="background:white;border:1px solid #B11E2E;color:#B11E2E;padding:6px 12px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;">Refresh</button>
+              <button id="ws-open" type="button" style="background:#B11E2E;color:white;border:none;padding:6px 12px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;">Open ↗</button>
+            </div>
+          </div>
+          <!-- Live Weekly renders inline via /api/projects/<code>/weekly/render?week_ending=YYYY-MM-DD&audience=... -->
+          <iframe id="ws-frame" style="width:100%;height:75vh;border:1px solid #E8E4DD;border-radius:6px;background:white;" title="Weekly Summary Report"></iframe>
+        </div>
+      </section>
+      <script>
+      (function() {
+        const PROJECT = (typeof PROJECT_CODE !== 'undefined') ? PROJECT_CODE : 'FR-BX-001';
+        const weekEl   = document.getElementById('ws-week');
+        const audEl    = document.getElementById('ws-audience');
+        const frame    = document.getElementById('ws-frame');
+        const refresh  = document.getElementById('ws-refresh');
+        const openBtn  = document.getElementById('ws-open');
+        function lastFridayLocal() {
+          // Mirror payroll_hours.last_completed_week — Friday of the most
+          // recent COMPLETED Mon-Fri week. If today is Fri, use prior Fri.
+          const d = new Date();
+          const dow = d.getDay();  // 0=Sun..6=Sat; Fri=5
+          let daysBack = (dow + 7 - 5) % 7;
+          if (daysBack === 0) daysBack = 7;
+          d.setDate(d.getDate() - daysBack);
+          return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+        }
+        function urlFor(weekISO, aud) {
+          return '/api/projects/' + encodeURIComponent(PROJECT)
+               + '/weekly/render?week_ending=' + encodeURIComponent(weekISO)
+               + '&audience=' + encodeURIComponent(aud);
+        }
+        function currentISO() {
+          return window.SSCDatePicker ? (SSCDatePicker.getISO(weekEl) || lastFridayLocal()) : (weekEl.value || lastFridayLocal());
+        }
+        function load() {
+          frame.src = urlFor(currentISO(), audEl.value);
+        }
+        if (window.SSCDatePicker) SSCDatePicker.setISO(weekEl, lastFridayLocal());
+        else weekEl.value = lastFridayLocal();
+        if (window.SSCDatePicker) SSCDatePicker.wire(weekEl);
+        refresh.addEventListener('click', load);
+        openBtn.addEventListener('click', () => window.open(urlFor(currentISO(), audEl.value), '_blank'));
+        weekEl.addEventListener('change', load);
+        audEl.addEventListener('change', load);
+        const navLink = document.querySelector('.nav-link[data-view="weekly-summary"]');
+        if (navLink) navLink.addEventListener('click', () => { if (!frame.src) load(); });
+      })();
+      </script>
 
       <!-- SITE CLOSURE -->
       <section class="view" data-view="site-closure">
