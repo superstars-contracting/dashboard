@@ -1973,6 +1973,10 @@
                 // showEntry() also calls clearDcrFormState(); both paths are
                 // idempotent.
                 clearDcrFormState({preserveBanner: true});
+                // The manual sign-ins added in this session are now
+                // committed to an issued DCR — drop the rollback set so
+                // a later Cancel can't delete them retroactively.
+                _sessionAddedSignInIds.clear();
                 // DCR-4: clear the re-issue context + banner so a
                 // subsequent New DCR doesn't carry over the marker.
                 _reissueContext = null;
@@ -2322,6 +2326,19 @@
           // when this flag is set.
           let _reissueContext = null;  // {seq, displayId, date}
 
+          // Tracks sign_in_log row ids the OPERATOR added via the manual
+          // labor-add form in the CURRENT entry session. The manual-add
+          // POST persists to sign_in_log immediately (that's how
+          // /api/sign-ins works); if the operator hits Cancel before
+          // Save / Issue, we DELETE these rows so nothing the operator
+          // added in a cancelled session sticks. Worker-app PIN sign-ins
+          // never enter this set — they come from the worker side and
+          // must persist regardless of operator session boundary.
+          // Cleared on: showEntry (new session start), Issue success
+          // (rows are now committed to the DCR), and the Cancel
+          // itself (after the deletes resolve).
+          let _sessionAddedSignInIds = new Set();
+
           // DCR-4: reopen an issued DCR for edit. Switches to entry view,
           // sets the date, reveals the re-issue banner, and triggers
           // loadDcr (which now renders existing photos as saved tiles).
@@ -2365,6 +2382,11 @@
             _reissueContext = null;
             const reissueBanner = document.getElementById('dcr-reissue-banner');
             if (reissueBanner) reissueBanner.style.display = 'none';
+            // Every new entry session starts with an empty rollback set —
+            // the previous session was already concluded by Cancel
+            // (which cleared it) or by Issue (which also cleared it).
+            // Clearing here is defensive against any path that didn't.
+            _sessionAddedSignInIds.clear();
             // Defensive: every entry into the form starts from a known-clean
             // state. The eager reset in issueDcr() success already clears
             // most of this on the way out, but we re-do it here so paths that
@@ -2486,6 +2508,12 @@
                 });
                 const json = await resp.json().catch(() => ({}));
                 if (resp.status === 201) {
+                  // Record this manual-add's sign_in_log id in the
+                  // session-added set so a subsequent Cancel can roll
+                  // it back. Worker-app PIN sign-ins never enter this
+                  // set — only operator manual adds.
+                  const newId = json && json.data && json.data.id;
+                  if (newId) _sessionAddedSignInIds.add(newId);
                   // Reset for fast multi-add — keep times (likely same crew window),
                   // but clear the worker pick so operator must select the next one.
                   if (sel) sel.value = '';
@@ -2513,10 +2541,38 @@
             });
           }
 
-          function cancelDcr() {
+          async function cancelDcr() {
             const unsavedRows = document.querySelectorAll('.dcr-row[data-saved="0"]');
-            if (unsavedRows.length > 0) {
-              if (!confirm('Discard ' + unsavedRows.length + ' unsaved DCR row(s)?')) return;
+            const manualSignInCount = _sessionAddedSignInIds.size;
+            // Single confirm that covers both kinds of unsaved work —
+            // text-row drafts AND operator manual sign-ins that were
+            // POSTed live but haven't been included in an issued DCR.
+            const partsToWarn = [];
+            if (unsavedRows.length) partsToWarn.push(unsavedRows.length + ' unsaved row(s)');
+            if (manualSignInCount) partsToWarn.push(manualSignInCount + ' manual sign-in(s) added this session');
+            if (partsToWarn.length) {
+              if (!confirm('Discard ' + partsToWarn.join(' and ') + '?')) return;
+            }
+            // Roll back operator manual sign-ins — these were persisted to
+            // sign_in_log on Add but were never committed to an issued DCR;
+            // leaving them in the DB pollutes future opens of this date
+            // (the bug: stuck sign-ins re-populate every reopen).
+            // Worker-app PIN sign-ins are NEVER in this set so they're
+            // untouched. Errors during delete are logged but don't block
+            // the rest of cancel — a stuck row is recoverable later, a
+            // half-completed cancel leaves the operator confused now.
+            if (manualSignInCount) {
+              const ids = Array.from(_sessionAddedSignInIds);
+              const results = await Promise.allSettled(
+                ids.map(id => fetch('/api/sign-ins/' + encodeURIComponent(id), {method: 'DELETE'}))
+              );
+              const failed = results.filter(r => r.status === 'rejected'
+                || (r.value && !r.value.ok && r.value.status !== 404)).length;
+              if (failed) {
+                console.warn('[DCR] cancelDcr: ' + failed + '/' + ids.length
+                  + ' manual sign-in deletes failed; operator may need to clean up.');
+              }
+              _sessionAddedSignInIds.clear();
             }
             // Eager clear on cancel too — same hygiene as issue-success path.
             clearDcrFormState();
