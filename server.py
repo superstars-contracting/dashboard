@@ -3495,6 +3495,43 @@ def api_project_lookahead_render(project_code):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/blank-forms', methods=['GET'])
+def api_blank_forms():
+    """Catalog of reusable blank (template) forms.
+
+    Returns every row in blank_forms with a file_url synthesized for
+    /files/data_room/forms/<filename> so the operator's UI can link
+    straight to the file without a second round-trip.
+
+    Optional category filter.
+    """
+    cat = (request.args.get('category') or '').strip()
+    where = []
+    params = []
+    if cat:
+        where.append("category = ?")
+        params.append(cat)
+    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+    try:
+        conn = db()
+        rows = conn.execute(
+            f"SELECT id, title, filename, category, description, mime_type, "
+            f"       created_at FROM blank_forms{where_sql} "
+            f"ORDER BY category, title",
+            params,
+        ).fetchall()
+        conn.close()
+        out = []
+        for r in rows:
+            d = dict(r)
+            d['file_url'] = '/files/data_room/forms/' + d['filename']
+            out.append(d)
+        return response_wrapper(out, count=len(out))
+    except Exception as e:
+        logging.error(f"GET /api/blank-forms: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/spec-products', methods=['GET'])
 def api_spec_products():
     """Browse / search the manufacturer-agnostic specifications catalog.

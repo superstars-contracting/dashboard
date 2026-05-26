@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Daily Suspended Scaffold Inspection</title>
+<style>
+  @page { size: Letter portrait; margin: 0.3in 0.4in; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    color: #1c1c1c;
+    font-size: 10pt;
+    line-height: 1.2;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .title-bar {
+    background: #b01e2d;
+    color: #fff;
+    padding: 5px 12px 6px;
+    border-radius: 3px 3px 0 0;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .title {
+    font-family: "Archivo", "Inter", system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    font-size: 13.5pt;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+  .subtitle {
+    font-size: 8pt;
+    opacity: 0.92;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .fields {
+    display: flex;
+    gap: 18px;
+    margin: 5px 0 5px;
+    padding: 0 2px;
+  }
+  .fields .f {
+    flex: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+  }
+  .fields .lbl {
+    font-weight: 700;
+    font-size: 8.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+  .fields .line {
+    flex: 1;
+    border-bottom: 1.1px solid #333;
+    height: 14px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    page-break-inside: avoid;
+  }
+  thead th {
+    background: #1c1c1c;
+    color: #fff;
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 3px 7px;
+    text-align: left;
+    border: 1px solid #1c1c1c;
+    line-height: 1.1;
+  }
+  thead th.center { text-align: center; }
+  tbody td {
+    border: 1px solid #888;
+    padding: 4px 8px;
+    vertical-align: middle;
+    line-height: 1.2;
+  }
+  tbody tr:nth-child(odd) td { background: #fafaf7; }
+  .col-item { width: 65%; }
+  .col-yn  { width: 5%; }
+  .col-comments { width: 20%; }
+
+  .num { font-weight: 700; color: #b01e2d; margin-right: 4px; }
+  .sub { padding-left: 22px !important; }
+  .sub-letter { font-weight: 700; color: #5f6470; margin-right: 4px; }
+  .group-head { font-weight: 600; }
+  .qualifier { color: #5f6470; font-style: italic; font-size: 9pt; }
+
+  .signoff {
+    display: flex;
+    gap: 18px;
+    margin-top: 5px;
+    padding: 0 2px;
+  }
+  .signoff .f {
+    flex: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+  }
+  .signoff .lbl {
+    font-weight: 700;
+    font-size: 8.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+  .signoff .line {
+    flex: 1;
+    border-bottom: 1.1px solid #333;
+    height: 14px;
+  }
+</style>
+</head>
+<body>
+
+<div class="title-bar">
+  <div class="title">Daily Suspended Scaffold Inspection</div>
+  <div class="subtitle">NYC DOB / OSHA — daily, before use</div>
+</div>
+
+<div class="fields">
+  <div class="f"><span class="lbl">Date:</span><span class="line"></span></div>
+  <div class="f"><span class="lbl">Inspection by:</span><span class="line"></span></div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th class="col-item">Item Inspected</th>
+      <th class="col-yn center">Yes</th>
+      <th class="col-yn center">No</th>
+      <th class="col-yn center">N/A</th>
+      <th class="col-comments">Comments</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td><span class="num">1.</span>Tiebacks are secured to structural components.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td><span class="num">2.</span>Independent lifelines are secured to independent anchorage.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="sub"><span class="sub-letter">a.</span>Lifelines have been protected from abrasion.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="sub"><span class="sub-letter">b.</span>Lifeline terminated with a bowline or rolling hitch knot.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="sub"><span class="sub-letter">c.</span>Lifeline reaches the lower level.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td><span class="num">3.</span>Wire hoisting rope is in good condition.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td><span class="num">4.</span>Fistgrips (3) in good condition, properly installed &amp; torqued.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td><span class="num">5.</span>Shackles are in good condition; secured by wire.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td><span class="num">6.</span>Thimbles used in the eye and are in good condition.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td><span class="num">7.</span><span class="group-head">Platform</span></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="sub"><span class="sub-letter">a.</span>Proper overhang for stirrups.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="sub"><span class="sub-letter">b.</span>Free of debris.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td><span class="num">8.</span>Guardrails installed on all open sides of the platform.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td><span class="num">9.</span>Wire mesh installed around all open sides of guardrail.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td><span class="num">10.</span>Uprights in good condition and properly spaced.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td><span class="num">11.</span>Motors in good condition. Emergency stop operational.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td><span class="num">12.</span>Stirrups are in good condition.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td><span class="num">13.</span>Workers using personal fall arrest before mounting scaffold.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td><span class="num">14.</span>Rope grabs used properly (not knots) and in good condition.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td><span class="num">15.</span><span class="group-head">Outriggers</span></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="sub"><span class="sub-letter">a.</span>Foreman did calculations; proper counterweights in use.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="sub"><span class="sub-letter">b.</span>Counterweights have been secured.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="sub"><span class="sub-letter">c.</span>Outrigger beams are in good condition.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="sub"><span class="sub-letter">d.</span>Pipe frames or Delta frames in good condition.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="sub"><span class="sub-letter">e.</span>Mudsills &amp; baseplates used under load-bearing frames.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td><span class="num">16.</span><span class="group-head">Paperwork</span></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="sub"><span class="sub-letter">a.</span>CD-5 filed, approved &amp; on site. <span class="qualifier">(occupied)</span></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="sub"><span class="sub-letter">b.</span>Foreman holds employer Cert. of Fitness. <span class="qualifier">(occupied)</span></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="sub"><span class="sub-letter">c.</span>Workers carry recognized scaffold completion cards.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="sub"><span class="sub-letter">d.</span>DOB-approved special rigger's license on site.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td><span class="num">17.</span><span class="group-head">All wire rope termination points</span></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="sub"><span class="sub-letter">a.</span>Shackle is being used.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="sub"><span class="sub-letter">b.</span>Thimble is being used.</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="sub"><span class="sub-letter">c.</span>3 J-Clamps are being used.</td><td></td><td></td><td></td><td></td></tr>
+  </tbody>
+</table>
+
+<div class="signoff">
+  <div class="f"><span class="lbl">Inspector signature:</span><span class="line"></span></div>
+  <div class="f"><span class="lbl">Date:</span><span class="line"></span></div>
+</div>
+
+</body>
+</html>

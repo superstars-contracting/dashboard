@@ -906,6 +906,21 @@
       <section class="view" data-view="documents">
         <div class="section">
           <h2>Project Documents</h2>
+          <!-- BLANK FORMS subsection — reusable safety / compliance
+               templates (scaffold inspection, future safety plan,
+               orientation, waste-management, rigging C-hook letters).
+               Sourced from the cross-project blank_forms catalog and
+               served from data_room/forms/. -->
+          <div style="margin-bottom:18px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;">
+              <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin:0;">Blank Forms</h3>
+              <span style="font-size:11px;color:#76777E;">Reusable templates · Print fresh each shift</span>
+            </div>
+            <div id="proj-blank-forms" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));gap:10px;">
+              <div style="padding:14px;text-align:center;color:#76777E;font-style:italic;background:white;border:1px solid #E8E4DD;border-radius:4px;">Loading…</div>
+            </div>
+          </div>
+
           <!-- SPECIFICATIONS subsection — first real-data section in
                Project Documents (the others below remain visual
                placeholders until the rest of #148 lands). The Specs
@@ -3216,11 +3231,50 @@ document.querySelectorAll('.nav-link').forEach(link => {
       document.querySelector('.views-container').scrollTo({top: 0, behavior: 'smooth'});
     }
     // Per-view lazy loads
-    if (targetView === 'documents' && typeof window.PROJ_loadAttachedSpecs === 'function') {
-      window.PROJ_loadAttachedSpecs();
+    if (targetView === 'documents') {
+      if (typeof window.PROJ_loadAttachedSpecs === 'function') window.PROJ_loadAttachedSpecs();
+      if (typeof window.PROJ_loadBlankForms === 'function') window.PROJ_loadBlankForms();
     }
   });
 });
+
+// ---- Project Documents — Blank Forms subsection --------------------
+// Loads /api/blank-forms; renders each as a click-to-open card. PDFs
+// open in a new tab via the /files/ static route.
+(function() {
+  const _esc = (s) => (s == null ? '' : String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'));
+
+  async function load() {
+    const grid = document.getElementById('proj-blank-forms');
+    if (!grid) return;
+    try {
+      const resp = await fetch('/api/blank-forms');
+      const j = await resp.json();
+      const rows = (j && j.data) || [];
+      if (!rows.length) {
+        grid.innerHTML = '<div style="padding:14px;text-align:center;color:#76777E;font-style:italic;background:white;border:1px solid #E8E4DD;border-radius:4px;">No blank forms yet.</div>';
+        return;
+      }
+      grid.innerHTML = rows.map(r => {
+        const ext = (r.filename || '').split('.').pop().toUpperCase();
+        return `<a href="${_esc(r.file_url)}" target="_blank" rel="noopener"
+                    style="display:block;padding:14px;background:white;border:1px solid #E8E4DD;border-left:4px solid #B11E2E;border-radius:4px;text-decoration:none;color:inherit;transition:all 0.15s;"
+                    onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.08)';this.style.borderLeftColor='#8B1623';"
+                    onmouseout="this.style.boxShadow='';this.style.borderLeftColor='#B11E2E';">
+          <div style="font-size:9px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">${_esc(r.category || 'Form')} · ${_esc(ext)}</div>
+          <div style="font-weight:700;font-size:13px;color:#14161C;margin-bottom:4px;">${_esc(r.title)}</div>
+          ${r.description ? '<div style="font-size:11px;color:#76777E;line-height:1.4;">' + _esc(r.description) + '</div>' : ''}
+          <div style="font-size:10px;color:#B11E2E;font-weight:600;margin-top:6px;letter-spacing:0.04em;text-transform:uppercase;">Open ↗</div>
+        </a>`;
+      }).join('');
+    } catch (e) {
+      console.warn('[blank-forms] load failed:', e);
+      grid.innerHTML = '<div style="padding:14px;text-align:center;color:#B11E2E;background:white;border:1px solid #E8E4DD;border-radius:4px;">Network error — retry</div>';
+    }
+  }
+  window.PROJ_loadBlankForms = load;
+})();
 
 // ---- Project Documents — Specifications subsection -----------------
 // Loads /api/projects/<code>/document-specs and renders the table.
