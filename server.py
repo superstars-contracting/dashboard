@@ -24,6 +24,15 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 from preview_routes import preview_bp
 app.register_blueprint(preview_bp)
 
+# Dashboard auth foundation (#48): wires /login, /api/auth/* and a
+# before_request gate that redirects unauthenticated requests to /login
+# (HTML) / returns 401 (JSON). The gate exempts /api/worker/*, /worker-app,
+# /api/health, /api/today, /files/* (static assets), and /preview/* —
+# worker-app PIN sign-in is untouched. Per-route role gating uses
+# @requires_role from auth.py.
+from auth import apply_auth_gate, requires_role, current_user  # noqa: F401 (requires_role re-exported for future use)
+apply_auth_gate(app)
+
 # Security: max upload size (20 MB per file). Anything larger is rejected at the WSGI layer.
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
 
@@ -89,14 +98,25 @@ def response_wrapper(data, count=None):
 
 # Per CLAUDE.md PII rule: PINs are derived from phone last-4, so plaintext
 # phones and PINs in server.log violate the same PII discipline as pasting
-# them into chats. Redact at the logging boundary so the file accumulates
-# only safe data.
+# them into chats. Auth foundation (#48) extends this to passwords +
+# password hashes — login bodies and any future password-change calls
+# must never leave plaintext in server.log. Redact at the logging
+# boundary so the file accumulates only safe data.
 _PIN_BEARING_FIELDS = {'phone_or_pin', 'pin', 'phone', 'emergency_contact_phone'}
+_SECRET_BEARING_FIELDS = {'password', 'password_hash', 'new_password', 'old_password', 'current_password'}
 
 def _redact_pii(body):
     if not isinstance(body, dict):
         return body
-    return {k: ('XXXX' if (k in _PIN_BEARING_FIELDS and v) else v) for k, v in body.items()}
+    def _redact_value(k, v):
+        if not v:
+            return v
+        if k in _SECRET_BEARING_FIELDS:
+            return '<redacted>'
+        if k in _PIN_BEARING_FIELDS:
+            return 'XXXX'
+        return v
+    return {k: _redact_value(k, v) for k, v in body.items()}
 
 
 def _fmt_mdy(value) -> str:
