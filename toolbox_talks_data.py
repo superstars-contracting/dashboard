@@ -885,5 +885,319 @@ TALKS = [
         ],
         "description": "Three independent systems on a swing-stage drop: counterweights, tiebacks, and lifelines — and the anchor that holds each.",
     },
+
+    # ============================================================
+    # Topic 12 — Counterweights, Outriggers, Mudsills
+    # ============================================================
+    {
+        "topic_number": 12,
+        "slug": "12-counterweights-outriggers-mudsills",
+        "category": "Scaffold",
+        "ch33_ref": "§3314",
+        "est_minutes": 15,
+        "title_en": "Suspended Scaffold — Counterweights, Outriggers, Mudsills",
+        "title_es": "Andamio Colgante — Contrapesos, Outriggers, Tablones Base",
+        "why_en": (
+            "On a parapet-clamp or outrigger drop, the counterweights are "
+            "the only thing keeping the rig from rotating off the roof. "
+            "Missing one weight, an outrigger on a soft spot, a mudsill on "
+            "uneven asphalt — the math fails and the rig goes over the "
+            "edge. Verify the math before workers go below."
+        ),
+        "why_es": (
+            "En una caída con parapet-clamp u outrigger, los contrapesos "
+            "son lo único que evita que el equipo se voltee del techo. "
+            "Falta un peso, un outrigger en un punto blando, un tablón "
+            "base sobre asfalto irregular — la matemática falla y el "
+            "equipo se va por el borde. Verifica la matemática antes de "
+            "que los trabajadores bajen."
+        ),
+        "rules_en": [
+            ("Counterweight = 4× the suspended load (working load × 4 safety factor).", "§3314.4.5"),
+            ("Counterweights of equal-weight pieces, not flowable material.", "§3314.4.5.2"),
+            ("Outriggers bear on a mudsill that distributes the load to the deck.", "§3314.4.5.3"),
+            ("Outrigger anchored / secured against displacement.", "§3314.4.5.3"),
+            ("Counterweights labeled with their weight; no missing pieces.", "§3314.4.5.2"),
+        ],
+        "rules_es": [
+            ("Contrapeso = 4× la carga colgada (carga × factor de seguridad 4).", "§3314.4.5"),
+            ("Contrapesos de piezas de peso igual, no material que fluye.", "§3314.4.5.2"),
+            ("Outriggers se apoyan en un tablón base que distribuye la carga.", "§3314.4.5.3"),
+            ("Outrigger anclado o asegurado contra desplazamiento.", "§3314.4.5.3"),
+            ("Contrapesos etiquetados con su peso; no falta ninguna pieza.", "§3314.4.5.2"),
+        ],
+        "do_en": [
+            "Re-count counterweights every morning — match the rigging plan.",
+            "Check the mudsill is full-contact on the roof deck, no rocking.",
+            "Verify each outrigger has its anchor pin or strap engaged.",
+            "Measure outrigger fulcrum-to-counterweight distance against the plan.",
+            "Mark and store odd-shaped counterweights together — no mixing.",
+        ],
+        "do_es": [
+            "Cuenta contrapesos cada mañana — confirma el plan de rigging.",
+            "Verifica que el tablón base toque completo el techo, sin moverse.",
+            "Confirma que cada outrigger tenga su pasador o correa puestos.",
+            "Mide la distancia outrigger-fulcro-contrapeso contra el plan.",
+            "Marca y guarda contrapesos de forma rara juntos — sin mezclar.",
+        ],
+        "dont_en": [
+            "Don't use sand, water drums, or rebar bundles as counterweight.",
+            "Don't move counterweights mid-shift without re-checking the math.",
+            "Don't put an outrigger on a soft membrane without a load-spreading plate.",
+            "Don't let counterweights overhang the roof edge.",
+        ],
+        "dont_es": [
+            "No uses arena, tanques de agua, ni varilla atada como contrapeso.",
+            "No muevas contrapesos durante el turno sin recalcular.",
+            "No pongas un outrigger sobre membrana suave sin placa.",
+            "No dejes contrapesos sobresalir del borde del techo.",
+        ],
+        "questions_en": [
+            "How many counterweights does today's drop require? Show me the math.",
+            "Is the mudsill bridging a roof seam or expansion joint?",
+            "What happens if one counterweight falls off mid-shift?",
+        ],
+        "questions_es": [
+            "¿Cuántos contrapesos necesita la caída de hoy? Muéstrame la matemática.",
+            "¿El tablón base cruza una junta del techo o de expansión?",
+            "¿Qué pasa si un contrapeso se cae durante el turno?",
+        ],
+        "description": "Outrigger / parapet-clamp rig math — 4× counterweight, mudsill, and what happens if a piece walks off.",
+    },
+
+    # ============================================================
+    # Topic 13 — Wire Rope Termination
+    # ============================================================
+    {
+        "topic_number": 13,
+        "slug": "13-wire-rope-termination",
+        "category": "Scaffold",
+        "ch33_ref": "§3314",
+        "est_minutes": 15,
+        "title_en": "Wire Rope Termination — Fistgrips, Shackles, Thimbles",
+        "title_es": "Terminación de Cable — Fistgrips, Grilletes, Guardacabos",
+        "why_en": (
+            "Every fall arrest and every scaffold suspension ends in a "
+            "wire-rope termination. Get the fistgrip orientation wrong, "
+            "skip the thimble, undersize the shackle — and a perfectly "
+            "good rope slips at the worst moment. The terminations are "
+            "what the engineers calculated; we don't get creative with them."
+        ),
+        "why_es": (
+            "Toda detención de caída y toda suspensión de andamio termina "
+            "en una terminación de cable. Pon el fistgrip al revés, salta "
+            "el guardacabos, usa grillete chico — y un cable perfectamente "
+            "bueno se zafa en el peor momento. Las terminaciones son lo "
+            "que el ingeniero calculó; no las improvisamos."
+        ),
+        "rules_en": [
+            ("Minimum 3 fistgrips on 3/8-in or smaller wire rope; more for larger.", "§3314.4.5.6"),
+            ("Saddle of the fistgrip on the LIVE side, U-bolt on the dead end.", "§3314.4.5.6"),
+            ("Thimble required in every eye-loop — no kinking the rope around shackles.", "§3314.4.5.6"),
+            ("Shackle pin oriented so vibration doesn't unscrew it; mouse it.", "§3314.4.5.6"),
+            ("Re-torque fistgrip nuts after the first load (rope settles).", "§3314.4.5.6"),
+        ],
+        "rules_es": [
+            ("Mínimo 3 fistgrips en cable 3/8 pulg o menor; más en cables grandes.", "§3314.4.5.6"),
+            ("La silla del fistgrip en el lado VIVO, el U-bolt en el extremo muerto.", "§3314.4.5.6"),
+            ("Guardacabos en cada lazo — no torcer el cable directo en el grillete.", "§3314.4.5.6"),
+            ("Pasador del grillete orientado para que la vibración no lo afloje; amárralo.", "§3314.4.5.6"),
+            ("Vuelve a apretar las tuercas del fistgrip después de la primera carga.", "§3314.4.5.6"),
+        ],
+        "do_en": [
+            "Inspect every termination at rig-up and again after first load.",
+            "Confirm fistgrip saddle is on the load side — 'never saddle a dead horse.'",
+            "Use a thimble inside every eye — no exceptions.",
+            "Match shackle size to rope diameter per the rigging plan.",
+            "Mouse the shackle pin with seizing wire to prevent backout.",
+        ],
+        "do_es": [
+            "Inspecciona cada terminación al armar y otra vez después de la primera carga.",
+            "Confirma que la silla del fistgrip esté del lado vivo.",
+            "Usa guardacabos dentro de cada lazo — sin excepción.",
+            "El tamaño del grillete coincide con el diámetro del cable según el plan.",
+            "Amarra el pasador del grillete con alambre para que no se zafe.",
+        ],
+        "dont_en": [
+            "Don't put fistgrip saddles on the dead end — that crushes the load side.",
+            "Don't reuse an eye that's been kinked or pulled past spec.",
+            "Don't substitute a smaller shackle to make it 'fit' the hole.",
+            "Don't paint or grease over a termination — it hides cracks.",
+        ],
+        "dont_es": [
+            "No pongas la silla del fistgrip en el extremo muerto — aplasta el lado vivo.",
+            "No reutilices un lazo torcido o que pasó del límite.",
+            "No sustituyas un grillete chico para que entre en el agujero.",
+            "No pintes ni engrases una terminación — esconde grietas.",
+        ],
+        "questions_en": [
+            "Show me a fistgrip on the scaffold — which side is the saddle on?",
+            "How many fistgrips does the rigging plan call for at this site?",
+            "What's the inspection criterion to retire a wire rope?",
+        ],
+        "questions_es": [
+            "Muéstrame un fistgrip en el andamio — ¿de qué lado está la silla?",
+            "¿Cuántos fistgrips pide el plan de rigging en este sitio?",
+            "¿Cuál es el criterio para retirar un cable de servicio?",
+        ],
+        "description": "Wire rope terminations — fistgrip orientation, thimbles, shackle sizing, mousing, and re-torque after first load.",
+    },
+
+    # ============================================================
+    # Topic 14 — Demolition Safety
+    # ============================================================
+    {
+        "topic_number": 14,
+        "slug": "14-demolition-safety",
+        "category": "Demo",
+        "ch33_ref": "§3306",
+        "est_minutes": 15,
+        "title_en": "Demolition Safety — Sequence, Dust, Falling Material",
+        "title_es": "Seguridad en Demolición — Secuencia, Polvo, Material que Cae",
+        "why_en": (
+            "Demolition is the most dangerous phase of any job. The "
+            "structure was designed to stand up — every cut, every break, "
+            "shifts loads in ways the original engineer didn't picture. "
+            "The demo plan exists because eyeballing it kills people. We "
+            "follow the plan, top down, no improvising."
+        ),
+        "why_es": (
+            "La demolición es la fase más peligrosa del trabajo. La "
+            "estructura fue diseñada para sostenerse — cada corte, cada "
+            "rotura, mueve las cargas en formas que el ingeniero original "
+            "no imaginó. El plan de demolición existe porque hacerlo a "
+            "ojo mata gente. Seguimos el plan, de arriba para abajo, sin "
+            "improvisar."
+        ),
+        "rules_en": [
+            ("Engineering survey required before demolition begins.", "§3306.2"),
+            ("Demolition plan filed with DOB; pre-construction meeting held.", "§3306.4"),
+            ("Demolish top-down or per the filed sequence — never improvise.", "§3306.5"),
+            ("Dust mitigation — water spray, screening, debris chutes.", "§3306.6"),
+            ("Falling material protected — chutes, netting, or enclosed enclosures.", "§3306.6.2"),
+        ],
+        "rules_es": [
+            ("Inspección de ingeniería requerida antes de empezar.", "§3306.2"),
+            ("Plan de demolición presentado al DOB; reunión previa hecha.", "§3306.4"),
+            ("Demoler de arriba a abajo o según la secuencia — nunca improvisar.", "§3306.5"),
+            ("Mitigar polvo — aspersión de agua, malla, conductos de escombros.", "§3306.6"),
+            ("Material que cae protegido — conductos, redes o encierros.", "§3306.6.2"),
+        ],
+        "do_en": [
+            "Confirm the demo sequence with the foreman before swinging a hammer.",
+            "Wet down the work area before and during cutting.",
+            "Drop debris only into chutes — never over open edges.",
+            "Watch for shifting loads when you cut a beam or strap.",
+            "Stop if you see anything you didn't expect — call the engineer.",
+        ],
+        "do_es": [
+            "Confirma la secuencia con el capataz antes de empezar.",
+            "Moja el área antes y durante el corte.",
+            "Tira escombros solo en conductos — nunca por bordes abiertos.",
+            "Cuida cargas que se muevan cuando cortas una viga o correa.",
+            "Para si ves algo que no esperabas — llama al ingeniero.",
+        ],
+        "dont_en": [
+            "Don't change the demolition sequence on your own.",
+            "Don't work below an active demo zone — clear it first.",
+            "Don't dry-cut concrete or masonry without water control.",
+            "Don't reuse a debris chute that shows cracking or wear.",
+        ],
+        "dont_es": [
+            "No cambies la secuencia de demolición por tu cuenta.",
+            "No trabajes debajo de una zona activa de demolición — despéjala primero.",
+            "No cortes concreto o mampostería en seco sin control de agua.",
+            "No reutilices un conducto agrietado o gastado.",
+        ],
+        "questions_en": [
+            "What's today's demo sequence — show me where it's posted.",
+            "Where does debris go from your station to the dumpster?",
+            "If a wall shifted unexpectedly right now, what would you do first?",
+        ],
+        "questions_es": [
+            "¿Cuál es la secuencia de hoy — muéstrame dónde está el plan?",
+            "¿A dónde van los escombros de tu puesto al contenedor?",
+            "Si una pared se moviera de repente, ¿qué harías primero?",
+        ],
+        "description": "Demolition — engineering survey, top-down sequence, dust mitigation, and protected debris paths.",
+    },
+
+    # ============================================================
+    # Topic 15 — Powder-Actuated Tools
+    # ============================================================
+    {
+        "topic_number": 15,
+        "slug": "15-powder-actuated-tools",
+        "category": "Demo",
+        "ch33_ref": "§3311",
+        "est_minutes": 15,
+        "title_en": "Powder-Actuated Tools — Safe Use & Training",
+        "title_es": "Herramientas de Pólvora — Uso Seguro y Capacitación",
+        "why_en": (
+            "A powder-actuated tool fires a fastener like a bullet — into "
+            "concrete, into steel, sometimes into a worker on the other "
+            "side of a wall. They are FDNY-permitted, training-restricted "
+            "tools. Wrong load color, wrong fastener length, no eye "
+            "protection — every one of those is a hospital trip."
+        ),
+        "why_es": (
+            "Una herramienta de pólvora dispara un clavo como bala — al "
+            "concreto, al acero, a veces a un trabajador del otro lado de "
+            "la pared. Son herramientas permisadas por FDNY, con "
+            "capacitación restringida. Color de carga equivocado, clavo "
+            "muy largo, sin lentes — cada uno es una visita al hospital."
+        ),
+        "rules_en": [
+            ("Operator licensed / certified by the tool manufacturer.", "§3311.2"),
+            ("Tool inspected before each shift; defective tools tagged out.", "§3311.3"),
+            ("Eye protection AND hearing protection required when firing.", "§3311.3 / OSHA"),
+            ("Match load color (power level) to the substrate — never over-power.", "§3311.3"),
+            ("Never fire through unsupported material or into a hollow wall.", "§3311.4"),
+        ],
+        "rules_es": [
+            ("Operador con licencia / certificación del fabricante.", "§3311.2"),
+            ("Inspeccionar herramienta antes de cada turno; defectuosa fuera de uso.", "§3311.3"),
+            ("Lentes Y protección auditiva requeridos al disparar.", "§3311.3 / OSHA"),
+            ("El color de la carga debe coincidir con el material — nunca sobre-potencia.", "§3311.3"),
+            ("Nunca disparar a material sin soporte o a pared hueca.", "§3311.4"),
+        ],
+        "do_en": [
+            "Show your certification card to the foreman before drawing the tool.",
+            "Test fire the tool on a scrap of the actual substrate.",
+            "Hold the tool perpendicular to the surface — 90 degrees only.",
+            "Keep your hand AWAY from the muzzle — no pinch grip.",
+            "Lock unused loads in the manufacturer's case, not your pocket.",
+        ],
+        "do_es": [
+            "Muestra tu tarjeta de certificación al capataz antes de tomar la herramienta.",
+            "Haz una prueba en un pedazo del mismo material.",
+            "Sostén la herramienta perpendicular — solo a 90 grados.",
+            "Mantén la mano LEJOS de la boca — no agarrar de pinza.",
+            "Guarda cargas no usadas en la caja del fabricante, no en el bolsillo.",
+        ],
+        "dont_en": [
+            "Don't use a powder-actuated tool without current certification.",
+            "Don't fire toward a worker on the other side of the wall.",
+            "Don't re-fire a misfire — wait 30 seconds, then unload.",
+            "Don't carry loose powder loads in your tool belt or pocket.",
+        ],
+        "dont_es": [
+            "No uses la herramienta sin certificación al día.",
+            "No dispares hacia un trabajador del otro lado de la pared.",
+            "No re-dispares una falla — espera 30 segundos y descarga.",
+            "No cargues pólvora suelta en el cinturón ni en el bolsillo.",
+        ],
+        "questions_en": [
+            "What's your current certification expiration date?",
+            "What load color goes into hardened concrete vs. a hollow CMU?",
+            "What do you do when the tool misfires?",
+        ],
+        "questions_es": [
+            "¿Cuándo vence tu certificación actual?",
+            "¿Qué color de carga va al concreto duro vs. CMU hueco?",
+            "¿Qué haces cuando la herramienta falla en disparar?",
+        ],
+        "description": "Powder-actuated tools — certification, load colors, perpendicular firing, and the misfire procedure.",
+    },
 ]
 

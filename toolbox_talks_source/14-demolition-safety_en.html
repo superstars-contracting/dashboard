@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Demolition Safety — Sequence, Dust, Falling Material</title>
+<style>
+  @page { size: Letter portrait; margin: 0.35in 0.4in; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Inter", "Segoe UI", Arial, sans-serif;
+    color: #1c1c1c;
+    font-size: 9.6pt;
+    line-height: 1.28;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .title-bar {
+    background: #b01e2d;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 3px 3px 0 0;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .title-bar .title {
+    font-family: "Archivo", "Inter", sans-serif;
+    font-weight: 800;
+    font-size: 13pt;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    line-height: 1.05;
+  }
+  .title-bar .meta {
+    font-size: 8.5pt;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-align: right;
+    opacity: 0.95;
+  }
+  .fields {
+    display: flex;
+    gap: 14px;
+    border: 1px solid #c9c5bd;
+    border-top: none;
+    background: #faf7f1;
+    padding: 5px 12px;
+    font-size: 9pt;
+  }
+  .fields .f { flex: 1; display: flex; align-items: baseline; gap: 6px; }
+  .fields .lbl {
+    font-weight: 700;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #54505a;
+    white-space: nowrap;
+  }
+  .fields .ln {
+    flex: 1;
+    border-bottom: 1px solid #54505a;
+    height: 11pt;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    margin-top: 6px;
+  }
+  .sec {
+    border: 1px solid #c9c5bd;
+    border-radius: 3px;
+    padding: 6px 9px 7px;
+    break-inside: avoid;
+  }
+  .sec.full { grid-column: 1 / -1; }
+  .sec h3 {
+    font-size: 8.5pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #b01e2d;
+    margin: 0 0 3px;
+    border-bottom: 1px solid #c9c5bd;
+    padding-bottom: 2px;
+  }
+  .sec p { margin: 0 0 3px; }
+  .sec ul { margin: 0; padding-left: 14px; }
+  .sec li { margin-bottom: 1.5px; }
+  .sec .ref {
+    color: #76777E;
+    font-size: 7.8pt;
+    font-weight: 600;
+  }
+  .signin {
+    margin-top: 7px;
+    border: 1px solid #c9c5bd;
+    border-radius: 3px;
+    padding: 5px 9px 6px;
+  }
+  .signin h3 {
+    font-size: 8.5pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #14161C;
+    margin: 0 0 3px;
+  }
+  table.signin-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.5pt;
+  }
+  table.signin-tbl th, table.signin-tbl td {
+    border-bottom: 1px solid #54505a;
+    padding: 4px 5px;
+    text-align: left;
+    vertical-align: bottom;
+    height: 18pt;
+  }
+  table.signin-tbl th {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 7.5pt;
+    color: #54505a;
+    height: 14pt;
+    border-bottom: 1.4px solid #14161C;
+  }
+  .foreman-row {
+    margin-top: 6px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 8.5pt;
+  }
+  .foreman-row .lbl {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 7.5pt;
+    color: #54505a;
+    white-space: nowrap;
+  }
+  .foreman-row .ln {
+    flex: 1;
+    border-bottom: 1px solid #54505a;
+    height: 14pt;
+  }
+</style>
+</head>
+<body>
+  <div class="title-bar">
+    <div class="title">Topic 14 · Demolition Safety — Sequence, Dust, Falling Material</div>
+    <div class="meta">Ch 33 §3306<br>15 min</div>
+  </div>
+  <div class="fields">
+    <div class="f"><span class="lbl">Date</span><span class="ln"></span></div>
+    <div class="f"><span class="lbl">Project</span><span class="ln"></span></div>
+    <div class="f"><span class="lbl">Foreman</span><span class="ln"></span></div>
+  </div>
+  <div class="grid">
+    <div class="sec full">
+      <h3>Why It Matters</h3>
+      <p>Demolition is the most dangerous phase of any job. The structure was designed to stand up — every cut, every break, shifts loads in ways the original engineer didn't picture. The demo plan exists because eyeballing it kills people. We follow the plan, top down, no improvising.</p>
+    </div>
+    <div class="sec">
+      <h3>Key Rules (Ch 33)</h3>
+      <ul><li>Engineering survey required before demolition begins. <span class="ref">§3306.2</span></li><li>Demolition plan filed with DOB; pre-construction meeting held. <span class="ref">§3306.4</span></li><li>Demolish top-down or per the filed sequence — never improvise. <span class="ref">§3306.5</span></li><li>Dust mitigation — water spray, screening, debris chutes. <span class="ref">§3306.6</span></li><li>Falling material protected — chutes, netting, or enclosed enclosures. <span class="ref">§3306.6.2</span></li></ul>
+    </div>
+    <div class="sec">
+      <h3>Do</h3>
+      <ul><li>Confirm the demo sequence with the foreman before swinging a hammer.</li><li>Wet down the work area before and during cutting.</li><li>Drop debris only into chutes — never over open edges.</li><li>Watch for shifting loads when you cut a beam or strap.</li><li>Stop if you see anything you didn't expect — call the engineer.</li></ul>
+    </div>
+    <div class="sec">
+      <h3>Do Not</h3>
+      <ul><li>Don't change the demolition sequence on your own.</li><li>Don't work below an active demo zone — clear it first.</li><li>Don't dry-cut concrete or masonry without water control.</li><li>Don't reuse a debris chute that shows cracking or wear.</li></ul>
+    </div>
+    <div class="sec">
+      <h3>Discussion Questions</h3>
+      <ul><li>What's today's demo sequence — show me where it's posted.</li><li>Where does debris go from your station to the dumpster?</li><li>If a wall shifted unexpectedly right now, what would you do first?</li></ul>
+    </div>
+  </div>
+  <div class="signin">
+    <h3>Worker Sign-In</h3>
+    <table class="signin-tbl">
+      <thead><tr>
+        <th style="width:34%;">Print Name</th>
+        <th style="width:38%;">Signature</th>
+        <th style="width:18%;">Date</th>
+      </tr></thead>
+      <tbody>
+        <tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+    <div class="foreman-row">
+      <span class="lbl">Foreman signature</span>
+      <span class="ln"></span>
+    </div>
+  </div>
+</body>
+</html>

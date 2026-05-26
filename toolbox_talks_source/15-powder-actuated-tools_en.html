@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Powder-Actuated Tools — Safe Use &amp; Training</title>
+<style>
+  @page { size: Letter portrait; margin: 0.35in 0.4in; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Inter", "Segoe UI", Arial, sans-serif;
+    color: #1c1c1c;
+    font-size: 9.6pt;
+    line-height: 1.28;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .title-bar {
+    background: #b01e2d;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 3px 3px 0 0;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .title-bar .title {
+    font-family: "Archivo", "Inter", sans-serif;
+    font-weight: 800;
+    font-size: 13pt;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    line-height: 1.05;
+  }
+  .title-bar .meta {
+    font-size: 8.5pt;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-align: right;
+    opacity: 0.95;
+  }
+  .fields {
+    display: flex;
+    gap: 14px;
+    border: 1px solid #c9c5bd;
+    border-top: none;
+    background: #faf7f1;
+    padding: 5px 12px;
+    font-size: 9pt;
+  }
+  .fields .f { flex: 1; display: flex; align-items: baseline; gap: 6px; }
+  .fields .lbl {
+    font-weight: 700;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #54505a;
+    white-space: nowrap;
+  }
+  .fields .ln {
+    flex: 1;
+    border-bottom: 1px solid #54505a;
+    height: 11pt;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    margin-top: 6px;
+  }
+  .sec {
+    border: 1px solid #c9c5bd;
+    border-radius: 3px;
+    padding: 6px 9px 7px;
+    break-inside: avoid;
+  }
+  .sec.full { grid-column: 1 / -1; }
+  .sec h3 {
+    font-size: 8.5pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #b01e2d;
+    margin: 0 0 3px;
+    border-bottom: 1px solid #c9c5bd;
+    padding-bottom: 2px;
+  }
+  .sec p { margin: 0 0 3px; }
+  .sec ul { margin: 0; padding-left: 14px; }
+  .sec li { margin-bottom: 1.5px; }
+  .sec .ref {
+    color: #76777E;
+    font-size: 7.8pt;
+    font-weight: 600;
+  }
+  .signin {
+    margin-top: 7px;
+    border: 1px solid #c9c5bd;
+    border-radius: 3px;
+    padding: 5px 9px 6px;
+  }
+  .signin h3 {
+    font-size: 8.5pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #14161C;
+    margin: 0 0 3px;
+  }
+  table.signin-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.5pt;
+  }
+  table.signin-tbl th, table.signin-tbl td {
+    border-bottom: 1px solid #54505a;
+    padding: 4px 5px;
+    text-align: left;
+    vertical-align: bottom;
+    height: 18pt;
+  }
+  table.signin-tbl th {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 7.5pt;
+    color: #54505a;
+    height: 14pt;
+    border-bottom: 1.4px solid #14161C;
+  }
+  .foreman-row {
+    margin-top: 6px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 8.5pt;
+  }
+  .foreman-row .lbl {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 7.5pt;
+    color: #54505a;
+    white-space: nowrap;
+  }
+  .foreman-row .ln {
+    flex: 1;
+    border-bottom: 1px solid #54505a;
+    height: 14pt;
+  }
+</style>
+</head>
+<body>
+  <div class="title-bar">
+    <div class="title">Topic 15 · Powder-Actuated Tools — Safe Use &amp; Training</div>
+    <div class="meta">Ch 33 §3311<br>15 min</div>
+  </div>
+  <div class="fields">
+    <div class="f"><span class="lbl">Date</span><span class="ln"></span></div>
+    <div class="f"><span class="lbl">Project</span><span class="ln"></span></div>
+    <div class="f"><span class="lbl">Foreman</span><span class="ln"></span></div>
+  </div>
+  <div class="grid">
+    <div class="sec full">
+      <h3>Why It Matters</h3>
+      <p>A powder-actuated tool fires a fastener like a bullet — into concrete, into steel, sometimes into a worker on the other side of a wall. They are FDNY-permitted, training-restricted tools. Wrong load color, wrong fastener length, no eye protection — every one of those is a hospital trip.</p>
+    </div>
+    <div class="sec">
+      <h3>Key Rules (Ch 33)</h3>
+      <ul><li>Operator licensed / certified by the tool manufacturer. <span class="ref">§3311.2</span></li><li>Tool inspected before each shift; defective tools tagged out. <span class="ref">§3311.3</span></li><li>Eye protection AND hearing protection required when firing. <span class="ref">§3311.3 / OSHA</span></li><li>Match load color (power level) to the substrate — never over-power. <span class="ref">§3311.3</span></li><li>Never fire through unsupported material or into a hollow wall. <span class="ref">§3311.4</span></li></ul>
+    </div>
+    <div class="sec">
+      <h3>Do</h3>
+      <ul><li>Show your certification card to the foreman before drawing the tool.</li><li>Test fire the tool on a scrap of the actual substrate.</li><li>Hold the tool perpendicular to the surface — 90 degrees only.</li><li>Keep your hand AWAY from the muzzle — no pinch grip.</li><li>Lock unused loads in the manufacturer's case, not your pocket.</li></ul>
+    </div>
+    <div class="sec">
+      <h3>Do Not</h3>
+      <ul><li>Don't use a powder-actuated tool without current certification.</li><li>Don't fire toward a worker on the other side of the wall.</li><li>Don't re-fire a misfire — wait 30 seconds, then unload.</li><li>Don't carry loose powder loads in your tool belt or pocket.</li></ul>
+    </div>
+    <div class="sec">
+      <h3>Discussion Questions</h3>
+      <ul><li>What's your current certification expiration date?</li><li>What load color goes into hardened concrete vs. a hollow CMU?</li><li>What do you do when the tool misfires?</li></ul>
+    </div>
+  </div>
+  <div class="signin">
+    <h3>Worker Sign-In</h3>
+    <table class="signin-tbl">
+      <thead><tr>
+        <th style="width:34%;">Print Name</th>
+        <th style="width:38%;">Signature</th>
+        <th style="width:18%;">Date</th>
+      </tr></thead>
+      <tbody>
+        <tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+    <div class="foreman-row">
+      <span class="lbl">Foreman signature</span>
+      <span class="ln"></span>
+    </div>
+  </div>
+</body>
+</html>
