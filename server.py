@@ -1514,6 +1514,24 @@ def get_dcr_daily(project_code, report_date):
     try:
         from dcr_aggregator import aggregate_dcr  # lazy to avoid circular import
         dcr = aggregate_dcr(project_code, report_date, audience)
+        # Surface the No-Work Day designation (if any) so the entry view
+        # can show the banner state on load. Pulled directly from
+        # report_index because the no-work flag is a report-level
+        # attribute, not part of the aggregated DCR section data.
+        conn = db()
+        nw_row = conn.execute(
+            "SELECT no_work, no_work_reason, no_work_note FROM report_index "
+            "WHERE project_code = ? AND report_date = ? AND report_type='DCR' "
+            "AND no_work = 1 LIMIT 1",
+            (project_code, report_date),
+        ).fetchone()
+        conn.close()
+        if nw_row:
+            dcr['no_work'] = 1
+            dcr['no_work_reason'] = nw_row['no_work_reason']
+            dcr['no_work_note'] = nw_row['no_work_note']
+        else:
+            dcr['no_work'] = 0
         return response_wrapper(dcr)
     except (KeyError, ValueError) as e:
         return jsonify({"error": str(e)}), 400
@@ -1570,6 +1588,7 @@ def next_dcr_sequence(conn, project_code, report_date=None):
 # to rewrite report_id strings without colliding with an inner
 # project_code "-NNN-" (the bug renumber_dcrs_by_date.py hit on FR-BX-001).
 import re as _re  # local-alias to avoid touching the top-of-file imports
+import time as _time
 _DCR_SEQ_TAIL_RE = _re.compile(r"-(\d{3})-(internal|client)$")
 
 
@@ -1626,31 +1645,52 @@ def shift_dcrs_for_backdate(conn, project_code, threshold_seq):
     # On-disk dirs — same two-step (NNN → .tmp_NNN → MMM). Walk
     # DESC-by-old-seq so existing high dirs free up their target slot
     # before a lower seq tries to take it.
+    #
+    # Hardening: a stale .tmp_NNN from a PRIOR failed run will block
+    # Step A's `src.rename(.tmp_NNN)` on Windows (rename is
+    # non-overwriting → WinError 183). Pre-clean any pre-existing
+    # .tmp_NNN before each Step A move. Symmetric guard at Step B for
+    # the destination NNN — if it somehow exists with content, log +
+    # rename it to .orphan_NNN_<ts> so the operator can recover, but
+    # never silently overwrite real DCR HTML/PDF.
     project_root = SCRIPT_DIR / "data_room" / "reports" / "dcr" / project_code
     if project_root.exists():
-        # Unique old_seqs to move (impacted has 1 row per audience but
-        # the dir is per-sequence)
         seen_old = []
         for r in impacted:
             o = int(r["dcr_sequence"])  # this was the OLD seq before the bump
             if o not in seen_old:
                 seen_old.append(o)
-        # Step A: to .tmp_NNN
+        # Step A: to .tmp_NNN — pre-clean stale temp first.
         for o in seen_old:
             src = project_root / f"{o:03d}"
+            tmp = project_root / f".tmp_{o:03d}"
+            if tmp.exists():
+                # Stale orphan from a prior aborted run. Quarantine it
+                # rather than delete in case it holds operator data.
+                quarantine = project_root / f".orphan_{o:03d}_{int(_time.time())}"
+                logging.warning(
+                    f"shift_dcrs_for_backdate: pre-existing {tmp.name} "
+                    f"quarantined to {quarantine.name} before Step A rename."
+                )
+                tmp.rename(quarantine)
             if src.exists():
-                src.rename(project_root / f".tmp_{o:03d}")
+                src.rename(tmp)
         # Step B: to (o+1)
         for o in seen_old:
             tmp = project_root / f".tmp_{o:03d}"
             dst = project_root / f"{o+1:03d}"
             if tmp.exists():
                 if dst.exists():
+                    # The target slot is occupied by a stale dir — quarantine
+                    # it instead of silently overwriting (operator may need
+                    # those files). Then complete the Step B rename.
+                    quarantine = project_root / f".orphan_dst_{o+1:03d}_{int(_time.time())}"
                     logging.warning(
-                        f"shift_dcrs_for_backdate: target {dst} exists; "
-                        f"left {tmp.name} in place — operator should re-sync."
+                        f"shift_dcrs_for_backdate: target {dst} exists at "
+                        f"Step B; quarantining to {quarantine.name} so the "
+                        f"shift can complete without data loss."
                     )
-                    continue
+                    dst.rename(quarantine)
                 tmp.rename(dst)
     return len(impacted)
 
@@ -1721,24 +1761,171 @@ def _issue_one_dcr(conn, project_code, report_date, audience, seq):
                 f"DCR {report_id}: PDF render failed — {pdf_status.get('error')}"
             )
 
+    # Promote any pre-issuance No-Work placeholder for this date.
+    # If the operator flagged the day BEFORE issuing (via /no-work POST),
+    # a status='no_work_pending' row exists without dcr_sequence. Capture
+    # its flag/reason/note so the new issued row carries them; the
+    # placeholder gets deleted in the same pass to keep report_index clean.
+    nw_row = conn.execute(
+        "SELECT id, no_work, no_work_reason, no_work_note FROM report_index "
+        "WHERE project_code = ? AND report_type='DCR' AND report_date = ? "
+        "AND status = 'no_work_pending' AND no_work = 1 LIMIT 1",
+        (project_code, report_date)
+    ).fetchone()
+    nw_flag = 0
+    nw_reason = None
+    nw_note = None
+    if nw_row:
+        nw_flag = 1
+        nw_reason = nw_row['no_work_reason']
+        nw_note = nw_row['no_work_note']
+        # Drop the placeholder — the real issued row supersedes it.
+        conn.execute("DELETE FROM report_index WHERE id = ?", (nw_row['id'],))
+    else:
+        # Already-flagged via /no-work on a previously-issued row? Read
+        # the existing issued row's flag so a re-issue doesn't drop it.
+        prev = conn.execute(
+            "SELECT no_work, no_work_reason, no_work_note FROM report_index "
+            "WHERE project_code = ? AND report_type='DCR' AND report_date = ? "
+            "AND no_work = 1 LIMIT 1",
+            (project_code, report_date)
+        ).fetchone()
+        if prev:
+            nw_flag = 1
+            nw_reason = prev['no_work_reason']
+            nw_note = prev['no_work_note']
+
     existing = conn.execute(
         "SELECT id FROM report_index WHERE project_code = ? AND report_type = ? AND report_id = ?",
         (project_code, 'DCR', report_id)
     ).fetchone()
     if existing:
         conn.execute(
-            "UPDATE report_index SET status = ?, report_date = ?, dcr_sequence = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            ('issued', report_date, seq, existing['id'])
+            "UPDATE report_index SET status = ?, report_date = ?, dcr_sequence = ?, "
+            "       no_work = ?, no_work_reason = ?, no_work_note = ?, "
+            "       updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            ('issued', report_date, seq, nw_flag, nw_reason, nw_note, existing['id'])
         )
     else:
         conn.execute(
-            "INSERT INTO report_index (report_date, project_code, report_type, report_id, status, dcr_sequence) VALUES (?, ?, ?, ?, ?, ?)",
-            (report_date, project_code, 'DCR', report_id, 'issued', seq)
+            "INSERT INTO report_index "
+            "  (report_date, project_code, report_type, report_id, status, "
+            "   dcr_sequence, no_work, no_work_reason, no_work_note) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (report_date, project_code, 'DCR', report_id, 'issued', seq,
+             nw_flag, nw_reason, nw_note)
         )
     return {"report_id": report_id, "audience": audience, "html_url": html_url,
             "html_path": out_file, "display_id": display_id, "sequence": seq,
             "pdf_path": pdf_path, "pdf_url": pdf_url, "pdf_status": pdf_status,
-            "drive_status": drive_status}
+            "drive_status": drive_status,
+            "no_work": nw_flag, "no_work_reason": nw_reason, "no_work_note": nw_note}
+
+
+NO_WORK_REASONS = {"Rain", "Snow", "Holiday", "Other"}
+
+
+@app.route('/api/projects/<project_code>/daily/<report_date>/no-work', methods=['POST', 'DELETE'])
+def api_dcr_no_work(project_code, report_date):
+    """Mark / unmark a DCR date as a No-Work Day (Rain / Snow / Holiday / Other).
+
+    POST body (optional):
+      {reason: 'Rain'|'Snow'|'Holiday'|'Other', note: str}
+      Defaults reason to 'Rain' when omitted (the most common case).
+
+    The flag persists on every report_index row matching (project_code,
+    report_date) — both audiences share the designation. If no row
+    exists yet (no DCR issued), an INSERT placeholder is created so the
+    no-work state is captured before issuance; issue_dcr later promotes
+    that placeholder into a full issued row.
+
+    DELETE clears the no-work designation (sets no_work=0, reason/note=NULL).
+
+    Returns the updated state.
+    """
+    try:
+        datetime.strptime(report_date, '%Y-%m-%d')
+    except ValueError:
+        return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+    try:
+        conn = db()
+        if not validate_project_exists(conn, project_code):
+            conn.close()
+            return jsonify({"error": "Project not found"}), 404
+
+        if request.method == 'DELETE':
+            conn.execute(
+                "UPDATE report_index SET no_work=0, no_work_reason=NULL, no_work_note=NULL, "
+                "       updated_at=CURRENT_TIMESTAMP "
+                "WHERE project_code = ? AND report_date = ? AND report_type='DCR'",
+                (project_code, report_date),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT no_work, no_work_reason, no_work_note FROM report_index "
+                "WHERE project_code = ? AND report_date = ? AND report_type='DCR' LIMIT 1",
+                (project_code, report_date),
+            ).fetchone()
+            conn.close()
+            return response_wrapper({
+                "project_code": project_code,
+                "report_date": report_date,
+                "no_work": int(row["no_work"]) if row else 0,
+                "no_work_reason": row["no_work_reason"] if row else None,
+                "no_work_note": row["no_work_note"] if row else None,
+            })
+
+        data = request.get_json() or {}
+        reason = (data.get('reason') or 'Rain').strip()
+        if reason not in NO_WORK_REASONS:
+            return jsonify({
+                "error": "reason must be one of: " + ", ".join(sorted(NO_WORK_REASONS))
+            }), 400
+        note = (data.get('note') or '').strip() or None
+
+        # Look up matching report_index rows for the date. If none exist,
+        # the operator is flagging the day BEFORE issuance — store a
+        # placeholder so the state is captured. issue_dcr later sees
+        # this and propagates the flag through to both audiences.
+        rows = conn.execute(
+            "SELECT id, dcr_sequence FROM report_index "
+            "WHERE project_code = ? AND report_date = ? AND report_type='DCR'",
+            (project_code, report_date),
+        ).fetchall()
+        if rows:
+            conn.execute(
+                "UPDATE report_index SET no_work=1, no_work_reason=?, no_work_note=?, "
+                "       updated_at=CURRENT_TIMESTAMP "
+                "WHERE project_code = ? AND report_date = ? AND report_type='DCR'",
+                (reason, note, project_code, report_date),
+            )
+        else:
+            # Pre-issuance placeholder. status='no_work_pending' so it
+            # doesn't confuse the archive (which filters status='issued').
+            conn.execute(
+                "INSERT INTO report_index "
+                "  (report_date, project_code, report_type, status, "
+                "   no_work, no_work_reason, no_work_note) "
+                "VALUES (?, ?, 'DCR', 'no_work_pending', 1, ?, ?)",
+                (report_date, project_code, reason, note),
+            )
+        conn.commit()
+        out = conn.execute(
+            "SELECT no_work, no_work_reason, no_work_note FROM report_index "
+            "WHERE project_code = ? AND report_date = ? AND report_type='DCR' LIMIT 1",
+            (project_code, report_date),
+        ).fetchone()
+        conn.close()
+        return response_wrapper({
+            "project_code": project_code,
+            "report_date": report_date,
+            "no_work": int(out["no_work"]),
+            "no_work_reason": out["no_work_reason"],
+            "no_work_note": out["no_work_note"],
+        })
+    except Exception as e:
+        logging.error(f"{request.method} /api/projects/{project_code}/daily/{report_date}/no-work: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/projects/<project_code>/daily/<report_date>/issue', methods=['POST'])

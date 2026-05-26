@@ -155,6 +155,11 @@ def main(project_code: str, dry_run: bool) -> int:
             )
 
     # ---- On-disk dir renames — same two-step (NNN → .tmp_NNN → MMM) ---
+    # Hardening: stale .tmp_NNN from a prior aborted run blocks step A
+    # on Windows (rename is non-overwriting → WinError 183). Pre-clean
+    # by quarantining any pre-existing temp / collision target to
+    # .orphan_*_<ts> so the rename can complete without data loss.
+    import time as _time
     project_root = REPORTS_ROOT / project_code
     if not project_root.exists():
         print(f"[renumber] WARN: report dir {project_root} doesn't exist; DB-only renumber.")
@@ -163,6 +168,10 @@ def main(project_code: str, dry_run: bool) -> int:
         for d, old, new in changed:
             src = project_root / f"{old:03d}"
             tmp = project_root / f".tmp_{old:03d}"
+            if tmp.exists():
+                quarantine = project_root / f".orphan_{old:03d}_{int(_time.time())}"
+                print(f"[renumber] WARN: pre-existing {tmp.name} quarantined to {quarantine.name}")
+                tmp.rename(quarantine)
             if src.exists():
                 src.rename(tmp)
         # B: rename each temp to the new NNN.
@@ -171,8 +180,9 @@ def main(project_code: str, dry_run: bool) -> int:
             dst = project_root / f"{new:03d}"
             if tmp.exists():
                 if dst.exists():
-                    print(f"[renumber] WARN: target {dst} already exists; skipping rename of {tmp.name}")
-                    continue
+                    quarantine = project_root / f".orphan_dst_{new:03d}_{int(_time.time())}"
+                    print(f"[renumber] WARN: target {dst.name} exists; quarantining to {quarantine.name}")
+                    dst.rename(quarantine)
                 tmp.rename(dst)
 
     conn.commit()
