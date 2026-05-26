@@ -573,5 +573,317 @@ TALKS = [
         ],
         "description": "Hot work fire safety — permits, fire watch, extinguishers, the standpipe rule, and FDNY S-56 holders.",
     },
+
+    # ============================================================
+    # Topic 8 — Unenclosed Perimeter Protection
+    # ============================================================
+    {
+        "topic_number": 8,
+        "slug": "08-unenclosed-perimeter-protection",
+        "category": "Fall",
+        "ch33_ref": "§3308",
+        "est_minutes": 15,
+        "title_en": "Unenclosed Perimeter Protection — Guards & Netting",
+        "title_es": "Protección del Perímetro Abierto — Barandales y Redes",
+        "why_en": (
+            "Every open edge above 6 feet is a fall waiting to happen — for "
+            "us and for anything we drop. Guardrails and perimeter netting "
+            "are not decoration. A loose rail or a sagging net is the line "
+            "between a normal Tuesday and a coroner's report. Check the "
+            "perimeter every shift."
+        ),
+        "why_es": (
+            "Cada borde abierto arriba de 6 pies es una caída esperando "
+            "pasar — para nosotros y para todo lo que se nos caiga. Los "
+            "barandales y las redes del perímetro no son decoración. Una "
+            "baranda floja o una red colgada es la línea entre un martes "
+            "normal y un reporte de muerte. Revisa el perímetro cada turno."
+        ),
+        "rules_en": [
+            ("Guardrails at every open edge >6 ft above lower level.", "§3308.4"),
+            ("Top rail 42 inches ±3, mid-rail at 21 inches, 4-inch toe board.", "§3308.4.1"),
+            ("Perimeter netting on every floor above grade during construction.", "§3308.5"),
+            ("Netting inspected weekly + after any drop event.", "§3308.5.3"),
+            ("Holes / openings >2 inches covered, marked, and secured.", "§3308.6"),
+        ],
+        "rules_es": [
+            ("Barandales en cada borde abierto >6 pies de altura.", "§3308.4"),
+            ("Riel superior 42 pulg ±3, riel medio 21 pulg, tabla 4 pulg.", "§3308.4.1"),
+            ("Red perimetral en cada piso arriba del suelo durante construcción.", "§3308.5"),
+            ("La red se inspecciona semanalmente y después de cualquier caída.", "§3308.5.3"),
+            ("Huecos >2 pulgadas cubiertos, marcados y asegurados.", "§3308.6"),
+        ],
+        "do_en": [
+            "Walk the perimeter at start of shift — push every rail, check height.",
+            "Replace damaged netting before continuing work on that floor.",
+            "Tie off if you must remove a guardrail temporarily.",
+            "Cover floor openings the second you see them — even just plywood + screws.",
+            "Report a loose or missing rail to the Foreman immediately.",
+        ],
+        "do_es": [
+            "Camina el perímetro al inicio del turno — empuja cada baranda, mide altura.",
+            "Reemplaza red dañada antes de seguir trabajando en ese piso.",
+            "Amárrate si tienes que quitar una baranda temporalmente.",
+            "Cubre huecos del piso al verlos — aunque sea plywood y tornillos.",
+            "Reporta baranda floja o faltante al capataz de inmediato.",
+        ],
+        "dont_en": [
+            "Don't remove a guardrail unless you're tied off and have approval.",
+            "Don't use a guardrail to hang material, tools, or hoses.",
+            "Don't step on a covered floor opening — walk around.",
+            "Don't trust netting after a heavy drop — inspect before using it.",
+        ],
+        "dont_es": [
+            "No quites una baranda sin estar amarrado y con permiso.",
+            "No uses la baranda para colgar material, herramientas, ni mangueras.",
+            "No pises un hueco tapado — camina alrededor.",
+            "No confíes en la red después de una caída fuerte — inspecciónala.",
+        ],
+        "questions_en": [
+            "Push the nearest guardrail right now — does it move more than an inch?",
+            "When was the perimeter netting last inspected on your floor?",
+            "Where's the closest uncovered floor opening you've seen this week?",
+        ],
+        "questions_es": [
+            "Empuja la baranda más cercana ahora — ¿se mueve más de una pulgada?",
+            "¿Cuándo se inspeccionó la red de tu piso por última vez?",
+            "¿Dónde está el hueco sin cubrir más cercano que viste esta semana?",
+        ],
+        "description": "Perimeter protection — guardrails, perimeter netting, floor-opening covers, and what to do before removing any of them.",
+    },
+
+    # ============================================================
+    # Topic 9 — Personal Fall Arrest Systems
+    # ============================================================
+    {
+        "topic_number": 9,
+        "slug": "09-personal-fall-arrest-systems",
+        "category": "Fall",
+        "ch33_ref": "§3314 + OSHA 1926 Subpart M",
+        "est_minutes": 15,
+        "title_en": "Personal Fall Arrest Systems — Harness, Lanyard, Rope Grab",
+        "title_es": "Sistemas Personales contra Caídas — Arnés, Cabo, Rope Grab",
+        "why_en": (
+            "On a suspended scaffold our harness is the difference between a "
+            "scare and a funeral. A harness worn loose, an unrated anchor, a "
+            "rope grab installed upside down — all kill the system silently. "
+            "Inspect every piece every time. The fall doesn't care that "
+            "you're in a hurry."
+        ),
+        "why_es": (
+            "En un andamio colgante el arnés es la diferencia entre un susto "
+            "y un funeral. Un arnés flojo, un anclaje sin calificar, un rope "
+            "grab al revés — todos matan el sistema en silencio. Inspecciona "
+            "cada pieza cada vez. La caída no le importa que tengas prisa."
+        ),
+        "rules_en": [
+            ("100% tie-off above 6 ft — every worker, every time.", "§3314.4.10"),
+            ("Independent vertical lifeline + rope grab for every scaffold occupant.", "§3314.4.10"),
+            ("Anchor rated for 5,000 lb per worker, or 2× max arrest force.", "OSHA 1926.502(d)(15)"),
+            ("Harness inspected before each use — webbing, D-ring, buckles.", "§3314.4.10 / OSHA"),
+            ("Shock-absorbing lanyard ≤6 ft; rope grab oriented per manufacturer.", "OSHA 1926.502(d)"),
+        ],
+        "rules_es": [
+            ("Amarre 100% arriba de 6 pies — cada trabajador, cada vez.", "§3314.4.10"),
+            ("Línea de vida vertical + rope grab independiente para cada persona.", "§3314.4.10"),
+            ("Anclaje calificado para 5,000 lb por trabajador, o 2× la fuerza máxima.", "OSHA 1926.502(d)(15)"),
+            ("Inspeccionar arnés antes de cada uso — correas, D-ring, hebillas.", "§3314.4.10 / OSHA"),
+            ("Cabo con absorbedor ≤6 pies; rope grab orientado según el fabricante.", "OSHA 1926.502(d)"),
+        ],
+        "do_en": [
+            "Snug the harness — two fingers under the chest strap, no more.",
+            "Inspect webbing inch by inch for cuts, burns, fuzziness.",
+            "Connect to the lifeline BEFORE stepping onto the scaffold.",
+            "Check the rope grab arrow points UP toward the anchor.",
+            "Retire any harness involved in an arrested fall — never reuse.",
+        ],
+        "do_es": [
+            "Aprieta el arnés — dos dedos bajo la correa del pecho, no más.",
+            "Inspecciona la correa pulgada por pulgada — cortes, quemaduras, pelusa.",
+            "Conéctate a la línea de vida ANTES de pisar el andamio.",
+            "Revisa que la flecha del rope grab apunte HACIA ARRIBA al anclaje.",
+            "Retira cualquier arnés que paró una caída — nunca lo reuses.",
+        ],
+        "dont_en": [
+            "Don't share lanyards or rope grabs — each worker has their own.",
+            "Don't tie off to a railing, pipe, or wire — only rated anchors.",
+            "Don't use a body belt as fall protection — it's banned.",
+            "Don't extend a lanyard with a knot or a second connector.",
+        ],
+        "dont_es": [
+            "No compartas cabos ni rope grabs — cada trabajador tiene el suyo.",
+            "No te amarres a baranda, tubo, ni alambre — solo a anclajes calificados.",
+            "No uses cinturón de cuerpo como protección contra caídas — está prohibido.",
+            "No extiendas un cabo con nudo ni con un segundo conector.",
+        ],
+        "questions_en": [
+            "Show me your harness — does the chest strap sit at sternum level?",
+            "Where is your anchor today and how do you know it's rated?",
+            "If you fell into the harness right now, what does the rescue plan say?",
+        ],
+        "questions_es": [
+            "Muéstrame tu arnés — ¿la correa del pecho está al nivel del esternón?",
+            "¿Dónde está tu anclaje hoy y cómo sabes que está calificado?",
+            "Si cayeras en el arnés ahora, ¿qué dice el plan de rescate?",
+        ],
+        "description": "Personal fall arrest — fit the harness, inspect the webbing, connect to a rated anchor, retire post-arrest.",
+    },
+
+    # ============================================================
+    # Topic 10 — Suspended Scaffold Daily Inspection
+    # ============================================================
+    {
+        "topic_number": 10,
+        "slug": "10-suspended-scaffold-daily-inspection",
+        "category": "Scaffold",
+        "ch33_ref": "§3314",
+        "est_minutes": 15,
+        "title_en": "Suspended Scaffold — Daily Inspection (Companion to the Checklist)",
+        "title_es": "Andamio Colgante — Inspección Diaria (Complemento al Checklist)",
+        "why_en": (
+            "Every shift our scaffold rises and falls on equipment that "
+            "wasn't inspected by us when we left yesterday. The competent "
+            "person walks the drop, the motors, the wire rope, the harness "
+            "anchors, and the cage — every morning. The daily checklist is "
+            "the receipt. No checklist, no work."
+        ),
+        "why_es": (
+            "Cada turno nuestro andamio sube y baja en equipo que no "
+            "inspeccionamos cuando nos fuimos ayer. La persona competente "
+            "camina la caída, los motores, el cable, los anclajes del arnés "
+            "y la jaula — cada mañana. El checklist diario es el recibo. "
+            "Sin checklist, no hay trabajo."
+        ),
+        "rules_en": [
+            ("Suspended scaffold inspected daily by a competent person before use.", "§3314.4.7"),
+            ("Pre-shift inspection of wire rope, motors, stirrups, tiebacks, lifelines.", "§3314.4.7"),
+            ("Drop platform load tested to 4× working load at rig-up.", "§3314.4.5"),
+            ("Document daily inspection — signature + date on the log.", "§3314.4.7"),
+            ("Out-of-service scaffolds tagged and the drop secured.", "§3314.4.8"),
+        ],
+        "rules_es": [
+            ("Andamio inspeccionado diariamente por persona competente antes de usar.", "§3314.4.7"),
+            ("Inspección antes del turno — cable, motores, estribos, tiebacks, líneas.", "§3314.4.7"),
+            ("Plataforma probada a 4× la carga de trabajo al armar.", "§3314.4.5"),
+            ("Documenta la inspección diaria — firma + fecha en el registro.", "§3314.4.7"),
+            ("Andamio fuera de servicio se etiqueta y se asegura.", "§3314.4.8"),
+        ],
+        "do_en": [
+            "Inspect from the ground up — outrigger / tieback / wire / motor / stirrup / platform.",
+            "Pull-test wire rope hand-over-hand for kinks, broken wires, birdcaging.",
+            "Cycle motors up + down empty before crew gets on.",
+            "Verify lifelines are independent of the suspension lines.",
+            "Sign the daily inspection log BEFORE the first worker boards.",
+        ],
+        "do_es": [
+            "Inspecciona de abajo hacia arriba — outrigger / tieback / cable / motor / estribo / plataforma.",
+            "Prueba el cable mano-sobre-mano — torceduras, hilos rotos, birdcaging.",
+            "Sube y baja los motores vacíos antes de que se suba la cuadrilla.",
+            "Verifica que las líneas de vida sean independientes de las de suspensión.",
+            "Firma el registro de inspección diaria ANTES del primer trabajador.",
+        ],
+        "dont_en": [
+            "Don't board a scaffold without seeing today's signed inspection.",
+            "Don't skip the cycle test because the scaffold looked fine yesterday.",
+            "Don't operate a scaffold with a damaged or kinked suspension rope.",
+            "Don't put more than the rated load on the platform — ever.",
+        ],
+        "dont_es": [
+            "No subas a un andamio sin ver la inspección firmada de hoy.",
+            "No saltes la prueba de motores porque ayer estaba bien.",
+            "No operes un andamio con cable de suspensión dañado o torcido.",
+            "No subas más de la carga calificada en la plataforma — nunca.",
+        ],
+        "questions_en": [
+            "Who is the competent person on this scaffold today?",
+            "What's one defect on a suspended scaffold that means STOP, not fix later?",
+            "Where is today's inspection log right now?",
+        ],
+        "questions_es": [
+            "¿Quién es la persona competente en este andamio hoy?",
+            "¿Cuál es un defecto que significa PARAR, no arreglar después?",
+            "¿Dónde está el registro de inspección de hoy ahora mismo?",
+        ],
+        "description": "Suspended scaffold daily inspection — what the competent person checks each morning, in order, and signs.",
+    },
+
+    # ============================================================
+    # Topic 11 — Tiebacks, Lifelines, Anchorage
+    # ============================================================
+    {
+        "topic_number": 11,
+        "slug": "11-suspended-scaffold-tiebacks-lifelines",
+        "category": "Scaffold",
+        "ch33_ref": "§3314",
+        "est_minutes": 15,
+        "title_en": "Suspended Scaffold — Tiebacks, Lifelines, Anchorage",
+        "title_es": "Andamio Colgante — Tiebacks, Líneas de Vida, Anclajes",
+        "why_en": (
+            "Counterweights hold the scaffold up. Tiebacks keep it from "
+            "tipping when the wind hits or a worker moves. Lifelines catch "
+            "us if the scaffold itself fails. These are three separate "
+            "systems — not interchangeable, not optional, not for "
+            "improvisation. Every anchor we use was designed for THIS load."
+        ),
+        "why_es": (
+            "Los contrapesos sostienen el andamio. Los tiebacks evitan que "
+            "se vuelque cuando pega el viento o un trabajador se mueve. Las "
+            "líneas de vida nos atrapan si el andamio mismo falla. Son tres "
+            "sistemas separados — no intercambiables, no opcionales, no "
+            "para improvisar. Cada anclaje que usamos fue diseñado para "
+            "ESTA carga."
+        ),
+        "rules_en": [
+            ("Tieback installed at every suspension point before lifting workers.", "§3314.4.6"),
+            ("Tieback angle 0–45° from horizontal, opposite of overturning.", "§3314.4.6.2"),
+            ("Lifelines independent of suspension lines, anchored separately.", "§3314.4.10"),
+            ("Anchorage rated 5,000 lb per worker (or 2× max arrest force).", "§3314.4.10 / OSHA"),
+            ("Building anchors PE-stamped on the C-hook / parapet clamp plan.", "§3314.4.6"),
+        ],
+        "rules_es": [
+            ("Tieback instalado en cada punto de suspensión antes de subir trabajadores.", "§3314.4.6"),
+            ("Ángulo del tieback 0–45° de horizontal, opuesto al volteo.", "§3314.4.6.2"),
+            ("Líneas de vida independientes de suspensión, ancladas aparte.", "§3314.4.10"),
+            ("Anclaje calificado a 5,000 lb por trabajador (o 2× la fuerza máx).", "§3314.4.10 / OSHA"),
+            ("Anclajes del edificio sellados por PE en el plan de C-hook / parapet.", "§3314.4.6"),
+        ],
+        "do_en": [
+            "Confirm tieback is in place AND tight before stepping on the platform.",
+            "Match every lifeline to its own independent anchor — not the rig's.",
+            "Visually verify the C-hook plan against what's installed today.",
+            "Re-tension a tieback that has gone slack overnight or after wind.",
+            "Tag any anchor with deformation or rust loss — pull it from service.",
+        ],
+        "do_es": [
+            "Confirma que el tieback esté puesto Y apretado antes de subir.",
+            "Conecta cada línea de vida a su propio anclaje independiente.",
+            "Verifica visualmente el plan de C-hook contra lo instalado hoy.",
+            "Re-tensa un tieback que se aflojó de noche o con viento.",
+            "Etiqueta cualquier anclaje con deformación u oxidación — fuera de uso.",
+        ],
+        "dont_en": [
+            "Don't share a single anchor between two lifelines.",
+            "Don't tie back to a pipe, rebar, or weld — only PE-approved anchors.",
+            "Don't install a tieback at a downward angle — it must pull horizontally / up.",
+            "Don't connect the rope grab to the suspension line.",
+        ],
+        "dont_es": [
+            "No compartas un anclaje entre dos líneas de vida.",
+            "No amarres a tubo, varilla, ni soldadura — solo a anclajes aprobados por PE.",
+            "No instales un tieback en ángulo hacia abajo — debe jalar horizontal / arriba.",
+            "No conectes el rope grab a la línea de suspensión.",
+        ],
+        "questions_en": [
+            "Walk me through your three independent connections right now.",
+            "What is the C-hook plan reference on your drop today?",
+            "If a tieback came loose mid-shift, what's the immediate action?",
+        ],
+        "questions_es": [
+            "Repasa tus tres conexiones independientes ahora.",
+            "¿Cuál es la referencia del plan de C-hook en tu caída de hoy?",
+            "Si un tieback se aflojara durante el turno, ¿qué haces de inmediato?",
+        ],
+        "description": "Three independent systems on a swing-stage drop: counterweights, tiebacks, and lifelines — and the anchor that holds each.",
+    },
 ]
 

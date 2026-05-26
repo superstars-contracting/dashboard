@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Andamio Colgante — Tiebacks, Líneas de Vida, Anclajes</title>
+<style>
+  @page { size: Letter portrait; margin: 0.35in 0.4in; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Inter", "Segoe UI", Arial, sans-serif;
+    color: #1c1c1c;
+    font-size: 9.6pt;
+    line-height: 1.28;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .title-bar {
+    background: #b01e2d;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 3px 3px 0 0;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .title-bar .title {
+    font-family: "Archivo", "Inter", sans-serif;
+    font-weight: 800;
+    font-size: 13pt;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    line-height: 1.05;
+  }
+  .title-bar .meta {
+    font-size: 8.5pt;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-align: right;
+    opacity: 0.95;
+  }
+  .fields {
+    display: flex;
+    gap: 14px;
+    border: 1px solid #c9c5bd;
+    border-top: none;
+    background: #faf7f1;
+    padding: 5px 12px;
+    font-size: 9pt;
+  }
+  .fields .f { flex: 1; display: flex; align-items: baseline; gap: 6px; }
+  .fields .lbl {
+    font-weight: 700;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #54505a;
+    white-space: nowrap;
+  }
+  .fields .ln {
+    flex: 1;
+    border-bottom: 1px solid #54505a;
+    height: 11pt;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    margin-top: 6px;
+  }
+  .sec {
+    border: 1px solid #c9c5bd;
+    border-radius: 3px;
+    padding: 6px 9px 7px;
+    break-inside: avoid;
+  }
+  .sec.full { grid-column: 1 / -1; }
+  .sec h3 {
+    font-size: 8.5pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #b01e2d;
+    margin: 0 0 3px;
+    border-bottom: 1px solid #c9c5bd;
+    padding-bottom: 2px;
+  }
+  .sec p { margin: 0 0 3px; }
+  .sec ul { margin: 0; padding-left: 14px; }
+  .sec li { margin-bottom: 1.5px; }
+  .sec .ref {
+    color: #76777E;
+    font-size: 7.8pt;
+    font-weight: 600;
+  }
+  .signin {
+    margin-top: 7px;
+    border: 1px solid #c9c5bd;
+    border-radius: 3px;
+    padding: 5px 9px 6px;
+  }
+  .signin h3 {
+    font-size: 8.5pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #14161C;
+    margin: 0 0 3px;
+  }
+  table.signin-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.5pt;
+  }
+  table.signin-tbl th, table.signin-tbl td {
+    border-bottom: 1px solid #54505a;
+    padding: 4px 5px;
+    text-align: left;
+    vertical-align: bottom;
+    height: 18pt;
+  }
+  table.signin-tbl th {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 7.5pt;
+    color: #54505a;
+    height: 14pt;
+    border-bottom: 1.4px solid #14161C;
+  }
+  .foreman-row {
+    margin-top: 6px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 8.5pt;
+  }
+  .foreman-row .lbl {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 7.5pt;
+    color: #54505a;
+    white-space: nowrap;
+  }
+  .foreman-row .ln {
+    flex: 1;
+    border-bottom: 1px solid #54505a;
+    height: 14pt;
+  }
+</style>
+</head>
+<body>
+  <div class="title-bar">
+    <div class="title">Tema 11 · Andamio Colgante — Tiebacks, Líneas de Vida, Anclajes</div>
+    <div class="meta">Cap. 33 §3314<br>15 min</div>
+  </div>
+  <div class="fields">
+    <div class="f"><span class="lbl">Fecha</span><span class="ln"></span></div>
+    <div class="f"><span class="lbl">Proyecto</span><span class="ln"></span></div>
+    <div class="f"><span class="lbl">Capataz</span><span class="ln"></span></div>
+  </div>
+  <div class="grid">
+    <div class="sec full">
+      <h3>Por qué importa</h3>
+      <p>Los contrapesos sostienen el andamio. Los tiebacks evitan que se vuelque cuando pega el viento o un trabajador se mueve. Las líneas de vida nos atrapan si el andamio mismo falla. Son tres sistemas separados — no intercambiables, no opcionales, no para improvisar. Cada anclaje que usamos fue diseñado para ESTA carga.</p>
+    </div>
+    <div class="sec">
+      <h3>Reglas clave (Cap. 33)</h3>
+      <ul><li>Tieback instalado en cada punto de suspensión antes de subir trabajadores. <span class="ref">§3314.4.6</span></li><li>Ángulo del tieback 0–45° de horizontal, opuesto al volteo. <span class="ref">§3314.4.6.2</span></li><li>Líneas de vida independientes de suspensión, ancladas aparte. <span class="ref">§3314.4.10</span></li><li>Anclaje calificado a 5,000 lb por trabajador (o 2× la fuerza máx). <span class="ref">§3314.4.10 / OSHA</span></li><li>Anclajes del edificio sellados por PE en el plan de C-hook / parapet. <span class="ref">§3314.4.6</span></li></ul>
+    </div>
+    <div class="sec">
+      <h3>Hacer</h3>
+      <ul><li>Confirma que el tieback esté puesto Y apretado antes de subir.</li><li>Conecta cada línea de vida a su propio anclaje independiente.</li><li>Verifica visualmente el plan de C-hook contra lo instalado hoy.</li><li>Re-tensa un tieback que se aflojó de noche o con viento.</li><li>Etiqueta cualquier anclaje con deformación u oxidación — fuera de uso.</li></ul>
+    </div>
+    <div class="sec">
+      <h3>No hacer</h3>
+      <ul><li>No compartas un anclaje entre dos líneas de vida.</li><li>No amarres a tubo, varilla, ni soldadura — solo a anclajes aprobados por PE.</li><li>No instales un tieback en ángulo hacia abajo — debe jalar horizontal / arriba.</li><li>No conectes el rope grab a la línea de suspensión.</li></ul>
+    </div>
+    <div class="sec">
+      <h3>Preguntas de discusión</h3>
+      <ul><li>Repasa tus tres conexiones independientes ahora.</li><li>¿Cuál es la referencia del plan de C-hook en tu caída de hoy?</li><li>Si un tieback se aflojara durante el turno, ¿qué haces de inmediato?</li></ul>
+    </div>
+  </div>
+  <div class="signin">
+    <h3>Lista de Asistencia</h3>
+    <table class="signin-tbl">
+      <thead><tr>
+        <th style="width:34%;">Nombre en letra de molde</th>
+        <th style="width:38%;">Firma</th>
+        <th style="width:18%;">Fecha</th>
+      </tr></thead>
+      <tbody>
+        <tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+    <div class="foreman-row">
+      <span class="lbl">Firma del capataz</span>
+      <span class="ln"></span>
+    </div>
+  </div>
+</body>
+</html>
