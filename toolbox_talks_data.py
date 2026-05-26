@@ -260,5 +260,318 @@ TALKS = [
         ],
         "description": "SST card tiers, expirations, and what happens when a worker shows up with no card or the wrong one.",
     },
+
+    # ============================================================
+    # Topic 4 — Adjoining Property Protection
+    # ============================================================
+    {
+        "topic_number": 4,
+        "slug": "04-adjoining-property-protection",
+        "category": "Site",
+        "ch33_ref": "§3309",
+        "est_minutes": 15,
+        "title_en": "Adjoining Property Protection — Windows, Sills, Neighbors",
+        "title_es": "Protección de Propiedad Vecina — Ventanas, Repisas, Vecinos",
+        "why_en": (
+            "Facade restoration in a row of NYC buildings means our drop, our "
+            "scaffold, and our tools are inches from someone else's window, "
+            "garden, fire escape, or air conditioner. One brick the wrong way, "
+            "one falling tool, and the building owner has a lawsuit and we "
+            "have a DOB stop-work."
+        ),
+        "why_es": (
+            "Restaurar fachadas en una fila de edificios de NYC significa que "
+            "nuestra caída, nuestro andamio y nuestras herramientas están a "
+            "pulgadas de la ventana, jardín, escalera de incendios o aire "
+            "acondicionado de otra persona. Un ladrillo mal puesto o una "
+            "herramienta que se cae, y el dueño nos demanda y el DOB nos para "
+            "el trabajo."
+        ),
+        "rules_en": [
+            ("Inspect adjoining property before work starts — photo evidence.", "§3309.1"),
+            ("Owner of the project protects neighboring property from damage.", "§3309.1"),
+            ("Notice to adjoining property owners required before work.", "§3309.2"),
+            ("Damage to adjoining property reported within 48 hours.", "§3309.4"),
+            ("Protective netting / catch platforms over neighboring windows.", "§3309.5 / §3308"),
+        ],
+        "rules_es": [
+            ("Inspecciona la propiedad vecina antes de empezar — con fotos.", "§3309.1"),
+            ("El dueño del proyecto protege la propiedad vecina del daño.", "§3309.1"),
+            ("Aviso al propietario vecino requerido antes del trabajo.", "§3309.2"),
+            ("Daño a propiedad vecina se reporta dentro de 48 horas.", "§3309.4"),
+            ("Red protectora o plataforma sobre ventanas vecinas.", "§3309.5 / §3308"),
+        ],
+        "do_en": [
+            "Walk the property line each morning — note any new damage.",
+            "Photo every adjoining window and sill BEFORE the first drop.",
+            "Tether every tool over 8 ft of ground or scaffold edge.",
+            "Stop work immediately if a brick or tool drops outside the line.",
+            "Report contact with neighbor to the Foreman the same shift.",
+        ],
+        "do_es": [
+            "Camina la línea de propiedad cada mañana — anota daños nuevos.",
+            "Fotografía cada ventana y repisa vecina ANTES de la primera caída.",
+            "Amarra cada herramienta sobre 8 pies de tierra o el borde del andamio.",
+            "Para el trabajo si un ladrillo o herramienta cae fuera de la línea.",
+            "Reporta cualquier contacto con vecinos al capataz el mismo turno.",
+        ],
+        "dont_en": [
+            "Don't lean tools, hoses, or material on a neighbor's wall or AC.",
+            "Don't dump debris into a neighbor's airshaft or garden.",
+            "Don't argue with a neighbor — refer them to the Foreman.",
+            "Don't move past a damaged window without flagging it.",
+        ],
+        "dont_es": [
+            "No apoyes herramientas, mangueras ni material en pared o aire del vecino.",
+            "No tires escombros al pozo de luz ni al jardín del vecino.",
+            "No discutas con un vecino — refiérelo al capataz.",
+            "No pases por una ventana dañada sin reportarla.",
+        ],
+        "questions_en": [
+            "Which neighboring window is closest to your drop today?",
+            "If a brick fell on a neighbor's AC right now, what is the first call?",
+            "Are the catch platforms / netting still where they were yesterday?",
+        ],
+        "questions_es": [
+            "¿Qué ventana vecina está más cerca de tu caída hoy?",
+            "Si un ladrillo cayera ahora en el aire del vecino, ¿cuál es la primera llamada?",
+            "¿Las plataformas o redes de protección siguen donde estaban ayer?",
+        ],
+        "description": "Adjoining property protection during facade work — pre-photos, notice, netting, and what to do when a neighbor's window gets hit.",
+    },
+
+    # ============================================================
+    # Topic 5 — Sidewalk Shed & Pedestrian Protection
+    # ============================================================
+    {
+        "topic_number": 5,
+        "slug": "05-sidewalk-shed-pedestrian-protection",
+        "category": "Site",
+        "ch33_ref": "§3307",
+        "est_minutes": 15,
+        "title_en": "Sidewalk Shed & Pedestrian Protection — Daily Check",
+        "title_es": "Cobertizo de Acera y Protección al Peatón — Inspección Diaria",
+        "why_en": (
+            "The sidewalk shed is the one piece of our site every passerby "
+            "trusts with their life. A loose panel, a missing light, a "
+            "cracked deck — pedestrians don't see the danger, they just walk "
+            "under it. We check the shed every morning so nothing falls on "
+            "the public."
+        ),
+        "why_es": (
+            "El cobertizo de la acera es la única parte de la obra en la que "
+            "cada peatón confía con su vida. Un panel suelto, una luz "
+            "faltante, una tabla rajada — los peatones no ven el peligro, "
+            "solo pasan debajo. Inspeccionamos el cobertizo cada mañana para "
+            "que nada caiga sobre el público."
+        ),
+        "rules_en": [
+            ("Sidewalk shed required when work is >40 ft above grade or per code.", "§3307.6"),
+            ("Daily inspection — Foreman or competent person, documented.", "§3307.6.5"),
+            ("Lighting on the shed: minimum 2 foot-candles, on dusk to dawn.", "§3307.6.4"),
+            ("Decking watertight; no gaps wider than 1 inch.", "§3307.6.2"),
+            ("Parapet / netting prevents tools or debris from going over.", "§3307.6.3"),
+        ],
+        "rules_es": [
+            ("Cobertizo requerido cuando el trabajo está >40 pies sobre la acera.", "§3307.6"),
+            ("Inspección diaria — capataz o persona competente, documentada.", "§3307.6.5"),
+            ("Iluminación: mínimo 2 foot-candles, prendida del atardecer al amanecer.", "§3307.6.4"),
+            ("Cubierta impermeable; sin grietas más anchas de 1 pulgada.", "§3307.6.2"),
+            ("Parapeto o red impide que herramientas o escombros se caigan.", "§3307.6.3"),
+        ],
+        "do_en": [
+            "Walk the shed at 7 AM — look up, look down, look at the lights.",
+            "Sweep debris off the deck before the shift starts.",
+            "Replace any burnt-out shed light THE SAME DAY.",
+            "Re-tie loose plywood or netting before going up.",
+            "Document the inspection on the shed log (every day).",
+        ],
+        "do_es": [
+            "Camina el cobertizo a las 7 AM — mira arriba, abajo y las luces.",
+            "Barre los escombros del techo antes de empezar el turno.",
+            "Reemplaza cualquier luz quemada del cobertizo EL MISMO DÍA.",
+            "Reata el plywood o la red suelta antes de subir.",
+            "Documenta la inspección en la bitácora del cobertizo (todos los días).",
+        ],
+        "dont_en": [
+            "Don't store material on the shed deck — it loads it past spec.",
+            "Don't block the pedestrian walkway with material or trash.",
+            "Don't leave tools on top of the shed at end of shift.",
+            "Don't ignore graffiti on the shed — note + report it.",
+        ],
+        "dont_es": [
+            "No guardes material sobre el cobertizo — lo sobrecarga.",
+            "No bloquees el paso peatonal con material ni basura.",
+            "No dejes herramientas arriba del cobertizo al final del turno.",
+            "No ignores el grafiti en el cobertizo — anótalo y repórtalo.",
+        ],
+        "questions_en": [
+            "Are all shed lights working right now? When did we last check?",
+            "What's on the shed deck that shouldn't be?",
+            "If a pedestrian got hit by something falling, where would you look first?",
+        ],
+        "questions_es": [
+            "¿Funcionan todas las luces del cobertizo ahora? ¿Cuándo lo revisamos?",
+            "¿Qué hay arriba del cobertizo que no debería estar?",
+            "Si algo cayera sobre un peatón, ¿dónde mirarías primero?",
+        ],
+        "description": "Sidewalk shed daily check — lighting, decking, debris on top, and the public's safety underneath.",
+    },
+
+    # ============================================================
+    # Topic 6 — Housekeeping & Combustible Debris
+    # ============================================================
+    {
+        "topic_number": 6,
+        "slug": "06-housekeeping-combustible-debris",
+        "category": "Site",
+        "ch33_ref": "§3303.4 / §3303.5",
+        "est_minutes": 15,
+        "title_en": "Housekeeping & Combustible Debris Control",
+        "title_es": "Limpieza y Control de Escombros Combustibles",
+        "why_en": (
+            "Most jobsite fires start in trash. Wood, cardboard, oily rags, "
+            "and resin tubs left in a pile near a torch or grinder are how a "
+            "clean facade job ends up on the FDNY news at six. Housekeeping "
+            "is not just tidy — it's the cheapest fire control we have."
+        ),
+        "why_es": (
+            "La mayoría de los incendios en obras empiezan en la basura. "
+            "Madera, cartón, trapos con aceite, y botes de resina dejados "
+            "en pila cerca de un soplete o esmeril son cómo un trabajo de "
+            "fachada limpia termina en las noticias de FDNY a las seis. La "
+            "limpieza no es solo orden — es el control de fuego más barato "
+            "que tenemos."
+        ),
+        "rules_en": [
+            ("Combustible waste removed from work area at end of each shift.", "§3303.4"),
+            ("Metal cans with lids for oily rags — emptied daily.", "§3303.5"),
+            ("Smoking only in designated areas — never near combustibles.", "§3303.4"),
+            ("Walkways and exits kept clear of debris at all times.", "§3303.4"),
+            ("Flammable liquids stored in approved containers, away from heat.", "§3303.5"),
+        ],
+        "rules_es": [
+            ("Basura combustible se saca del área al final de cada turno.", "§3303.4"),
+            ("Latas de metal con tapa para trapos con aceite — vaciadas a diario.", "§3303.5"),
+            ("Fumar solo en áreas designadas — nunca cerca de combustibles.", "§3303.4"),
+            ("Pasillos y salidas libres de escombros todo el tiempo.", "§3303.4"),
+            ("Líquidos inflamables en envases aprobados, lejos del calor.", "§3303.5"),
+        ],
+        "do_en": [
+            "Bag and bin debris hourly — don't let piles build up.",
+            "Use the metal oily-rag can — close the lid every time.",
+            "Sweep your station before lunch and before you leave.",
+            "Walk a 10-ft circle around any hot work to clear flammables.",
+            "Empty trash to the dumpster before end of shift, not Monday.",
+        ],
+        "do_es": [
+            "Embolsa y tira escombros cada hora — no dejes que se acumulen.",
+            "Usa la lata de metal para trapos con aceite — cierra la tapa siempre.",
+            "Barre tu puesto antes del almuerzo y antes de irte.",
+            "Camina 10 pies alrededor de cualquier soplete para sacar inflamables.",
+            "Vacía la basura al contenedor antes del final del turno, no el lunes.",
+        ],
+        "dont_en": [
+            "Don't pile cardboard or wood near a torch, grinder, or saw.",
+            "Don't smoke or vape outside the designated smoking zone.",
+            "Don't dump solvents into trash bags — they ignite.",
+            "Don't let oily rags sit loose — they spontaneously combust.",
+        ],
+        "dont_es": [
+            "No apiles cartón ni madera cerca de soplete, esmeril o sierra.",
+            "No fumes ni vapees fuera del área designada para fumadores.",
+            "No tires solventes en bolsas de basura — se prenden.",
+            "No dejes trapos con aceite sueltos — se combustionan solos.",
+        ],
+        "questions_en": [
+            "Where is the oily-rag can on this site, and when was it last emptied?",
+            "Show me one combustible pile within 10 feet of hot work right now.",
+            "What's the fastest path from your station to the nearest extinguisher?",
+        ],
+        "questions_es": [
+            "¿Dónde está la lata de trapos con aceite, y cuándo se vació?",
+            "Muéstrame una pila combustible a menos de 10 pies de un soplete ahora.",
+            "¿Cuál es el camino más rápido de tu puesto al extintor más cercano?",
+        ],
+        "description": "Housekeeping and combustible debris — why most jobsite fires start in trash and how to keep work zones clear.",
+    },
+
+    # ============================================================
+    # Topic 7 — Fire Safety During Construction
+    # ============================================================
+    {
+        "topic_number": 7,
+        "slug": "07-fire-safety-hot-work",
+        "category": "Site",
+        "ch33_ref": "§3303.7 / §3303.8",
+        "est_minutes": 15,
+        "title_en": "Fire Safety During Construction — Hot Work, Extinguishers, Standpipe",
+        "title_es": "Seguridad Contra Incendios — Trabajo en Caliente, Extintores, Tubería Vertical",
+        "why_en": (
+            "Hot work — torch cutting, welding, grinding sparks — is the "
+            "single highest-risk activity on a facade job. A spark drops "
+            "three floors into a pile of cardboard, smolders for two hours, "
+            "ignites after we leave. Most construction fires are not "
+            "discovered until it's too late."
+        ),
+        "why_es": (
+            "El trabajo en caliente — corte con soplete, soldadura, chispas "
+            "de esmeril — es la actividad de más alto riesgo en una fachada. "
+            "Una chispa cae tres pisos a una pila de cartón, arde dos horas, "
+            "se prende después de irnos. La mayoría de los incendios no se "
+            "descubren hasta que ya es tarde."
+        ),
+        "rules_en": [
+            ("Hot work permit required before any cutting, welding, brazing.", "§3303.7.2"),
+            ("Fire watch posted during hot work and 30 min after.", "§3303.7.4"),
+            ("Portable extinguisher within 25 ft of every hot-work station.", "§3303.7.5"),
+            ("Working standpipe required when building is >75 ft.", "§3303.8"),
+            ("FDNY S-56 Certificate of Fitness holder must be on site.", "§3303.7.1"),
+        ],
+        "rules_es": [
+            ("Permiso de trabajo en caliente requerido antes de cortar o soldar.", "§3303.7.2"),
+            ("Vigilante de incendio durante el trabajo y 30 min después.", "§3303.7.4"),
+            ("Extintor portátil a menos de 25 pies de cada estación caliente.", "§3303.7.5"),
+            ("Tubería vertical funcional requerida cuando el edificio es >75 pies.", "§3303.8"),
+            ("Titular del Certificado FDNY S-56 debe estar en sitio.", "§3303.7.1"),
+        ],
+        "do_en": [
+            "Pull a hot work permit and post it at the work location.",
+            "Clear a 35-foot radius of combustibles before starting.",
+            "Station a fire watch with a charged extinguisher.",
+            "Keep watching for 30 minutes after the torch is off.",
+            "Confirm the standpipe is charged before going above 75 ft.",
+        ],
+        "do_es": [
+            "Saca el permiso de trabajo en caliente y póngalo en el sitio del trabajo.",
+            "Despeja 35 pies a la redonda de combustibles antes de empezar.",
+            "Pon un vigilante de incendio con un extintor cargado.",
+            "Sigue vigilando 30 minutos después de apagar el soplete.",
+            "Confirma que la tubería vertical esté cargada antes de subir arriba de 75 pies.",
+        ],
+        "dont_en": [
+            "Don't cut, weld, or grind without a current hot work permit.",
+            "Don't leave hot work unattended — even for a minute.",
+            "Don't use a damaged or undischarged extinguisher.",
+            "Don't block the standpipe inlet or extinguisher access.",
+        ],
+        "dont_es": [
+            "No cortes, sueldes ni esmeriles sin un permiso vigente.",
+            "No dejes trabajo en caliente sin vigilancia — ni un minuto.",
+            "No uses un extintor dañado o descargado.",
+            "No bloquees la entrada de la tubería vertical ni el acceso al extintor.",
+        ],
+        "questions_en": [
+            "Who holds the S-56 Certificate on this site, and where are they right now?",
+            "Where is the closest extinguisher to your work station? Is it charged?",
+            "What happens to a spark that falls behind a window opening?",
+        ],
+        "questions_es": [
+            "¿Quién tiene el Certificado S-56 en este sitio, y dónde está ahora?",
+            "¿Dónde está el extintor más cercano a tu puesto? ¿Está cargado?",
+            "¿Qué pasa con una chispa que cae detrás de una ventana abierta?",
+        ],
+        "description": "Hot work fire safety — permits, fire watch, extinguishers, the standpipe rule, and FDNY S-56 holders.",
+    },
 ]
 

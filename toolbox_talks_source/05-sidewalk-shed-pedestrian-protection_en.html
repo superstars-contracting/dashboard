@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sidewalk Shed &amp; Pedestrian Protection — Daily Check</title>
+<style>
+  @page { size: Letter portrait; margin: 0.35in 0.4in; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Inter", "Segoe UI", Arial, sans-serif;
+    color: #1c1c1c;
+    font-size: 9.6pt;
+    line-height: 1.28;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .title-bar {
+    background: #b01e2d;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 3px 3px 0 0;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .title-bar .title {
+    font-family: "Archivo", "Inter", sans-serif;
+    font-weight: 800;
+    font-size: 13pt;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    line-height: 1.05;
+  }
+  .title-bar .meta {
+    font-size: 8.5pt;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-align: right;
+    opacity: 0.95;
+  }
+  .fields {
+    display: flex;
+    gap: 14px;
+    border: 1px solid #c9c5bd;
+    border-top: none;
+    background: #faf7f1;
+    padding: 5px 12px;
+    font-size: 9pt;
+  }
+  .fields .f { flex: 1; display: flex; align-items: baseline; gap: 6px; }
+  .fields .lbl {
+    font-weight: 700;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #54505a;
+    white-space: nowrap;
+  }
+  .fields .ln {
+    flex: 1;
+    border-bottom: 1px solid #54505a;
+    height: 11pt;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    margin-top: 6px;
+  }
+  .sec {
+    border: 1px solid #c9c5bd;
+    border-radius: 3px;
+    padding: 6px 9px 7px;
+    break-inside: avoid;
+  }
+  .sec.full { grid-column: 1 / -1; }
+  .sec h3 {
+    font-size: 8.5pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #b01e2d;
+    margin: 0 0 3px;
+    border-bottom: 1px solid #c9c5bd;
+    padding-bottom: 2px;
+  }
+  .sec p { margin: 0 0 3px; }
+  .sec ul { margin: 0; padding-left: 14px; }
+  .sec li { margin-bottom: 1.5px; }
+  .sec .ref {
+    color: #76777E;
+    font-size: 7.8pt;
+    font-weight: 600;
+  }
+  .signin {
+    margin-top: 7px;
+    border: 1px solid #c9c5bd;
+    border-radius: 3px;
+    padding: 5px 9px 6px;
+  }
+  .signin h3 {
+    font-size: 8.5pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #14161C;
+    margin: 0 0 3px;
+  }
+  table.signin-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.5pt;
+  }
+  table.signin-tbl th, table.signin-tbl td {
+    border-bottom: 1px solid #54505a;
+    padding: 4px 5px;
+    text-align: left;
+    vertical-align: bottom;
+    height: 18pt;
+  }
+  table.signin-tbl th {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 7.5pt;
+    color: #54505a;
+    height: 14pt;
+    border-bottom: 1.4px solid #14161C;
+  }
+  .foreman-row {
+    margin-top: 6px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 8.5pt;
+  }
+  .foreman-row .lbl {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 7.5pt;
+    color: #54505a;
+    white-space: nowrap;
+  }
+  .foreman-row .ln {
+    flex: 1;
+    border-bottom: 1px solid #54505a;
+    height: 14pt;
+  }
+</style>
+</head>
+<body>
+  <div class="title-bar">
+    <div class="title">Topic 5 · Sidewalk Shed &amp; Pedestrian Protection — Daily Check</div>
+    <div class="meta">Ch 33 §3307<br>15 min</div>
+  </div>
+  <div class="fields">
+    <div class="f"><span class="lbl">Date</span><span class="ln"></span></div>
+    <div class="f"><span class="lbl">Project</span><span class="ln"></span></div>
+    <div class="f"><span class="lbl">Foreman</span><span class="ln"></span></div>
+  </div>
+  <div class="grid">
+    <div class="sec full">
+      <h3>Why It Matters</h3>
+      <p>The sidewalk shed is the one piece of our site every passerby trusts with their life. A loose panel, a missing light, a cracked deck — pedestrians don't see the danger, they just walk under it. We check the shed every morning so nothing falls on the public.</p>
+    </div>
+    <div class="sec">
+      <h3>Key Rules (Ch 33)</h3>
+      <ul><li>Sidewalk shed required when work is &gt;40 ft above grade or per code. <span class="ref">§3307.6</span></li><li>Daily inspection — Foreman or competent person, documented. <span class="ref">§3307.6.5</span></li><li>Lighting on the shed: minimum 2 foot-candles, on dusk to dawn. <span class="ref">§3307.6.4</span></li><li>Decking watertight; no gaps wider than 1 inch. <span class="ref">§3307.6.2</span></li><li>Parapet / netting prevents tools or debris from going over. <span class="ref">§3307.6.3</span></li></ul>
+    </div>
+    <div class="sec">
+      <h3>Do</h3>
+      <ul><li>Walk the shed at 7 AM — look up, look down, look at the lights.</li><li>Sweep debris off the deck before the shift starts.</li><li>Replace any burnt-out shed light THE SAME DAY.</li><li>Re-tie loose plywood or netting before going up.</li><li>Document the inspection on the shed log (every day).</li></ul>
+    </div>
+    <div class="sec">
+      <h3>Do Not</h3>
+      <ul><li>Don't store material on the shed deck — it loads it past spec.</li><li>Don't block the pedestrian walkway with material or trash.</li><li>Don't leave tools on top of the shed at end of shift.</li><li>Don't ignore graffiti on the shed — note + report it.</li></ul>
+    </div>
+    <div class="sec">
+      <h3>Discussion Questions</h3>
+      <ul><li>Are all shed lights working right now? When did we last check?</li><li>What's on the shed deck that shouldn't be?</li><li>If a pedestrian got hit by something falling, where would you look first?</li></ul>
+    </div>
+  </div>
+  <div class="signin">
+    <h3>Worker Sign-In</h3>
+    <table class="signin-tbl">
+      <thead><tr>
+        <th style="width:34%;">Print Name</th>
+        <th style="width:38%;">Signature</th>
+        <th style="width:18%;">Date</th>
+      </tr></thead>
+      <tbody>
+        <tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+    <div class="foreman-row">
+      <span class="lbl">Foreman signature</span>
+      <span class="ln"></span>
+    </div>
+  </div>
+</body>
+</html>
