@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Labor Rates — Superstars Contracting</title>
+<style>
+  :root {
+    --ink: #14161C;
+    --ink-soft: #54505A;
+    --mute: #76777E;
+    --brand-red: #B11E2E;
+    --brand-red-dark: #8B1623;
+    --bg: #FAF7F1;
+    --card: #FFFFFF;
+    --border: #E8E4DD;
+    --ok: #2F7C57;
+    --warn: #B68838;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .header {
+    background: var(--ink);
+    color: white;
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    width: 30px; height: 30px;
+    color: var(--brand-red);
+  }
+  .brand-name {
+    font-weight: 800; letter-spacing: 0.04em;
+    text-transform: uppercase; font-size: 13px;
+  }
+  .brand-sub {
+    font-size: 10px; color: #9b9ca0;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    margin-top: 2px;
+  }
+  .header-actions { display: flex; align-items: center; gap: 16px; }
+  .role-chip {
+    background: #2a2c34;
+    color: #fff; padding: 4px 10px;
+    border-radius: 3px; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    font-weight: 700;
+  }
+  .back-link {
+    color: #9b9ca0; font-size: 12px;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .back-link:hover { color: white; }
+  main { padding: 28px; max-width: 1100px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  .subhead {
+    font-size: 12px; color: var(--brand-red);
+    text-transform: uppercase; letter-spacing: 0.1em;
+    font-weight: 700; margin-bottom: 16px;
+  }
+  .audit-notice {
+    background: #fff7e0; border: 1px solid #e6c989;
+    border-left: 4px solid var(--warn);
+    padding: 10px 14px; border-radius: 3px;
+    font-size: 12px; color: #5b4a18;
+    margin-bottom: 22px;
+  }
+  .grid { display: grid; gap: 10px; }
+  .row {
+    background: var(--card); border: 1px solid var(--border);
+    border-left: 4px solid var(--brand-red);
+    border-radius: 4px;
+    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: 1.4fr 0.8fr auto auto;
+    gap: 16px; align-items: center;
+  }
+  .who .wid {
+    font-weight: 700; color: var(--brand-red);
+    font-size: 12px; letter-spacing: 0.04em;
+  }
+  .who .name { font-weight: 700; font-size: 15px; margin-top: 2px; }
+  .who .trade { color: var(--mute); font-size: 11px; margin-top: 2px; }
+  .rate {
+    text-align: right;
+  }
+  .rate .val {
+    font-weight: 800; font-size: 22px;
+    color: var(--ink);
+  }
+  .rate .effective {
+    font-size: 11px; color: var(--mute); margin-top: 2px;
+  }
+  .rate-missing {
+    color: var(--warn); font-weight: 700; font-size: 13px;
+    letter-spacing: 0.04em;
+  }
+  .btn {
+    background: white; color: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 14px; font-size: 12px;
+    font-weight: 700; letter-spacing: 0.05em;
+    text-transform: uppercase; cursor: pointer;
+  }
+  .btn:hover { background: var(--bg); border-color: var(--brand-red); }
+  .btn-primary {
+    background: var(--brand-red); color: white; border-color: var(--brand-red);
+  }
+  .btn-primary:hover { background: var(--brand-red-dark); border-color: var(--brand-red-dark); }
+  .history {
+    grid-column: 1 / -1;
+    border-top: 1px dashed var(--border);
+    margin-top: 12px; padding-top: 10px;
+    display: none;
+  }
+  .row.expanded .history { display: block; }
+  .history-row {
+    display: grid;
+    grid-template-columns: 110px 1fr 1.4fr;
+    gap: 12px; padding: 4px 0;
+    font-size: 12px;
+    border-bottom: 1px solid #f2efe7;
+  }
+  .history-row .from {
+    font-weight: 700; color: var(--ink-soft);
+  }
+  .history-row .val {
+    font-weight: 600;
+  }
+  .history-row .meta {
+    color: var(--mute); font-size: 11px;
+  }
+  .history-empty {
+    color: var(--mute); font-style: italic; font-size: 12px;
+  }
+
+  /* Modal */
+  .modal-bg {
+    position: fixed; inset: 0;
+    background: rgba(20,22,28,0.45);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: white; width: 460px;
+    border-radius: 6px;
+    padding: 22px 24px;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.25);
+  }
+  .modal h2 {
+    margin: 0 0 4px; font-size: 18px;
+  }
+  .modal .worker-line {
+    font-size: 12px; color: var(--mute);
+    margin-bottom: 18px;
+  }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block;
+    font-size: 11px; color: var(--ink-soft);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .field input, .field textarea {
+    width: 100%; padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: 3px;
+    font-family: inherit; font-size: 14px;
+    color: var(--ink);
+  }
+  .field input:focus, .field textarea:focus {
+    outline: none; border-color: var(--brand-red);
+  }
+  .modal-actions {
+    display: flex; justify-content: flex-end;
+    gap: 8px; margin-top: 18px;
+  }
+  .err {
+    color: var(--brand-red); font-size: 12px;
+    margin-top: 8px; min-height: 16px;
+  }
+  .err.ok { color: var(--ok); }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <polygon points="12,2 14.6,8.6 21.5,9.3 16.2,13.9 18,20.5 12,17 6,20.5 7.8,13.9 2.5,9.3 9.4,8.6"/>
+      </svg>
+      <div>
+        <div class="brand-name">Superstars Contracting</div>
+        <div class="brand-sub">Labor Rates · Admin</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span class="role-chip" id="hdr-role">…</span>
+      <span id="hdr-user" style="font-size:12px;color:#9b9ca0;"></span>
+      <a class="back-link" href="/">← Company Console</a>
+    </div>
+  </div>
+
+  <main>
+    <h1>Labor Rates</h1>
+    <div class="subhead">C-Suite / Admin only</div>
+    <div class="audit-notice">
+      Every change is logged with actor, date, and before/after values.
+      Audit trail is retained for compliance and pay-rate disputes.
+    </div>
+    <div id="rates-grid" class="grid">
+      <div style="padding:18px;text-align:center;color:var(--mute);background:white;border:1px solid var(--border);border-radius:4px;">Loading workers…</div>
+    </div>
+  </main>
+
+  <!-- Edit Rate Modal -->
+  <div class="modal-bg" id="modal-bg">
+    <div class="modal" role="dialog" aria-modal="true">
+      <h2>Set Hourly Rate</h2>
+      <div class="worker-line" id="modal-worker">—</div>
+      <div class="field">
+        <label for="m-rate">New hourly rate (USD)</label>
+        <input type="number" id="m-rate" step="0.01" min="0.01" inputmode="decimal" placeholder="0.00">
+      </div>
+      <div class="field">
+        <label for="m-from">Effective from</label>
+        <input type="date" id="m-from">
+      </div>
+      <div class="field">
+        <label for="m-notes">Notes (optional)</label>
+        <textarea id="m-notes" rows="2" placeholder="Reason for the change…"></textarea>
+      </div>
+      <div class="err" id="m-err"></div>
+      <div class="modal-actions">
+        <button class="btn" type="button" id="m-cancel">Cancel</button>
+        <button class="btn btn-primary" type="button" id="m-save">Save rate</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function() {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => (s == null ? '' : String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'));
+
+  function fmtMoney(n) {
+    if (n == null || isNaN(n)) return '—';
+    return '$' + Number(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+  function todayLocal() {
+    const d = new Date();
+    return d.getFullYear() + '-'
+         + String(d.getMonth()+1).padStart(2,'0') + '-'
+         + String(d.getDate()).padStart(2,'0');
+  }
+
+  let editingEmpId = null;
+
+  async function loadMe() {
+    try {
+      const r = await fetch('/api/auth/me', {credentials: 'include'});
+      const j = await r.json();
+      if (j && j.user) {
+        $('hdr-role').textContent = j.user.role || '—';
+        $('hdr-user').textContent = j.user.full_name || j.user.email || '';
+      }
+    } catch (e) {}
+  }
+
+  async function loadGrid() {
+    const grid = $('rates-grid');
+    try {
+      const r = await fetch('/api/labor-rates/workers', {credentials: 'include'});
+      if (r.status === 403) {
+        grid.innerHTML = '<div style="padding:18px;text-align:center;color:var(--brand-red);background:white;border:1px solid var(--border);border-radius:4px;">Forbidden — your role cannot view labor rates.</div>';
+        return;
+      }
+      if (r.status === 401) {
+        window.location.href = '/login?next=/admin/labor-rates';
+        return;
+      }
+      const j = await r.json();
+      const workers = (j && j.data) || [];
+      if (!workers.length) {
+        grid.innerHTML = '<div style="padding:18px;text-align:center;color:var(--mute);background:white;border:1px solid var(--border);border-radius:4px;">No active workers.</div>';
+        return;
+      }
+      grid.innerHTML = workers.map(w => {
+        const hasRate = w.current_rate != null;
+        const rateBlock = hasRate
+          ? `<div class="val">${fmtMoney(w.current_rate)}/hr</div>
+             <div class="effective">Since ${esc(w.current_effective_from)}</div>`
+          : `<div class="rate-missing">Rate not set</div>
+             <div class="effective" style="color:var(--warn);">Add a rate to begin</div>`;
+        return `<div class="row" data-emp="${esc(w.employee_id)}">
+          <div class="who">
+            <div class="wid">${esc(w.worker_id || '—')}</div>
+            <div class="name">${esc(w.name || '—')}</div>
+            <div class="trade">${esc(w.trade || '')}</div>
+          </div>
+          <div class="rate">${rateBlock}</div>
+          <button class="btn" type="button" data-action="history" data-emp="${esc(w.employee_id)}">
+            View history${w.history_count ? ' (' + w.history_count + ')' : ''}
+          </button>
+          <button class="btn btn-primary" type="button" data-action="edit"
+                  data-emp="${esc(w.employee_id)}"
+                  data-name="${esc(w.name)}"
+                  data-wid="${esc(w.worker_id || '')}">
+            ${hasRate ? 'Edit rate' : 'Set rate'}
+          </button>
+          <div class="history" data-history-for="${esc(w.employee_id)}"></div>
+        </div>`;
+      }).join('');
+    } catch (e) {
+      grid.innerHTML = '<div style="padding:18px;text-align:center;color:var(--brand-red);background:white;border:1px solid var(--border);border-radius:4px;">Network error — retry.</div>';
+    }
+  }
+
+  async function loadHistory(empId, container) {
+    try {
+      const r = await fetch('/api/labor-rates/workers/' + encodeURIComponent(empId) + '/history',
+                            {credentials: 'include'});
+      const j = await r.json();
+      const rows = (j && j.data) || [];
+      if (!rows.length) {
+        container.innerHTML = '<div class="history-empty">No history yet.</div>';
+        return;
+      }
+      container.innerHTML = '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;font-weight:700;color:var(--ink-soft);margin-bottom:4px;">History</div>'
+        + rows.map(r => {
+          const period = r.effective_to
+            ? `${esc(r.effective_from)} → ${esc(r.effective_to)}`
+            : `${esc(r.effective_from)} → current`;
+          const by = r.created_by_name ? esc(r.created_by_name) : '(unknown)';
+          return `<div class="history-row">
+            <div class="from">${period}</div>
+            <div class="val">${fmtMoney(r.hourly_rate)}/hr</div>
+            <div class="meta">Set by ${by} · ${esc((r.created_at || '').slice(0,10))}${r.notes ? ' · ' + esc(r.notes) : ''}</div>
+          </div>`;
+        }).join('');
+    } catch (e) {
+      container.innerHTML = '<div class="history-empty" style="color:var(--brand-red);">Failed to load history.</div>';
+    }
+  }
+
+  function openModal(empId, name, wid) {
+    editingEmpId = empId;
+    $('modal-worker').textContent = (wid ? wid + ' · ' : '') + (name || '');
+    $('m-rate').value = '';
+    $('m-from').value = todayLocal();
+    $('m-notes').value = '';
+    $('m-err').textContent = '';
+    $('m-err').className = 'err';
+    $('modal-bg').classList.add('open');
+    setTimeout(() => $('m-rate').focus(), 50);
+  }
+  function closeModal() {
+    $('modal-bg').classList.remove('open');
+    editingEmpId = null;
+  }
+
+  async function saveRate() {
+    const errEl = $('m-err');
+    errEl.textContent = '';
+    errEl.className = 'err';
+    const rate = parseFloat($('m-rate').value);
+    const from = $('m-from').value;
+    const notes = $('m-notes').value.trim() || null;
+    if (!rate || rate <= 0) { errEl.textContent = 'Enter a positive rate.'; return; }
+    if (!from) { errEl.textContent = 'Effective-from date is required.'; return; }
+    try {
+      const r = await fetch('/api/labor-rates/workers/' + encodeURIComponent(editingEmpId), {
+        method: 'POST',
+        credentials: 'include',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({hourly_rate: rate, effective_from: from, notes: notes}),
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        errEl.textContent = (j && j.error) || ('Save failed (' + r.status + ')');
+        return;
+      }
+      errEl.className = 'err ok';
+      errEl.textContent = 'Saved.';
+      setTimeout(() => { closeModal(); loadGrid(); }, 350);
+    } catch (e) {
+      errEl.textContent = 'Network error.';
+    }
+  }
+
+  document.addEventListener('click', (e) => {
+    const editBtn = e.target.closest('[data-action="edit"]');
+    if (editBtn) {
+      openModal(
+        editBtn.getAttribute('data-emp'),
+        editBtn.getAttribute('data-name'),
+        editBtn.getAttribute('data-wid'),
+      );
+      return;
+    }
+    const histBtn = e.target.closest('[data-action="history"]');
+    if (histBtn) {
+      const empId = histBtn.getAttribute('data-emp');
+      const row = histBtn.closest('.row');
+      const container = row.querySelector('[data-history-for]');
+      const wasOpen = row.classList.contains('expanded');
+      row.classList.toggle('expanded');
+      if (!wasOpen) loadHistory(empId, container);
+      return;
+    }
+  });
+  $('m-cancel').addEventListener('click', closeModal);
+  $('m-save').addEventListener('click', saveRate);
+  $('modal-bg').addEventListener('click', (e) => {
+    if (e.target === $('modal-bg')) closeModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && $('modal-bg').classList.contains('open')) closeModal();
+  });
+
+  loadMe();
+  loadGrid();
+})();
+</script>
+</body>
+</html>
