@@ -25,7 +25,7 @@ SEED = [
         "danger_hard_hat_area.pdf",
         "danger_hard_hat_area.html",
         "Safety",
-        "portrait",
+        "landscape",
         "ANSI Z535 danger sign. Post at every entry to a hard-hat-required zone.",
     ),
     (
@@ -34,7 +34,7 @@ SEED = [
         "warning_men_working_above.pdf",
         "warning_men_working_above.html",
         "Safety",
-        "portrait",
+        "landscape",
         "ANSI Z535 warning sign with upward arrow. Post below any overhead "
         "work zone (suspended scaffold drop, lift, hoist path).",
     ),
@@ -44,7 +44,7 @@ SEED = [
         "caution_construction_in_progress.pdf",
         "caution_construction_in_progress.html",
         "Safety",
-        "portrait",
+        "landscape",
         "ANSI Z535 caution sign. General site-boundary marker.",
     ),
     (
@@ -53,7 +53,7 @@ SEED = [
         "caution_do_not_enter.pdf",
         "caution_do_not_enter.html",
         "Site",
-        "portrait",
+        "landscape",
         "Caution sign with circle-slash hand pictogram. Post at restricted "
         "access points (drop zone, electrical, work platforms).",
     ),
@@ -63,7 +63,7 @@ SEED = [
         "notice_all_ppe_required.pdf",
         "notice_all_ppe_required.html",
         "PPE",
-        "portrait",
+        "landscape",
         "Notice sign with 6 PPE pictograms (hard hat, eye, hearing, hi-vis, "
         "gloves, boots). Post at PPE-mandatory entry points.",
     ),
@@ -73,7 +73,7 @@ SEED = [
         "notice_keep_work_area_clean.pdf",
         "notice_keep_work_area_clean.html",
         "Site",
-        "portrait",
+        "landscape",
         "Housekeeping reminder. Post in shared work zones, debris staging, "
         "and at scaffold drops.",
     ),
@@ -93,7 +93,7 @@ SEED = [
         "restricted_area_construction.pdf",
         "restricted_area_construction.html",
         "DOB",
-        "portrait",
+        "landscape",
         "NYC DOB Restricted Construction / Work in Progress posting (U-1012-01). "
         "Post at site perimeter / restricted floors.",
     ),
@@ -103,7 +103,7 @@ SEED = [
         "dress_code_ppe_en.pdf",
         "dress_code_ppe_en.html",
         "PPE",
-        "portrait",
+        "landscape",
         "Illustrated dress-code poster with labeled PPE callouts: hard hat, "
         "eye / hearing protection, respirator, hi-vis vest, gloves, long "
         "trousers, work shoes. English only.",
@@ -114,7 +114,7 @@ SEED = [
         "dress_code_ppe_bilingual.pdf",
         "dress_code_ppe_bilingual.html",
         "PPE",
-        "portrait",
+        "landscape",
         "Bilingual (English / Spanish) illustrated dress-code poster. Same "
         "PPE callouts as PPE-002 with Spanish translations under each label.",
     ),
@@ -192,6 +192,17 @@ def main():
         if cur.rowcount == 1:
             inserted += 1
         else:
+            # Row already exists — refresh metadata (orientation, category,
+            # code, description) so re-running the seeder brings rows into
+            # spec after operator-feedback redesigns (#167 flipped every
+            # sign to landscape).
+            conn.execute(
+                "UPDATE signage_templates SET "
+                "  code = ?, category = ?, orientation = ?, "
+                "  description = ?, updated_at = CURRENT_TIMESTAMP "
+                "WHERE title = ?",
+                (code, category, orientation, description, title),
+            )
             ignored += 1
     conn.commit()
 
