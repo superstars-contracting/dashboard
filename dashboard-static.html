@@ -1187,12 +1187,33 @@
             <strong>Re-issuing</strong> <span id="dcr-reissue-id">—</span> — any changes you make below will replace the issued report. The report number + date are preserved.
           </div>
 
-          <!-- Controls bar: date picker + refresh + status -->
-          <div style="display:flex;gap:16px;align-items:center;background:white;border:1px solid #E8E4DD;border-radius:4px;padding:14px 16px;margin-bottom:24px;flex-wrap:wrap;">
+          <!-- Controls bar: date picker + refresh + No-Work + status -->
+          <div style="display:flex;gap:16px;align-items:center;background:white;border:1px solid #E8E4DD;border-radius:4px;padding:14px 16px;margin-bottom:14px;flex-wrap:wrap;">
             <label for="dcr-date" style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Date</label>
             <input type="date" id="dcr-date" style="padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
             <button id="dcr-refresh" type="button" style="padding:6px 14px;border:none;border-radius:4px;background:#14161C;color:white;font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;">Refresh from data</button>
+            <!-- No-Work Day toggle. Reason dropdown lives next to the button —
+                 visible whether or not the flag is set so the operator can
+                 pick before clicking Mark. Note: free-text. -->
+            <span style="display:inline-flex;gap:6px;align-items:center;margin-left:8px;padding-left:12px;border-left:1px solid #E8E4DD;">
+              <select id="dcr-nowork-reason" style="padding:6px 8px;border:1px solid #E8E4DD;border-radius:4px;font-size:12px;font-family:inherit;background:white;">
+                <option value="Rain">Rain</option>
+                <option value="Snow">Snow</option>
+                <option value="Holiday">Holiday</option>
+                <option value="Other">Other</option>
+              </select>
+              <input type="text" id="dcr-nowork-note" placeholder="note (optional)" style="width:140px;padding:6px 8px;border:1px solid #E8E4DD;border-radius:4px;font-size:12px;font-family:inherit;">
+              <button id="dcr-nowork-mark" type="button" style="padding:6px 12px;border:1px solid #B68838;border-radius:4px;background:#FFF4D6;color:#7A5E1E;font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;">Mark No-Work</button>
+            </span>
             <div id="dcr-status" style="margin-left:auto;font-size:11px;color:#76777E;">Loading…</div>
+          </div>
+          <!-- No-Work banner. Shown when no_work=1; hidden otherwise. Renders
+               above section 1 so the operator sees the designation before
+               scrolling into the (empty) sections. -->
+          <div id="dcr-nowork-banner" style="display:none;background:#FFE8D6;border:1px solid #E8AC6A;border-left:5px solid #B11E2E;padding:12px 16px;border-radius:4px;margin-bottom:14px;font-size:14px;color:#7A2E1B;font-weight:700;letter-spacing:0.04em;display:none;align-items:center;gap:12px;">
+            <span style="font-size:18px;">⛔</span>
+            <span><span id="dcr-nowork-label">NO WORK — RAIN</span><span id="dcr-nowork-noteshow" style="font-weight:400;color:#444;margin-left:8px;"></span></span>
+            <button id="dcr-nowork-clear" type="button" style="margin-left:auto;background:white;border:1px solid #B11E2E;color:#B11E2E;padding:4px 10px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:0.04em;cursor:pointer;">CLEAR NO-WORK</button>
           </div>
 
           <!-- 1. PROJECT INFO -->
@@ -1446,6 +1467,7 @@
               renderProjectInfo(dcr.project);
               renderWeather(dcr.weather);
               renderLabor(dcr.labor);
+              renderNoWorkBanner(dcr);
               // DCR-4: render existing photos as saved tiles so the
               // operator can see + remove them during edit. New uploads
               // go into the same grid via the upload-first flow (#108).
@@ -2399,6 +2421,107 @@
             if (btn) btn.addEventListener('click', () => issueDcr());
           }
 
+          // ---- No-Work Day (first-class flag, replaces typing "no work
+          //      rain" into Work Performed). The flag lives on
+          //      report_index.no_work; the API endpoint at
+          //      /api/projects/<code>/daily/<date>/no-work POSTs to set
+          //      and DELETEs to clear. -----------------------------------
+          function renderNoWorkBanner(dcr) {
+            const banner = document.getElementById('dcr-nowork-banner');
+            if (!banner) return;
+            if (dcr && dcr.no_work) {
+              const reason = (dcr.no_work_reason || 'OTHER').toUpperCase();
+              document.getElementById('dcr-nowork-label').textContent = 'NO WORK — ' + reason;
+              const noteEl = document.getElementById('dcr-nowork-noteshow');
+              noteEl.textContent = dcr.no_work_note ? ('· ' + dcr.no_work_note) : '';
+              banner.style.display = 'flex';
+              // Sync the reason dropdown so the next Mark click keeps state
+              const rs = document.getElementById('dcr-nowork-reason');
+              if (rs && dcr.no_work_reason) rs.value = dcr.no_work_reason;
+              const nt = document.getElementById('dcr-nowork-note');
+              if (nt) nt.value = dcr.no_work_note || '';
+            } else {
+              banner.style.display = 'none';
+            }
+          }
+
+          async function markNoWorkDay() {
+            const dateStr = getCurrentDate();
+            if (!dateStr) { alert('Pick a DCR date first.'); return; }
+            const reason = document.getElementById('dcr-nowork-reason').value || 'Rain';
+            const note = (document.getElementById('dcr-nowork-note').value || '').trim();
+            // If labor has rows in the rendered table, warn + offer clear.
+            const laborTbody = document.getElementById('dcr-labor-tbody');
+            const labRows = laborTbody ? laborTbody.querySelectorAll('tr[data-emp-id], tr').length : 0;
+            // Better: fetch live labor count from the daily endpoint to count
+            // sign-ins (the rendered table might be stale).
+            let liveSignIns = 0;
+            try {
+              const r = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/daily/' + encodeURIComponent(dateStr) + '?audience=internal');
+              const j = await r.json();
+              liveSignIns = ((j && j.data && j.data.labor && j.data.labor.rows) || []).length;
+            } catch (_) {}
+            if (liveSignIns > 0) {
+              if (!confirm('This day has ' + liveSignIns + ' sign-in(s). Clear them and mark No-Work (' + reason + ')?')) return;
+              // Clear: delete each sign-in by id from the daily aggregator's
+              // labor.rows (sign_in_id surfaced by dcr_aggregator). Mirrors
+              // the #153 Cancel-rollback's per-row DELETE so the audit
+              // trail is the same.
+              try {
+                const r = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/daily/' + encodeURIComponent(dateStr) + '?audience=internal');
+                const j = await r.json();
+                const ids = ((j && j.data && j.data.labor && j.data.labor.rows) || [])
+                  .map(row => row.sign_in_id).filter(Boolean);
+                await Promise.allSettled(ids.map(id =>
+                  fetch('/api/sign-ins/' + encodeURIComponent(id), {method: 'DELETE'})
+                ));
+              } catch (e) {
+                alert('Failed to clear sign-ins: ' + (e && e.message));
+                return;
+              }
+            }
+            try {
+              const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/daily/' + encodeURIComponent(dateStr) + '/no-work', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({reason, note: note || null}),
+              });
+              if (!resp.ok) {
+                const j = await resp.json().catch(()=>({}));
+                alert('Mark No-Work failed: ' + (j.error || ('HTTP ' + resp.status)));
+                return;
+              }
+              // Refresh the DCR view so the banner + empty labor render.
+              loadDcr(dateStr);
+            } catch (e) {
+              alert('Network error: ' + (e && e.message));
+            }
+          }
+
+          async function clearNoWorkDay() {
+            const dateStr = getCurrentDate();
+            if (!dateStr) return;
+            if (!confirm('Clear the No-Work designation for ' + dateStr + '?')) return;
+            try {
+              const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/daily/' + encodeURIComponent(dateStr) + '/no-work', {method: 'DELETE'});
+              if (!resp.ok && resp.status !== 404) {
+                const j = await resp.json().catch(()=>({}));
+                alert('Clear No-Work failed: ' + (j.error || ('HTTP ' + resp.status)));
+                return;
+              }
+              loadDcr(dateStr);
+            } catch (e) {
+              alert('Network error: ' + (e && e.message));
+            }
+          }
+
+          function setupNoWorkButton() {
+            const mark = document.getElementById('dcr-nowork-mark');
+            const clear = document.getElementById('dcr-nowork-clear');
+            if (mark) mark.addEventListener('click', markNoWorkDay);
+            if (clear) clear.addEventListener('click', clearNoWorkDay);
+          }
+
           // ---- Manual labor entry (backdated DCRs) ----
 
           async function loadProjectWorkers() {
@@ -2609,6 +2732,7 @@
             setupIssueButtons();
             setupArchiveControls();
             setupLaborManualAdd();
+            setupNoWorkButton();
             // Preload the toolbox-talk library + assigned-workers list so the
             // entry form's dropdowns are populated the moment the operator
             // clicks "Issue New DCR".

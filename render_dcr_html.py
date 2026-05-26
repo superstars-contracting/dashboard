@@ -360,6 +360,22 @@ class DCRHTMLRenderer:
         proj = self.dcr.get('project') or {}
         doctype = ("Daily Construction Report" if self.audience == 'internal'
                    else "Daily Progress Report")
+        # No-Work Day banner — prominent below the header band when set.
+        # Renders for both audiences. Optional note appears in smaller
+        # weight after the reason so the rendered report carries the
+        # operator's free-text context (e.g. "site closed by GC").
+        nw_html = ''
+        if self.dcr.get('no_work'):
+            reason = (self.dcr.get('no_work_reason') or 'OTHER').upper()
+            note = self.dcr.get('no_work_note') or ''
+            note_html = (f' <span style="font-weight:400;color:#444;">· {_esc(note)}</span>'
+                         if note else '')
+            nw_html = (
+                f'<div class="nowork-band" style="background:#FFE8D6;border-left:6px solid var(--red);'
+                f'padding:10px 16px;margin-top:4px;font-size:14px;font-weight:800;color:#7A2E1B;'
+                f'letter-spacing:0.05em;text-transform:uppercase;">'
+                f'⛔ NO WORK — {_esc(reason)}{note_html}</div>'
+            )
         return f"""<div class="head">
   <div class="brand">
     <!-- SWAP HERE when official brand logo arrives.  See SUPERSTARS_STAR_SVG
@@ -376,7 +392,8 @@ class DCRHTMLRenderer:
     <div class="rid">{_esc(_fmt_mdy(proj.get('date')))}</div>
   </div>
 </div>
-<div class="redbar"></div>"""
+<div class="redbar"></div>
+{nw_html}"""
 
     def _footer(self) -> str:
         proj = self.dcr.get('project') or {}

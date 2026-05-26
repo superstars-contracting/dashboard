@@ -193,6 +193,23 @@ def build_week_grid(conn, monday):
         })
         grand_total += weekly_total
 
+    # No-Work Day designation per date — surfaced so consumers (Labor
+    # Rate Tracker, Weekly Summary) can render "NO WORK — REASON" in
+    # that day's column instead of a blank zero. Pulled from
+    # report_index.no_work; date keys match `dates` exactly.
+    no_work_by_date: dict[str, dict] = {}
+    placeholders2 = ",".join("?" * len(date_strs))
+    for r in conn.execute(
+        f"SELECT DISTINCT report_date, no_work_reason, no_work_note "
+        f"FROM report_index "
+        f"WHERE report_type='DCR' AND no_work=1 AND report_date IN ({placeholders2})",
+        date_strs,
+    ).fetchall():
+        no_work_by_date[r["report_date"]] = {
+            "reason": r["no_work_reason"],
+            "note": r["no_work_note"],
+        }
+
     return {
         "week_start": date_strs[0],
         "week_end": date_strs[-1],
@@ -200,4 +217,5 @@ def build_week_grid(conn, monday):
         "workers": grid_workers,
         "totals_by_day": [round(t, 2) for t in totals_by_day],
         "grand_total": round(grand_total, 2),
+        "no_work_by_date": no_work_by_date,
     }

@@ -159,6 +159,10 @@ def aggregate_dcr(project_code, date_str, audience='internal'):
             'company': 'Superstars Contracting', 'trade': r.get('emp_trade'),
             'time_in': r.get('time_in'), 'time_out': r.get('time_out'),
             'hours': hours, 'area': None, 'notes': None,
+            # sign_in_log.id — surfaced so client-side flows (Cancel
+            # rollback, No-Work Day clear-and-mark) can target specific
+            # rows for delete without scraping the listing endpoint.
+            'sign_in_id': r.get('id'),
         })
     # Sort by Worker ID ascending so the DCR sign-in roster is consistent
     # everywhere it renders (entry view + rendered/printed DCR). Per
@@ -343,6 +347,22 @@ def aggregate_dcr(project_code, date_str, audience='internal'):
     elif weather_block.get('am') is None and weather_block.get('pm') is None:
         warnings.append(f"VAL-006: weather data missing for {date_str}")
 
+    # Pull No-Work Day designation while the connection is still open.
+    # Renderers / Labor Rate / Weekly read dcr['no_work'].
+    nw_row = conn.execute(
+        "SELECT no_work, no_work_reason, no_work_note FROM report_index "
+        "WHERE project_code = ? AND report_date = ? AND report_type='DCR' "
+        "AND no_work = 1 LIMIT 1",
+        (project_code, date_str),
+    ).fetchone()
+    no_work_flag = 0
+    no_work_reason = None
+    no_work_note = None
+    if nw_row:
+        no_work_flag = 1
+        no_work_reason = nw_row['no_work_reason']
+        no_work_note = nw_row['no_work_note']
+
     conn.close()
 
     dcr = {
@@ -437,5 +457,13 @@ def aggregate_dcr(project_code, date_str, audience='internal'):
         }
         dcr['issues_delays'] = issues_full
         dcr['visitors'] = visitors_full
+
+    # Surface the No-Work designation pulled above. Renderers read this
+    # flag to draw the prominent NO-WORK banner + auto-fill the
+    # weather/work-stoppage line with the reason. Empty labor/work
+    # sections are valid when no_work=1.
+    dcr['no_work'] = no_work_flag
+    dcr['no_work_reason'] = no_work_reason
+    dcr['no_work_note'] = no_work_note
 
     return dcr

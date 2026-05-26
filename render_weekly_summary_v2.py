@@ -73,15 +73,21 @@ def _load_data(conn: sqlite3.Connection, project_code: str,
         "SELECT * FROM projects WHERE project_code = ?", (project_code,)
     ).fetchone() or {})
 
-    # DCRs issued in the week (gives a paper-trail count + display IDs)
+    # DCRs issued in the week (gives a paper-trail count + display IDs).
+    # Also pull the No-Work flag + reason so the schedule-status section
+    # can list which days were no-work and why.
     dcrs = [dict(r) for r in conn.execute(
-        "SELECT DISTINCT dcr_sequence, report_date, status, MIN(created_at) AS created_at "
+        "SELECT DISTINCT dcr_sequence, report_date, status, MIN(created_at) AS created_at, "
+        "       MAX(no_work) AS no_work, "
+        "       COALESCE(MAX(no_work_reason), '') AS no_work_reason, "
+        "       COALESCE(MAX(no_work_note), '') AS no_work_note "
         "FROM report_index WHERE project_code = ? AND report_type = 'DCR' "
         "AND report_date BETWEEN ? AND ? "
         "GROUP BY dcr_sequence, report_date, status "
         "ORDER BY report_date",
         (project_code, start_iso, end_iso),
     ).fetchall()]
+    no_work_days = [d for d in dcrs if d.get('no_work')]
 
     # Sign-ins → headcount + hours per day. compute_worked_hours is
     # the canonical calc; replicate the same shape payroll_hours uses.
@@ -218,6 +224,7 @@ def _load_data(conn: sqlite3.Connection, project_code: str,
     return {
         "project": project,
         "dcrs": dcrs,
+        "no_work_days": no_work_days,
         "per_day": per_day,
         "work": work,
         "equipment": equipment,
@@ -382,7 +389,24 @@ def _weather_section(data: dict) -> str:
             f'{w.get("pm_temp_f") if w.get("pm_temp_f") is not None else "—"}',
             _esc(w.get("wind") or "—"),
         ])
-    return _table(["Date", "Conditions (AM / PM)", "AM/PM °F", "Wind"], rows)
+    weather_table = _table(["Date", "Conditions (AM / PM)", "AM/PM °F", "Wind"], rows)
+    # work_stoppages_due_to_weather (spec field) — counted from
+    # No-Work Days flagged Rain / Snow. The spec line in the weekly
+    # report covers any weather-driven stoppage; Holiday / Other are
+    # also listed for completeness but only the weather reasons get
+    # rolled up into the explicit stoppage count.
+    weather_no_work = [d for d in data['no_work_days']
+                       if (d.get('no_work_reason') or '').lower() in ('rain', 'snow')]
+    stop_block = (
+        f'<p style="margin-top:8px;"><b>Work stoppages due to weather:</b> '
+        f'{len(weather_no_work)} day(s)'
+        + (' — ' + ', '.join(_esc(_fmt_mdy(d['report_date'])) + ' ('
+                              + _esc((d.get('no_work_reason') or '').upper()) + ')'
+                              for d in weather_no_work)
+           if weather_no_work else '')
+        + '</p>'
+    )
+    return weather_table + stop_block
 
 
 def _materials_section(data: dict) -> str:
@@ -499,10 +523,26 @@ def render_weekly_summary_html(conn: sqlite3.Connection, project_code: str,
         _progress_summary(data, week_dates),
         "Concatenated daily work_log narratives. Location-grouped roll-up partial until DCR carries location_reference (#122)."))
 
+    # Schedule status — reference the Look-Ahead + list any No-Work Days
+    # this week (the operator-marked rain/snow/holiday/other days that
+    # drop a column of zero hours by design, not by data gap).
+    nw_block = ''
+    if data['no_work_days']:
+        items = ''.join(
+            f'<li><b>{_esc(_fmt_mdy(d["report_date"]))}</b> — <span class="bad">NO WORK · {_esc((d.get("no_work_reason") or "OTHER").upper())}</span>'
+            + (f' <span class="muted">· {_esc(d.get("no_work_note") or "")}</span>' if d.get("no_work_note") else '')
+            + '</li>'
+            for d in data['no_work_days']
+        )
+        nw_block = (
+            f'<p style="margin-top:8px;"><b>No-Work Days this week ({len(data["no_work_days"])}):</b>'
+            f'<ul style="margin:4px 0 0 18px;padding:0;">{items}</ul></p>'
+        )
     sections.append(_section(3, "Schedule Status",
         f'<p>Reference the <b>Two-Week Look-Ahead</b> for upcoming activities + open constraints. '
         f'Live at <code>/api/projects/{_esc(project_code)}/lookahead/render</code>.</p>'
-        f'<p class="muted">Master schedule comparison waits for the Primavera P6 import; the Look-Ahead grid is rendered with day-cell hooks ready for those dates.</p>'))
+        f'<p class="muted">Master schedule comparison waits for the Primavera P6 import; the Look-Ahead grid is rendered with day-cell hooks ready for those dates.</p>'
+        + nw_block))
 
     if audience == "internal":
         sections.append(_section(4, "Manpower & Equipment", _manpower(data, week_dates)))

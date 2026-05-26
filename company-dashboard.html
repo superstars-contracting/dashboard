@@ -3132,10 +3132,15 @@ applyLanguage();
 
   let currentMonday = null;
 
-  function renderHead(dates) {
+  function renderHead(dates, noWorkByDate) {
     const labels = dayLabels();
     const dayCells = dates.map((d, i) => {
       const dayNum = (new Date(d + 'T00:00:00')).getDate();
+      const nw = noWorkByDate && noWorkByDate[d];
+      if (nw) {
+        const reason = (nw.reason || 'OTHER').toUpperCase();
+        return `<th class="lrt-num" style="background:#FFE8D6;color:#7A2E1B;" title="${esc(reason)}${nw.note ? ' · ' + esc(nw.note) : ''}">${esc(labels[i])} ${dayNum}<div style="font-size:8px;font-weight:800;letter-spacing:0.5px;margin-top:1px;">NO WORK</div><div style="font-size:7.5px;font-weight:700;">${esc(reason)}</div></th>`;
+      }
       return `<th class="lrt-num">${esc(labels[i])} ${dayNum}</th>`;
     }).join('');
     // The two LRT-GATE <th>s carry class="lrt-comp" so a future
@@ -3152,7 +3157,7 @@ applyLanguage();
     </tr>`;
   }
 
-  function renderBody(workers) {
+  function renderBody(workers, noWorkByDate) {
     if (!workers || !workers.length) {
       $('lrt-tbody').innerHTML = '<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--mute);">No active workers.</td></tr>';
       return;
@@ -3160,6 +3165,13 @@ applyLanguage();
     const rows = workers.map(w => {
       const dayCells = w.days.map(d => {
         const h = d.hours;
+        const nw = noWorkByDate && noWorkByDate[d.date];
+        if (nw) {
+          // No-Work Day — the column header carries the reason; per-row
+          // cells render a small dash so the column reads "muted, no
+          // entry expected" instead of "blank, data missing".
+          return `<td class="lrt-num" style="background:#FFF4E6;color:#A0561B;">—</td>`;
+        }
         const cell = (h && h > 0) ? h.toFixed(2) : '<span style="color:var(--mute);">—</span>';
         return `<td class="lrt-num">${cell}</td>`;
       }).join('');
@@ -3214,8 +3226,8 @@ applyLanguage();
       if (!grid) { setStatus('No data for this week', 'var(--mute)'); return; }
       currentMonday = grid.week_start;
       $('lrt-range').textContent = fmtRange(grid.week_start);
-      renderHead(grid.dates);
-      renderBody(grid.workers);
+      renderHead(grid.dates, grid.no_work_by_date || {});
+      renderBody(grid.workers, grid.no_work_by_date || {});
       renderFoot(grid);
       setStatus('');
     } catch (e) {
