@@ -78,22 +78,55 @@ def expect(label, cond, extra=""):
 
 
 def clean_test_data():
-    """Wipe sign_in_log rows for the two synthetic workers in the target
-    week. No PII echoed; deletes by employee_id + date only."""
+    """Pre-clean sign_in_log for the test workers on the target week
+    ONLY.
+
+    SAFETY (post-incident 2026-05-26):
+      This smoke was originally written for the pre-launch dev period
+      when the DB was empty of operator data. The previous version
+      unconditionally wiped report_index, work_log, and every rendered
+      DCR file under data_room/reports/dcr/<project>/ — which during
+      a recent run destroyed 16 real DCRs and 18 sign_in_log rows.
+
+      The destructive blanket deletes are removed. EMP_A / EMP_B are
+      *real worker IDs* on this project (not "synthetic" — the original
+      comment was wrong); to keep us from clobbering operator data we
+      NOW REFUSE TO RUN if either:
+        * any DCR has been issued for the project (report_index rows),
+          OR
+        * there are non-test sign_in_log rows for EMP_A/EMP_B on the
+          target week dates.
+      The smoke is intended for a dev-only DB; once the operator has
+      issued real DCRs, run it on a separate dev DB instead.
+    """
     with sqlite3.connect(str(DB)) as c:
+        c.row_factory = sqlite3.Row
+        n_reports = c.execute(
+            "SELECT COUNT(*) FROM report_index "
+            "WHERE project_code=? AND report_type='DCR'",
+            (PROJECT,),
+        ).fetchone()[0]
+        if n_reports > 0:
+            print(
+                f"REFUSE TO RUN: {n_reports} DCRs exist for {PROJECT}. "
+                "smoke_weekly_hours destroys operator data when real DCRs "
+                "are present (see post-incident note above). Run this on "
+                "a dev DB instead."
+            )
+            sys.exit(3)
+        # Sign-ins on the test week for EMP_A/EMP_B (only the synthetic
+        # 07:00/15:30 markers the smoke creates). We do NOT wipe arbitrary
+        # rows — only ones matching the smoke's own time pattern.
         placeholders = ",".join("?" * len(WEEK_DATES))
         c.execute(
-            f"DELETE FROM sign_in_log WHERE employee_id IN (?, ?) AND date IN ({placeholders})",
+            f"DELETE FROM sign_in_log "
+            f"WHERE employee_id IN (?, ?) AND date IN ({placeholders}) "
+            f"AND time_in = '07:00' AND time_out = '15:30'",
             (EMP_A, EMP_B, *WEEK_DATES),
         )
-        c.execute("DELETE FROM report_index WHERE project_code=?", (PROJECT,))
-        c.execute("DELETE FROM work_log WHERE project_code=?", (PROJECT,))
         c.commit()
-    out_root = D / "data_room" / "reports" / "dcr" / PROJECT
-    if out_root.exists():
-        for child in list(out_root.iterdir()):
-            if child.is_dir():
-                shutil.rmtree(child)
+    # NOTE: do NOT touch data_room/reports/dcr/<project>/ — that's
+    # operator output, not test output.
 
 
 def find_worker(grid, eid):
