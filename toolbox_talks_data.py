@@ -1199,5 +1199,318 @@ TALKS = [
         ],
         "description": "Powder-actuated tools — certification, load colors, perpendicular firing, and the misfire procedure.",
     },
+
+    # ============================================================
+    # Topic 16 — Material Hoisting & Rigging Basics
+    # ============================================================
+    {
+        "topic_number": 16,
+        "slug": "16-material-hoisting-rigging",
+        "category": "Demo",
+        "ch33_ref": "§3316",
+        "est_minutes": 15,
+        "title_en": "Material Hoisting & Rigging Basics",
+        "title_es": "Hoisting de Material y Conceptos Básicos de Rigging",
+        "why_en": (
+            "A pallet of brick, a bundle of conduit, a hoisted A/C "
+            "compressor — every load above grade is a potential drop. The "
+            "rigger calculates capacity, the signaler controls the lift, "
+            "and every worker below stays out of the swing path. One bad "
+            "sling and a load lands on someone's shift change."
+        ),
+        "why_es": (
+            "Una tarima de ladrillo, un atado de tubería, un compresor "
+            "izado — cada carga arriba es una caída potencial. El rigger "
+            "calcula la capacidad, el señalero controla el izaje, y todo "
+            "trabajador abajo se mantiene fuera del trayecto. Un cabestro "
+            "malo y la carga aterriza en el cambio de turno de alguien."
+        ),
+        "rules_en": [
+            ("Licensed rigger / climber for any hoisting >2,000 lb or >75 ft.", "§3316.5"),
+            ("Sling capacity rated; tags legible at the slings.", "§3316.7"),
+            ("Designated signal-person at every lift — one signaler, one operator.", "§3316.6"),
+            ("Tagline on loads that could swing.", "§3316.7"),
+            ("No load over personnel — the swing radius is a no-go zone.", "§3316.7"),
+        ],
+        "rules_es": [
+            ("Rigger / escalador con licencia para izaje >2,000 lb o >75 pies.", "§3316.5"),
+            ("Cabestros con capacidad calificada; etiquetas legibles.", "§3316.7"),
+            ("Señalero designado en cada izaje — un señalero, un operador.", "§3316.6"),
+            ("Línea de control en cargas que puedan oscilar.", "§3316.7"),
+            ("Ninguna carga sobre personas — el radio de oscilación es zona prohibida.", "§3316.7"),
+        ],
+        "do_en": [
+            "Inspect every sling and shackle before the lift starts.",
+            "Confirm the signal person — only ONE signaler talks to the operator.",
+            "Use a tagline on any load that can rotate or swing.",
+            "Stand outside the load's swing radius; eye contact with the signaler.",
+            "Stop the lift instantly if you see a sling slip or hear cable noise.",
+        ],
+        "do_es": [
+            "Inspecciona cada cabestro y grillete antes del izaje.",
+            "Confirma al señalero — solo UNO le habla al operador.",
+            "Usa una línea de control en cualquier carga que pueda girar.",
+            "Quédate fuera del radio de oscilación; contacto visual con el señalero.",
+            "Para el izaje al instante si ves un cabestro zafarse o ruido en el cable.",
+        ],
+        "dont_en": [
+            "Don't walk under a suspended load — even briefly.",
+            "Don't shout signals over the radio if you're not the assigned signaler.",
+            "Don't use a damaged sling — retire it the moment you see fraying.",
+            "Don't overload — capacity is a hard ceiling, not a target.",
+        ],
+        "dont_es": [
+            "No camines bajo una carga suspendida — ni un momento.",
+            "No grites señales por radio si no eres el señalero asignado.",
+            "No uses un cabestro dañado — retíralo al ver hilos rotos.",
+            "No sobrecargues — la capacidad es tope, no meta.",
+        ],
+        "questions_en": [
+            "Who is the assigned signaler today, and what is the all-stop signal?",
+            "What's the safest standing position during a load swing?",
+            "How do you read a sling capacity tag — give an example.",
+        ],
+        "questions_es": [
+            "¿Quién es el señalero asignado hoy y cuál es la señal de paro?",
+            "¿Cuál es la posición más segura durante una oscilación?",
+            "¿Cómo se lee la etiqueta de capacidad de un cabestro — un ejemplo?",
+        ],
+        "description": "Hoisting and rigging basics — licensed rigger, sling capacity, single signaler, no load over personnel.",
+    },
+
+    # ============================================================
+    # Topic 17 — PPE Essentials
+    # ============================================================
+    {
+        "topic_number": 17,
+        "slug": "17-ppe-essentials",
+        "category": "General",
+        "ch33_ref": "general (touches §3303)",
+        "est_minutes": 15,
+        "title_en": "PPE Essentials — Hard Hat, Eye, Hand, Foot, Hearing",
+        "title_es": "PPE Esencial — Casco, Ojos, Manos, Pies, Oído",
+        "why_en": (
+            "PPE is the LAST line of defense — after engineering controls, "
+            "after admin controls, after we've done everything else "
+            "right. It only works if it fits, if it's the right rating, "
+            "and if we actually wear it. Walking onto an SSC site without "
+            "the full kit means going home."
+        ),
+        "why_es": (
+            "El PPE es la ÚLTIMA línea de defensa — después de los "
+            "controles de ingeniería, de los controles administrativos, "
+            "de hacer todo lo demás bien. Solo funciona si te queda, si "
+            "es del tipo correcto, y si de verdad lo usas. Entrar a una "
+            "obra de SSC sin el equipo completo significa irse a casa."
+        ),
+        "rules_en": [
+            ("Hard hat ANSI Z89.1 — every worker, every step on site.", "general / §3303"),
+            ("Eye protection Z87.1 — anytime there's grinding, cutting, drilling.", "general / OSHA"),
+            ("Gloves matched to the task — cut, chemical, or impact rating.", "general"),
+            ("Steel- or composite-toe boots ASTM F2413 — 365 days a year.", "general"),
+            ("Hearing protection NRR ≥25 above 85 dB exposure.", "OSHA 1910.95"),
+        ],
+        "rules_es": [
+            ("Casco ANSI Z89.1 — cada trabajador, cada paso en la obra.", "general / §3303"),
+            ("Lentes Z87.1 — siempre que haya esmerilar, cortar, perforar.", "general / OSHA"),
+            ("Guantes según la tarea — corte, químico, o impacto.", "general"),
+            ("Botas con punta de acero o composite ASTM F2413 — todo el año.", "general"),
+            ("Protección auditiva NRR ≥25 arriba de 85 dB de exposición.", "OSHA 1910.95"),
+        ],
+        "do_en": [
+            "Inspect your hard hat shell weekly — any crack, retire it.",
+            "Wear safety glasses any time tools are running, period.",
+            "Match glove type to the hazard — leather for hot, nitrile for chemical.",
+            "Replace boots when the sole is smooth — traction is part of PPE.",
+            "Carry foam earplugs as backup when muffs aren't practical.",
+        ],
+        "do_es": [
+            "Inspecciona el casco semanalmente — si hay grieta, retíralo.",
+            "Ponte los lentes siempre que las herramientas estén prendidas.",
+            "Guantes según el peligro — cuero para calor, nitrilo para químico.",
+            "Reemplaza botas cuando la suela esté lisa — tracción es parte del PPE.",
+            "Carga tapones de espuma como respaldo cuando las orejeras no sirvan.",
+        ],
+        "dont_en": [
+            "Don't take your hard hat off to wipe your forehead in a danger zone.",
+            "Don't wear hoodies that prevent the hard hat from sitting flat.",
+            "Don't use one glove for two hazards (leather + acid burns through).",
+            "Don't wear sneakers, even just to the supply truck.",
+        ],
+        "dont_es": [
+            "No te quites el casco en zona de peligro para secarte la frente.",
+            "No uses sudaderas que no dejen el casco asentar plano.",
+            "No uses un guante para dos peligros (el cuero + ácido se atraviesa).",
+            "No uses tenis, ni siquiera para ir al camión de materiales.",
+        ],
+        "questions_en": [
+            "What's the ANSI rating on your hard hat right now? When did you get it?",
+            "Show me your safety glasses — do they have side shields?",
+            "What's the loudest tool on this site, and do you have hearing protection for it?",
+        ],
+        "questions_es": [
+            "¿Qué clasificación ANSI tiene tu casco ahora? ¿Cuándo lo recibiste?",
+            "Muéstrame tus lentes — ¿tienen protección lateral?",
+            "¿Cuál es la herramienta más ruidosa, y tienes la protección auditiva?",
+        ],
+        "description": "PPE essentials — head, eye, hand, foot, hearing. Ratings, fit, and replacement triggers.",
+    },
+
+    # ============================================================
+    # Topic 18 — Heat Illness Prevention
+    # ============================================================
+    {
+        "topic_number": 18,
+        "slug": "18-heat-illness-prevention",
+        "category": "General",
+        "ch33_ref": "OSHA / NYC general industry",
+        "est_minutes": 15,
+        "title_en": "Heat Illness Prevention — Water, Rest, Shade",
+        "title_es": "Prevención de Enfermedad por Calor — Agua, Descanso, Sombra",
+        "why_en": (
+            "A 90°F day on a black-tar roof with a swing-stage drop is "
+            "120°F at the work surface. Heat exhaustion sneaks up — "
+            "headache, dizziness, then collapse. Heat stroke is a "
+            "medical emergency. We pre-hydrate, we rotate, and we watch "
+            "each other for early signs. Nobody works through it."
+        ),
+        "why_es": (
+            "Un día de 90°F en un techo negro con una caída de andamio "
+            "es 120°F en la superficie. La fatiga por calor llega sin "
+            "aviso — dolor de cabeza, mareo, luego el colapso. El golpe "
+            "de calor es emergencia médica. Pre-hidratamos, rotamos, y "
+            "nos cuidamos unos a otros. Nadie aguanta a la fuerza."
+        ),
+        "rules_en": [
+            ("Cool water within 100 ft of every work station — refilled hourly.", "OSHA heat guidance"),
+            ("Shaded rest area, 10-min break minimum every 2 hours above 90°F.", "OSHA / NYC"),
+            ("Acclimatize new workers — 20% load on day 1, full load by day 5.", "OSHA"),
+            ("Buddy system: each worker watches their partner for symptoms.", "OSHA"),
+            ("Heat-stroke training annually for foremen.", "OSHA"),
+        ],
+        "rules_es": [
+            ("Agua fría a menos de 100 pies de cada puesto — rellenada cada hora.", "OSHA"),
+            ("Área de sombra, descanso mínimo de 10 min cada 2 horas arriba de 90°F.", "OSHA / NYC"),
+            ("Aclimatar trabajadores nuevos — 20% el día 1, carga completa el día 5.", "OSHA"),
+            ("Sistema de pareja: cada uno vigila a su compañero por síntomas.", "OSHA"),
+            ("Capacitación anual sobre golpe de calor para capataces.", "OSHA"),
+        ],
+        "do_en": [
+            "Drink 8 oz of water every 20 minutes when temp + humidity > 85.",
+            "Take your 10-minute shade break — don't skip it to 'finish.'",
+            "Eat salty snacks at break (electrolytes, not just water).",
+            "Watch your buddy: confusion, nausea, no sweating = pull them out.",
+            "Tell the foreman the moment you feel light-headed.",
+        ],
+        "do_es": [
+            "Toma 8 oz de agua cada 20 minutos cuando temp + humedad > 85.",
+            "Toma tus 10 minutos de sombra — no los saltes por 'terminar.'",
+            "Come algo salado en el descanso (electrolitos, no solo agua).",
+            "Cuida a tu pareja: confusión, náusea, sin sudor = sácalo del trabajo.",
+            "Avísale al capataz al sentir mareo.",
+        ],
+        "dont_en": [
+            "Don't drink energy drinks or alcohol on shift — they dehydrate.",
+            "Don't wait until you're thirsty — thirst is already dehydration.",
+            "Don't 'push through' dizziness or cramps.",
+            "Don't strip PPE for ventilation — cool sleeves, lighter colors instead.",
+        ],
+        "dont_es": [
+            "No tomes bebidas energéticas ni alcohol en el turno — deshidratan.",
+            "No esperes a tener sed — la sed ya es deshidratación.",
+            "No 'aguantes' mareo ni calambres.",
+            "No te quites el PPE para ventilar — usa mangas frescas o colores claros.",
+        ],
+        "questions_en": [
+            "Where is the closest water cooler from your station?",
+            "What are the early signs of heat exhaustion? (name 3)",
+            "Your buddy stops sweating and looks confused — what's your move?",
+        ],
+        "questions_es": [
+            "¿Dónde está el agua más cercana a tu puesto?",
+            "¿Cuáles son los primeros signos de fatiga por calor? (di 3)",
+            "Tu pareja deja de sudar y se ve confundido — ¿qué haces?",
+        ],
+        "description": "Heat illness — pre-hydration, the 100-ft water rule, acclimatization, and how to spot heat stroke in your buddy.",
+    },
+
+    # ============================================================
+    # Topic 19 — Cold Weather Work
+    # ============================================================
+    {
+        "topic_number": 19,
+        "slug": "19-cold-weather-work",
+        "category": "General",
+        "ch33_ref": "OSHA / NYC general industry",
+        "est_minutes": 15,
+        "title_en": "Cold Weather Work — Frostbite, Slips, Hydration",
+        "title_es": "Trabajo en Frío — Congelación, Resbalones, Hidratación",
+        "why_en": (
+            "NYC winter on a parapet — wind 30+ mph, wet hands on cold "
+            "steel, fingers numb in five minutes. Cold injuries are "
+            "slower than heat illness but just as serious. Hypothermia "
+            "kills, frostbite scars, and slick scaffold decks turn a "
+            "minor stumble into a six-floor fall."
+        ),
+        "why_es": (
+            "Invierno en NYC en un parapeto — viento 30+ mph, manos "
+            "mojadas en acero frío, dedos entumidos en cinco minutos. "
+            "Las lesiones por frío son más lentas que el calor pero "
+            "igual de serias. La hipotermia mata, la congelación deja "
+            "cicatriz, y un andamio resbaloso convierte un tropiezo en "
+            "una caída de seis pisos."
+        ),
+        "rules_en": [
+            ("Warm-up shelter on site whenever wind chill ≤ 20°F.", "OSHA"),
+            ("Layered clothing: wicking, insulating, wind/waterproof outer.", "OSHA"),
+            ("Inspect / clear ice from scaffold deck before every shift.", "general / §3314"),
+            ("Hot (non-alcoholic) drinks available; hot food at lunch.", "OSHA"),
+            ("Pair work for any exposure under 0°F wind chill.", "OSHA"),
+        ],
+        "rules_es": [
+            ("Refugio de calentamiento en sitio cuando wind chill ≤ 20°F.", "OSHA"),
+            ("Ropa en capas: térmica, aislante, exterior contra viento y agua.", "OSHA"),
+            ("Inspeccionar y quitar hielo del andamio antes de cada turno.", "general / §3314"),
+            ("Bebidas calientes (sin alcohol); comida caliente en el almuerzo.", "OSHA"),
+            ("Trabajo en pareja con exposición bajo 0°F wind chill.", "OSHA"),
+        ],
+        "do_en": [
+            "Wear three layers — base, insulation, wind/waterproof shell.",
+            "Change wet gloves immediately — wet hands lose heat 25× faster.",
+            "Spread ice melt on walking surfaces before the first shift.",
+            "Take warm-up breaks every hour below 0°F wind chill.",
+            "Watch your buddy's face / hands for white patches.",
+        ],
+        "do_es": [
+            "Usa tres capas — térmica, aislante, exterior contra viento y agua.",
+            "Cambia guantes mojados de inmediato — la mano mojada pierde calor 25× más rápido.",
+            "Echa sal o hielo derretido en superficies de caminar antes del turno.",
+            "Toma descansos para calentarte cada hora bajo 0°F wind chill.",
+            "Vigila la cara y manos de tu pareja por manchas blancas.",
+        ],
+        "dont_en": [
+            "Don't drink alcohol before or during shift — it cools you faster.",
+            "Don't ignore numb fingers — that's stage one of frostbite.",
+            "Don't grip metal tools with bare hands in freezing temps.",
+            "Don't rub frostbitten skin — that damages it further.",
+        ],
+        "dont_es": [
+            "No tomes alcohol antes o durante el turno — te enfría más rápido.",
+            "No ignores los dedos dormidos — esa es la primera etapa de congelación.",
+            "No agarres herramientas de metal con la mano sin guante en frío.",
+            "No frotes piel congelada — la dañas más.",
+        ],
+        "questions_en": [
+            "Where is the warming shelter at this site?",
+            "What's the first sign of frostbite on a hand?",
+            "Why is wet clothing in cold weather more dangerous than no clothing?",
+        ],
+        "questions_es": [
+            "¿Dónde está el refugio de calentamiento en este sitio?",
+            "¿Cuál es el primer signo de congelación en la mano?",
+            "¿Por qué la ropa mojada en frío es más peligrosa que estar sin ropa?",
+        ],
+        "description": "Cold-weather work — layered clothing, ice on scaffold decks, wet-glove rule, and frostbite signs.",
+    },
 ]
 
