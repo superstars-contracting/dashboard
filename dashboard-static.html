@@ -1215,6 +1215,15 @@
             <span><span id="dcr-nowork-label">NO WORK — RAIN</span><span id="dcr-nowork-noteshow" style="font-weight:400;color:#444;margin-left:8px;"></span></span>
             <button id="dcr-nowork-clear" type="button" style="margin-left:auto;background:white;border:1px solid #B11E2E;color:#B11E2E;padding:4px 10px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:0.04em;cursor:pointer;">CLEAR NO-WORK</button>
           </div>
+          <!-- Stale-DCR banner — set when sign_in_log mutated after the
+               DCR was issued. The on-disk rendered HTML/PDF no longer
+               matches live data; re-issue regenerates it and clears the
+               flag. Visible alongside the no-work banner (they can both
+               apply to the same DCR). -->
+          <div id="dcr-stale-banner" style="display:none;background:#FFF4D6;border:1px solid #E8C76A;border-left:5px solid #B68838;padding:10px 16px;border-radius:4px;margin-bottom:14px;font-size:13px;color:#7A5E1E;align-items:center;gap:10px;">
+            <span style="font-size:16px;">⚠</span>
+            <span><strong>This DCR is STALE.</strong> Sign-in data has changed since it was last issued. <strong>Re-issue</strong> to refresh the rendered report.</span>
+          </div>
 
           <!-- 1. PROJECT INFO -->
           <div style="margin-bottom:24px;">
@@ -1468,6 +1477,7 @@
               renderWeather(dcr.weather);
               renderLabor(dcr.labor);
               renderNoWorkBanner(dcr);
+              renderStaleBanner(dcr);
               // DCR-4: render existing photos as saved tiles so the
               // operator can see + remove them during edit. New uploads
               // go into the same grid via the upload-first flow (#108).
@@ -2152,10 +2162,16 @@
             const reportDateDisplay = reportDate ? _fmt(reportDate) : '—';
             const issuedAtRaw = r.updated_at || r.created_at;
             const issuedAtDisplay = issuedAtRaw ? _fmt(issuedAtRaw) : '—';
-            return '<tr>' +
+            // Stale badge — set when sign_in_log mutated after issuance.
+            // Renders next to the status pill so the operator sees it
+            // at-a-glance without scanning detail. Re-issue clears it.
+            const stalePill = r.stale
+              ? '<span title="sign_in_log changed after this DCR was issued — re-issue to refresh the rendered report" style="margin-left:6px;padding:3px 8px;border-radius:3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;background:#FFE8D6;color:#7A2E1B;border:1px solid #E8AC6A;">⚠ STALE</span>'
+              : '';
+            return '<tr' + (r.stale ? ' style="background:#FFF8F0;"' : '') + '>' +
               '<td style="font-family:\'Archivo\', -apple-system, BlinkMacSystemFont, \'Helvetica Neue\', Helvetica, Arial, sans-serif;font-size:13px;font-weight:600;">' + esc(displayId) + '</td>' +
               '<td>' + esc(reportDateDisplay) + '</td>' +
-              '<td><span style="padding:3px 8px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;background:' + statusColor + ';color:white;">' + esc(r.status || '—') + '</span></td>' +
+              '<td><span style="padding:3px 8px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;background:' + statusColor + ';color:white;">' + esc(r.status || '—') + '</span>' + stalePill + '</td>' +
               '<td style="font-size:12px;color:#76777E;">' + esc(issuedAtDisplay) + '</td>' +
               '<td style="white-space:nowrap;">' + viewLink + editBtn + deleteBtn + '</td>' +
             '</tr>';
@@ -2426,6 +2442,16 @@
           //      report_index.no_work; the API endpoint at
           //      /api/projects/<code>/daily/<date>/no-work POSTs to set
           //      and DELETEs to clear. -----------------------------------
+          function renderStaleBanner(dcr) {
+            const banner = document.getElementById('dcr-stale-banner');
+            if (!banner) return;
+            if (dcr && dcr.stale) {
+              banner.style.display = 'flex';
+            } else {
+              banner.style.display = 'none';
+            }
+          }
+
           function renderNoWorkBanner(dcr) {
             const banner = document.getElementById('dcr-nowork-banner');
             if (!banner) return;

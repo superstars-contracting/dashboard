@@ -244,6 +244,9 @@ def create_sign_in():
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (date_str, employee_id, project_code, time_in, time_out, now, now)
         )
+        # Stale flag: if a DCR was already issued for this (project, date),
+        # the rendered artifact no longer matches live labor. Mark it.
+        _mark_dcr_stale(conn, project_code, date_str)
         conn.commit()
         new_id = conn.execute("SELECT last_insert_rowid() as id").fetchone()['id']
         row = conn.execute("SELECT * FROM sign_in_log WHERE id = ?", (new_id,)).fetchone()
@@ -261,10 +264,15 @@ def update_sign_in(sign_in_id):
         time_out = data.get('time_out')
 
         conn = db()
+        existing = conn.execute(
+            "SELECT project_code, date FROM sign_in_log WHERE id = ?", (sign_in_id,)
+        ).fetchone()
         conn.execute(
             "UPDATE sign_in_log SET time_out = ?, updated_at = ? WHERE id = ?",
             (time_out, datetime.now().isoformat(), sign_in_id)
         )
+        if existing:
+            _mark_dcr_stale(conn, existing["project_code"], existing["date"])
         conn.commit()
 
         row = conn.execute("SELECT * FROM sign_in_log WHERE id = ?", (sign_in_id,)).fetchone()
@@ -297,7 +305,9 @@ def replace_sign_in(sign_in_id):
             return jsonify({"error": f"time_out ({time_out}) is before time_in ({time_in})"}), 400
 
         conn = db()
-        existing = conn.execute("SELECT id FROM sign_in_log WHERE id = ?", (sign_in_id,)).fetchone()
+        existing = conn.execute(
+            "SELECT project_code, date FROM sign_in_log WHERE id = ?", (sign_in_id,)
+        ).fetchone()
         if not existing:
             conn.close()
             return jsonify({"error": "sign_in_log row not found"}), 404
@@ -305,6 +315,7 @@ def replace_sign_in(sign_in_id):
             "UPDATE sign_in_log SET time_in = ?, time_out = ?, updated_at = ? WHERE id = ?",
             (time_in, time_out, datetime.now().isoformat(), sign_in_id)
         )
+        _mark_dcr_stale(conn, existing["project_code"], existing["date"])
         conn.commit()
         row = conn.execute("SELECT * FROM sign_in_log WHERE id = ?", (sign_in_id,)).fetchone()
         conn.close()
@@ -324,11 +335,16 @@ def delete_sign_in(sign_in_id):
     'already gone' from 'never existed' if needed."""
     try:
         conn = db()
-        existing = conn.execute("SELECT id FROM sign_in_log WHERE id = ?", (sign_in_id,)).fetchone()
+        # Read (project_code, date) BEFORE deleting so we can mark the
+        # corresponding DCR stale once the row is gone.
+        existing = conn.execute(
+            "SELECT project_code, date FROM sign_in_log WHERE id = ?", (sign_in_id,)
+        ).fetchone()
         if not existing:
             conn.close()
             return jsonify({"error": "sign_in_log row not found"}), 404
         conn.execute("DELETE FROM sign_in_log WHERE id = ?", (sign_in_id,))
+        _mark_dcr_stale(conn, existing["project_code"], existing["date"])
         conn.commit()
         conn.close()
         return jsonify({"deleted": True, "id": sign_in_id}), 200
@@ -1514,15 +1530,21 @@ def get_dcr_daily(project_code, report_date):
     try:
         from dcr_aggregator import aggregate_dcr  # lazy to avoid circular import
         dcr = aggregate_dcr(project_code, report_date, audience)
-        # Surface the No-Work Day designation (if any) so the entry view
-        # can show the banner state on load. Pulled directly from
-        # report_index because the no-work flag is a report-level
-        # attribute, not part of the aggregated DCR section data.
+        # Surface No-Work Day + stale flags so the entry view can show
+        # the banner state on load. Both are report-level attributes
+        # not part of the aggregated DCR section data.
         conn = db()
         nw_row = conn.execute(
             "SELECT no_work, no_work_reason, no_work_note FROM report_index "
             "WHERE project_code = ? AND report_date = ? AND report_type='DCR' "
             "AND no_work = 1 LIMIT 1",
+            (project_code, report_date),
+        ).fetchone()
+        stale_row = conn.execute(
+            "SELECT MAX(stale) AS stale, MAX(stale_marked_at) AS stale_marked_at "
+            "FROM report_index "
+            "WHERE project_code = ? AND report_date = ? AND report_type='DCR' "
+            "AND status = 'issued'",
             (project_code, report_date),
         ).fetchone()
         conn.close()
@@ -1532,12 +1554,40 @@ def get_dcr_daily(project_code, report_date):
             dcr['no_work_note'] = nw_row['no_work_note']
         else:
             dcr['no_work'] = 0
+        if stale_row and stale_row['stale']:
+            dcr['stale'] = 1
+            dcr['stale_marked_at'] = stale_row['stale_marked_at']
+        else:
+            dcr['stale'] = 0
         return response_wrapper(dcr)
     except (KeyError, ValueError) as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         logging.error(f"GET /api/projects/{project_code}/daily/{report_date}: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+
+def _mark_dcr_stale(conn, project_code, report_date):
+    """Mark any issued DCR for (project_code, report_date) as stale.
+
+    Called from every sign_in_log mutation path. The rendered HTML/PDF
+    on disk was frozen at issue time; once labor changes, the artifact
+    no longer matches live data — flag it so the UI prompts re-issue.
+
+    No-op when the project_code/date pair has no issued DCR (operator
+    edited labor on a day that was never issued — nothing to mark).
+    Re-running on an already-stale row is also a no-op (the WHERE
+    clause matches but the UPDATE is idempotent).
+    """
+    if not project_code or not report_date:
+        return
+    conn.execute(
+        "UPDATE report_index SET stale = 1, stale_marked_at = CURRENT_TIMESTAMP "
+        "WHERE project_code = ? AND report_date = ? "
+        "AND report_type = 'DCR' AND status = 'issued' "
+        "AND (stale IS NULL OR stale = 0)",
+        (project_code, report_date),
+    )
 
 
 def lookup_existing_dcr_sequence(conn, project_code, report_date):
@@ -1810,11 +1860,21 @@ def _issue_one_dcr(conn, project_code, report_date, audience, seq):
         conn.execute(
             "INSERT INTO report_index "
             "  (report_date, project_code, report_type, report_id, status, "
-            "   dcr_sequence, no_work, no_work_reason, no_work_note) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "   dcr_sequence, no_work, no_work_reason, no_work_note, stale) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
             (report_date, project_code, 'DCR', report_id, 'issued', seq,
              nw_flag, nw_reason, nw_note)
         )
+    # Clear stale across ALL audience rows for this (project, date) —
+    # re-issuance regenerates the artifact from current data, so both
+    # internal and client are now in sync with live regardless of which
+    # audience this call rendered. Operator's mental model is "the DCR
+    # for date X is fresh," not "the internal copy is fresh."
+    conn.execute(
+        "UPDATE report_index SET stale = 0, stale_marked_at = NULL "
+        "WHERE project_code = ? AND report_date = ? AND report_type = 'DCR'",
+        (project_code, report_date),
+    )
     return {"report_id": report_id, "audience": audience, "html_url": html_url,
             "html_path": out_file, "display_id": display_id, "sequence": seq,
             "pdf_path": pdf_path, "pdf_url": pdf_url, "pdf_status": pdf_status,
@@ -3042,6 +3102,11 @@ def worker_session_start():
             (today, employee_id, project_code, now_iso, now_iso, now_iso)
         )
         sign_in_log_id = cursor.lastrowid
+        # Stale flag: if a DCR was already issued for this (project, date)
+        # — usually only matters when the operator backdates a DCR before
+        # workers finish signing out — flag it. Worker-app sign-ins on
+        # not-yet-issued days are no-op (no DCR to mark).
+        _mark_dcr_stale(conn, project_code, today)
         conn.commit()
         conn.close()
 
@@ -3074,7 +3139,7 @@ def worker_session_end():
 
         conn = db()
         row = conn.execute(
-            "SELECT id FROM sign_in_log "
+            "SELECT id, project_code, date FROM sign_in_log "
             "WHERE employee_id = ? AND date = ? AND time_out IS NULL "
             "ORDER BY id DESC LIMIT 1",
             (employee_id, today)
@@ -3088,6 +3153,7 @@ def worker_session_end():
             "UPDATE sign_in_log SET time_out = ?, updated_at = ? WHERE id = ?",
             (now_iso, now_iso, sign_in_log_id)
         )
+        _mark_dcr_stale(conn, row['project_code'], row['date'])
         conn.commit()
         conn.close()
 
