@@ -387,8 +387,18 @@ def api_payroll_hours():
     Returns the payroll_hours.build_week_grid dict: dates, workers (with
     per-day cells + weekly totals), totals_by_day, grand_total. Worker pool
     = employees with at least one active project_assignment.
+
+    Role-gated comp data (#158): if the requester's role is
+    'admin' / 'c_suite', each worker carries `hourly_rate` and
+    `amount_owed` for THIS week (rate effective on the week's start
+    Monday, per worker_rates). For all other roles those keys are
+    OMITTED ENTIRELY (not zeroed, not "—") so a sniffed payload
+    reveals nothing about pay (per CLAUDE.md comp-data rule + #146
+    handoff).
     """
     from payroll_hours import last_completed_week, build_week_grid
+    from worker_rates import get_rate_effective_on, role_can_see_rates
+    from auth import current_user
     week_start = (request.args.get('week_start') or '').strip()
     try:
         if week_start:
@@ -398,10 +408,36 @@ def api_payroll_hours():
         else:
             monday, _ = last_completed_week()
         conn = db()
-        grid = build_week_grid(conn, monday)
-        conn.close()
+        try:
+            grid = build_week_grid(conn, monday)
+            # Comp-data overlay — admin/c_suite only.
+            user = current_user() or {}
+            if role_can_see_rates(user.get('role')):
+                grand_amount = 0.0
+                week_start_iso = grid['week_start']
+                for w in grid.get('workers', []):
+                    r = get_rate_effective_on(conn, w['employee_id'], week_start_iso)
+                    if r:
+                        w['hourly_rate'] = round(float(r['hourly_rate']), 2)
+                        w['rate_effective_from'] = r['effective_from']
+                        w['amount_owed'] = round(
+                            float(r['hourly_rate']) * float(w.get('weekly_total') or 0),
+                            2,
+                        )
+                        grand_amount += w['amount_owed']
+                    else:
+                        # Worker has no rate set yet — hours visible, comp omitted
+                        # per row. UI renders "Rate not set" placeholder.
+                        w['rate_not_set'] = True
+                grid['grand_amount_owed'] = round(grand_amount, 2)
+                grid['rates_visible'] = True
+            else:
+                grid['rates_visible'] = False
+        finally:
+            conn.close()
         return response_wrapper(grid), 200
     except Exception as e:
+        # Never echo any rate values — only the operation that failed.
         logging.error(f"GET /api/payroll/hours: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
@@ -3550,6 +3586,142 @@ def api_blank_forms():
     except Exception as e:
         logging.error(f"GET /api/blank-forms: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+
+# ====================================================================
+# Labor Rates admin (#158) — admin/c_suite only
+# ====================================================================
+# These endpoints carry COMPENSATION data. The blanket auth gate
+# ensures a session exists; @requires_role('admin','c_suite') ensures
+# the caller is authorized to see/edit rates. Anyone else gets 403.
+#
+# PII rule: rate values must never appear in server.log. The logging
+# in this section uses counts / booleans / employee_id only — never
+# the rate dollar amount.
+# ====================================================================
+
+@app.route('/api/labor-rates/workers', methods=['GET'])
+@requires_role('admin', 'c_suite')
+def api_labor_rates_workers():
+    """Per-worker overview: every active worker with their current rate
+    (or null if no rate set yet) + a count of historical rate rows.
+
+    Used by the Labor Rates admin page to render one row per worker.
+    """
+    from worker_rates import get_current_rate
+    try:
+        conn = db()
+        try:
+            rows = conn.execute(
+                """SELECT DISTINCT e.employee_id, e.worker_id, e.name, e.trade
+                   FROM employees e
+                   JOIN project_assignments pa ON pa.employee_id = e.employee_id
+                   WHERE pa.status = 'active'
+                   ORDER BY CAST(SUBSTR(e.employee_id, 3) AS INTEGER)"""
+            ).fetchall()
+            out = []
+            for w in rows:
+                eid = w['employee_id']
+                cur_rate = get_current_rate(conn, eid)
+                hist_count = conn.execute(
+                    "SELECT COUNT(*) FROM worker_rates WHERE employee_id = ?", (eid,)
+                ).fetchone()[0]
+                d = {
+                    'employee_id': eid,
+                    'worker_id': w['worker_id'],
+                    'name': w['name'],
+                    'trade': w['trade'],
+                    'history_count': hist_count,
+                }
+                if cur_rate:
+                    d['current_rate'] = round(float(cur_rate['hourly_rate']), 2)
+                    d['current_effective_from'] = cur_rate['effective_from']
+                    d['current_notes'] = cur_rate['notes']
+                # else: rate_not_set is implied by absence of current_rate
+                out.append(d)
+        finally:
+            conn.close()
+        return response_wrapper(out, count=len(out))
+    except Exception as e:
+        # Operation only — never echo rate values.
+        logging.error(f"GET /api/labor-rates/workers: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/labor-rates/workers/<employee_id>/history', methods=['GET'])
+@requires_role('admin', 'c_suite')
+def api_labor_rates_history(employee_id):
+    """Full rate history for one worker, newest first."""
+    from worker_rates import get_rate_history
+    try:
+        conn = db()
+        try:
+            rows = get_rate_history(conn, employee_id)
+            # Each row's hourly_rate is rounded for display consistency.
+            for r in rows:
+                if 'hourly_rate' in r and r['hourly_rate'] is not None:
+                    r['hourly_rate'] = round(float(r['hourly_rate']), 2)
+        finally:
+            conn.close()
+        return response_wrapper(rows, count=len(rows))
+    except Exception as e:
+        logging.error(f"GET /api/labor-rates/workers/{employee_id}/history: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/labor-rates/workers/<employee_id>', methods=['POST'])
+@requires_role('admin', 'c_suite')
+def api_labor_rates_set(employee_id):
+    """Create a new rate row, atomically end-dating the prior active one.
+
+    Body JSON: {hourly_rate: float, effective_from: 'YYYY-MM-DD',
+                notes?: str}
+
+    Writes an audit_log entry. Never logs the rate value to server.log.
+    """
+    from worker_rates import set_rate, RateError
+    try:
+        body = request.get_json(silent=True) or {}
+        user = current_user() or {}
+        actor_id = user.get('id')
+        actor_role = user.get('role')
+        conn = db()
+        try:
+            new_row = set_rate(
+                conn,
+                employee_id=employee_id,
+                hourly_rate=body.get('hourly_rate'),
+                effective_from=(body.get('effective_from') or '').strip(),
+                notes=body.get('notes'),
+                actor_user_id=actor_id,
+                actor_role=actor_role,
+            )
+        finally:
+            conn.close()
+        # Log the operation outcome with counts/IDs only — no rate value.
+        logging.info(
+            f"labor-rates: rate_change actor_id={actor_id} role={actor_role} "
+            f"target={employee_id} ok=1"
+        )
+        # The response carries the new row including the rate — that's
+        # fine, it's an authenticated admin/c_suite response over TLS.
+        new_row['hourly_rate'] = round(float(new_row['hourly_rate']), 2)
+        return response_wrapper(new_row), 201
+    except RateError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logging.error(f"POST /api/labor-rates/workers/{employee_id}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/admin/labor-rates', methods=['GET'])
+@requires_role('admin', 'c_suite')
+def admin_labor_rates_page():
+    """Serve the Labor Rates admin page (HTML). Static file gated by role."""
+    page = SCRIPT_DIR / 'admin_labor_rates.html'
+    if not page.exists():
+        return jsonify({"error": "admin page not found"}), 404
+    return send_file(str(page))
 
 
 @app.route('/api/toolbox-talks/library', methods=['GET'])
