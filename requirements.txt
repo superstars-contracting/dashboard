@@ -40,6 +40,11 @@ sendgrid>=6.11
 Pillow>=11.0
 pillow-heif>=1.3
 
+# Password hashing for dashboard auth (users table). Per-user salt, no
+# plaintext passwords on disk. Worker-app PIN path is unaffected — workers
+# don't get accounts.
+bcrypt>=4.0
+
 # ===== FUTURE / NOT YET IN CODEBASE =====
 # Uncomment when needed:
 
