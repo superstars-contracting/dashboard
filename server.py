@@ -3864,6 +3864,22 @@ def api_project_on_site(project_code):
                    ORDER BY s.time_in, s.id""",
                 (project_code, date_str)
             ).fetchall()
+            # day_location: first non-empty location_elevation OR trade_area
+            # from any work_log row for this project+date. Surfaced on the
+            # Daily Sign-In table's Area column for every row — the team is
+            # at this location today. Empty when no work_log exists yet.
+            wl_row = conn.execute(
+                """SELECT location_elevation, trade_area
+                     FROM work_log
+                    WHERE project_code = ? AND date = ?
+                    ORDER BY id ASC""",
+                (project_code, date_str)
+            ).fetchone()
+            day_location = None
+            if wl_row:
+                loc = (wl_row['location_elevation'] or '').strip()
+                area = (wl_row['trade_area'] or '').strip()
+                day_location = loc or area or None
         finally:
             conn.close()
         workers = []
@@ -3919,6 +3935,7 @@ def api_project_on_site(project_code):
             'still_on_site': still_on_site,
             'foreman': foreman,
             'workers': workers,
+            'day_location': day_location,
         })
     except Exception as e:
         logging.error(f"GET /api/projects/{project_code}/on-site: {str(e)}")

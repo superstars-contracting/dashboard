@@ -724,97 +724,8 @@
                   <th>Area</th>
                 </tr>
               </thead>
-              <tbody>
-                <tr>
-                  <td>E-001</td>
-                  <td>John Doe</td>
-                  <td>Foreman</td>
-                  <td>07:00</td>
-                  <td>15:30</td>
-                  <td>8.5</td>
-                  <td>South Elev</td>
-                </tr>
-                <tr>
-                  <td>E-002</td>
-                  <td>Maria Garcia</td>
-                  <td>Bricklayer</td>
-                  <td>07:30</td>
-                  <td>16:00</td>
-                  <td>8.5</td>
-                  <td>South Elev</td>
-                </tr>
-                <tr>
-                  <td>E-003</td>
-                  <td>James Wilson</td>
-                  <td>Laborer</td>
-                  <td>08:00</td>
-                  <td>16:30</td>
-                  <td>8.5</td>
-                  <td>North Face</td>
-                </tr>
-                <tr>
-                  <td>E-004</td>
-                  <td>Ahmed Hassan</td>
-                  <td>Mason</td>
-                  <td>07:30</td>
-                  <td>15:45</td>
-                  <td>8.25</td>
-                  <td>South Elev</td>
-                </tr>
-                <tr>
-                  <td>E-005</td>
-                  <td>Sarah Chen</td>
-                  <td>Safety Officer</td>
-                  <td>07:00</td>
-                  <td>15:30</td>
-                  <td>8.5</td>
-                  <td>Site Wide</td>
-                </tr>
-                <tr>
-                  <td>E-006</td>
-                  <td>Michael Torres</td>
-                  <td>Scaffold Tech</td>
-                  <td>07:00</td>
-                  <td>15:30</td>
-                  <td>8.5</td>
-                  <td>West Side</td>
-                </tr>
-                <tr>
-                  <td>E-007</td>
-                  <td>Lisa Anderson</td>
-                  <td>QA Inspector</td>
-                  <td>08:00</td>
-                  <td>16:30</td>
-                  <td>8.5</td>
-                  <td>Demo Area</td>
-                </tr>
-                <tr>
-                  <td>E-008</td>
-                  <td>David Kim</td>
-                  <td>Laborer</td>
-                  <td>07:30</td>
-                  <td>16:00</td>
-                  <td>8.5</td>
-                  <td>North Face</td>
-                </tr>
-                <tr>
-                  <td>E-009</td>
-                  <td>Patricia Lopez</td>
-                  <td>Carpenter</td>
-                  <td>08:00</td>
-                  <td>16:30</td>
-                  <td>8.5</td>
-                  <td>Demo Area</td>
-                </tr>
-                <tr>
-                  <td>E-010</td>
-                  <td>Robert Brown</td>
-                  <td>Electrician</td>
-                  <td>07:00</td>
-                  <td>15:30</td>
-                  <td>8.5</td>
-                  <td>Site Wide</td>
-                </tr>
+              <tbody id="daily-signin-tbody">
+                <tr><td colspan="7" style="padding:18px;text-align:center;color:#76777E;">Loading…</td></tr>
               </tbody>
             </table>
           </div>
@@ -4235,9 +4146,51 @@ document.querySelectorAll('.nav-link').forEach(link => {
       }
 
       renderTodayDcr(latestDcr?.data || null);
+
+      // ---- Daily Sign-In table (live roster) ----
+      // Replaces the prior hardcoded John Doe / Maria Garcia demo rows.
+      // Same /on-site source — single query path for "who is on site today".
+      renderDailySignIn(site);
     } catch (e) {
       console.warn('[Dashboard] live-data refresh failed:', e);
     }
+  }
+
+  function _escHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function renderDailySignIn(site) {
+    const tbody = document.getElementById('daily-signin-tbody');
+    if (!tbody) return;
+    const workers = (site && Array.isArray(site.workers)) ? site.workers : [];
+    if (workers.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="padding:18px;text-align:center;color:#76777E;">No sign-ins recorded yet today.</td></tr>';
+      return;
+    }
+    const dayLoc = site && site.day_location ? site.day_location : '';
+    const html = workers.map(w => {
+      const wid = w.worker_id ? _escHtml(w.worker_id) : '—';
+      const name = _escHtml(w.name || '—');
+      const trade = _escHtml(w.trade || '—');
+      const tin = _escHtml(w.time_in || '—');
+      const tout = w.time_out ? _escHtml(w.time_out)
+                              : '<span style="color:#B68838;">still in</span>';
+      const hrs = (w.hours != null) ? Number(w.hours).toFixed(2) : '—';
+      const area = dayLoc ? _escHtml(dayLoc) : '—';
+      return '<tr>'
+           + '<td>' + wid + '</td>'
+           + '<td>' + name + '</td>'
+           + '<td>' + trade + '</td>'
+           + '<td>' + tin + '</td>'
+           + '<td>' + tout + '</td>'
+           + '<td>' + hrs + '</td>'
+           + '<td>' + area + '</td>'
+           + '</tr>';
+    }).join('');
+    tbody.innerHTML = html;
   }
 
   refresh();
