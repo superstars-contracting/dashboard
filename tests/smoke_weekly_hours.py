@@ -135,7 +135,9 @@ try:
     for _ in range(15):
         time.sleep(1)
         try:
-            if urllib.request.urlopen("http://127.0.0.1:5050/", timeout=2).status == 200:
+            # Probe an unauthenticated endpoint — the auth gate (#48) redirects
+            # "/" to /login, so probe /api/health which is in the public allowlist.
+            if urllib.request.urlopen("http://127.0.0.1:5050/api/health", timeout=2).status == 200:
                 break
         except Exception:
             pass
@@ -143,6 +145,9 @@ try:
             sys.exit(2)
     else:
         sys.exit(2)
+    # Auth gate (#48): login the smoke admin + patch urllib for cookies.
+    import _smoke_auth
+    _smoke_auth.setup()
 
     # ----- Step 1: default week resolves correctly -----
     print("\n--- Step 1: GET /api/payroll/hours (no week_start) ---")

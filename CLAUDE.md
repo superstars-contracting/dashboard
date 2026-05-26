@@ -290,6 +290,57 @@ Get-ScheduledTask   -TaskName "SSC Dashboard Server"   # status
 #   data_room/server_logs/server-YYYY-MM-DD.log
 ```
 
+## Dashboard auth foundation (#48)
+
+The dashboard (company console + project dashboard) sits behind a real
+login. Worker-app PIN sign-in is unaffected — workers continue using the
+worker app's PIN flow and do NOT get rows in `users`.
+
+**Schema:** `users` (id, email, password_hash, role, full_name,
+employee_id_link, is_active, created_at, last_login_at). Roles:
+`admin`, `c_suite`, `pm`, `super`. `sessions` table holds server-side
+sessions; cookie is opaque, 12-hour sliding. Schema lives in
+`schema_auth.sql`; apply via `python apply_auth_schema.py` (idempotent).
+
+**Gating:** `auth.apply_auth_gate(app)` registers a `before_request` hook
+that redirects unauthenticated HTML requests to `/login?next=...` and
+returns 401 JSON for unauthenticated `/api/*` requests. Public exemptions:
+`/login`, `/api/auth/*`, `/api/health`, `/api/today`, `/api/worker/*`,
+`/worker-app`, `/files/*`, `/preview/*`. For per-route role gating use
+`@requires_role('admin', 'c_suite')` (e.g., once Labor Rates #158 lands).
+
+**Bootstrap (FIRST RUN ON A FRESH DEPLOY — REQUIRED):**
+
+```powershell
+# 1. Apply the auth schema (idempotent; safe to re-run)
+python apply_auth_schema.py
+
+# 2. Seed the first admin user (interactive — never echoes the password)
+python bootstrap_admin.py
+
+# 3. Start / restart the scheduled task so the server picks up the new code
+Stop-ScheduledTask  -TaskName "SSC Dashboard Server"
+Start-ScheduledTask -TaskName "SSC Dashboard Server"
+
+# 4. Sign in at /login (or https://ssc-bkbase.tail55067c.ts.net/login)
+```
+
+If the server starts before bootstrap runs, the dashboard is locked
+(redirect loop to /login with no valid creds) — run `bootstrap_admin.py`
+and refresh.
+
+**PII discipline for auth:** never log passwords, password_hashes, or
+full session ids. The login API does not distinguish "no such email"
+from "wrong password" — both return the same 401. `_smoke_auth.py`
+provides a known smoke admin for the test suite; production users are
+created via `bootstrap_admin.py` (first admin) or, later, an in-app
+admin surface.
+
+**HTTPS / cookie flag:** session cookies set `Secure` when either
+`request.is_secure` (direct HTTPS) or `X-Forwarded-Proto: https`
+(Tailscale-terminated HTTPS). Localhost HTTP works without `Secure`;
+both paths verified in `tests/smoke_auth.py`.
+
 ## Compensation / payroll data governance
 
 Pay rates, gross/net pay, deductions, tax withholdings, and any
@@ -349,6 +400,13 @@ The tools catch what slips past discipline; they do not license carelessness. So
 | `worker-app.html` | Mobile PWA for worker check-in. PIN = last 4 of phone. |
 | `company-dashboard.html` | Cross-project console with EN/ES toggle. |
 | `dashboard-static.html` | Per-project dashboard. |
+| `login.html` | Dashboard sign-in page (#48). Brand-styled, vanilla JS. |
+| `auth.py` | Dashboard auth: hashing, sessions, `before_request` gate, `requires_role`. |
+| `schema_auth.sql` / `apply_auth_schema.py` | users + sessions tables, idempotent migration. |
+| `bootstrap_admin.py` | One-shot interactive seeder for the FIRST admin user. |
+| `static/js/auth_menu.js` | Header user menu (name · role · Sign out) on both dashboards. |
+| `tests/_smoke_auth.py` | Smoke-suite helper: seeds smoke admin, patches `requests`/`urllib` so existing tests authenticate. |
+| `tests/smoke_auth.py` | Auth foundation end-to-end smoke: login, gate, logout, exemptions. |
 
 ## Architecture
 

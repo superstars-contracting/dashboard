@@ -38,6 +38,10 @@ from pathlib import Path
 
 import requests
 
+# Auth gate (#48): login the smoke admin + patch requests so cookies ride along.
+import _smoke_auth  # noqa: E402
+_smoke_auth.setup()
+
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
 SCRIPT_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = SCRIPT_DIR / "superstars.db"

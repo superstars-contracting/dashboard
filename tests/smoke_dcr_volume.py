@@ -114,7 +114,9 @@ def main():
     try:
         for i in range(20):
             time.sleep(1)
-            s, _ = hit("GET", "/")
+            # Probe an unauthenticated endpoint — the auth gate (#48) makes / redirect
+            # to /login, so "/" no longer signals readiness on its own.
+            s, _ = hit("GET", "/api/health")
             if s == 200:
                 print(f"  server up after {i+1}s")
                 break
@@ -124,6 +126,10 @@ def main():
         else:
             print("  server did NOT come up")
             sys.exit(2)
+        # Auth gate (#48): server is up — login the smoke admin + patch
+        # urllib so urlopen calls carry the session cookie.
+        import _smoke_auth
+        _smoke_auth.setup()
 
         # ================================================================
         # Phase 1 — 200 sequential issuances
