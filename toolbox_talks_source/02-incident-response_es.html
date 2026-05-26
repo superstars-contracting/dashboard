@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Respuesta a Incidentes — Qué Hacer Cuando Algo Pasa</title>
+<style>
+  @page { size: Letter portrait; margin: 0.35in 0.4in; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Inter", "Segoe UI", Arial, sans-serif;
+    color: #1c1c1c;
+    font-size: 9.6pt;
+    line-height: 1.28;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .title-bar {
+    background: #b01e2d;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 3px 3px 0 0;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .title-bar .title {
+    font-family: "Archivo", "Inter", sans-serif;
+    font-weight: 800;
+    font-size: 13pt;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    line-height: 1.05;
+  }
+  .title-bar .meta {
+    font-size: 8.5pt;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-align: right;
+    opacity: 0.95;
+  }
+  .fields {
+    display: flex;
+    gap: 14px;
+    border: 1px solid #c9c5bd;
+    border-top: none;
+    background: #faf7f1;
+    padding: 5px 12px;
+    font-size: 9pt;
+  }
+  .fields .f { flex: 1; display: flex; align-items: baseline; gap: 6px; }
+  .fields .lbl {
+    font-weight: 700;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #54505a;
+    white-space: nowrap;
+  }
+  .fields .ln {
+    flex: 1;
+    border-bottom: 1px solid #54505a;
+    height: 11pt;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    margin-top: 6px;
+  }
+  .sec {
+    border: 1px solid #c9c5bd;
+    border-radius: 3px;
+    padding: 6px 9px 7px;
+    break-inside: avoid;
+  }
+  .sec.full { grid-column: 1 / -1; }
+  .sec h3 {
+    font-size: 8.5pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #b01e2d;
+    margin: 0 0 3px;
+    border-bottom: 1px solid #c9c5bd;
+    padding-bottom: 2px;
+  }
+  .sec p { margin: 0 0 3px; }
+  .sec ul { margin: 0; padding-left: 14px; }
+  .sec li { margin-bottom: 1.5px; }
+  .sec .ref {
+    color: #76777E;
+    font-size: 7.8pt;
+    font-weight: 600;
+  }
+  .signin {
+    margin-top: 7px;
+    border: 1px solid #c9c5bd;
+    border-radius: 3px;
+    padding: 5px 9px 6px;
+  }
+  .signin h3 {
+    font-size: 8.5pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #14161C;
+    margin: 0 0 3px;
+  }
+  table.signin-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.5pt;
+  }
+  table.signin-tbl th, table.signin-tbl td {
+    border-bottom: 1px solid #54505a;
+    padding: 4px 5px;
+    text-align: left;
+    vertical-align: bottom;
+    height: 18pt;
+  }
+  table.signin-tbl th {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 7.5pt;
+    color: #54505a;
+    height: 14pt;
+    border-bottom: 1.4px solid #14161C;
+  }
+  .foreman-row {
+    margin-top: 6px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 8.5pt;
+  }
+  .foreman-row .lbl {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 7.5pt;
+    color: #54505a;
+    white-space: nowrap;
+  }
+  .foreman-row .ln {
+    flex: 1;
+    border-bottom: 1px solid #54505a;
+    height: 14pt;
+  }
+</style>
+</head>
+<body>
+  <div class="title-bar">
+    <div class="title">Tema 2 · Respuesta a Incidentes — Qué Hacer Cuando Algo Pasa</div>
+    <div class="meta">Cap. 33 §3301.6 / §3301.7 / §3301.8<br>15 min</div>
+  </div>
+  <div class="fields">
+    <div class="f"><span class="lbl">Fecha</span><span class="ln"></span></div>
+    <div class="f"><span class="lbl">Proyecto</span><span class="ln"></span></div>
+    <div class="f"><span class="lbl">Capataz</span><span class="ln"></span></div>
+  </div>
+  <div class="grid">
+    <div class="sec full">
+      <h3>Por qué importa</h3>
+      <p>Cuando alguien se lastima — o casi se lastima — los primeros diez minutos lo deciden todo. Reportes confusos, tarde o faltantes convierten incidentes manejables en hospitalizaciones, quejas a FDNY y violaciones del DOB. Esto lo tiene que saber cada miembro del equipo de memoria.</p>
+    </div>
+    <div class="sec">
+      <h3>Reglas clave (Cap. 33)</h3>
+      <ul><li>Llama al 911 primero si la lesión es grave — sangrado, inconsciente, caída. <span class="ref">§3301.6</span></li><li>Notifica al Coordinador de Seguridad inmediatamente. <span class="ref">§3301.6 / §3301.8</span></li><li>Hay que notificar al DOB de todo accidente reportable. <span class="ref">§3301.6</span></li><li>Preserva la escena — no muevas equipo ni escombros. <span class="ref">§3301.7</span></li><li>Toma declaraciones de testigos el MISMO día. <span class="ref">§3301.7</span></li></ul>
+    </div>
+    <div class="sec">
+      <h3>Hacer</h3>
+      <ul><li>Llama al 911 si alguien está inconsciente, sangrando mucho, o se cayó.</li><li>Para el trabajo en el área afectada.</li><li>Avisa al capataz y al Coordinador de Seguridad por teléfono — no texto.</li><li>Escribe lo que viste antes de hablar con otros.</li><li>Quédate en el sitio hasta dar tu declaración.</li></ul>
+    </div>
+    <div class="sec">
+      <h3>No hacer</h3>
+      <ul><li>No muevas al herido si puede empeorar la lesión.</li><li>No limpies la escena antes de que el Coordinador la vea.</li><li>No discutas de quién tuvo la culpa — solo los hechos.</li><li>No publiques fotos ni detalles en redes sociales.</li><li>No te vayas antes de dar tu declaración.</li></ul>
+    </div>
+    <div class="sec">
+      <h3>Preguntas de discusión</h3>
+      <ul><li>¿Dónde está el botiquín de primeros auxilios y el AED más cercanos?</li><li>¿Quién es el Coordinador de Seguridad hoy y cuál es su número?</li><li>Si vieras un cuasi-accidente ahora, ¿lo reportarías? ¿Por qué sí o no?</li></ul>
+    </div>
+  </div>
+  <div class="signin">
+    <h3>Lista de Asistencia</h3>
+    <table class="signin-tbl">
+      <thead><tr>
+        <th style="width:34%;">Nombre en letra de molde</th>
+        <th style="width:38%;">Firma</th>
+        <th style="width:18%;">Fecha</th>
+      </tr></thead>
+      <tbody>
+        <tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+    <div class="foreman-row">
+      <span class="lbl">Firma del capataz</span>
+      <span class="ln"></span>
+    </div>
+  </div>
+</body>
+</html>

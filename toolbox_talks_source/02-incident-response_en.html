@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Incident Response — What To Do When Something Happens</title>
+<style>
+  @page { size: Letter portrait; margin: 0.35in 0.4in; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Inter", "Segoe UI", Arial, sans-serif;
+    color: #1c1c1c;
+    font-size: 9.6pt;
+    line-height: 1.28;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .title-bar {
+    background: #b01e2d;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 3px 3px 0 0;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .title-bar .title {
+    font-family: "Archivo", "Inter", sans-serif;
+    font-weight: 800;
+    font-size: 13pt;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    line-height: 1.05;
+  }
+  .title-bar .meta {
+    font-size: 8.5pt;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-align: right;
+    opacity: 0.95;
+  }
+  .fields {
+    display: flex;
+    gap: 14px;
+    border: 1px solid #c9c5bd;
+    border-top: none;
+    background: #faf7f1;
+    padding: 5px 12px;
+    font-size: 9pt;
+  }
+  .fields .f { flex: 1; display: flex; align-items: baseline; gap: 6px; }
+  .fields .lbl {
+    font-weight: 700;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #54505a;
+    white-space: nowrap;
+  }
+  .fields .ln {
+    flex: 1;
+    border-bottom: 1px solid #54505a;
+    height: 11pt;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    margin-top: 6px;
+  }
+  .sec {
+    border: 1px solid #c9c5bd;
+    border-radius: 3px;
+    padding: 6px 9px 7px;
+    break-inside: avoid;
+  }
+  .sec.full { grid-column: 1 / -1; }
+  .sec h3 {
+    font-size: 8.5pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #b01e2d;
+    margin: 0 0 3px;
+    border-bottom: 1px solid #c9c5bd;
+    padding-bottom: 2px;
+  }
+  .sec p { margin: 0 0 3px; }
+  .sec ul { margin: 0; padding-left: 14px; }
+  .sec li { margin-bottom: 1.5px; }
+  .sec .ref {
+    color: #76777E;
+    font-size: 7.8pt;
+    font-weight: 600;
+  }
+  .signin {
+    margin-top: 7px;
+    border: 1px solid #c9c5bd;
+    border-radius: 3px;
+    padding: 5px 9px 6px;
+  }
+  .signin h3 {
+    font-size: 8.5pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #14161C;
+    margin: 0 0 3px;
+  }
+  table.signin-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.5pt;
+  }
+  table.signin-tbl th, table.signin-tbl td {
+    border-bottom: 1px solid #54505a;
+    padding: 4px 5px;
+    text-align: left;
+    vertical-align: bottom;
+    height: 18pt;
+  }
+  table.signin-tbl th {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 7.5pt;
+    color: #54505a;
+    height: 14pt;
+    border-bottom: 1.4px solid #14161C;
+  }
+  .foreman-row {
+    margin-top: 6px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 8.5pt;
+  }
+  .foreman-row .lbl {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 7.5pt;
+    color: #54505a;
+    white-space: nowrap;
+  }
+  .foreman-row .ln {
+    flex: 1;
+    border-bottom: 1px solid #54505a;
+    height: 14pt;
+  }
+</style>
+</head>
+<body>
+  <div class="title-bar">
+    <div class="title">Topic 2 · Incident Response — What To Do When Something Happens</div>
+    <div class="meta">Ch 33 §3301.6 / §3301.7 / §3301.8<br>15 min</div>
+  </div>
+  <div class="fields">
+    <div class="f"><span class="lbl">Date</span><span class="ln"></span></div>
+    <div class="f"><span class="lbl">Project</span><span class="ln"></span></div>
+    <div class="f"><span class="lbl">Foreman</span><span class="ln"></span></div>
+  </div>
+  <div class="grid">
+    <div class="sec full">
+      <h3>Why It Matters</h3>
+      <p>When someone gets hurt — or almost gets hurt — the first ten minutes decide everything. Confused, late, or missing reports turn fixable incidents into hospital stays, FDNY complaints, and DOB violations. This is what every crew member must know cold.</p>
+    </div>
+    <div class="sec">
+      <h3>Key Rules (Ch 33)</h3>
+      <ul><li>Call 911 first if injury is serious — bleeding, unconscious, fall. <span class="ref">§3301.6</span></li><li>Notify the Site Safety Coordinator immediately on any incident. <span class="ref">§3301.6 / §3301.8</span></li><li>DOB must be notified of any reportable accident. <span class="ref">§3301.6</span></li><li>Preserve the scene — do not move equipment or debris. <span class="ref">§3301.7</span></li><li>Get witness statements the SAME day, while memory is fresh. <span class="ref">§3301.7</span></li></ul>
+    </div>
+    <div class="sec">
+      <h3>Do</h3>
+      <ul><li>Call 911 if anyone is unconscious, bleeding heavily, or fell.</li><li>Stop work in the affected area.</li><li>Notify Foreman and Site Safety Coordinator by phone — not text.</li><li>Write down what you saw before talking to others.</li><li>Stay on site until you give your statement.</li></ul>
+    </div>
+    <div class="sec">
+      <h3>Do Not</h3>
+      <ul><li>Don't move the injured worker if it could make injury worse.</li><li>Don't clean up the scene before the SSC sees it.</li><li>Don't discuss fault on site — give facts only.</li><li>Don't post photos or details on social media.</li><li>Don't leave the site before your statement is taken.</li></ul>
+    </div>
+    <div class="sec">
+      <h3>Discussion Questions</h3>
+      <ul><li>Where is the nearest first-aid kit and AED on this site?</li><li>Who is the Site Safety Coordinator today, and what is their phone number?</li><li>If you saw a near-miss right now, would you report it? Why or why not?</li></ul>
+    </div>
+  </div>
+  <div class="signin">
+    <h3>Worker Sign-In</h3>
+    <table class="signin-tbl">
+      <thead><tr>
+        <th style="width:34%;">Print Name</th>
+        <th style="width:38%;">Signature</th>
+        <th style="width:18%;">Date</th>
+      </tr></thead>
+      <tbody>
+        <tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+    <div class="foreman-row">
+      <span class="lbl">Foreman signature</span>
+      <span class="ln"></span>
+    </div>
+  </div>
+</body>
+</html>
