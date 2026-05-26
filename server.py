@@ -3552,6 +3552,49 @@ def api_blank_forms():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/toolbox-talks/library', methods=['GET'])
+def api_toolbox_talks_library():
+    """Catalog of Ch 33 toolbox talks (EN + ES PDFs per talk).
+
+    Mirrors /api/blank-forms + /api/signage-templates shape. Returns
+    every row in `toolbox_talks` with synthesized URLs for both
+    languages under /files/data_room/toolbox_talks/.
+
+    Optional category filter (Site / Fall / Scaffold / Demo / General).
+
+    Note: distinct from the pre-existing /api/toolbox-talks (which
+    reads from toolbox_talk_library — an older empty-stub table).
+    """
+    cat = (request.args.get('category') or '').strip()
+    where = []
+    params = []
+    if cat:
+        where.append("category = ?")
+        params.append(cat)
+    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+    try:
+        conn = db()
+        rows = conn.execute(
+            f"SELECT id, topic_number, category, title_en, title_es, "
+            f"       ch33_ref, filename_en, filename_es, est_minutes, "
+            f"       description, created_at "
+            f"FROM toolbox_talks{where_sql} "
+            f"ORDER BY topic_number",
+            params,
+        ).fetchall()
+        conn.close()
+        out = []
+        for r in rows:
+            d = dict(r)
+            d['file_url_en'] = '/files/data_room/toolbox_talks/' + d['filename_en']
+            d['file_url_es'] = '/files/data_room/toolbox_talks/' + d['filename_es']
+            out.append(d)
+        return response_wrapper(out, count=len(out))
+    except Exception as e:
+        logging.error(f"GET /api/toolbox-talks/library: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/signage-templates', methods=['GET'])
 def api_signage_templates():
     """Catalog of standard construction-site signs (signage_templates).
