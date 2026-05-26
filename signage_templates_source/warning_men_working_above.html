@@ -25,6 +25,7 @@
     border: 8px solid #000;
     border-radius: 14px;
     padding: 18px;
+    gap: 14px;
   }
   .header {
     flex: 0 0 22%;
@@ -42,52 +43,64 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 0 18px;
   }
-  .header .word {
-    color: #000;
-    font-size: 96pt;
-    font-weight: 900;
-    letter-spacing: 0.04em;
-    line-height: 1;
-  }
+  .header svg { width: 100%; height: 100%; }
   .body {
     flex: 1;
     display: grid;
     grid-template-columns: 3fr 1fr;
     gap: 24px;
     align-items: center;
-    padding: 18px 8px;
+    padding: 4px;
   }
-  .text-block {
-    text-align: center;
+  .text-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
   }
-  .line {
-    font-size: 78pt;
-    font-weight: 900;
-    line-height: 1.0;
-    letter-spacing: 0.01em;
-  }
+  .text-wrap svg { width: 100%; height: 100%; }
   .arrow {
     display: flex;
     align-items: center;
     justify-content: center;
+    height: 100%;
   }
-  .arrow svg { width: 100%; height: 90%; }
+  .arrow svg { height: 90%; width: 100%; }
 </style>
 </head>
 <body>
   <div class="sign">
     <div class="header">
-      <div class="band"><div class="word">WARNING</div></div>
+      <div class="band">
+        <svg viewBox="0 0 100 22" preserveAspectRatio="xMidYMid meet" aria-label="WARNING">
+          <text x="50" y="18" text-anchor="middle"
+                textLength="92" lengthAdjust="spacingAndGlyphs"
+                font-family="Arial Black, Helvetica, sans-serif"
+                font-weight="900" font-size="20" fill="#000">WARNING</text>
+        </svg>
+      </div>
     </div>
     <div class="body">
-      <div class="text-block">
-        <div class="line">MEN</div>
-        <div class="line">WORKING</div>
-        <div class="line">ABOVE</div>
+      <div class="text-wrap">
+        <svg viewBox="0 0 100 64" preserveAspectRatio="xMidYMid meet" aria-label="MEN WORKING ABOVE">
+          <text x="50" y="20" text-anchor="middle"
+                textLength="40" lengthAdjust="spacingAndGlyphs"
+                font-family="Arial Black, Helvetica, sans-serif"
+                font-weight="900" font-size="18" fill="#000">MEN</text>
+          <text x="50" y="42" text-anchor="middle"
+                textLength="86" lengthAdjust="spacingAndGlyphs"
+                font-family="Arial Black, Helvetica, sans-serif"
+                font-weight="900" font-size="18" fill="#000">WORKING</text>
+          <text x="50" y="62" text-anchor="middle"
+                textLength="64" lengthAdjust="spacingAndGlyphs"
+                font-family="Arial Black, Helvetica, sans-serif"
+                font-weight="900" font-size="18" fill="#000">ABOVE</text>
+        </svg>
       </div>
       <div class="arrow" aria-hidden="true">
-        <svg viewBox="0 0 50 200" xmlns="http://www.w3.org/2000/svg">
+        <svg viewBox="0 0 50 200" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
           <polygon points="25,5 47,40 35,40 35,195 15,195 15,40 3,40" fill="#000"/>
         </svg>
       </div>
