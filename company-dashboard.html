@@ -3162,7 +3162,23 @@ applyLanguage();
       $('lrt-tbody').innerHTML = '<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--mute);">No active workers.</td></tr>';
       return;
     }
-    const rows = workers.map(w => {
+    // Filter: render only workers with ≥1 sign-in this week
+    // (weekly_total > 0). The handoff is explicit — a no-work day
+    // WITHIN the week is per-column flagging (already wired), NOT
+    // a reason to drop the worker. The filter is per-week activity,
+    // not per-day. At 50+ workers, rendering everyone is unreadable;
+    // the absentees-this-week aren't payroll-relevant rows.
+    // The Hours Log (a sibling consumer of build_week_grid) still
+    // shows the full active roster so absences are visible there
+    // for time-entry; only the LRT applies this filter.
+    const totalRosterCount = workers.length;
+    const activeWorkers = workers.filter(w => (w.weekly_total || 0) > 0);
+    const hiddenCount = totalRosterCount - activeWorkers.length;
+    if (!activeWorkers.length) {
+      $('lrt-tbody').innerHTML = `<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--mute);">No worker had a sign-in this week. ${totalRosterCount > 0 ? '<span style="color:var(--ink-soft);">(${totalRosterCount} on the roster.)</span>' : ''}</td></tr>`;
+      return;
+    }
+    const rows = activeWorkers.map(w => {
       const dayCells = w.days.map(d => {
         const h = d.hours;
         const nw = noWorkByDate && noWorkByDate[d.date];
@@ -3229,7 +3245,17 @@ applyLanguage();
       renderHead(grid.dates, grid.no_work_by_date || {});
       renderBody(grid.workers, grid.no_work_by_date || {});
       renderFoot(grid);
-      setStatus('');
+      // Status banner: active-this-week / on-roster count so the
+      // operator knows the filter is on and how many were hidden.
+      const total = (grid.workers || []).length;
+      const active = (grid.workers || []).filter(w => (w.weekly_total || 0) > 0).length;
+      if (total === 0) {
+        setStatus('No active workers in the roster.', 'var(--mute)');
+      } else if (active === total) {
+        setStatus(`All ${total} active worker(s) had sign-ins this week.`, '#2F7C57');
+      } else {
+        setStatus(`Showing ${active} of ${total} worker(s) — ${total - active} had no sign-ins this week.`, 'var(--mute)');
+      }
     } catch (e) {
       console.warn('[LRT] load failed:', e);
       setStatus('Network error — retry', '#B11E2E');
