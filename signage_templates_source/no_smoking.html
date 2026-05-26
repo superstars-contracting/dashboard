@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NO SMOKING</title>
+<style>
+  @page { size: Letter landscape; margin: 0.4in; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Arial Black", "Helvetica Neue", Arial, sans-serif;
+    color: #000;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .sign {
+    width: 100%;
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    border: 10px solid #000;
+    border-radius: 18px;
+    padding: 26px 36px;
+    gap: 24px;
+  }
+  .word {
+    font-size: 220pt;
+    font-weight: 900;
+    text-align: center;
+    line-height: 0.85;
+  }
+  .pict {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pict svg { width: 92%; height: 92%; max-height: 6.5in; }
+</style>
+</head>
+<body>
+  <div class="sign">
+    <div>
+      <div class="word">NO</div>
+      <div class="word">SMOKING</div>
+    </div>
+    <div class="pict" aria-hidden="true">
+      <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="110" cy="110" r="92" fill="none" stroke="#d20a16" stroke-width="18"/>
+        <rect x="38" y="104" width="142" height="14" fill="#000"/>
+        <rect x="170" y="100" width="10" height="22" fill="#000"/>
+        <path d="M70 96 C76 84 70 76 76 64" fill="none" stroke="#000" stroke-width="6" stroke-linecap="round"/>
+        <path d="M90 96 C96 84 90 76 96 64" fill="none" stroke="#000" stroke-width="6" stroke-linecap="round"/>
+        <path d="M110 96 C116 84 110 76 116 64" fill="none" stroke="#000" stroke-width="6" stroke-linecap="round"/>
+        <line x1="46" y1="46" x2="174" y2="174" stroke="#d20a16" stroke-width="18" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

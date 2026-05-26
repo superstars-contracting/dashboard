@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NOTICE — All PPE Required Beyond This Point</title>
+<style>
+  @page { size: Letter portrait; margin: 0.4in; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Arial Black", "Helvetica Neue", Arial, sans-serif;
+    color: #000;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .sign {
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border: 8px solid #000;
+    border-radius: 14px;
+    padding: 18px;
+  }
+  .header {
+    flex: 0 0 18%;
+    background: #1b5cb3;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .header .word {
+    color: #fff;
+    font-size: 92pt;
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: 0.04em;
+    line-height: 1;
+  }
+  .body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-evenly;
+    text-align: center;
+    padding: 16px 4px;
+  }
+  .line {
+    font-size: 56pt;
+    font-weight: 900;
+    line-height: 0.98;
+    letter-spacing: 0.01em;
+  }
+  .pictos {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    width: 100%;
+    padding: 0 6px;
+  }
+  .ppe {
+    background: #1b5cb3;
+    border-radius: 50%;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ppe svg { width: 70%; height: 70%; fill: #fff; }
+  .label {
+    font-size: 11pt;
+    font-weight: 700;
+    margin-top: 4px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #000;
+  }
+  .ppe-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+</style>
+</head>
+<body>
+  <div class="sign">
+    <div class="header"><div class="word">NOTICE</div></div>
+    <div class="body">
+      <div>
+        <div class="line">ALL PPE REQUIRED</div>
+        <div class="line">BEYOND THIS POINT</div>
+      </div>
+      <div class="pictos">
+        <div class="ppe-slot">
+          <div class="ppe" aria-label="Hard hat">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <path d="M50 24 C32 24 18 38 18 58 L18 70 L82 70 L82 58 C82 38 68 24 50 24 Z"/>
+              <rect x="14" y="68" width="72" height="8" rx="2"/>
+              <rect x="46" y="24" width="8" height="14"/>
+            </svg>
+          </div>
+          <div class="label">Hard Hat</div>
+        </div>
+        <div class="ppe-slot">
+          <div class="ppe" aria-label="Eye protection">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 46 C12 38 20 34 30 34 L42 34 C46 34 48 36 50 38 C52 36 54 34 58 34 L70 34 C80 34 88 38 88 46 L88 56 C88 64 80 68 70 68 L58 68 C54 68 52 66 50 64 C48 66 46 68 42 68 L30 68 C20 68 12 64 12 56 Z"/>
+              <ellipse cx="32" cy="51" rx="10" ry="9" fill="#1b5cb3"/>
+              <ellipse cx="68" cy="51" rx="10" ry="9" fill="#1b5cb3"/>
+            </svg>
+          </div>
+          <div class="label">Eye</div>
+        </div>
+        <div class="ppe-slot">
+          <div class="ppe" aria-label="Hearing protection">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <path d="M22 38 C22 30 28 24 36 24 L36 76 C28 76 22 70 22 62 Z"/>
+              <path d="M78 38 C78 30 72 24 64 24 L64 76 C72 76 78 70 78 62 Z"/>
+              <rect x="36" y="46" width="28" height="8"/>
+            </svg>
+          </div>
+          <div class="label">Hearing</div>
+        </div>
+        <div class="ppe-slot">
+          <div class="ppe" aria-label="Hi-vis vest">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <path d="M30 22 L42 22 L50 30 L58 22 L70 22 L78 32 L78 80 L60 80 L60 50 L40 50 L40 80 L22 80 L22 32 Z"/>
+              <rect x="22" y="56" width="56" height="4" fill="#1b5cb3"/>
+              <rect x="22" y="68" width="56" height="4" fill="#1b5cb3"/>
+            </svg>
+          </div>
+          <div class="label">Vest</div>
+        </div>
+        <div class="ppe-slot">
+          <div class="ppe" aria-label="Gloves">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <path d="M30 30 L36 30 L36 18 C36 14 40 12 44 12 C48 12 50 14 50 18 L50 30 L54 30 L54 12 C54 8 58 6 62 6 C66 6 68 8 68 12 L68 30 L72 30 L72 16 C72 12 76 10 80 10 C84 10 86 12 86 16 L86 56 C86 70 76 86 60 86 L48 86 C36 86 30 76 30 66 Z"/>
+            </svg>
+          </div>
+          <div class="label">Gloves</div>
+        </div>
+        <div class="ppe-slot">
+          <div class="ppe" aria-label="Work boots">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <path d="M22 30 L40 30 L40 56 L70 56 L80 64 L80 76 L22 76 Z"/>
+              <rect x="22" y="76" width="58" height="6"/>
+              <rect x="26" y="80" width="6" height="4" fill="#1b5cb3"/>
+              <rect x="38" y="80" width="6" height="4" fill="#1b5cb3"/>
+              <rect x="50" y="80" width="6" height="4" fill="#1b5cb3"/>
+              <rect x="62" y="80" width="6" height="4" fill="#1b5cb3"/>
+            </svg>
+          </div>
+          <div class="label">Boots</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
