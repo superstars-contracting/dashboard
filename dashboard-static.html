@@ -3218,19 +3218,45 @@ document.querySelectorAll('.nav-link').forEach(link => {
       const c = _color(r.category);
       const ext = (r.filename || '').split('.').pop().toUpperCase();
       const orient = r.orientation === 'landscape' ? '· landscape' : '';
+      // v2 (#169): big title is the dominant element. Reference codes
+      // (U-1012-01 / G2547 / G2729 / S-9775 / WARN0034 / DOB-G2547 /
+      // SAFE-001 etc.) stay in the DB and inside the rendered PDFs,
+      // but are stripped from the CARD display so the title reads
+      // cleanly. Card is flex-column so the "Open ↗" link sits flush
+      // at the bottom and every card in the grid takes the same height.
+      const displayTitle = _stripRefCodes(r.title);
+      // v2 (#169): title-dominant card matching the Toolbox v2 pattern
+      // from #166 (commit 9c9b98b). Drops the description text (which
+      // carried ref codes like S-9775 / DOB-G2547 / WARN0034) — those
+      // codes stay in the DB and inside the PDFs but never on the card.
       return `<a href="${_esc(r.file_url)}" target="_blank" rel="noopener"
-                  style="display:block;padding:14px;background:white;border:1px solid #E8E4DD;border-left:4px solid ${c};border-radius:4px;text-decoration:none;color:inherit;transition:all 0.15s;"
+                  style="display:flex;flex-direction:column;padding:14px 16px 14px;background:white;border:1px solid #E8E4DD;border-left:4px solid ${c};border-radius:4px;text-decoration:none;color:inherit;transition:all 0.15s;min-height:170px;"
                   onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.08)';"
                   onmouseout="this.style.boxShadow='';">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px;">
-          <div style="font-size:9px;font-weight:700;color:${c};text-transform:uppercase;letter-spacing:0.08em;">${_esc(r.category || 'Sign')} · ${_esc(ext)} ${orient}</div>
-          ${r.code ? '<div style="font-size:9px;font-weight:700;color:#76777E;letter-spacing:0.05em;">' + _esc(r.code) + '</div>' : ''}
-        </div>
-        <div style="font-weight:700;font-size:13px;color:#14161C;margin-bottom:4px;line-height:1.3;">${_esc(r.title)}</div>
-        ${r.description ? '<div style="font-size:11px;color:#76777E;line-height:1.4;">' + _esc(r.description) + '</div>' : ''}
-        <div style="font-size:10px;color:${c};font-weight:600;margin-top:6px;letter-spacing:0.04em;text-transform:uppercase;">Open ↗</div>
+        <div style="font-size:10px;font-weight:800;color:${c};text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">${_esc(r.category || 'Sign')} · ${_esc(ext)} ${orient}</div>
+        <div style="flex:1;font-family:Inter,Archivo,system-ui,sans-serif;font-weight:800;font-size:18px;color:#14161C;line-height:1.22;">${_esc(displayTitle)}</div>
+        <div style="font-size:11px;color:${c};font-weight:800;letter-spacing:0.08em;text-transform:uppercase;margin-top:12px;">Open ↗</div>
       </a>`;
     }).join('');
+  }
+
+  // Strip reference codes from a display title — they belong in the DB
+  // and inside the PDF, not on the card. Examples removed:
+  //   "RESTRICTED AREA — Construction Work in Progress (U-1012-01)"
+  //     -> "RESTRICTED AREA — Construction Work in Progress"
+  //   "DOB G2547 — Restricted Area / Construction Work in Progress"
+  //     -> "Restricted Area / Construction Work in Progress"
+  //   "DOB G2729 — Construction Permit Notice (Bilingual EN/ES)"
+  //     -> "Construction Permit Notice (Bilingual EN/ES)"
+  function _stripRefCodes(s) {
+    if (!s) return s;
+    return String(s)
+      // Parenthesised DOB / SmartSign codes anywhere
+      .replace(/\s*\((?:U-\d+-\d+|G\d+[A-Z]*|S-\d+|WARN\d+|s-\d+)\)\s*/gi, ' ')
+      // Leading "DOB G2547 — ", "DOB G2729 — " etc.
+      .replace(/^(?:DOB\s+)?(?:G\d+[A-Z]*|U-\d+-\d+|S-\d+|WARN\d+)\s*[—\-:]\s*/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   async function load() {
