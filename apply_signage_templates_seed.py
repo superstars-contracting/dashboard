@@ -48,16 +48,6 @@ SEED = [
         "ANSI Z535 caution sign. General site-boundary marker.",
     ),
     (
-        "SAFE-004",
-        "CAUTION — Do Not Enter / Authorized Personnel Only",
-        "caution_do_not_enter.pdf",
-        "caution_do_not_enter.html",
-        "Site",
-        "landscape",
-        "Caution sign with circle-slash hand pictogram. Post at restricted "
-        "access points (drop zone, electrical, work platforms).",
-    ),
-    (
         "PPE-001",
         "NOTICE — All PPE Required Beyond This Point",
         "notice_all_ppe_required.pdf",
@@ -65,7 +55,8 @@ SEED = [
         "PPE",
         "landscape",
         "Notice sign with 6 PPE pictograms (hard hat, eye, hearing, hi-vis, "
-        "gloves, boots). Post at PPE-mandatory entry points.",
+        "gloves, boots). Post at PPE-mandatory entry points. Source: "
+        "all-ppe-required-notice-sign-s-9775.pdf (SmartSign).",
     ),
     (
         "SITE-001",
@@ -94,8 +85,38 @@ SEED = [
         "restricted_area_construction.html",
         "DOB",
         "landscape",
-        "NYC DOB Restricted Construction / Work in Progress posting (U-1012-01). "
-        "Post at site perimeter / restricted floors.",
+        "NYC DOB Restricted Construction / Work in Progress posting "
+        "(U-1012-01). Cropped from the upper-left quadrant of the 4-up "
+        "DOB source sticker sheet. Post at site perimeter / restricted "
+        "floors.",
+    ),
+    (
+        "DOB-G2547",
+        "DOB G2547 — Restricted Area / Construction Work in Progress",
+        "dob_g2547.pdf",
+        "dob_g2547.html",
+        "DOB",
+        "landscape",
+        "NYC DOB G2547 posting. Embed of the canonical DOB source PDF.",
+    ),
+    (
+        "DOB-G2729",
+        "DOB G2729 — Construction Permit Notice",
+        "dob_g2729.pdf",
+        "dob_g2729.html",
+        "DOB",
+        "landscape",
+        "NYC DOB G2729 posting (English). Embed of the canonical DOB source PDF.",
+    ),
+    (
+        "DOB-G2729BI",
+        "DOB G2729 — Construction Permit Notice (Bilingual EN/ES)",
+        "dob_g2729_bilingual.pdf",
+        "dob_g2729_bilingual.html",
+        "DOB",
+        "landscape",
+        "NYC DOB G2729 posting (bilingual EN/ES). Embed of the canonical "
+        "DOB source PDF.",
     ),
     (
         "PPE-002",
