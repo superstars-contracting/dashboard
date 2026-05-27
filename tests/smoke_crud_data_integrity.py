@@ -107,6 +107,65 @@ def add_note(result, msg):
     result.notes.append(msg)
 
 
+def _synth_worker(label):
+    """Create a synthetic SMK-#### worker. Returns the employee_id, or None
+    if creation failed. Caller is responsible for teardown via
+    `_synth_teardown(emp_id)`.
+
+    The synthetic-worker pattern exists so face-photo and credential-issuance
+    CRUD round-trips don't write through to a real operator worker. The
+    previous flaw (caught in #172-v2 / Robert): test_face_photo POSTed a
+    1x1 placeholder JPEG to employees[0] = W-0001, then "restored" only the
+    DB column. The upload handler had already overwritten face.jpg on disk
+    with the placeholder bytes; the smoke test passed (column round-trip)
+    while the worker's real photo file was destroyed. test_credential_issue
+    had the same defect (placeholder face write + supersedes real CoF).
+    """
+    syn_id = "SMK-" + uuid.uuid4().hex[:6].upper()
+    resp = requests.post(f"{BASE}/api/workers/create", json={
+        "employee_id": syn_id,
+        "name": f"SMOKE {label}",
+        "trade": f"SMOKE_{label.upper()}",
+        "language": "EN",
+    }, timeout=10)
+    if resp.status_code != 200:
+        return None
+    return syn_id
+
+
+def _synth_teardown(emp_id):
+    """Drop a synthetic SMK-#### worker, its credential rows, AND its
+    worker_records folder. Idempotent; safe to call from finally:."""
+    if not emp_id or not emp_id.startswith("SMK-"):
+        return
+    folder = None
+    conn = db()
+    try:
+        row = conn.execute(
+            "SELECT folder_path FROM employees WHERE employee_id = ?",
+            (emp_id,)
+        ).fetchone()
+        folder = row["folder_path"] if row else None
+        for tbl in (
+            "project_assignments", "cof_cards", "company_id_cards",
+            "certifications", "worker_documents", "sign_in_log",
+        ):
+            conn.execute(f"DELETE FROM {tbl} WHERE employee_id = ?", (emp_id,))
+        conn.execute("DELETE FROM employees WHERE employee_id = ?", (emp_id,))
+        conn.commit()
+    finally:
+        conn.close()
+    if folder:
+        import shutil
+        try:
+            p = Path(folder).resolve()
+            wr = (SCRIPT_DIR / "worker_records").resolve()
+            if str(p).startswith(str(wr)) and p.exists():
+                shutil.rmtree(p, ignore_errors=True)
+        except Exception:
+            pass
+
+
 # ---------- Pre-flight ----------
 
 def preflight():
@@ -295,53 +354,47 @@ def test_intake_status(real_emp_id):
 
 def test_face_photo(real_emp_id):
     """Face photo: POST /api/employees/<id>/face-photo (multipart). No
-    public DELETE."""
+    public DELETE.
+
+    Operates on a synthetic SMK-#### worker — never on `real_emp_id`. The
+    face-photo upload handler overwrites face.<ext> on disk before the DB
+    UPDATE; a "restore" that only rewinds the column leaves the real
+    worker's photo bytes clobbered. See `_synth_worker` / #172-v2.
+    """
     r = SectionResult("Worker face photo (upload)")
-    # Capture prior value so we can restore later
-    conn = db()
+    syn_id = _synth_worker("FacePhoto")
+    if not syn_id:
+        r.create = r.edit = r.delete = r.shows = False
+        add_note(r, "synth worker create failed")
+        return r
     try:
-        prior = conn.execute(
-            "SELECT face_image_path FROM employees WHERE employee_id = ?",
-            (real_emp_id,)
-        ).fetchone()
-        prior_path = prior["face_image_path"] if prior else None
-    finally:
-        conn.close()
-    # CREATE — upload
-    files = {"file": ("smoke_face.jpg", make_jpeg_bytes(), "image/jpeg")}
-    up = requests.post(
-        f"{BASE}/api/employees/{real_emp_id}/face-photo",
-        files=files, timeout=15,
-    )
-    g = requests.get(f"{BASE}/api/workers/{real_emp_id}", timeout=10)
-    new_path = g.json()["data"]["employee"]["face_image_path"] if g.status_code == 200 else None
-    r.create = (up.status_code == 200 and bool(new_path))
-    # EDIT = re-upload (overwrites)
-    up2 = requests.post(
-        f"{BASE}/api/employees/{real_emp_id}/face-photo",
-        files={"file": ("smoke_face2.jpg", make_jpeg_bytes(), "image/jpeg")},
-        timeout=15,
-    )
-    r.edit = (up2.status_code == 200)
-    # SHOWS — face_image_path is referenced by /credential endpoint.
-    # Check BEFORE delete so a working DELETE doesn't make SHOWS see absent.
-    g3 = requests.get(f"{BASE}/api/employees/{real_emp_id}/credential", timeout=10)
-    r.shows = (g3.status_code == 200 and g3.json()["data"].get("face_image_path_present") is True)
-    # DELETE
-    d = requests.delete(f"{BASE}/api/employees/{real_emp_id}/face-photo", timeout=10)
-    r.delete = (d.status_code == 200)
-    if not r.delete:
-        add_note(r, f"no public DELETE for face-photo (status {d.status_code})")
-    # Restore prior face_image_path so we don't permanently overwrite a real worker
-    conn = db()
-    try:
-        conn.execute(
-            "UPDATE employees SET face_image_path = ? WHERE employee_id = ?",
-            (prior_path, real_emp_id)
+        # CREATE — upload
+        files = {"file": ("smoke_face.jpg", make_jpeg_bytes(), "image/jpeg")}
+        up = requests.post(
+            f"{BASE}/api/employees/{syn_id}/face-photo",
+            files=files, timeout=15,
         )
-        conn.commit()
+        g = requests.get(f"{BASE}/api/workers/{syn_id}", timeout=10)
+        new_path = g.json()["data"]["employee"]["face_image_path"] if g.status_code == 200 else None
+        r.create = (up.status_code == 200 and bool(new_path))
+        # EDIT = re-upload (overwrites)
+        up2 = requests.post(
+            f"{BASE}/api/employees/{syn_id}/face-photo",
+            files={"file": ("smoke_face2.jpg", make_jpeg_bytes(), "image/jpeg")},
+            timeout=15,
+        )
+        r.edit = (up2.status_code == 200)
+        # SHOWS — face_image_path is referenced by /credential endpoint.
+        # Check BEFORE delete so a working DELETE doesn't make SHOWS see absent.
+        g3 = requests.get(f"{BASE}/api/employees/{syn_id}/credential", timeout=10)
+        r.shows = (g3.status_code == 200 and g3.json()["data"].get("face_image_path_present") is True)
+        # DELETE
+        d = requests.delete(f"{BASE}/api/employees/{syn_id}/face-photo", timeout=10)
+        r.delete = (d.status_code == 200)
+        if not r.delete:
+            add_note(r, f"no public DELETE for face-photo (status {d.status_code})")
     finally:
-        conn.close()
+        _synth_teardown(syn_id)
     return r
 
 
@@ -405,55 +458,58 @@ def test_cert_upload(real_emp_id):
 
 def test_credential_issue(real_emp_id):
     """Credential issuance: POST /api/employees/<id>/credential/issue.
-    Hard-gates on face photo. No public UPDATE/DELETE."""
+    Hard-gates on face photo. No public UPDATE/DELETE.
+
+    Operates on a synthetic SMK-#### worker — never on `real_emp_id`. The
+    previous flaw (caught in #172-v2): override_active=True against a real
+    worker marks their existing CoF as 'replaced' permanently (cleanup
+    only DELETEd the test issuance row, not the supersede flip), AND the
+    "ensure face photo" upload writes a 1x1 placeholder over the real
+    worker's face.jpg on disk. The synthetic has no certs so it falls
+    through to Company ID issuance, which exercises the same code path.
+    """
     r = SectionResult("Credential issuance (CoF/Company ID)")
-    # Make sure a face photo exists (test_face_photo restored, so re-add)
-    files = {"file": ("smoke_face.jpg", make_jpeg_bytes(), "image/jpeg")}
-    requests.post(f"{BASE}/api/employees/{real_emp_id}/face-photo", files=files, timeout=15)
-    # CREATE — issue. override_active=True so we can run on a real worker
-    # who might already hold a credential without polluting their record.
-    iss = requests.post(
-        f"{BASE}/api/employees/{real_emp_id}/credential/issue",
-        json={"issued_by": MARKER, "override_active": True},
-        timeout=15,
-    )
-    issued_ok = (iss.status_code in (200, 201))
-    # READ-BACK
-    g = requests.get(f"{BASE}/api/employees/{real_emp_id}/credential", timeout=10)
-    has_current = bool(g.status_code == 200 and g.json()["data"].get("type"))
-    r.create = (issued_ok and has_current)
-    cred_type = g.json()["data"].get("type") if has_current else None
-    # SHOWS — intake-summary surfaces current_credential. Check BEFORE
-    # PATCH/DELETE so the soft-revoke from DELETE doesn't sabotage SHOWS.
-    ls = requests.get(f"{BASE}/api/workers/intake-summary", timeout=10).json()["data"]
-    row = next((x for x in ls if x["employee_id"] == real_emp_id), None)
-    r.shows = bool(row and row.get("current_credential") and
-                   row["current_credential"].get("type") == cred_type)
-    # EDIT — PATCH credential notes (non-empty body required)
-    p = requests.patch(f"{BASE}/api/employees/{real_emp_id}/credential",
-                       json={"notes": MARKER + "_CRED_NOTE"}, timeout=10)
-    r.edit = (p.status_code == 200)
-    if not r.edit:
-        add_note(r, f"PATCH credential failed (status {p.status_code})")
-    # DELETE
-    d = requests.delete(f"{BASE}/api/employees/{real_emp_id}/credential", timeout=10)
-    r.delete = (d.status_code == 200)
-    if not r.delete:
-        add_note(r, f"DELETE credential failed (status {d.status_code})")
-    # Cleanup — retract the test issuance via direct SQL
-    conn = db()
+    syn_id = _synth_worker("Credential")
+    if not syn_id:
+        r.create = r.edit = r.delete = r.shows = False
+        add_note(r, "synth worker create failed")
+        return r
     try:
-        conn.execute(
-            "DELETE FROM cof_cards WHERE employee_id = ? AND issued_by = ?",
-            (real_emp_id, MARKER)
+        # Synthetic worker needs a face photo before /credential/issue passes
+        # its hard-gate check. Writing to the synthetic's folder is contained.
+        files = {"file": ("smoke_face.jpg", make_jpeg_bytes(), "image/jpeg")}
+        requests.post(f"{BASE}/api/employees/{syn_id}/face-photo", files=files, timeout=15)
+        # CREATE — issue. No override_active needed; synthetic has no prior credential.
+        iss = requests.post(
+            f"{BASE}/api/employees/{syn_id}/credential/issue",
+            json={"issued_by": MARKER},
+            timeout=15,
         )
-        conn.execute(
-            "DELETE FROM company_id_cards WHERE employee_id = ? AND issued_by = ?",
-            (real_emp_id, MARKER)
-        )
-        conn.commit()
+        issued_ok = (iss.status_code in (200, 201))
+        # READ-BACK
+        g = requests.get(f"{BASE}/api/employees/{syn_id}/credential", timeout=10)
+        has_current = bool(g.status_code == 200 and g.json()["data"].get("type"))
+        r.create = (issued_ok and has_current)
+        cred_type = g.json()["data"].get("type") if has_current else None
+        # SHOWS — intake-summary surfaces current_credential. Check BEFORE
+        # PATCH/DELETE so the soft-revoke from DELETE doesn't sabotage SHOWS.
+        ls = requests.get(f"{BASE}/api/workers/intake-summary", timeout=10).json()["data"]
+        row = next((x for x in ls if x["employee_id"] == syn_id), None)
+        r.shows = bool(row and row.get("current_credential") and
+                       row["current_credential"].get("type") == cred_type)
+        # EDIT — PATCH credential notes (non-empty body required)
+        p = requests.patch(f"{BASE}/api/employees/{syn_id}/credential",
+                           json={"notes": MARKER + "_CRED_NOTE"}, timeout=10)
+        r.edit = (p.status_code == 200)
+        if not r.edit:
+            add_note(r, f"PATCH credential failed (status {p.status_code})")
+        # DELETE
+        d = requests.delete(f"{BASE}/api/employees/{syn_id}/credential", timeout=10)
+        r.delete = (d.status_code == 200)
+        if not r.delete:
+            add_note(r, f"DELETE credential failed (status {d.status_code})")
     finally:
-        conn.close()
+        _synth_teardown(syn_id)
     return r
 
 
