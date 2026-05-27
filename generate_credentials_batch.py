@@ -38,7 +38,13 @@ Pipeline:
      PNG. These are tiled 4× on the back pages.
   4. Assemble the Letter-landscape bundle HTML with all the PNGs
      base64-embedded in 2×2 grids, alternating front-page / back-page.
+     Page 1 carries a tiny print-instructions footer (#187) telling
+     the operator to pick long-edge flip; pages 2-8 are footer-free.
   5. Render the bundle HTML to PDF via headless Edge.
+  6. Post-process the PDF catalog to set
+     /ViewerPreferences << /Duplex /DuplexFlipLongEdge >>
+     so modern print dialogs auto-select long-edge duplex (#187).
+     Some dialogs ignore the hint; the page-1 footer is the backstop.
 
 Output: data_room/credentials/batch_print/SuperstarsContracting-AllIDs-<YYYY-MM-DD>.pdf
 
@@ -332,6 +338,25 @@ BUNDLE_TEMPLATE = """<!DOCTYPE html>
   }
   .slot.empty { /* invisible — see comment in module docstring */ }
   .slot img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+  /* Page-1-only print-instructions footer (#187).
+     Backstop for the PDF /ViewerPreferences /Duplex hint — some print
+     dialogs ignore the catalog hint and default to whatever the driver
+     remembered last. The footer lives in the bottom-margin band (the
+     page has 1.125in of clear space below the bottom row of cards), so
+     it never overlaps card content. Restricted to page 1 so it
+     doesn't reprint behind every card; the operator only needs to
+     read it once. */
+  .print-instructions {
+    position: absolute;
+    left: 0; right: 0;
+    bottom: 0.25in;
+    text-align: center;
+    font-size: 8pt;
+    color: #999;
+    font-weight: 400;
+    font-variant-numeric: normal;
+  }
 </style>
 </head>
 <body>
@@ -346,6 +371,9 @@ BUNDLE_TEMPLATE = """<!DOCTYPE html>
         {% endif %}
       {% endfor %}
     </div>
+    {% if loop.first %}
+      <div class="print-instructions">Print 2-sided · Flip on long edge</div>
+    {% endif %}
   </div>
 {% endfor %}
 </body>
@@ -434,11 +462,46 @@ def build_bundle(fronts_by_type, shared_backs, output_pdf, base_url):
         subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         for _ in range(40):
             if Path(output_pdf).exists() and Path(output_pdf).stat().st_size > 0:
-                return True
+                break
             time.sleep(0.2)
-        return False
+        else:
+            return False
+        # Bake the long-edge duplex hint into the PDF catalog (#187).
+        # Most modern print dialogs (Adobe Reader, Edge, Chrome) honor
+        # this and auto-select Flip-on-Long-Edge, which keeps the
+        # shared-back tile right-side-up. The page-1 footer in the
+        # bundle template is the backstop for dialogs that ignore the
+        # hint.
+        _bake_long_edge_duplex_hint(output_pdf)
+        return True
     finally:
         shutil.rmtree(profile, ignore_errors=True)
+
+
+def _bake_long_edge_duplex_hint(pdf_path):
+    """Set /ViewerPreferences << /Duplex /DuplexFlipLongEdge >> in the
+    PDF catalog. Pure post-process: doesn't touch page content. Errors
+    are logged + swallowed — a hint failure should never block the
+    download (the page-1 footer still tells the operator which flip
+    to pick).
+    """
+    try:
+        from pypdf import PdfReader, PdfWriter
+        reader = PdfReader(str(pdf_path))
+        writer = PdfWriter(clone_from=reader)
+        # The .duplex setter creates the ViewerPreferences dict if
+        # absent, otherwise patches in the /Duplex entry.
+        writer.viewer_preferences.duplex = "/DuplexFlipLongEdge"
+        # Write to a sibling temp file first, then atomic-replace —
+        # avoids leaving a half-written PDF if the write is interrupted.
+        tmp_out = Path(str(pdf_path) + ".duplex.tmp")
+        with tmp_out.open("wb") as f:
+            writer.write(f)
+        tmp_out.replace(pdf_path)
+    except Exception as e:
+        # PDF was already written successfully; this is best-effort.
+        print(f"  WARN: duplex-hint post-process failed: {type(e).__name__}: {e}",
+              file=sys.stderr)
 
 
 def main(base_url="http://127.0.0.1:5050"):

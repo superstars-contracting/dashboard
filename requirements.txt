@@ -45,6 +45,17 @@ pillow-heif>=1.3
 # don't get accounts.
 bcrypt>=4.0
 
+# PDF rendering library (read-only) — used by generate_credentials_batch
+# to extract per-card pages as PNGs for the bundle's tiled layout, and
+# to verify post-render page counts.
+pypdfium2>=4.0
+
+# PDF post-processing (read + write) — used by generate_credentials_batch
+# to bake /ViewerPreferences /Duplex /DuplexFlipLongEdge into the bundle's
+# catalog so print dialogs auto-pick long-edge duplex. Modern MIT-licensed
+# successor to PyPDF2. Pure Python, no native deps.
+pypdf>=6.0
+
 # ===== FUTURE / NOT YET IN CODEBASE =====
 # Uncomment when needed:
 
