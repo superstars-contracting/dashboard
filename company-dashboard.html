@@ -257,7 +257,14 @@
           <h2 data-i18n="p-workforce-title">Workforce</h2>
           <div class="h2-sub" data-i18n="p-workforce-sub">All workers in the company. Add new workers here — they join the master roster and can be assigned to any project.</div>
         </div>
-        <button class="btn" id="add-worker-btn" data-i18n="btn-onboard">+ ONBOARD</button>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button class="btn" id="print-all-ids-btn"
+                  style="display:none;background:white;color:var(--ink);border:1px solid var(--border);"
+                  title="Generate one printable PDF with every worker's credential — CoF for field workers, Company ID for the rest. Admin/C-Suite only.">
+            🖨 Print All IDs
+          </button>
+          <button class="btn" id="add-worker-btn" data-i18n="btn-onboard">+ ONBOARD</button>
+        </div>
       </div>
 
       <table class="roster">
@@ -2721,6 +2728,58 @@ applyLanguage();
   // Modal
   const modal = $('#intake-modal');
   $('#add-worker-btn').addEventListener('click', () => modal.classList.add('active'));
+
+  // Print All IDs (#174) — admin/c_suite only. Server-side @requires_role
+  // is the real authority; this is UX. Same gate pattern as the Labor
+  // Rates admin nav tab below.
+  const printAllBtn = document.getElementById('print-all-ids-btn');
+  function _maybeRevealPrintAllBtn(user) {
+    if (!printAllBtn || !user) return;
+    if (user.role === 'admin' || user.role === 'c_suite') {
+      printAllBtn.style.display = '';
+    }
+  }
+  document.addEventListener('ssc:user-loaded', (e) => _maybeRevealPrintAllBtn(e.detail));
+  if (window.__SSC_USER) _maybeRevealPrintAllBtn(window.__SSC_USER);
+
+  if (printAllBtn) {
+    printAllBtn.addEventListener('click', async () => {
+      const original = printAllBtn.innerHTML;
+      printAllBtn.disabled = true;
+      printAllBtn.innerHTML = 'Generating…';
+      try {
+        // POST regenerates for today (GET would also work, but POST is
+        // the intent here — "produce a fresh bundle from current data").
+        const r = await fetch('/api/credentials/batch-print', {
+          method: 'POST', credentials: 'include',
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          alert('Batch print failed: ' + (j.error || r.status));
+          return;
+        }
+        const url = j.data && j.data.url;
+        const filename = (j.data && j.data.filename) || ('all_credentials_' + new Date().toISOString().slice(0,10) + '.pdf');
+        if (!url) {
+          alert('Batch print response missing url');
+          return;
+        }
+        // Trigger download via a hidden anchor — same pattern as DCR export.
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (err) {
+        alert('Batch print error: ' + (err && err.message ? err.message : String(err)));
+      } finally {
+        printAllBtn.disabled = false;
+        printAllBtn.innerHTML = original;
+      }
+    });
+  }
+
   $('#modal-close').addEventListener('click', () => modal.classList.remove('active'));
   $('#modal-cancel').addEventListener('click', () => modal.classList.remove('active'));
   modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('active'); });

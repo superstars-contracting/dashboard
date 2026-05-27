@@ -3600,6 +3600,59 @@ def api_blank_forms():
 # the rate dollar amount.
 # ====================================================================
 
+# ====================================================================
+# Batch credential print (#174 / #178) — admin/c_suite only
+# ====================================================================
+# Generates a single PDF bundle containing every active worker's
+# credential card (CoF for W-0001..W-0012, Company ID for W-0013/14)
+# laid out 4-up on Letter LANDSCAPE with 2.00" lamination spacing
+# between adjacent cards. Back-pages tile a single shared back design
+# 4x (no mirroring), so any duplex mode prints correctly. Operator
+# prints duplex, cuts at the visible 2" gaps, laminates.
+
+@app.route('/api/credentials/batch-print', methods=['POST', 'GET'])
+@requires_role('admin', 'c_suite')
+def api_credentials_batch_print():
+    """Generate (and serve) the credentials batch-print PDF.
+
+    POST regenerates the bundle for today; GET returns the existing
+    file (if present) or generates on demand. The PDF lives at
+    data_room/credentials/batch_print/SuperstarsContracting-AllIDs-<YYYY-MM-DD>.pdf
+    and is served via the existing /files/ static mount.
+    """
+    import generate_credentials_batch as gcb
+    from datetime import date as _date
+    try:
+        today = _date.today().isoformat()
+        output = (SCRIPT_DIR / "data_room" / "credentials"
+                  / "batch_print" / f"SuperstarsContracting-AllIDs-{today}.pdf")
+        regenerate = (request.method == 'POST') or (not output.exists())
+        if regenerate:
+            # Use the loopback base URL so headless Edge can fetch
+            # /files/ assets from the running server. Photos are
+            # already inlined as data: URIs (see fetch_card_context),
+            # so /worker-files/ auth gating is irrelevant. The bundle
+            # gen runs inline here — for the current operator roster
+            # (~14 workers) it completes in well under 30 s.
+            rc = gcb.main(base_url="http://127.0.0.1:5050")
+            if rc != 0 or not output.exists():
+                return jsonify({"error": "batch-print render failed"}), 500
+        rel = output.relative_to(SCRIPT_DIR).as_posix()
+        logging.info(
+            f"credentials batch-print served: {rel} "
+            f"({output.stat().st_size} bytes)"
+        )
+        return response_wrapper({
+            "url": "/files/" + rel,
+            "filename": output.name,
+            "size": output.stat().st_size,
+            "generated_at": today,
+        })
+    except Exception as e:
+        logging.error(f"{request.method} /api/credentials/batch-print: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/labor-rates/workers', methods=['GET'])
 @requires_role('admin', 'c_suite')
 def api_labor_rates_workers():
