@@ -251,7 +251,11 @@
     vertical-align: top;
   }
   .attest-text {
-    font-size: 2.6mm;
+    /* Reference body text — pulled down from 2.6mm to 2.2mm to free the
+       vertical room the larger attestation values now claim (#177). The
+       paragraph is the citation context, not the legal-attestation read;
+       size matches the back-cite scale. */
+    font-size: 2.2mm;
     line-height: 1.4;
     color: var(--ink);
     font-weight: 500;
@@ -267,10 +271,18 @@
      paragraph, which left raw text in place when rigger data was a
      'TBD' placeholder. Two rows x two columns: Special Rigger name +
      License #, then Issuer Signature + Date. Legal citations stay
-     intact (1 RCNY 104-20(k), NYC Building Code 3314.4). */
+     intact (1 RCNY 104-20(k), NYC Building Code 3314.4).
+
+     Typography pass #177: the four attestation VALUES (rigger name,
+     license #, signature, date) are what an inspector reads at arm's
+     length when the worker presents the card; they're the legal data,
+     not the reference paragraph. Values bumped 2.6mm -> 4.0mm (~11pt),
+     font-weight 700, with the row min-height grown 4.2mm -> 5.6mm and
+     bottom-padding grown 1.4mm -> 2.0mm so the row breathes. Labels
+     held at 1.8mm intentionally — they're guide text. */
   table.back-fields { width: 100%; border-collapse: collapse; table-layout: fixed; }
   table.back-fields td {
-    padding: 0 0 1.4mm 0;
+    padding: 0 0 2.0mm 0;
     vertical-align: top;
   }
   table.back-fields td:first-child { padding-right: 3mm; width: 60%; }
@@ -278,21 +290,23 @@
   .bf-label {
     font-size: 1.8mm; font-weight: 700; letter-spacing: 0.3mm;
     text-transform: uppercase; color: var(--mute);
-    margin-bottom: 0.4mm;
+    margin-bottom: 0.6mm;
   }
   .bf-value {
-    font-size: 2.6mm; font-weight: 600; color: var(--ink);
+    font-size: 4.0mm; font-weight: 700; color: var(--ink);
     border-bottom: 0.3mm solid var(--ink);
-    min-height: 4.2mm;
+    min-height: 5.6mm;
     line-height: 1.1;
-    padding-bottom: 0.4mm;
+    padding-bottom: 0.5mm;
     word-break: break-word;
   }
   .bf-value.sig { padding-top: 0.4mm; }
-  .bf-value.sig img { max-height: 3.6mm; max-width: 90%; vertical-align: bottom; }
+  .bf-value.sig img { max-height: 5.0mm; max-width: 90%; vertical-align: bottom; }
   .bf-value.mono {
     font-family: 'Consolas', 'Menlo', monospace;
-    font-size: 2.4mm; letter-spacing: 0.2mm;
+    /* Mono glyphs read tighter per-character; keep license # / date a hair
+       smaller than the sans values so they don't visually dominate. */
+    font-size: 3.6mm; letter-spacing: 0.2mm;
   }
 
   /* Back footer row — compacted to absorb the extra vertical space the
