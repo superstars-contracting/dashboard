@@ -285,8 +285,19 @@ def _is_public_path(path: str) -> bool:
 
 
 def _wants_json(path: str) -> bool:
-    """JSON-style endpoints get a 401; HTML routes get a redirect to /login."""
+    """JSON-style endpoints get a 401; HTML routes get a redirect to /login.
+
+    Non-HTML resource fetches (worker-photo image, file downloads under
+    /worker-files/) ALSO get 401 instead of a redirect. The 302 -> /login
+    HTML response is fatal when a <img src=/worker-files/...> hits it
+    while the cookie isn't set yet — the browser caches the redirected
+    HTML against the image URL, then renders that URL as a broken image
+    on every subsequent page load even after a fresh login. See #172
+    (Robert A. photo loop bug). 401 keeps the browser cache clean.
+    """
     if path.startswith("/api/"):
+        return True
+    if path.startswith("/worker-files/"):
         return True
     accept = request.headers.get("Accept", "")
     return "application/json" in accept and "text/html" not in accept

@@ -5478,6 +5478,13 @@ def serve_card_live(emp_id, cred_type):
         # LIVE photo — read employees.face_image_path each request. Build a
         # /worker-files/ URL if the file exists; empty string otherwise so
         # the template's {% if %} falls back to its 'PHOTO' placeholder.
+        #
+        # Cache-bust with the file's mtime (#172): if the operator deletes
+        # + re-uploads a photo, the file path is identical (face.jpg per
+        # worker) so the browser cache would otherwise serve the prior
+        # bytes (or, worse, the prior 401/302 redirect HTML cached during
+        # a brief unauthed moment). Suffixing ?v=<mtime> forces a fresh
+        # request whenever the underlying file changes.
         photo_url = ''
         face_path = emp.get('face_image_path')
         if face_path:
@@ -5488,6 +5495,10 @@ def serve_card_live(emp_id, cred_type):
                 try:
                     rel = fp.resolve().relative_to(WORKER_RECORDS_DIR.resolve())
                     photo_url = '/worker-files/' + str(rel).replace('\\', '/')
+                    try:
+                        photo_url += f'?v={int(fp.stat().st_mtime)}'
+                    except OSError:
+                        pass
                 except ValueError:
                     photo_url = ''
 
