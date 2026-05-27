@@ -105,24 +105,41 @@ def _anon_session() -> requests.Session:
 
 
 def _pick_test_worker() -> str:
-    """Pick an arbitrary active employee_id to attach test rates to.
-    Synthetic / smoke-marked workers preferred; falls back to the
-    lowest-numbered active worker.
+    """Create a synthetic SMK-#### worker dedicated to rate testing.
+
+    Previous version picked the LOWEST-numbered active employee (always
+    E-00001 = W-0001) and the cleanup wiped ALL worker_rates + audit_log
+    rate_change rows for that worker — silently destroying the operator's
+    legitimate rate row + audit history on every run. Comp data is
+    company-confidential per CLAUDE.md and losing one row is non-trivial.
+    Synthetic isolation is the only safe approach. (Pattern matches the
+    #172-v2 fix to smoke_crud_data_integrity.test_face_photo.)
     """
+    import uuid
+    syn_id = "SMK-" + uuid.uuid4().hex[:6].upper()
     conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
-    row = conn.execute(
-        """SELECT e.employee_id FROM employees e
-           JOIN project_assignments pa ON pa.employee_id = e.employee_id
-           WHERE pa.status='active'
-           ORDER BY CAST(SUBSTR(e.employee_id, 3) AS INTEGER) LIMIT 1"""
-    ).fetchone()
-    conn.close()
-    return row["employee_id"] if row else "E-00001"
+    try:
+        conn.execute(
+            "INSERT INTO employees (employee_id, name, trade, intake_status, language) "
+            "VALUES (?, 'SMOKE Rates', 'SMK_RATES', 'pending', 'EN')",
+            (syn_id,)
+        )
+        conn.execute(
+            "INSERT INTO project_assignments (employee_id, project_code, status) "
+            "VALUES (?, 'FR-BX-001', 'active')",
+            (syn_id,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return syn_id
 
 
 def _cleanup_rate_rows(employee_id: str) -> int:
-    """Remove rate rows + audit entries we inserted for this worker."""
+    """Remove rate rows + audit entries we inserted, AND drop the synthetic
+    worker (employees + project_assignments rows). Idempotent — safe to
+    call from a final block even when no rows were inserted.
+    """
     conn = sqlite3.connect(str(DB_PATH))
     n_rates_before = conn.execute(
         "SELECT COUNT(*) FROM worker_rates WHERE employee_id=?", (employee_id,)
@@ -132,6 +149,11 @@ def _cleanup_rate_rows(employee_id: str) -> int:
         "DELETE FROM audit_log WHERE action='rate_change' AND target_id=?",
         (employee_id,),
     )
+    # Synthetic worker teardown. Guard prefix-only so a future caller that
+    # passes a real E-##### never wipes employees rows here.
+    if employee_id.startswith("SMK-"):
+        conn.execute("DELETE FROM project_assignments WHERE employee_id=?", (employee_id,))
+        conn.execute("DELETE FROM employees WHERE employee_id=?", (employee_id,))
     conn.commit()
     conn.close()
     return n_rates_before
@@ -143,9 +165,10 @@ def main() -> int:
     # The _smoke_auth shim has already logged in the smoke admin via the
     # module-level requests; we use `requests` (admin) + a fresh session
     # (pm) for the role-gate checks.
+    # _pick_test_worker() creates a fresh SMK-#### each run; no defensive
+    # cleanup needed at start (the prior version called _cleanup_rate_rows
+    # here, but that now deletes the synthetic itself — breaks the test).
     test_emp = _pick_test_worker()
-    # Defensive cleanup first — if a prior run died mid-way.
-    _cleanup_rate_rows(test_emp)
 
     # ---- 1. unauthenticated -> 401 on the admin endpoints
     print("\n-- unauthenticated 401 --")

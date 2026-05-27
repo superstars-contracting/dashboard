@@ -287,7 +287,15 @@ def run_propagation(emp_id, cohort_label, want_type):
         if want_type == "cof":
             m = re.search(r'class="field-value mono expires"[^>]*>\s*([^\s<]+)', html_after_photo)
             exp_in_html = m.group(1) if m else ""
-            results["photo_change_expiry_unchanged"] = (exp_in_html == exp_at_issue)
+            # exp_at_issue is ISO (YYYY-MM-DD) straight from the API; the
+            # rendered HTML is MM-DD-YYYY per CLAUDE.md display rule (#137).
+            # Compare digit-equivalence so the display-format change isn't a
+            # spurious mismatch.
+            digits_html = re.sub(r"\D", "", exp_in_html)
+            digits_iso = re.sub(r"\D", "", exp_at_issue)
+            results["photo_change_expiry_unchanged"] = (
+                sorted(digits_html) == sorted(digits_iso) and len(digits_html) == 8
+            )
         else:
             results["photo_change_expiry_unchanged"] = True  # N/A for Company ID
 
@@ -321,50 +329,78 @@ def run_propagation(emp_id, cohort_label, want_type):
 # ---------- Cohort drivers ----------
 
 def driver():
-    # EXISTING: E-00001 (canonical worker)
-    EXISTING = "E-00001"
+    # ALL cohorts are synthetic SMK-#### workers. The previous version
+    # hard-coded EXISTING = E-00001 (W-0001) for the "EXISTING" runs;
+    # run_propagation's upload_face overwrites the worker's face.jpg
+    # bytes on disk and the `restore_emp` step only rolls back the DB
+    # column — the same defect that destroyed Robert's photo through
+    # smoke_crud_data_integrity.test_face_photo (see #172-v2). Two
+    # workers ("alpha"/"beta") cover the "EXISTING vs NEW" distinction
+    # the test was originally written for; from the propagation logic's
+    # point of view, both are real workers with face/phone/PIN/credential
+    # state — the only difference was which row in the employees table
+    # backed them.
+    cohorts = {
+        "alpha_cof":  ("SMK-" + uuid.uuid4().hex[:6].upper(), "cof",        "5551110000"),
+        "alpha_cid":  ("SMK-" + uuid.uuid4().hex[:6].upper(), "company_id", "5551110001"),
+        "beta_cof":   ("SMK-" + uuid.uuid4().hex[:6].upper(), "cof",        "5551112222"),
+        "beta_cid":   ("SMK-" + uuid.uuid4().hex[:6].upper(), "company_id", "5551112223"),
+    }
 
-    # NEW: create a synthetic worker for each card type so they're isolated.
-    new_cof_id = "SMK-" + uuid.uuid4().hex[:6].upper()
-    new_cid_id = "SMK-" + uuid.uuid4().hex[:6].upper()
-    for sid in (new_cof_id, new_cid_id):
+    # Create the synthetic workers.
+    for sid, _ctype, _phone in cohorts.values():
         requests.post(f"{BASE}/api/workers/create", json={
             "employee_id": sid,
             "name": "SMOKE Propagation",
             "trade": "SMK_PROP",
         }, timeout=10)
+
     # /api/workers/create doesn't auto-assign worker_id or derive PIN —
     # do both manually so the propagation baseline has the data it
     # expects (W-#### card number renders correctly, PIN is non-NULL).
     from worker_id import next_worker_id_sequence, format_worker_id
     conn = db()
     try:
-        for sid in (new_cof_id, new_cid_id):
+        for sid, _ctype, _phone in cohorts.values():
             seq = next_worker_id_sequence(conn)
             wid = format_worker_id(seq)
             conn.execute("UPDATE employees SET worker_id = ? WHERE employee_id = ?", (wid, sid))
             conn.commit()
     finally:
         conn.close()
+
     # Use the public PATCH endpoint to set phone — that re-derives PIN
     # via the documented (phone last-4) mechanism the live render reads.
-    for sid, phone in ((new_cof_id, "5551110000"), (new_cid_id, "5551112222")):
+    for sid, _ctype, phone in cohorts.values():
         requests.patch(f"{BASE}/api/employees/{sid}", json={"phone": phone}, timeout=10)
 
     all_results = {}
     try:
-        all_results["existing_cof"] = run_propagation(EXISTING, "EXISTING", "cof")
-        all_results["existing_cid"] = run_propagation(EXISTING, "EXISTING", "company_id")
-        all_results["new_cof"] = run_propagation(new_cof_id, "NEW-SYN", "cof")
-        all_results["new_cid"] = run_propagation(new_cid_id, "NEW-SYN", "company_id")
+        all_results["alpha_cof"] = run_propagation(cohorts["alpha_cof"][0],  "ALPHA-SYN", "cof")
+        all_results["alpha_cid"] = run_propagation(cohorts["alpha_cid"][0],  "ALPHA-SYN", "company_id")
+        all_results["beta_cof"]  = run_propagation(cohorts["beta_cof"][0],   "BETA-SYN",  "cof")
+        all_results["beta_cid"]  = run_propagation(cohorts["beta_cid"][0],   "BETA-SYN",  "company_id")
     finally:
+        # Capture folder paths BEFORE deletion so we can rmtree them after.
+        conn = db()
+        folders_to_rm = []
+        try:
+            for sid, _ctype, _phone in cohorts.values():
+                row = conn.execute(
+                    "SELECT folder_path FROM employees WHERE employee_id = ?",
+                    (sid,)
+                ).fetchone()
+                if row and row["folder_path"]:
+                    folders_to_rm.append(row["folder_path"])
+        finally:
+            conn.close()
         # Hard-delete synthetic workers (no other history left for them)
-        for sid in (new_cof_id, new_cid_id):
+        for sid, _ctype, _phone in cohorts.values():
             requests.delete(f"{BASE}/api/employees/{sid}", timeout=10)
-        # Belt-and-suspenders: nuke any leftover folders / SMK- rows
+        # Belt-and-suspenders: nuke any leftover SMK- rows.
         conn = db()
         try:
-            for sid in (new_cof_id, new_cid_id):
+            for sid, _ctype, _phone in cohorts.values():
                 conn.execute("DELETE FROM project_assignments WHERE employee_id = ?", (sid,))
                 conn.execute("DELETE FROM cof_cards WHERE employee_id = ?", (sid,))
                 conn.execute("DELETE FROM company_id_cards WHERE employee_id = ?", (sid,))
@@ -373,6 +409,16 @@ def driver():
             conn.commit()
         finally:
             conn.close()
+        # On-disk folder teardown — bounded to worker_records/ for safety.
+        import shutil
+        wr = (SCRIPT_DIR / "worker_records").resolve()
+        for fp in folders_to_rm:
+            try:
+                p = Path(fp).resolve()
+                if str(p).startswith(str(wr)) and p.exists():
+                    shutil.rmtree(p, ignore_errors=True)
+            except Exception:
+                pass
 
     # ---- summarize ----
     print("\n========== PROPAGATION SUMMARY ==========")

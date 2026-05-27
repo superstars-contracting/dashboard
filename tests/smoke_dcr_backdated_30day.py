@@ -82,9 +82,46 @@ def expect(label, cond, extra=""):
         print(line)
 
 
+def refuse_if_operator_data_present():
+    """Abort if FR-BX-001 has any real DCRs/sign-ins/work_log/deliveries on
+    OR around the target date range. cleanup_dates does an unconditional
+    DELETE on report_index (no date filter) and a date-filtered wipe on the
+    other tables — between them they would erase the operator's recent DCRs
+    and labor history. (Same guard pattern as smoke_weekly_hours after #163.)
+    """
+    with sqlite3.connect(str(DB)) as c:
+        n_dcr = c.execute(
+            "SELECT COUNT(*) FROM report_index WHERE project_code=? AND report_type='DCR'",
+            (PROJECT,),
+        ).fetchone()[0]
+        n_si = c.execute(
+            "SELECT COUNT(*) FROM sign_in_log WHERE project_code=?", (PROJECT,)
+        ).fetchone()[0]
+        n_wl = c.execute(
+            "SELECT COUNT(*) FROM work_log WHERE project_code=?", (PROJECT,)
+        ).fetchone()[0]
+        n_dl = c.execute(
+            "SELECT COUNT(*) FROM deliveries WHERE project_code=?", (PROJECT,)
+        ).fetchone()[0]
+    if n_dcr or n_si or n_wl or n_dl:
+        print(
+            f"REFUSE TO RUN: {PROJECT} already has operator data — "
+            f"DCRs={n_dcr} sign-ins={n_si} work_log={n_wl} deliveries={n_dl}. "
+            f"smoke_dcr_backdated_30day.cleanup_dates() wipes the entire "
+            f"project's DCR index and the labor rows on a 30-day window; "
+            f"running here would destroy them. Run on a dev DB instead.",
+            file=sys.stderr,
+        )
+        sys.exit(3)
+
+
 def cleanup_dates(dates_iso):
     """Wipe all FR-BX-001 data for the given dates + report_index for the
-    project (since the smoke test owns all DCRs in this run)."""
+    project (since the smoke test owns all DCRs in this run).
+
+    DANGEROUS — the report_index DELETE has no date filter. Guard before
+    any call: `refuse_if_operator_data_present()` must run first.
+    """
     with sqlite3.connect(str(DB)) as c:
         placeholders = ",".join("?" * len(dates_iso))
         n_si = c.execute(
@@ -114,6 +151,11 @@ def main():
     print(f"=== 30-day backdated DCR volume smoke ===")
     print(f"  project: {PROJECT}")
     print(f"  date range: {START_DATE.isoformat()} .. {(TODAY - timedelta(days=1)).isoformat()}  ({N_DAYS} days)")
+
+    # Refuse-to-run guard: cleanup_dates wipes the project's DCR index
+    # unconditionally + labor rows on the 30-day window. Operator data
+    # must not be present (handoff #175 / post-mortem of #163).
+    refuse_if_operator_data_present()
 
     # Get the worker pool (employee_ids only — no names echoed)
     with sqlite3.connect(str(DB)) as c:

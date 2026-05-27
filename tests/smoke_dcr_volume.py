@@ -80,8 +80,44 @@ def hit(method, path, body=None, timeout=15):
         return None, repr(e)
 
 
+def refuse_if_operator_data_present():
+    """Abort if the project already has DCRs / sign-ins / work_log / deliveries
+    — wipe_fr_bx_001() does an unconditional truncate on the project and would
+    destroy them. The smoke is invoked manually and assumes a clean project
+    state; if real operator data exists, the operator must run on a separate
+    dev DB instead. (Same guard pattern as smoke_weekly_hours after #163.)
+    """
+    with sqlite3.connect(str(DB)) as c:
+        n_dcr = c.execute(
+            "SELECT COUNT(*) FROM report_index WHERE project_code=? AND report_type='DCR'",
+            (PROJECT,),
+        ).fetchone()[0]
+        n_si = c.execute(
+            "SELECT COUNT(*) FROM sign_in_log WHERE project_code=?", (PROJECT,)
+        ).fetchone()[0]
+        n_wl = c.execute(
+            "SELECT COUNT(*) FROM work_log WHERE project_code=?", (PROJECT,)
+        ).fetchone()[0]
+        n_dl = c.execute(
+            "SELECT COUNT(*) FROM deliveries WHERE project_code=?", (PROJECT,)
+        ).fetchone()[0]
+    if n_dcr or n_si or n_wl or n_dl:
+        print(
+            f"REFUSE TO RUN: {PROJECT} already has operator data — "
+            f"DCRs={n_dcr} sign-ins={n_si} work_log={n_wl} deliveries={n_dl}. "
+            f"smoke_dcr_volume.wipe_fr_bx_001() does an unconditional truncate "
+            f"on the project and would destroy them. Run on a dev DB instead.",
+            file=sys.stderr,
+        )
+        sys.exit(3)
+
+
 def wipe_fr_bx_001():
-    """Hard reset of all FR-BX-001 test data (DB + filesystem)."""
+    """Hard reset of all FR-BX-001 test data (DB + filesystem).
+
+    DANGEROUS — wipes every row for the project. Guard before any call:
+    `refuse_if_operator_data_present()` must run first.
+    """
     with sqlite3.connect(str(DB)) as c:
         c.execute("DELETE FROM report_index WHERE project_code=?", (PROJECT,))
         c.execute("DELETE FROM work_log WHERE project_code=?", (PROJECT,))
@@ -100,6 +136,9 @@ def main():
     print(f"  base date: {BASE_DATE.isoformat()}")
     print()
 
+    # Refuse-to-run guard: wipe_fr_bx_001 truncates the project. Operator
+    # data must not be present (handoff #175 / post-mortem of #163).
+    refuse_if_operator_data_present()
     # Pre-clean
     wipe_fr_bx_001()
     print("pre-clean done")
