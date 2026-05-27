@@ -327,16 +327,32 @@ def get_rigger(rigger_id):
     return dict(r) if r else None
 
 
-def get_default_rigger_for_project(project_code):
-    """Returns the default rigger for a project (the one used for quick-issue)."""
+def get_default_rigger_for_project(project_code, rigger_type='Special Rigger'):
+    """Returns the default rigger for a project (the one used for quick-issue).
+
+    Filters by `rigger_type` so a CoF — which under NYC DOB §3314.4 must be
+    signed by a Special Rigger — won't silently pick up a Master Rigger /
+    Sign Hanger row if the operator later adds one and marks it default.
+    Pass `rigger_type=None` to disable the filter (any active rigger,
+    default first).
+    """
     conn = db_conn()
-    r = conn.execute(
-        """SELECT id, rigger_name, license_number, signature_path
-           FROM project_riggers
-           WHERE project_code = ? AND is_active = 1
-           ORDER BY is_default DESC, id ASC LIMIT 1""",
-        (project_code,)
-    ).fetchone()
+    if rigger_type is None:
+        r = conn.execute(
+            """SELECT id, rigger_name, license_number, signature_path
+               FROM project_riggers
+               WHERE project_code = ? AND is_active = 1
+               ORDER BY is_default DESC, id ASC LIMIT 1""",
+            (project_code,)
+        ).fetchone()
+    else:
+        r = conn.execute(
+            """SELECT id, rigger_name, license_number, signature_path
+               FROM project_riggers
+               WHERE project_code = ? AND is_active = 1 AND rigger_type = ?
+               ORDER BY is_default DESC, id ASC LIMIT 1""",
+            (project_code, rigger_type)
+        ).fetchone()
     conn.close()
     return dict(r) if r else None
 
