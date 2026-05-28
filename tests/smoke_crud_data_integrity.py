@@ -1008,6 +1008,174 @@ def test_weekly_hours():
     return r
 
 
+def test_dcr_staling_lifecycle():
+    """#196 regression guard: DCR `stale` flag lifecycle —
+       issue → not_stale → mutate sign_in_log → stale → re-issue → not_stale.
+
+    The Kevin-on-5-21 / DCR-014 stale-badge regression was a textbook
+    instance of this lifecycle drifting silently: #192 cleared stale
+    via the issue endpoint, then `test_weekly_hours` mutated a 5-21
+    sign-in via /api/sign-ins (which fires `_mark_dcr_stale`),
+    re-staling DCR-014 until the operator noticed. Three pieces of
+    the lifecycle to assert here, each one is the natural transition
+    pair the operator's UI depends on.
+
+    Synthetic-only per #175 / the #195 audit:
+      - Uses an SMK-#### worker
+      - Uses a FUTURE date well outside any operator window so no
+        real DCR collides
+      - Issues against FR-BX-001 (the only project with templates,
+        since `_issue_one_dcr` renders the artifact via WeasyPrint).
+        The synthetic date guarantees no real row touched.
+    """
+    r = SectionResult("DCR staling lifecycle [#196]")
+    from datetime import date as _date
+
+    # Synthetic future date — 2030 quarter is safely past any
+    # operator-relevant window. Use the same family the other #195/#196
+    # synthetic smokes use so we're consistent.
+    SYN_DATE = "2030-03-20"
+    PROJECT_CODE = "FR-BX-001"
+    syn_id = _synth_worker("StaleLife")
+    if not syn_id:
+        r.create = r.edit = r.delete = r.shows = False
+        add_note(r, "synth worker create failed")
+        return r
+    issued_seq = None
+    try:
+        # Step 1 — seed: post a sign-in for the synthetic worker on
+        # the synthetic date via the API so the standard mutation
+        # path runs (matches what the operator's daily-report UI does).
+        cr = requests.post(f"{BASE}/api/sign-ins", json={
+            "employee_id": syn_id, "project_code": PROJECT_CODE,
+            "date": SYN_DATE, "time_in": "07:00", "time_out": "15:30",
+        }, timeout=10)
+        seed_sign_in_id = cr.json()["data"]["id"] if cr.status_code in (200, 201) else None
+        if not seed_sign_in_id:
+            r.create = False
+            add_note(r, f"seed sign-in POST failed status={cr.status_code}")
+            return r
+
+        # Step 2 — issue the DCR for the synthetic date. The #194
+        # roster-completeness gate would fire here because the
+        # project has historical regulars (W-0001..W-0011) far
+        # outside this smoke's synthetic future window — the smoke
+        # cares about the staling lifecycle, NOT the gate, so use
+        # the documented `roster_skip=true` ad-hoc escape (#194
+        # explicitly reserves this for tooling and never exposes it
+        # in the UI).
+        iss = requests.post(
+            f"{BASE}/api/projects/{PROJECT_CODE}/daily/{SYN_DATE}/issue",
+            json={"audience": "both", "roster_skip": True}, timeout=30,
+        )
+        issued = iss.json().get("data", {}) if iss.ok else {}
+        issued_seq = issued.get("sequence")
+        if iss.status_code not in (200, 201) or issued_seq is None:
+            r.create = False
+            add_note(r,
+                f"issue failed status={iss.status_code} body={iss.text[:120]}")
+            return r
+        # Confirm post-issue stale=0 on both audiences.
+        conn = db()
+        try:
+            row_internal = conn.execute(
+                "SELECT stale FROM report_index "
+                "WHERE project_code = ? AND report_date = ? "
+                "AND report_id LIKE '%-internal'",
+                (PROJECT_CODE, SYN_DATE)
+            ).fetchone()
+            row_client = conn.execute(
+                "SELECT stale FROM report_index "
+                "WHERE project_code = ? AND report_date = ? "
+                "AND report_id LIKE '%-client'",
+                (PROJECT_CODE, SYN_DATE)
+            ).fetchone()
+        finally:
+            conn.close()
+        r.create = bool(
+            row_internal and row_client
+            and (row_internal["stale"] or 0) == 0
+            and (row_client["stale"] or 0) == 0
+        )
+
+        # Step 3 — mutate sign_in_log via the API (PUT changes times).
+        # This should fire _mark_dcr_stale; verify both audience rows
+        # flip to stale=1.
+        mu = requests.put(f"{BASE}/api/sign-ins/{seed_sign_in_id}",
+                          json={"time_in": "08:00", "time_out": "14:00"},
+                          timeout=10)
+        conn = db()
+        try:
+            after_mut = conn.execute(
+                "SELECT report_id, stale FROM report_index "
+                "WHERE project_code = ? AND report_date = ?",
+                (PROJECT_CODE, SYN_DATE)
+            ).fetchall()
+        finally:
+            conn.close()
+        all_stale = all((a["stale"] or 0) == 1 for a in after_mut)
+        r.edit = (mu.status_code == 200 and len(after_mut) >= 2 and all_stale)
+        if not r.edit:
+            stales = [(a["report_id"], a["stale"]) for a in after_mut]
+            add_note(r, f"post-mutate state: {stales}  mut_status={mu.status_code}")
+
+        # Step 4 — re-issue. Should clear stale on BOTH rows.
+        # roster_skip again for the same reason as Step 2.
+        ri = requests.post(
+            f"{BASE}/api/projects/{PROJECT_CODE}/daily/{SYN_DATE}/issue",
+            json={"audience": "both", "override_active": True,
+                  "roster_skip": True}, timeout=30,
+        )
+        conn = db()
+        try:
+            after_reissue = conn.execute(
+                "SELECT report_id, stale FROM report_index "
+                "WHERE project_code = ? AND report_date = ?",
+                (PROJECT_CODE, SYN_DATE)
+            ).fetchall()
+        finally:
+            conn.close()
+        all_clean = all((a["stale"] or 0) == 0 for a in after_reissue)
+        r.delete = (ri.status_code in (200, 201) and all_clean)
+        if not r.delete:
+            stales = [(a["report_id"], a["stale"]) for a in after_reissue]
+            add_note(r, f"post-reissue state: {stales}  reissue_status={ri.status_code}")
+
+        # SHOWS: all three transitions held.
+        r.shows = bool(r.create and r.edit and r.delete)
+    finally:
+        # Teardown — remove the synthetic DCR rows, the synthetic
+        # artifact directory, the sign_in_log row, then the worker.
+        conn = db()
+        try:
+            conn.execute(
+                "DELETE FROM report_index "
+                "WHERE project_code = ? AND report_date = ?",
+                (PROJECT_CODE, SYN_DATE)
+            )
+            conn.execute(
+                "DELETE FROM sign_in_log "
+                "WHERE project_code = ? AND date = ? AND employee_id = ?",
+                (PROJECT_CODE, SYN_DATE, syn_id)
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        # Remove the issued artifact directory if known.
+        if issued_seq is not None:
+            from pathlib import Path as _P
+            import shutil
+            art = (_P(str(SCRIPT_DIR)) / "data_room" / "reports" / "dcr"
+                   / PROJECT_CODE / f"{issued_seq:03d}")
+            try:
+                if art.exists():
+                    shutil.rmtree(art, ignore_errors=True)
+            except Exception:
+                pass
+        _synth_teardown(syn_id)
+    return r
+
+
 def test_roster_completeness_check():
     """#194 prevention guard: DCR issue endpoint refuses to silently
     issue when a regularly-present worker is missing from today's
@@ -1426,6 +1594,7 @@ def main():
         ("PinInvariant",     lambda: test_pin_invariant()),
         ("SignInDcrInvariant", lambda: test_signin_dcr_invariant()),
         ("RosterCompleteness", lambda: test_roster_completeness_check()),
+        ("DcrStalingLifecycle", lambda: test_dcr_staling_lifecycle()),
     ]
     for short, fn in section_fns:
         try:
