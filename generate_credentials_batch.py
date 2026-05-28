@@ -116,6 +116,26 @@ def fetch_card_context(emp_id):
         ).fetchone()
         if not emp:
             return None
+
+        # Render-time PIN self-heal (#188 Option A) — mirror of the
+        # guard in server.serve_card_live. The bundle path is a
+        # separate Python process from the live render, so the guard
+        # has to run here too; the canonical helper makes the duplicate
+        # cheap (one import + one call). Self-heals NULL/empty/invalid
+        # PINs into a derived (phone last-4) or random unused PIN,
+        # audit-logged with `pin_render_heal` action and PII-safe
+        # before/after payloads.
+        from worker_pin import assign_pin_for_worker, is_valid_pin
+        if not is_valid_pin(emp["pin"]):
+            new_pin = assign_pin_for_worker(
+                c, emp_id,
+                actor_user_id=None, actor_role="bundle_generator",
+                source="pin_render_heal",
+            )
+            if new_pin:
+                c.commit()
+                emp = dict(emp)
+                emp["pin"] = new_pin
         cof = c.execute(
             "SELECT card_id, card_number_display, issued_date, expires_date, "
             "       issued_by, rigger_name_snapshot, rigger_license_snapshot, "

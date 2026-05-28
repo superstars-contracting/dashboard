@@ -982,6 +982,48 @@ def test_weekly_hours():
     return r
 
 
+def test_pin_invariant():
+    """#188 regression guard: every active worker has a 4-digit numeric PIN.
+
+    Post-#188 the canonical guard (worker_pin.assign_pin_for_worker called
+    from the render entry-points in server.serve_card_live AND
+    generate_credentials_batch.fetch_card_context) should make this
+    invariant impossible to violate. This test asserts it directly so any
+    future regression (e.g., a third worker-create path that bypasses
+    PIN derivation AND somehow never renders before the operator notices)
+    is caught here instead of on the printed card.
+
+    Read-only — does NOT mutate worker rows. PII-safe — only counts +
+    W-#### are surfaced; PIN values are never printed.
+    """
+    r = SectionResult("PIN invariant (every active worker has 4-digit PIN) [#188]")
+    conn = db()
+    try:
+        rows = conn.execute(
+            """SELECT worker_id, pin
+                 FROM employees
+                WHERE archived_at IS NULL
+                ORDER BY CAST(SUBSTR(worker_id, 3) AS INTEGER)"""
+        ).fetchall()
+    finally:
+        conn.close()
+    bad = []
+    for row in rows:
+        pin = row["pin"]
+        if (pin is None or pin == "" or len(pin) != 4 or not pin.isdigit()):
+            bad.append(row["worker_id"])
+    # CREATE = "the invariant holds at smoke-time"
+    r.create = (len(bad) == 0)
+    if not r.create:
+        # PII rule: list W-####s, never the (missing/wrong) value.
+        add_note(r, f"workers with invalid PIN: {bad}")
+    # EDIT / DELETE / SHOWS are N/A — this is a read-only invariant.
+    r.edit = "n/a"
+    r.delete = "n/a"
+    r.shows = (len(rows) > 0)  # we got SOME rows back (sanity)
+    return r
+
+
 # ---------- Main ----------
 
 def main():
@@ -1011,6 +1053,7 @@ def main():
         ("Visitors",         lambda: test_visitors()),
         ("Photos",           lambda: test_photos()),
         ("WeeklyHours",      lambda: test_weekly_hours()),
+        ("PinInvariant",     lambda: test_pin_invariant()),
     ]
     for short, fn in section_fns:
         try:

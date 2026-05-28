@@ -5504,6 +5504,35 @@ def serve_card_live(emp_id, cred_type):
             return jsonify({"error": "Worker not found"}), 404
         emp = dict(emp)
 
+        # Render-time PIN self-heal (#188 Option A).
+        # PINs may be missing if a worker was created via a code path
+        # that bypassed WF-3's last-4-phone derivation — historically:
+        # rows pre-dating WF-3 / #126, but also any future alternate
+        # worker-create path that forgets to derive. Rather than
+        # printing '----' on the card or failing the render, generate
+        # + persist + audit-log a PIN inline, BEFORE templating. The
+        # canonical helper (worker_pin.assign_pin_for_worker) handles
+        # phone-last-4 derivation, #133 collision fallback, and the
+        # PII-safe audit_log payload.
+        from worker_pin import assign_pin_for_worker, is_valid_pin
+        if not is_valid_pin(emp.get('pin')):
+            user = current_user() or {}
+            new_pin = assign_pin_for_worker(
+                conn,
+                emp_id,
+                actor_user_id=user.get('id'),
+                actor_role=user.get('role') or 'system',
+                source='pin_render_heal',
+            )
+            if new_pin:
+                conn.commit()
+                emp['pin'] = new_pin
+                # PII rule: don't log the PIN value, only the fact.
+                logging.info(
+                    f"cards/{cred_type}/live: pin_render_heal applied "
+                    f"employee_id={emp_id} actor_role={user.get('role')}"
+                )
+
         if cred_type == 'cof':
             card_row = conn.execute(
                 "SELECT card_id, card_number_display, issued_date, expires_date, "
