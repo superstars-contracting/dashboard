@@ -219,6 +219,259 @@ def divergence_summary(divergences: Iterable[dict]) -> dict:
     }
 
 
+# =====================================================================
+# #194 — DCR-issue-time roster completeness check (the prevention).
+# =====================================================================
+# Failure mode this catches: at DCR issue time, the foreman can forget
+# a worker who was actually present (this is exactly what happened to
+# Kevin W-0003 on 2026-05-21 — DCR-014 was issued without him). By the
+# time anyone notices, the DCR is signed/archived and the worker's day
+# is lost. The reconciliation invariant from #191 CANNOT catch this —
+# it compares sign_in_log to the DCR roster, and both agree (the row
+# was just never added).
+#
+# This module's prevention: at issue time, compute who has been on site
+# REGULARLY in the recent past. If any regular is missing from today's
+# roster, refuse to issue silently — return a structured response the
+# UI uses to surface a modal. The operator either acknowledges the
+# absence (worker really is off today) or adds the worker with a
+# default shift. Either way, the omission can't ship silently.
+
+ROSTER_THRESHOLD_DEFAULT = 4   # appearances within window required
+ROSTER_WINDOW_DEFAULT = 7      # working days to look back over
+ROSTER_DEFAULT_TIME_IN = "07:00"
+ROSTER_DEFAULT_TIME_OUT = "15:30"   # 07:00..15:30 - 30min lunch = 8h
+
+
+def _last_n_working_days(
+    conn: sqlite3.Connection,
+    project_code: str,
+    as_of: str,
+    window: int,
+) -> list[str]:
+    """Return the last `window` working days for `project_code`
+    strictly BEFORE `as_of` (ISO YYYY-MM-DD). Working days = days where
+    AT LEAST ONE sign_in_log row exists for the project — that's the
+    operational definition of "the project was active." Days with no
+    sign-ins (weekends + no_work DCR days where the project produced
+    zero labor) are skipped.
+
+    Ordered most-recent first; the caller can either iterate or
+    convert to a set.
+    """
+    rows = conn.execute(
+        "SELECT DISTINCT date FROM sign_in_log "
+        "WHERE project_code = ? AND date < ? "
+        "ORDER BY date DESC LIMIT ?",
+        (project_code, as_of, window),
+    ).fetchall()
+    return [r["date"] for r in rows]
+
+
+def compute_recent_regulars(
+    conn: sqlite3.Connection,
+    project_code: str,
+    as_of: str,
+    *,
+    threshold: int = ROSTER_THRESHOLD_DEFAULT,
+    window: int = ROSTER_WINDOW_DEFAULT,
+) -> dict[str, int]:
+    """Return {W-####: appearance_count} for workers who appeared in
+    sign_in_log on `threshold`-or-more of the last `window` working
+    days for `project_code`, anchored at `as_of` (exclusive).
+
+    Counts span ALL sign_in_log appearances within the window,
+    regardless of the source — operator-entered, worker self-signed,
+    or roster-completeness-default rows from this same module. The
+    intent is "have they been here recently"; how the row got into the
+    log doesn't change that answer.
+
+    Empty result if the project has fewer than `threshold` working
+    days of history (nascent-project / cold-start case: nobody is yet
+    a "regular," so nothing can be missing).
+    """
+    days = _last_n_working_days(conn, project_code, as_of, window)
+    if len(days) < threshold:
+        return {}
+    placeholders = ",".join("?" * len(days))
+    rows = conn.execute(
+        f"SELECT e.worker_id AS worker_id, COUNT(DISTINCT s.date) AS n "
+        f"FROM sign_in_log s "
+        f"JOIN employees e ON e.employee_id = s.employee_id "
+        f"WHERE s.project_code = ? AND s.date IN ({placeholders}) "
+        f"GROUP BY e.worker_id "
+        f"HAVING COUNT(DISTINCT s.date) >= ?",
+        [project_code, *days, threshold],
+    ).fetchall()
+    return {r["worker_id"]: r["n"] for r in rows}
+
+
+def compute_proposed_roster(
+    conn: sqlite3.Connection,
+    project_code: str,
+    report_date: str,
+) -> set[str]:
+    """Set of W-#### identifiers currently in sign_in_log for
+    (project_code, report_date) — i.e., who would appear on the DCR
+    artifact if issuance fired right now."""
+    emp_to_wid = _employee_id_to_worker_id(conn)
+    rows = conn.execute(
+        "SELECT DISTINCT employee_id FROM sign_in_log "
+        "WHERE project_code = ? AND date = ?",
+        (project_code, report_date),
+    ).fetchall()
+    out = set()
+    for r in rows:
+        wid = emp_to_wid.get(r["employee_id"])
+        if wid:
+            out.add(wid)
+    return out
+
+
+def detect_missing_regulars(
+    conn: sqlite3.Connection,
+    project_code: str,
+    report_date: str,
+    *,
+    threshold: int = ROSTER_THRESHOLD_DEFAULT,
+    window: int = ROSTER_WINDOW_DEFAULT,
+) -> list[dict]:
+    """Combine compute_recent_regulars + compute_proposed_roster.
+
+    Returns a list of {worker_id, recent_count, window, threshold}
+    dicts — one entry per regular who is NOT on today's proposed
+    roster. Empty list means the roster is complete by the heuristic.
+
+    Result is sorted by worker_id for stable JSON output.
+    """
+    regulars = compute_recent_regulars(
+        conn, project_code, report_date,
+        threshold=threshold, window=window,
+    )
+    proposed = compute_proposed_roster(conn, project_code, report_date)
+    missing_wids = sorted(set(regulars) - proposed)
+    return [
+        {
+            "worker_id": wid,
+            "recent_count": regulars[wid],
+            "window": window,
+            "threshold": threshold,
+        }
+        for wid in missing_wids
+    ]
+
+
+def apply_roster_completeness_decision(
+    conn: sqlite3.Connection,
+    project_code: str,
+    report_date: str,
+    *,
+    acknowledge_missing: list[str],
+    action: str,
+    actor_user_id: Optional[int] = None,
+    actor_role: Optional[str] = "system",
+) -> dict:
+    """Resolve a roster-completeness gap so the DCR issue can proceed.
+
+    `acknowledge_missing` is the full list of W-####s the operator
+    confirmed as either absent or to-be-added (must match the missing
+    set the UI surfaced — the endpoint cross-checks).
+
+    `action` is one of:
+      - 'mark_absent'   : proceed without any inserts; audit-log the
+                          operator's decision so future audit trails
+                          show the omission was explicit.
+      - 'add_default_8h': insert sign_in_log rows for each ack'd
+                          W-#### with the canonical 07:00..15:30
+                          (=8h) shift; audit-log per insert.
+      - 'cancel'        : explicit no-op; the caller (the issue
+                          endpoint) interprets this by NOT proceeding
+                          with issuance.
+
+    Returns a summary dict the endpoint can echo back to the UI.
+    """
+    if action not in ('mark_absent', 'add_default_8h', 'cancel'):
+        raise ValueError(f"action must be mark_absent | add_default_8h | cancel, got {action!r}")
+    summary = {
+        "action": action,
+        "acknowledged_count": len(acknowledge_missing),
+        "inserted_count": 0,
+        "errors": [],
+    }
+    if action == 'cancel':
+        return summary
+
+    if action == 'mark_absent':
+        # Audit only — no DB mutations. One row per ack'd W-####.
+        for wid in acknowledge_missing:
+            conn.execute(
+                "INSERT INTO audit_log "
+                "(action, actor_user_id, actor_role, target_type, target_id, "
+                " before_json, after_json, note, created_at) "
+                "VALUES ('roster_completeness_mark_absent', ?, ?, 'worker', ?, ?, ?, ?, "
+                "        CURRENT_TIMESTAMP)",
+                (
+                    actor_user_id, actor_role, wid,
+                    json.dumps({"on_proposed_roster": False,
+                                "is_recent_regular": True}),
+                    json.dumps({"on_proposed_roster": False,
+                                "is_recent_regular": True,
+                                "operator_decision": "mark_absent",
+                                "date": report_date,
+                                "project_code": project_code}),
+                    "#194 — operator confirmed regular worker absent today",
+                )
+            )
+        return summary
+
+    # action == 'add_default_8h' — insert sign_in_log row + audit.
+    wid_to_emp = _worker_id_to_employee_id(conn)
+    for wid in acknowledge_missing:
+        emp_id = wid_to_emp.get(wid)
+        if not emp_id:
+            summary["errors"].append(f"no employee row for {wid}")
+            continue
+        # Defensive duplicate-skip: the operator may have raced an
+        # actual sign-in between the modal opening and the action POST.
+        existing = conn.execute(
+            "SELECT id FROM sign_in_log "
+            "WHERE project_code = ? AND date = ? AND employee_id = ? LIMIT 1",
+            (project_code, report_date, emp_id),
+        ).fetchone()
+        if existing:
+            continue
+        conn.execute(
+            "INSERT INTO sign_in_log "
+            "(date, employee_id, project_code, time_in, time_out, "
+            " created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            (report_date, emp_id, project_code,
+             ROSTER_DEFAULT_TIME_IN, ROSTER_DEFAULT_TIME_OUT),
+        )
+        conn.execute(
+            "INSERT INTO audit_log "
+            "(action, actor_user_id, actor_role, target_type, target_id, "
+            " before_json, after_json, note, created_at) "
+            "VALUES ('signin_roster_completeness_default', ?, ?, 'worker', ?, ?, ?, ?, "
+            "        CURRENT_TIMESTAMP)",
+            (
+                actor_user_id, actor_role, emp_id,
+                json.dumps({"log_present": False}),
+                json.dumps({
+                    "log_present": True,
+                    "hours": 8.0,
+                    "source": "roster_completeness_default",
+                    "date": report_date,
+                    "project_code": project_code,
+                }),
+                "#194 — operator chose 'Add with 8h default' "
+                "after roster-completeness check flagged this regular as missing",
+            )
+        )
+        summary["inserted_count"] += 1
+    return summary
+
+
 def reconcile_in_dcr_not_log(
     conn: sqlite3.Connection,
     project_code: str,

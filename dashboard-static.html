@@ -1862,6 +1862,87 @@
             el.style.color = color || '#76777E';
           }
 
+          // #194 — modal shown when the DCR-issue endpoint returns
+          // 409 + roster_completeness_required:true. Renders the
+          // missing regulars (W-#### + name lookup + recent-day count)
+          // and three operator actions; resolves with the chosen
+          // action string ('mark_absent' | 'add_default_8h' | 'cancel'
+          // | null on ESC / overlay click).
+          //
+          // Issue is BLOCKED until the operator picks an action.
+          async function showRosterCompletenessModal(missing) {
+            return new Promise((resolve) => {
+              const overlay = document.createElement('div');
+              overlay.setAttribute('role', 'dialog');
+              overlay.setAttribute('aria-modal', 'true');
+              overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,22,28,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+              const box = document.createElement('div');
+              box.style.cssText = 'background:#fff;border-radius:8px;box-shadow:0 24px 64px rgba(0,0,0,0.30);max-width:520px;width:100%;padding:24px;font-family:Inter,system-ui,sans-serif;color:#14161C;';
+              const title = document.createElement('div');
+              title.style.cssText = 'font-size:16px;font-weight:800;letter-spacing:0.3px;margin-bottom:6px;color:#B11E2E;';
+              title.textContent = '⚠ Roster completeness check';
+              const subtitle = document.createElement('div');
+              subtitle.style.cssText = 'font-size:13px;color:#4A4A4A;margin-bottom:14px;';
+              subtitle.textContent = 'These workers have been on site recently but are NOT on today\'s draft roster:';
+              const list = document.createElement('ul');
+              list.style.cssText = 'list-style:none;margin:0 0 16px 0;padding:0;border:1px solid #E5E2D9;border-radius:4px;background:#FAF7F1;';
+              missing.forEach((m, i) => {
+                const li = document.createElement('li');
+                li.style.cssText = 'padding:8px 12px;font-size:13px;display:flex;justify-content:space-between;align-items:center;'
+                  + (i < missing.length - 1 ? 'border-bottom:1px solid #E5E2D9;' : '');
+                const wid = document.createElement('span');
+                wid.style.cssText = 'font-weight:700;color:#B11E2E;';
+                wid.textContent = m.worker_id;
+                const meta = document.createElement('span');
+                meta.style.cssText = 'font-size:11px;color:#76777E;';
+                meta.textContent = (m.recent_count || 0) + ' of last ' + (m.window || 7) + ' working days';
+                li.appendChild(wid);
+                li.appendChild(meta);
+                list.appendChild(li);
+              });
+              const question = document.createElement('div');
+              question.style.cssText = 'font-size:13px;color:#14161C;margin-bottom:14px;';
+              question.textContent = 'Are they absent today, or did the draft miss them?';
+              const buttons = document.createElement('div');
+              buttons.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;';
+              function mkBtn(label, color, bg, action) {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = label;
+                b.style.cssText = 'padding:8px 14px;border-radius:4px;border:1px solid '+color+';background:'+bg+';color:'+color+';font-size:12px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.4px;';
+                b.addEventListener('click', () => {
+                  document.body.removeChild(overlay);
+                  resolve(action);
+                });
+                return b;
+              }
+              buttons.appendChild(mkBtn('Mark all absent · continue', '#B11E2E', '#fff', 'mark_absent'));
+              buttons.appendChild(mkBtn('Add all · 8h default', '#2F7C57', '#fff', 'add_default_8h'));
+              buttons.appendChild(mkBtn('Cancel · let me review', '#76777E', '#fff', 'cancel'));
+              box.appendChild(title);
+              box.appendChild(subtitle);
+              box.appendChild(list);
+              box.appendChild(question);
+              box.appendChild(buttons);
+              overlay.appendChild(box);
+              // ESC = cancel; overlay-click = cancel.
+              overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                  document.body.removeChild(overlay);
+                  resolve(null);
+                }
+              });
+              document.addEventListener('keydown', function esc(e) {
+                if (e.key === 'Escape') {
+                  document.removeEventListener('keydown', esc);
+                  if (overlay.parentNode) document.body.removeChild(overlay);
+                  resolve(null);
+                }
+              });
+              document.body.appendChild(overlay);
+            });
+          }
+
           async function issueDcr(override) {
             const dateStr = getCurrentDate();
             // DCR-4: when the entry view was opened via Edit (re-issue
@@ -1949,6 +2030,60 @@
                   return issueDcr(true);
                 }
                 setIssueStatus('Cancelled', '#76777E');
+              } else if (resp.status === 409 && json && json.roster_completeness_required === true) {
+                // #194 — roster-completeness modal. Operator either
+                // marks the missing regulars absent for today, adds
+                // them with the canonical 07:00..15:30 (=8h) default,
+                // or cancels the issue entirely. Issue is BLOCKED
+                // until a decision is taken.
+                const missing = json.missing_regulars || [];
+                const ackWids = missing.map(m => m.worker_id);
+                const decision = await showRosterCompletenessModal(missing);
+                if (decision === 'cancel' || !decision) {
+                  setIssueStatus('Cancelled — review the roster and try again', '#76777E');
+                  return;
+                }
+                // Re-POST with the operator's resolution. The server
+                // applies it (audit-logs the absence OR inserts the
+                // default rows) BEFORE the artifact is rendered, so
+                // the issued DCR carries the resolved roster.
+                const ackResp = await fetch(
+                  '/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/daily/'
+                  + encodeURIComponent(dateStr) + '/issue',
+                  {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                      audience: 'both',
+                      override_active: !!override,
+                      roster_completeness: {
+                        action: decision,
+                        acknowledge_missing: ackWids,
+                      },
+                    }),
+                  }
+                );
+                const ackJson = await ackResp.json();
+                if (ackResp.status === 201 && ackJson && ackJson.data && ackJson.data.internal_url) {
+                  window.open(ackJson.data.internal_url, '_blank');
+                  const banner2 = document.getElementById('dcr-issued-banner');
+                  if (banner2) {
+                    banner2.style.display = 'block';
+                    banner2.innerHTML =
+                      '<strong style="color:#2F7C57;">✓ DCR issued (roster completeness check resolved) — ' +
+                      (ackJson.data.display_id || '') + '</strong>';
+                  }
+                  clearDcrFormState({preserveBanner: true});
+                  _sessionAddedSignInIds.clear();
+                  _reissueContext = null;
+                  const rb = document.getElementById('dcr-reissue-banner');
+                  if (rb) rb.style.display = 'none';
+                  showArchive();
+                } else {
+                  setIssueStatus('Failed after roster ack: '
+                    + ((ackJson && ackJson.error) || ('HTTP ' + ackResp.status)),
+                    '#B11E2E');
+                }
               } else {
                 setIssueStatus('Failed: ' + ((json && json.error) || ('HTTP ' + resp.status)), '#B11E2E');
               }

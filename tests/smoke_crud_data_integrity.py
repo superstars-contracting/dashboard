@@ -982,6 +982,193 @@ def test_weekly_hours():
     return r
 
 
+def test_roster_completeness_check():
+    """#194 prevention guard: DCR issue endpoint refuses to silently
+    issue when a regularly-present worker is missing from today's
+    roster. Asserts the modal protocol (409 with missing_regulars
+    payload, then 200/201 after operator acknowledgement).
+
+    Synthetic-only per #175: two SMK-#### workers + a future date well
+    outside any operator-relevant window (2030-03-13) on FR-BX-001 so
+    the project's render pipeline still works but no real DCR collides.
+
+    Steps:
+      1. Seed: create SMK-A + SMK-B + SMK-C (project_assignments for
+         FR-BX-001). Insert sign_in_log rows for SMK-A + SMK-B on 5 of
+         the 7 working days prior to TEST_DATE; SMK-C only on 1 day
+         (NOT a regular). On TEST_DATE itself, sign_in_log has SMK-A
+         only — SMK-B is the missing regular.
+      2. POST /api/projects/FR-BX-001/daily/<TEST_DATE>/issue with no
+         roster_completeness body → expect 409 + missing_regulars
+         containing SMK-B's W-#### and NOT SMK-C's.
+      3. POST again with roster_completeness={action: 'mark_absent',
+         acknowledge_missing: [SMK-B.wid]} → expect 200/201 and a
+         'roster_completeness_mark_absent' audit row for SMK-B's emp.
+      4. Teardown of every SMK-* row + the rendered artifact.
+    """
+    r = SectionResult("Roster completeness (#194)")
+    import os
+    from datetime import date as _date, timedelta as _td
+    from pathlib import Path as _P
+
+    TEST_DATE = "2030-03-13"
+    test_date_d = _date.fromisoformat(TEST_DATE)
+    # Build 5 of the prior 7 weekdays as "recent" presence.
+    prior_days = []
+    cursor = test_date_d - _td(days=1)
+    while len(prior_days) < 5:
+        if cursor.weekday() < 5:
+            prior_days.append(cursor.isoformat())
+        cursor -= _td(days=1)
+
+    syn_a = _synth_worker("RostA")
+    syn_b = _synth_worker("RostB")
+    syn_c = _synth_worker("RostC")
+    if not (syn_a and syn_b and syn_c):
+        r.create = r.edit = r.delete = r.shows = False
+        add_note(r, "synth worker create failed")
+        # Teardown what did get created
+        for sid in (syn_a, syn_b, syn_c):
+            if sid: _synth_teardown(sid)
+        return r
+    artifact_dir = _P(str(SCRIPT_DIR)) / "data_room" / "reports" / "dcr" / "FR-BX-001"
+    seq_dir_to_remove = None
+    try:
+        # Get the synthetic W-####s for assertion comparison
+        conn = db()
+        try:
+            wid_a = conn.execute(
+                "SELECT worker_id FROM employees WHERE employee_id = ?", (syn_a,)
+            ).fetchone()["worker_id"]
+            wid_b = conn.execute(
+                "SELECT worker_id FROM employees WHERE employee_id = ?", (syn_b,)
+            ).fetchone()["worker_id"]
+            wid_c = conn.execute(
+                "SELECT worker_id FROM employees WHERE employee_id = ?", (syn_c,)
+            ).fetchone()["worker_id"]
+            # SMK-A + SMK-B each: 5 days of prior sign-ins (regulars)
+            for d in prior_days:
+                for emp_id in (syn_a, syn_b):
+                    conn.execute(
+                        "INSERT INTO sign_in_log "
+                        "(date, employee_id, project_code, time_in, time_out, "
+                        " created_at, updated_at) "
+                        "VALUES (?, ?, 'FR-BX-001', '07:00', '15:30', "
+                        "        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                        (d, emp_id),
+                    )
+            # SMK-C: only ONE prior day (not a regular).
+            conn.execute(
+                "INSERT INTO sign_in_log "
+                "(date, employee_id, project_code, time_in, time_out, "
+                " created_at, updated_at) "
+                "VALUES (?, ?, 'FR-BX-001', '07:00', '15:30', "
+                "        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                (prior_days[0], syn_c),
+            )
+            # On TEST_DATE itself: SMK-A only. SMK-B = missing regular.
+            conn.execute(
+                "INSERT INTO sign_in_log "
+                "(date, employee_id, project_code, time_in, time_out, "
+                " created_at, updated_at) "
+                "VALUES (?, ?, 'FR-BX-001', '07:00', '15:30', "
+                "        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                (TEST_DATE, syn_a),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        # Step 2 — first POST: expect 409 + missing_regulars=[wid_b]
+        url = f"{BASE}/api/projects/FR-BX-001/daily/{TEST_DATE}/issue"
+        resp = requests.post(url, json={"audience": "internal"}, timeout=15)
+        body = resp.json() if resp.headers.get("Content-Type", "").startswith("application/json") else {}
+        missing_set = {m["worker_id"] for m in (body.get("missing_regulars") or [])}
+        r.create = (
+            resp.status_code == 409
+            and body.get("roster_completeness_required") is True
+            and wid_b in missing_set
+            and wid_c not in missing_set
+        )
+        if not r.create:
+            add_note(r,
+                f"first POST: status={resp.status_code}  "
+                f"missing={missing_set}  "
+                f"expected wid_b={wid_b} in, wid_c={wid_c} out")
+
+        # Step 3 — second POST: ack with mark_absent → expect 201.
+        # Capture the issued sequence so we can rmtree the artifact in
+        # teardown.
+        resp2 = requests.post(url, json={
+            "audience": "internal",
+            "roster_completeness": {
+                "action": "mark_absent",
+                "acknowledge_missing": [wid_b],
+            },
+        }, timeout=30)
+        body2 = resp2.json() if resp2.headers.get("Content-Type", "").startswith("application/json") else {}
+        issued_seq = (body2.get("data") or {}).get("sequence")
+        r.edit = (resp2.status_code in (200, 201) and issued_seq is not None)
+        if issued_seq:
+            seq_dir_to_remove = artifact_dir / f"{issued_seq:03d}"
+
+        # Step 3b — audit row written for SMK-B's mark_absent.
+        conn = db()
+        try:
+            audit_n = conn.execute(
+                "SELECT COUNT(*) FROM audit_log "
+                "WHERE action='roster_completeness_mark_absent' AND target_id=?",
+                (wid_b,),
+            ).fetchone()[0]
+        finally:
+            conn.close()
+        r.delete = (audit_n >= 1)
+        if not r.delete:
+            add_note(r, f"expected mark_absent audit row for {wid_b}, got {audit_n}")
+
+        r.shows = (r.create and r.edit and r.delete)
+    finally:
+        conn = db()
+        try:
+            for sid in (syn_a, syn_b, syn_c):
+                conn.execute("DELETE FROM sign_in_log WHERE employee_id = ?", (sid,))
+            # Remove the issued DCR rows + clean up audit_log noise
+            conn.execute(
+                "DELETE FROM report_index "
+                "WHERE project_code='FR-BX-001' AND report_date = ?",
+                (TEST_DATE,),
+            )
+            for sid in (syn_a, syn_b, syn_c):
+                conn.execute(
+                    "DELETE FROM audit_log "
+                    "WHERE action IN ('roster_completeness_mark_absent', "
+                    "                 'signin_roster_completeness_default') "
+                    "AND target_id = ?",
+                    (sid,),
+                )
+            wid_locals = [wid_a, wid_b, wid_c] if 'wid_a' in dir() else []
+            for wid in wid_locals:
+                conn.execute(
+                    "DELETE FROM audit_log "
+                    "WHERE action IN ('roster_completeness_mark_absent') "
+                    "AND target_id = ?",
+                    (wid,),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+        for sid in (syn_a, syn_b, syn_c):
+            _synth_teardown(sid)
+        # Remove the issued artifact directory if we know which one.
+        import shutil
+        try:
+            if seq_dir_to_remove and seq_dir_to_remove.exists():
+                shutil.rmtree(seq_dir_to_remove, ignore_errors=True)
+        except Exception:
+            pass
+    return r
+
+
 def test_signin_dcr_invariant():
     """#191 regression guard: sign_in_log ↔ DCR-artifact roster
     divergence detection + reconciliation end-to-end.
@@ -1212,6 +1399,7 @@ def main():
         ("WeeklyHours",      lambda: test_weekly_hours()),
         ("PinInvariant",     lambda: test_pin_invariant()),
         ("SignInDcrInvariant", lambda: test_signin_dcr_invariant()),
+        ("RosterCompleteness", lambda: test_roster_completeness_check()),
     ]
     for short, fn in section_fns:
         try:

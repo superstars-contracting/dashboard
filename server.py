@@ -2066,6 +2066,15 @@ def issue_dcr(project_code, report_date):
     data = request.get_json() or {}
     audience = data.get('audience', 'internal')
     override_active = bool(data.get('override_active', False))
+    # #194 — roster-completeness modal protocol. The UI surfaces a
+    # modal when this endpoint returns 409 with `missing_regulars`
+    # set; the modal collects an `action` and re-POSTs with
+    # `roster_completeness` set so this endpoint can apply it BEFORE
+    # the issue proceeds. `roster_skip=true` is the explicit "I've
+    # already resolved offline" escape (reserved for ad-hoc tooling;
+    # NOT exposed in the UI).
+    roster_completeness = data.get('roster_completeness') or {}
+    roster_skip = bool(data.get('roster_skip', False))
     if audience not in ('internal', 'client', 'both'):
         return jsonify({"error": "audience must be 'internal', 'client', or 'both'"}), 400
     try:
@@ -2081,6 +2090,62 @@ def issue_dcr(project_code, report_date):
     # /files/ static route would happily serve.
     written_files = []
     try:
+        # ---- #194 roster completeness gate ----
+        # Pull recent-regulars from sign_in_log; if any are missing
+        # from today's roster AND the operator hasn't already resolved
+        # the modal, return 409 with the structured payload the UI
+        # uses to surface it.
+        import signin_dcr_reconcile as sdr
+        if not roster_skip:
+            missing = sdr.detect_missing_regulars(
+                conn, project_code, report_date,
+                threshold=sdr.ROSTER_THRESHOLD_DEFAULT,
+                window=sdr.ROSTER_WINDOW_DEFAULT,
+            )
+            ack_action = roster_completeness.get('action')
+            ack_missing = list(roster_completeness.get('acknowledge_missing') or [])
+            if missing:
+                missing_set = {m['worker_id'] for m in missing}
+                if ack_action == 'cancel':
+                    conn.close()
+                    return jsonify({
+                        "error": "DCR issuance cancelled by operator (#194 roster check)",
+                        "roster_completeness_status": "cancelled_by_operator",
+                    }), 409
+                # If the operator hasn't acknowledged the full set, OR
+                # action is missing, return the gate response.
+                if (ack_action not in ('mark_absent', 'add_default_8h')
+                        or set(ack_missing) != missing_set):
+                    conn.close()
+                    return jsonify({
+                        "error": (
+                            "Roster completeness check (#194): "
+                            f"{len(missing)} regularly-present worker(s) "
+                            f"not on today's roster. Operator must "
+                            f"acknowledge before DCR can issue."
+                        ),
+                        "roster_completeness_required": True,
+                        "missing_regulars": missing,
+                        "project_code": project_code,
+                        "report_date": report_date,
+                        "modal_actions": [
+                            "mark_absent",
+                            "add_default_8h",
+                            "cancel",
+                        ],
+                    }), 409
+                # Operator has resolved the modal — apply the decision
+                # before issuing. Inserts happen inside the same conn,
+                # rolled back if anything below this point fails.
+                user = current_user() or {}
+                sdr.apply_roster_completeness_decision(
+                    conn, project_code, report_date,
+                    acknowledge_missing=ack_missing,
+                    action=ack_action,
+                    actor_user_id=user.get('id'),
+                    actor_role=user.get('role') or 'system',
+                )
+        # ---- end #194 gate ----
         existing_seq = lookup_existing_dcr_sequence(conn, project_code, report_date)
         if existing_seq is not None and not override_active:
             conn.close()
