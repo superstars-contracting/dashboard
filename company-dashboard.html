@@ -591,6 +591,23 @@
       <div id="lrt-source-notice" style="background:#FAF7F1;border:1px solid var(--border);border-left:4px solid var(--brand-red);color:var(--ink-soft);font-size:11px;padding:7px 12px;border-radius:3px;margin-bottom:12px;display:none;align-items:center;gap:8px;">
         <span data-i18n="p-labor-rate-source">Rates from <strong>worker_rates</strong> (effective on this week's Monday). Edit at <a href="/admin/labor-rates" style="color:var(--brand-red);font-weight:600;">/admin/labor-rates</a>. All changes are audit-logged.</span>
       </div>
+      <!-- #191 — sign_in_log ↔ DCR-artifact divergence banner.
+           Hidden when the displayed week has no divergence. Surfaces
+           the moment any (date, W-####) disagreement appears between
+           the issued DCR's W-#### roster and sign_in_log, with an
+           admin/c_suite-gated [Reconcile] button that inserts the
+           missing sign_in_log rows from the DCR roster (audit-logged
+           per row with PII-safe {log_present: bool, source: 'dcr',
+           report_id} payloads). Architectural note in
+           signin_dcr_reconcile.py — sign_in_log is the source of
+           truth; the DCR is a frozen rendering; the banner exists as
+           a defensive invariant for any future divergence path. -->
+      <div id="lrt-divergence-banner"
+           style="display:none;background:#FFF5E6;border:1px solid #D9A663;border-left:4px solid #B27A18;color:#5C3A00;font-size:12px;padding:9px 12px;border-radius:3px;margin-bottom:12px;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap;">
+        <span><strong>⚠ Sign-in data inconsistent with issued DCRs</strong> for this week — <span id="lrt-divergence-count">0</span> divergence(s). The DCR roster has worker entries that are missing from the daily sign-in log.</span>
+        <button id="lrt-reconcile-btn" type="button"
+                style="background:#B27A18;color:white;border:none;padding:6px 14px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:0.4px;cursor:pointer;text-transform:uppercase;">Reconcile</button>
+      </div>
       <div id="lrt-status" style="font-size:12px;color:var(--mute);min-height:18px;margin-bottom:8px;"></div>
       <div id="lrt-grid-wrap">
         <table id="lrt-grid" style="width:100%;border-collapse:collapse;font-size:12px;">
@@ -3306,6 +3323,36 @@ applyLanguage();
     </tr>`;
   }
 
+  // #191 — sign_in_log ↔ DCR divergence banner: target project (the
+  // only project with DCRs today; future projects either inherit this
+  // or get their own per-project LRT after #193 lands the project-
+  // internal LRT entry point).
+  const LRT_DIVERGENCE_PROJECT = 'FR-BX-001';
+
+  async function refreshDivergenceBanner(weekStartIso) {
+    const banner = $('lrt-divergence-banner');
+    const countEl = $('lrt-divergence-count');
+    if (!banner) return;
+    try {
+      const r = await fetch(
+        `/api/projects/${LRT_DIVERGENCE_PROJECT}/signin-dcr-divergence`
+        + (weekStartIso ? `?week_start=${encodeURIComponent(weekStartIso)}` : '')
+      );
+      // 403 (non-admin) or 401 (unauth) — silently hide. The
+      // banner is only a surface for admin/c_suite.
+      if (!r.ok) { banner.style.display = 'none'; return; }
+      const j = await r.json();
+      const summary = (j && j.data && j.data.summary) || {};
+      const total = summary.total || 0;
+      if (countEl) countEl.textContent = total;
+      banner.style.display = (total > 0) ? 'flex' : 'none';
+    } catch (e) {
+      // Network glitch — keep the banner hidden; the next loadGrid
+      // will retry.
+      banner.style.display = 'none';
+    }
+  }
+
   async function loadGrid(weekStartIso) {
     setStatus('Loading…');
     try {
@@ -3320,6 +3367,8 @@ applyLanguage();
       // Show the audit notice only when the caller can see comp data.
       const notice = $('lrt-source-notice');
       if (notice) notice.style.display = ratesVisible ? 'flex' : 'none';
+      // Refresh the #191 invariant banner alongside the grid render.
+      refreshDivergenceBanner(grid.week_start);
       renderHead(grid.dates, grid.no_work_by_date || {}, ratesVisible);
       renderBody(grid.workers, grid.no_work_by_date || {});
       renderFoot(grid);
@@ -3353,6 +3402,46 @@ applyLanguage();
   }
   $('lrt-prev').addEventListener('click', () => shiftWeek(-7));
   $('lrt-next').addEventListener('click', () => shiftWeek(7));
+
+  // #191 — admin-gated [Reconcile] click. POSTs the reconcile endpoint
+  // for the current week, then re-runs loadGrid so the banner clears
+  // and the grid reflects any newly-inserted sign_in_log rows.
+  const reconcileBtn = $('lrt-reconcile-btn');
+  if (reconcileBtn) {
+    reconcileBtn.addEventListener('click', async () => {
+      if (!currentMonday) return;
+      const original = reconcileBtn.innerHTML;
+      reconcileBtn.disabled = true;
+      reconcileBtn.innerHTML = 'Reconciling…';
+      try {
+        const r = await fetch(
+          `/api/projects/${LRT_DIVERGENCE_PROJECT}/signin-dcr-divergence/reconcile`
+          + `?week_start=${encodeURIComponent(currentMonday)}`,
+          { method: 'POST', credentials: 'include' }
+        );
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          alert('Reconcile failed: ' + (j.error || r.status));
+          return;
+        }
+        const s = j && j.data && j.data.reconcile_summary;
+        const post = j && j.data && j.data.post_divergences_summary;
+        const msg = s
+          ? `Reconciled ${s.reconciled} sign-in row(s).`
+            + (post && post.total > 0
+                ? ` ${post.total} divergence(s) remain (in_log_not_dcr — operator review).`
+                : '')
+          : 'Done.';
+        setStatus(msg, '#2F7C57');
+        await loadGrid(currentMonday);
+      } catch (err) {
+        alert('Reconcile error: ' + (err && err.message ? err.message : String(err)));
+      } finally {
+        reconcileBtn.disabled = false;
+        reconcileBtn.innerHTML = original;
+      }
+    });
+  }
 
   // Reveal the "Labor Rates" admin nav tab only for admin/c_suite. The
   // tab is hidden in the DOM by default; auth_menu.js fires

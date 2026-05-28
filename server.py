@@ -3791,6 +3791,138 @@ def api_labor_rates_set(employee_id):
         return jsonify({"error": str(e)}), 500
 
 
+# ====================================================================
+# Sign-in ↔ DCR divergence invariant (#191) — defensive infrastructure
+# ====================================================================
+# See signin_dcr_reconcile.py for the architectural rationale. Short
+# version: sign_in_log IS the source of truth; the issued DCR is a
+# frozen rendering. _mark_dcr_stale flows DCR → log direction only,
+# which means current code paths can't introduce divergence — but
+# this endpoint surfaces any that DO appear (e.g., via manual DB
+# manipulation or a future regression).
+
+@app.route('/api/projects/<project_code>/signin-dcr-divergence', methods=['GET'])
+@requires_role('admin', 'c_suite')
+def api_signin_dcr_divergence(project_code):
+    """Return the sign_in_log ↔ DCR divergence summary + per-(date,
+    W-####) list for `project_code` over the date range. Read-only.
+
+    Query params:
+      week_start (optional, ISO Monday) — narrows to that Monday-Friday
+      start_date / end_date (optional, ISO) — explicit range
+    If no params, the endpoint scans every issued DCR for the project.
+
+    Response shape:
+      {data: {
+        project_code, start_date, end_date,
+        summary: {total, in_dcr_not_log, in_log_not_dcr},
+        divergences: [{date, worker_id, class, report_id}, ...]
+      }}
+    """
+    import signin_dcr_reconcile as sdr
+    try:
+        start = (request.args.get('start_date') or '').strip() or None
+        end = (request.args.get('end_date') or '').strip() or None
+        week_start = (request.args.get('week_start') or '').strip()
+        if week_start:
+            monday = datetime.strptime(week_start, '%Y-%m-%d').date()
+            if monday.weekday() != 0:
+                return jsonify({"error": "week_start must be a Monday"}), 400
+            start = monday.isoformat()
+            end = (monday + timedelta(days=4)).isoformat()
+        conn = db()
+        try:
+            divergences = sdr.compute_divergences(
+                conn, project_code, start_date=start, end_date=end
+            )
+            summary = sdr.divergence_summary(divergences)
+        finally:
+            conn.close()
+        return response_wrapper({
+            "project_code": project_code,
+            "start_date": start,
+            "end_date": end,
+            "summary": summary,
+            "divergences": divergences,
+        })
+    except Exception as e:
+        logging.error(
+            f"GET /api/projects/{project_code}/signin-dcr-divergence: {str(e)}"
+        )
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/projects/<project_code>/signin-dcr-divergence/reconcile',
+           methods=['POST'])
+@requires_role('admin', 'c_suite')
+def api_signin_dcr_reconcile(project_code):
+    """Reconcile every `in_dcr_not_log` divergence for `project_code`
+    over the given week (or full range). Inserts the missing
+    sign_in_log rows from the DCR artifact, audit-logs each restore
+    with PII-safe payloads. `in_log_not_dcr` divergences are returned
+    in the response but NOT auto-deleted (operator decision).
+
+    Body / query: same shape as the GET endpoint (week_start OR
+    start_date+end_date). Returns the post-reconcile summary so the
+    UI can re-render the banner without a second round-trip.
+    """
+    import signin_dcr_reconcile as sdr
+    try:
+        start = (request.args.get('start_date') or '').strip() or None
+        end = (request.args.get('end_date') or '').strip() or None
+        week_start = (request.args.get('week_start') or '').strip()
+        if week_start:
+            monday = datetime.strptime(week_start, '%Y-%m-%d').date()
+            if monday.weekday() != 0:
+                return jsonify({"error": "week_start must be a Monday"}), 400
+            start = monday.isoformat()
+            end = (monday + timedelta(days=4)).isoformat()
+        user = current_user() or {}
+        conn = db()
+        try:
+            divergences = sdr.compute_divergences(
+                conn, project_code, start_date=start, end_date=end
+            )
+            # Single transaction — the helper stages INSERTs on the
+            # conn; commit here when the helper returns cleanly.
+            reconcile_summary = sdr.reconcile_in_dcr_not_log(
+                conn, project_code, divergences,
+                actor_user_id=user.get('id'),
+                actor_role=user.get('role') or 'system',
+            )
+            if reconcile_summary.get("errors"):
+                conn.rollback()
+            else:
+                conn.commit()
+            # Re-compute divergences post-reconcile so the UI gets
+            # fresh state.
+            post = sdr.compute_divergences(
+                conn, project_code, start_date=start, end_date=end
+            )
+        finally:
+            conn.close()
+        logging.info(
+            f"signin-dcr-reconcile: project={project_code} "
+            f"week_start={week_start} "
+            f"reconciled={reconcile_summary.get('reconciled')} "
+            f"actor_role={user.get('role')}"
+        )
+        return response_wrapper({
+            "project_code": project_code,
+            "start_date": start,
+            "end_date": end,
+            "reconcile_summary": reconcile_summary,
+            "post_divergences_summary": sdr.divergence_summary(post),
+            "post_divergences": post,
+        })
+    except Exception as e:
+        logging.error(
+            f"POST /api/projects/{project_code}/signin-dcr-divergence/reconcile: "
+            f"{str(e)}"
+        )
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/admin/labor-rates', methods=['GET'])
 @requires_role('admin', 'c_suite')
 def admin_labor_rates_page():

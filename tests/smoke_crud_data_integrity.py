@@ -982,6 +982,163 @@ def test_weekly_hours():
     return r
 
 
+def test_signin_dcr_invariant():
+    """#191 regression guard: sign_in_log ↔ DCR-artifact roster
+    divergence detection + reconciliation end-to-end.
+
+    Synthetic-only per the #175 audit — creates a synthetic SMK-#### worker
+    and a dedicated SMK-DCR-INV project_code so real production data
+    (FR-BX-001 and the operator's actual workers) is never touched.
+    Steps:
+      1. Establish a clean SMK round-trip: sign_in_log + fake DCR
+         artifact + report_index row → no divergence.
+      2. DELETE the sign_in_log row → compute_divergences must report
+         one in_dcr_not_log.
+      3. Run reconcile_in_dcr_not_log → row restored, audit row added.
+      4. Post-reconcile compute_divergences → empty again.
+      5. Teardown of every SMK-* row + artifact directory.
+    """
+    r = SectionResult("Sign-in <-> DCR invariant [#191]")
+    import os
+    from pathlib import Path as _P
+    SMK_PROJECT = "SMK-DCR-INV"
+    TEST_DATE = "2020-01-15"  # well outside any operator-relevant window
+    syn_id = _synth_worker("DcrInv")
+    if not syn_id:
+        r.create = r.edit = r.delete = r.shows = False
+        add_note(r, "synth worker create failed")
+        return r
+    artifact_dir = _P(str(SCRIPT_DIR)) / "data_room" / "reports" / "dcr" / SMK_PROJECT / "001"
+    try:
+        # Look up the synthetic's worker_id (W-#### assigned by
+        # /api/workers/create; need it for the fake artifact body).
+        conn = db()
+        try:
+            row = conn.execute(
+                "SELECT worker_id FROM employees WHERE employee_id = ?",
+                (syn_id,)
+            ).fetchone()
+            syn_wid = row["worker_id"] if row else None
+            if not syn_wid:
+                r.create = False
+                add_note(r, "synthetic worker has no W-#### assigned")
+                return r
+            # Step 1 — seed: sign_in_log row, fake DCR artifact + report_index.
+            conn.execute(
+                "INSERT INTO sign_in_log (date, employee_id, project_code, "
+                "time_in, time_out, created_at, updated_at) "
+                "VALUES (?, ?, ?, '07:00', '15:30', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                (TEST_DATE, syn_id, SMK_PROJECT),
+            )
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            (artifact_dir / "internal.html").write_text(
+                f"<html><body>Synthetic DCR · {syn_wid}</body></html>",
+                encoding="utf-8",
+            )
+            conn.execute(
+                "INSERT INTO report_index "
+                "(report_id, project_code, report_type, status, report_date, "
+                " dcr_sequence, no_work, stale, created_at, updated_at) "
+                "VALUES (?, ?, 'DCR', 'issued', ?, 1, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                (f"DCR-{SMK_PROJECT}-001-internal", SMK_PROJECT, TEST_DATE),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        # Step 1 cont. — compute divergences against the seeded state.
+        import sys as _sys
+        _sys.path.insert(0, str(SCRIPT_DIR))
+        from signin_dcr_reconcile import (
+            compute_divergences, reconcile_in_dcr_not_log
+        )
+        conn = db()
+        try:
+            divs0 = compute_divergences(conn, SMK_PROJECT)
+        finally:
+            conn.close()
+        r.create = (len(divs0) == 0)
+        if not r.create:
+            add_note(r, f"seeded state had {len(divs0)} divergences "
+                        f"(expected 0)")
+
+        # Step 2 — DELETE the sign_in_log row, expect 1 in_dcr_not_log.
+        conn = db()
+        try:
+            conn.execute(
+                "DELETE FROM sign_in_log "
+                "WHERE project_code = ? AND date = ? AND employee_id = ?",
+                (SMK_PROJECT, TEST_DATE, syn_id),
+            )
+            conn.commit()
+            divs1 = compute_divergences(conn, SMK_PROJECT)
+        finally:
+            conn.close()
+        r.edit = (
+            len(divs1) == 1
+            and divs1[0]["class"] == "in_dcr_not_log"
+            and divs1[0]["worker_id"] == syn_wid
+            and divs1[0]["date"] == TEST_DATE
+        )
+        if not r.edit:
+            add_note(r, f"post-delete divergences unexpected: {divs1}")
+
+        # Step 3 — reconcile, expect inserted + audit row.
+        conn = db()
+        try:
+            rec = reconcile_in_dcr_not_log(
+                conn, SMK_PROJECT, divs1,
+                actor_user_id=None, actor_role="smoke",
+            )
+            conn.commit()
+            divs2 = compute_divergences(conn, SMK_PROJECT)
+            audit_n = conn.execute(
+                "SELECT COUNT(*) FROM audit_log "
+                "WHERE action='signin_reconcile_from_dcr' AND target_id=?",
+                (syn_id,),
+            ).fetchone()[0]
+        finally:
+            conn.close()
+        r.delete = (  # "DELETE" column in the smoke = the round-trip result
+            rec.get("reconciled") == 1
+            and len(divs2) == 0
+            and audit_n >= 1
+        )
+        if not r.delete:
+            add_note(r,
+                f"reconcile summary={rec}  post divs={divs2}  audit rows={audit_n}")
+
+        # Step 4 — SHOWS = invariant holds end-to-end.
+        r.shows = (r.create and r.edit and r.delete)
+    finally:
+        # Teardown — pure SMK-* cleanup.
+        conn = db()
+        try:
+            conn.execute(
+                "DELETE FROM sign_in_log WHERE project_code = ?", (SMK_PROJECT,)
+            )
+            conn.execute(
+                "DELETE FROM report_index WHERE project_code = ?", (SMK_PROJECT,)
+            )
+            conn.execute(
+                "DELETE FROM audit_log "
+                "WHERE action='signin_reconcile_from_dcr' AND target_id LIKE 'SMK-%'"
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        _synth_teardown(syn_id)
+        # Remove the SMK fake DCR artifact directory.
+        import shutil
+        try:
+            top = artifact_dir.parent  # SMK-DCR-INV/
+            if top.exists():
+                shutil.rmtree(top, ignore_errors=True)
+        except Exception:
+            pass
+    return r
+
+
 def test_pin_invariant():
     """#188 regression guard: every active worker has a 4-digit numeric PIN.
 
@@ -1054,6 +1211,7 @@ def main():
         ("Photos",           lambda: test_photos()),
         ("WeeklyHours",      lambda: test_weekly_hours()),
         ("PinInvariant",     lambda: test_pin_invariant()),
+        ("SignInDcrInvariant", lambda: test_signin_dcr_invariant()),
     ]
     for short, fn in section_fns:
         try:
