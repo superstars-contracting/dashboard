@@ -1661,6 +1661,336 @@ def test_lrt_midweek_rate_onset():
     return r
 
 
+def test_lrt_future_dated_rate():
+    """Future-dated rate: rate A this week, NEW rate B effective next Mon.
+    Current week renders rate A; future week renders rate B.
+
+    Validates: the per-day lookup correctly picks the *latest* rate row
+    whose effective_from is <= the day being computed. A future-dated
+    rate must not bleed back into the current week.
+    """
+    r = SectionResult("LRT future-dated rate [#197-verify]")
+    WEEK_A = "2030-04-08"       # Monday
+    WEEK_B = "2030-04-15"       # Monday (1 week future)
+    SYN_TUE_A = "2030-04-09"
+    SYN_TUE_B = "2030-04-16"
+    syn_id = _synth_worker("LrtFuture")
+    if not syn_id:
+        r.create = r.edit = r.delete = r.shows = False
+        add_note(r, "synth worker create failed")
+        return r
+    try:
+        # Rate A=$1.00 effective WEEK_A start. Rate B=$2.00 effective
+        # WEEK_B start (one week in the future from operator's POV).
+        ra = _lrt_set_rate_api(syn_id, 1.00, WEEK_A)
+        rb = _lrt_set_rate_api(syn_id, 2.00, WEEK_B)
+        # 8h on Tue of each week.
+        _lrt_signin(syn_id, PROJECT, SYN_TUE_A)
+        _lrt_signin(syn_id, PROJECT, SYN_TUE_B)
+        r.create = (ra.status_code == 201 and rb.status_code == 201)
+        # WEEK_A — Tue is 2030-04-09, before rate B's effective_from.
+        # Per-day lookup returns rate A → amount_owed = 8 * $1.00 = 8.00.
+        grid_a = _lrt_week(WEEK_A)
+        row_a = _lrt_find_row(grid_a, syn_id)
+        ok_a = bool(
+            row_a
+            and not row_a.get("rate_not_set")
+            and abs(float(row_a.get("amount_owed") or 0) - 8.0) < 0.005
+            and row_a.get("rate_effective_from") == WEEK_A
+        )
+        # WEEK_B — Tue is 2030-04-16, after rate B's effective_from.
+        # Per-day picks rate B → amount_owed = 8 * $2.00 = 16.00.
+        grid_b = _lrt_week(WEEK_B)
+        row_b = _lrt_find_row(grid_b, syn_id)
+        ok_b = bool(
+            row_b
+            and not row_b.get("rate_not_set")
+            and abs(float(row_b.get("amount_owed") or 0) - 16.0) < 0.005
+            and row_b.get("rate_effective_from") == WEEK_B
+        )
+        r.shows = ok_a and ok_b
+        r.edit = ok_a  # current-week rate A behavior
+        r.delete = ok_b  # future-week rate B behavior
+        if not r.shows:
+            add_note(r,
+                f"weekA ok={ok_a} eff_from={row_a.get('rate_effective_from') if row_a else None}; "
+                f"weekB ok={ok_b} eff_from={row_b.get('rate_effective_from') if row_b else None}")
+    finally:
+        _lrt_cleanup_rate_state(syn_id)
+        _synth_teardown(syn_id)
+    return r
+
+
+def test_lrt_retroactive_rate():
+    """Retroactive rate: worker has rate A for two weeks, then operator
+    enters rate B with the SAME effective_from as A (or matching the
+    earliest worked day). Both weeks now render at rate B — the "raise
+    applied to weeks already worked" payroll scenario.
+
+    Implementation note: set_rate validates effective_from >= current's
+    effective_from, so retroactive-to-same-date is the supported path.
+    Earlier than current's effective_from is explicitly rejected by
+    worker_rates.set_rate (RateError). This test exercises the
+    same-date retroactive path which is what payroll's "raise" usually
+    means anyway.
+    """
+    r = SectionResult("LRT retroactive rate [#197-verify]")
+    WEEK_1 = "2030-05-06"     # Monday
+    WEEK_2 = "2030-05-13"     # Monday
+    SYN_TUE_1 = "2030-05-07"
+    SYN_TUE_2 = "2030-05-14"
+    syn_id = _synth_worker("LrtRetro")
+    if not syn_id:
+        r.create = r.edit = r.delete = r.shows = False
+        add_note(r, "synth worker create failed")
+        return r
+    try:
+        # Rate A=$1.00 effective WEEK_1. Two weeks of work at A.
+        ra = _lrt_set_rate_api(syn_id, 1.00, WEEK_1)
+        _lrt_signin(syn_id, PROJECT, SYN_TUE_1)
+        _lrt_signin(syn_id, PROJECT, SYN_TUE_2)
+        # Sanity at rate A: week 1 amount_owed = 8.
+        grid_pre = _lrt_week(WEEK_1)
+        row_pre = _lrt_find_row(grid_pre, syn_id)
+        pre_ok = bool(
+            row_pre
+            and abs(float(row_pre.get("amount_owed") or 0) - 8.0) < 0.005
+        )
+        # Operator enters retroactive rate B=$2.00 effective same date (WEEK_1).
+        rb = _lrt_set_rate_api(syn_id, 2.00, WEEK_1)
+        r.create = (ra.status_code == 201 and rb.status_code == 201 and pre_ok)
+        if rb.status_code != 201:
+            add_note(r, f"retroactive set_rate -> {rb.status_code} {rb.text[:120]}")
+        # WEEK_1 now renders at rate B (8 * $2.00 = 16.00).
+        grid_a = _lrt_week(WEEK_1)
+        row_a = _lrt_find_row(grid_a, syn_id)
+        ok_a = bool(
+            row_a
+            and not row_a.get("rate_not_set")
+            and abs(float(row_a.get("amount_owed") or 0) - 16.0) < 0.005
+        )
+        # WEEK_2 renders at rate B too (8 * $2.00 = 16.00).
+        grid_b = _lrt_week(WEEK_2)
+        row_b = _lrt_find_row(grid_b, syn_id)
+        ok_b = bool(
+            row_b
+            and not row_b.get("rate_not_set")
+            and abs(float(row_b.get("amount_owed") or 0) - 16.0) < 0.005
+        )
+        r.shows = ok_a and ok_b
+        r.edit = ok_a    # retroactive applied to week 1
+        r.delete = ok_b  # rate B applied to week 2 too
+        if not r.shows:
+            add_note(r,
+                f"week1 ok={ok_a}  week2 ok={ok_b}")
+    finally:
+        _lrt_cleanup_rate_state(syn_id)
+        _synth_teardown(syn_id)
+    return r
+
+
+def test_lrt_rate_transition_midperiod():
+    """Mid-week rate transition: rate A from Mon, rate B from Wed of same
+    week. Per the per-day lookup (#197), Mon-Tue compute with rate A,
+    Wed-Fri compute with rate B. amount_owed sums those per-day amounts.
+
+    Operationally rare for construction (rate changes usually align to
+    Mondays / pay periods) but this test asserts the per-day path
+    handles it. Without per-day, the whole week would lock to one rate
+    and silently miscalculate.
+    """
+    r = SectionResult("LRT mid-week rate transition [#197-verify]")
+    WEEK = "2030-06-03"       # Monday
+    DAYS = ["2030-06-03", "2030-06-04", "2030-06-05", "2030-06-06", "2030-06-07"]
+    syn_id = _synth_worker("LrtTrans")
+    if not syn_id:
+        r.create = r.edit = r.delete = r.shows = False
+        add_note(r, "synth worker create failed")
+        return r
+    try:
+        # Rate A=$1.00 from Mon, rate B=$2.00 from Wed.
+        ra = _lrt_set_rate_api(syn_id, 1.00, DAYS[0])   # Mon
+        rb = _lrt_set_rate_api(syn_id, 2.00, DAYS[2])   # Wed
+        # 8h every weekday.
+        for d in DAYS:
+            _lrt_signin(syn_id, PROJECT, d)
+        r.create = (ra.status_code == 201 and rb.status_code == 201)
+        grid = _lrt_week(WEEK)
+        row = _lrt_find_row(grid, syn_id)
+        # Per-day breakdown: Mon, Tue @ $1.00 = $8 each; Wed, Thu, Fri
+        # @ $2.00 = $16 each. Total = 2*8 + 3*16 = 16 + 48 = 64.00.
+        expected = 2 * 8 * 1.00 + 3 * 8 * 2.00
+        ok = bool(
+            row
+            and not row.get("rate_not_set")
+            and abs(float(row.get("amount_owed") or 0) - expected) < 0.005
+            and float(row.get("weekly_total") or 0) == 40.0
+        )
+        r.shows = ok
+        # EDIT = per-day math correct; DELETE step = cleanup verified
+        # by meta-smoke clean diff.
+        r.edit = ok
+        r.delete = True
+        if not ok:
+            add_note(r,
+                f"expected amount_owed={expected} got={row.get('amount_owed') if row else None}  "
+                f"weekly_total={row.get('weekly_total') if row else None}")
+    finally:
+        _lrt_cleanup_rate_state(syn_id)
+        _synth_teardown(syn_id)
+    return r
+
+
+def test_lrt_end_dated_rate():
+    """End-dated rate: rate A active, then end-dated (effective_to set).
+    LRT for any week AFTER effective_to renders "Rate not set" correctly
+    (no stale rate bleed-through), and weeks fully WITHIN the active
+    window still render rate A.
+
+    Also exercises the #158 auto-end-dating: when rate B is inserted on
+    top of rate A, A's effective_to gets set to (B.effective_from - 1
+    day) automatically by set_rate. Verifies that auto-end-date is
+    honored by the per-day lookup.
+    """
+    r = SectionResult("LRT end-dated rate [#197-verify]")
+    WEEK_ACTIVE = "2030-07-01"       # Monday — rate A is active this week
+    WEEK_AFTER = "2030-07-15"        # Monday — well past end_date
+    SYN_TUE_ACTIVE = "2030-07-02"
+    SYN_TUE_AFTER = "2030-07-16"
+    syn_id = _synth_worker("LrtEnd")
+    if not syn_id:
+        r.create = r.edit = r.delete = r.shows = False
+        add_note(r, "synth worker create failed")
+        return r
+    try:
+        # Rate A=$1.00 active from 2030-07-01.
+        ra = _lrt_set_rate_api(syn_id, 1.00, WEEK_ACTIVE)
+        # Set rate B=$2.00 effective 2030-07-08 (Monday of week-2).
+        # Per #158, this auto-end-dates rate A with effective_to=2030-07-07.
+        rb = _lrt_set_rate_api(syn_id, 2.00, "2030-07-08")
+        # Sign-in in the active window (WEEK_ACTIVE).
+        _lrt_signin(syn_id, PROJECT, SYN_TUE_ACTIVE)
+        # Sign-in in the post-B window (WEEK_AFTER, beyond rate B too).
+        _lrt_signin(syn_id, PROJECT, SYN_TUE_AFTER)
+        r.create = (ra.status_code == 201 and rb.status_code == 201)
+        # WEEK_ACTIVE: rate A should still render (within its window).
+        grid_a = _lrt_week(WEEK_ACTIVE)
+        row_a = _lrt_find_row(grid_a, syn_id)
+        ok_a = bool(
+            row_a
+            and not row_a.get("rate_not_set")
+            and abs(float(row_a.get("amount_owed") or 0) - 8.0) < 0.005
+            and row_a.get("rate_effective_from") == WEEK_ACTIVE
+        )
+        # WEEK_AFTER: rate B (effective_from=2030-07-08) covers
+        # 2030-07-16, so rate B renders (8h * $2 = $16). The OLD rate A
+        # would be incorrectly applied IF the lookup ignored
+        # effective_to; this asserts the auto-end-date is honored.
+        grid_b = _lrt_week(WEEK_AFTER)
+        row_b = _lrt_find_row(grid_b, syn_id)
+        ok_b = bool(
+            row_b
+            and not row_b.get("rate_not_set")
+            and abs(float(row_b.get("amount_owed") or 0) - 16.0) < 0.005
+            and row_b.get("rate_effective_from") == "2030-07-08"
+        )
+        # Also verify: manually end-date rate B (post-supersede) so no
+        # rate is active in WEEK_AFTER, then assert "Rate not set"
+        # renders. Direct UPDATE — no rate API for retroactive end-date.
+        conn = db()
+        try:
+            conn.execute(
+                "UPDATE worker_rates SET effective_to = '2030-07-09' "
+                "WHERE employee_id = ? AND effective_from = '2030-07-08'",
+                (syn_id,)
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        # Now WEEK_AFTER's 2030-07-16 sign-in has no rate active on it.
+        grid_c = _lrt_week(WEEK_AFTER)
+        row_c = _lrt_find_row(grid_c, syn_id)
+        ok_c = bool(
+            row_c
+            and row_c.get("rate_not_set") is True
+            and "hourly_rate" not in row_c
+        )
+        r.shows = ok_a and ok_b and ok_c
+        r.edit = ok_a and ok_b  # rate-A active window + auto-end-date honored
+        r.delete = ok_c          # post-end-date "Rate not set" rendered
+        if not r.shows:
+            add_note(r,
+                f"active ok={ok_a}  postB ok={ok_b}  postEnd ok={ok_c}")
+    finally:
+        _lrt_cleanup_rate_state(syn_id)
+        _synth_teardown(syn_id)
+    return r
+
+
+def test_lrt_hire_mid_pay_period():
+    """Mid-pay-period hire: worker first signs in Wed of a week, rate
+    effective_from = hire date. Wed/Thu/Fri have hours + rate; Mon/Tue
+    have no entry. Per-day lookup must NOT render "Rate not set" for
+    the worker's row just because Mon/Tue have no hours — the worker
+    DID work within the effective range, just not on every day.
+
+    The Mario W-0007 case generalized: any new hire onboarding mid-week
+    where the rate row effective_from = first day worked.
+    """
+    r = SectionResult("LRT mid-period hire [#197-verify]")
+    WEEK = "2030-08-05"       # Monday
+    SYN_WED = "2030-08-07"
+    SYN_THU = "2030-08-08"
+    SYN_FRI = "2030-08-09"
+    syn_id = _synth_worker("LrtHire")
+    if not syn_id:
+        r.create = r.edit = r.delete = r.shows = False
+        add_note(r, "synth worker create failed")
+        return r
+    try:
+        # Rate effective on hire date (Wed). No sign-ins Mon/Tue.
+        ra = _lrt_set_rate_api(syn_id, 1.00, SYN_WED)
+        _lrt_signin(syn_id, PROJECT, SYN_WED)
+        _lrt_signin(syn_id, PROJECT, SYN_THU)
+        _lrt_signin(syn_id, PROJECT, SYN_FRI)
+        r.create = (ra.status_code == 201)
+        grid = _lrt_week(WEEK)
+        row = _lrt_find_row(grid, syn_id)
+        # Wed+Thu+Fri @ 8h = 24h * $1.00 = $24.
+        ok_amount = bool(
+            row
+            and not row.get("rate_not_set")
+            and abs(float(row.get("amount_owed") or 0) - 24.0) < 0.005
+            and float(row.get("weekly_total") or 0) == 24.0
+            and row.get("rate_effective_from") == SYN_WED
+        )
+        # Mon + Tue cells: no entry, hours == 0.
+        days = row.get("days", []) if row else []
+        mon_clear = any(
+            d.get("date") == "2030-08-05"
+            and not d.get("has_entry")
+            and (d.get("hours") or 0) == 0
+            for d in days
+        )
+        tue_clear = any(
+            d.get("date") == "2030-08-06"
+            and not d.get("has_entry")
+            and (d.get("hours") or 0) == 0
+            for d in days
+        )
+        r.shows = ok_amount and mon_clear and tue_clear
+        r.edit = ok_amount   # amount_owed correct, not blanked by Mon/Tue gap
+        r.delete = mon_clear and tue_clear
+        if not r.shows:
+            add_note(r,
+                f"amount_ok={ok_amount}  mon_clear={mon_clear}  tue_clear={tue_clear}  "
+                f"rate_eff_from={row.get('rate_effective_from') if row else None}")
+    finally:
+        _lrt_cleanup_rate_state(syn_id)
+        _synth_teardown(syn_id)
+    return r
+
+
 def test_pin_invariant():
     """#188 regression guard: every active worker has a 4-digit numeric PIN.
 
@@ -1736,8 +2066,15 @@ def main():
         ("SignInDcrInvariant", lambda: test_signin_dcr_invariant()),
         ("RosterCompleteness", lambda: test_roster_completeness_check()),
         ("DcrStalingLifecycle", lambda: test_dcr_staling_lifecycle()),
-        # LRT mid-week rate onset (#197 fix verification).
+        # LRT rate-effective-date suite — #197 (mid-week onset bug)
+        # plus 5 verification scenarios. All synthetic SMK-#### workers
+        # on 2030-class dates; placeholder rates $1.00 / $2.00 only.
         ("LrtMidWeekRateOnset", lambda: test_lrt_midweek_rate_onset()),
+        ("LrtFutureDatedRate",  lambda: test_lrt_future_dated_rate()),
+        ("LrtRetroactiveRate",  lambda: test_lrt_retroactive_rate()),
+        ("LrtRateTransition",   lambda: test_lrt_rate_transition_midperiod()),
+        ("LrtEndDatedRate",     lambda: test_lrt_end_dated_rate()),
+        ("LrtHireMidPeriod",    lambda: test_lrt_hire_mid_pay_period()),
     ]
     for short, fn in section_fns:
         try:
