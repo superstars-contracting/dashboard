@@ -3301,8 +3301,17 @@
 // Sidebar navigation - view switching
 document.querySelectorAll('.nav-link').forEach(link => {
   link.addEventListener('click', (e) => {
-    e.preventDefault();
     const targetView = link.getAttribute('data-view');
+    // #195 — `.nav-link` is shared between in-page view-switchers
+    // (data-view="employees" etc.) AND external href links (the LRT
+    // entry-point at /company-dashboard.html#labor-rate, future ones
+    // like that). Only swallow the click for in-page switchers; let
+    // the browser handle external href navigation normally. Without
+    // this gate the unconditional preventDefault below intercepts
+    // EVERY .nav-link click — the LRT link looked dead because the
+    // anchor's href never fired.
+    if (!targetView) return;
+    e.preventDefault();
 
     // Update sidebar active state
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));

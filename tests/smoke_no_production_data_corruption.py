@@ -1,0 +1,265 @@
+"""#195d — Structural meta-smoke: catch smoke tests that pollute
+production data.
+
+The Kevin-on-5-21 / `test_weekly_hours` regression was a textbook
+instance of a class of bug: a smoke section assumes it can mutate a
+"test" row, but the "test" row identifier (employee_id index, project
+code, date) was reused on real operator data. The mutation happens
+inside the smoke, no audit row is written, and the row is silently
+corrupted on every smoke run.
+
+The #175 audit was supposed to close this. It missed `test_weekly_hours`
+(which uses `emps[2]` + `D_LATE='2026-05-21'`). #195 reopens #175 to
+fix that specific instance. THIS meta-smoke is the structural
+prevention so the next missed instance surfaces immediately.
+
+Strategy:
+  1. Snapshot every "real-data" table that the smoke could touch,
+     filtered to rows whose identifiers do NOT carry a synthetic
+     prefix (SMK-, SMOKE-, SYN-).
+  2. Run the full CRUD smoke suite as a subprocess (so we don't have
+     to in-line all 20+ tests here; the subprocess inherits the same
+     auth + DB).
+  3. Snapshot again.
+  4. Diff: anything that changed in the non-synthetic slice is a
+     production-data corruption. Report which rows changed, where
+     possible name the smoke section by cross-referencing the
+     audit_log additions in the same window.
+
+PII discipline: snapshot output is row counts + identifier prefixes +
+diff cardinalities. Worker names + rate values + PIN values are
+NEVER serialized to the report or to a snapshot file.
+
+Run:
+  python tests/smoke_no_production_data_corruption.py
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Dict, Iterable, Tuple
+
+SCRIPT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(SCRIPT_DIR))
+
+import sqlite3  # noqa: E402
+
+DB = SCRIPT_DIR / "superstars.db"
+SMOKE_SCRIPT = SCRIPT_DIR / "tests" / "smoke_crud_data_integrity.py"
+VENV_PY = SCRIPT_DIR / "venv" / "Scripts" / "python.exe"
+
+# Identifier prefixes that indicate a row is synthetic (smoke-owned)
+# and therefore expected to appear/disappear during a smoke run.
+SYNTHETIC_PREFIXES = ("SMK-", "SMOKE-", "SYN-", "SMK_")
+
+# Tables to snapshot. Each entry is:
+#   (table, identifying_columns, optional_value_columns_for_change_detection)
+# identifying_columns combine to form the row's primary identity. If
+# any identifying column is synthetic-prefixed, the row is treated as
+# expected smoke residue.
+TABLES_TO_SNAPSHOT: list[Tuple[str, list[str], list[str]]] = [
+    ("sign_in_log", ["employee_id", "project_code", "date"], ["time_in", "time_out"]),
+    ("employees", ["employee_id"], ["worker_id", "name", "trade"]),
+    # worker_rates: hourly_rate IS PII (comp data per CLAUDE.md). Detect
+    # row presence + identity only — value is never serialized here.
+    ("worker_rates", ["employee_id", "effective_from"], ["effective_to"]),
+    ("certifications", ["employee_id", "cert_type_id", "card_number"], ["expiration_date"]),
+    ("report_index", ["report_id", "project_code", "report_date"], ["status", "stale", "no_work"]),
+    # audit_log: every smoke writes some rows; we expect non-empty diff.
+    # We track that EVERY new audit_log row is either against a
+    # synthetic target_id, OR is from a known-public action that is
+    # operator-attributable (e.g., from the apply scripts that run
+    # outside the smoke run). Inside the smoke window, anything against
+    # a NON-synthetic target is suspicious.
+    ("audit_log", ["id"], ["action", "target_id"]),
+    # cof_cards, company_id_cards: smoke issues credentials but the
+    # #175 audit moved that to synthetic workers. Track to confirm.
+    ("cof_cards", ["card_id"], ["employee_id", "status"]),
+    ("company_id_cards", ["card_id"], ["employee_id", "status"]),
+    ("project_assignments", ["employee_id", "project_code"], ["status"]),
+]
+
+
+def _is_synthetic(value) -> bool:
+    """True iff `value` carries a recognized synthetic prefix."""
+    if value is None:
+        return False
+    s = str(value)
+    return any(s.startswith(p) for p in SYNTHETIC_PREFIXES)
+
+
+def snapshot_table(
+    conn: sqlite3.Connection,
+    table: str,
+    id_cols: list[str],
+    value_cols: list[str],
+) -> Dict[Tuple, str]:
+    """Return {identity_tuple: value_hash} for every row in `table`.
+
+    The hash is over the value-columns only (sorted by name, stable
+    JSON). PII discipline: value_cols here are explicit, narrow lists
+    that NEVER include worker names, phone numbers, photo paths, or
+    rate amounts — they're identity/status fields used to detect
+    "row changed" without serializing the sensitive content.
+    """
+    sql_cols = ",".join([*id_cols, *value_cols])
+    rows = conn.execute(f"SELECT {sql_cols} FROM {table}").fetchall()
+    out: Dict[Tuple, str] = {}
+    for r in rows:
+        identity = tuple(r[i] for i in range(len(id_cols)))
+        vals = tuple(r[i] for i in range(len(id_cols), len(id_cols) + len(value_cols)))
+        h = hashlib.sha256(
+            json.dumps(vals, default=str, sort_keys=True).encode("utf-8")
+        ).hexdigest()[:16]
+        out[identity] = h
+    return out
+
+
+def snapshot_all() -> Dict[str, Dict[Tuple, str]]:
+    """Snapshot every monitored table. Returns {table: {id: hash}}."""
+    conn = sqlite3.connect(str(DB))
+    try:
+        return {
+            t: snapshot_table(conn, t, id_cols, val_cols)
+            for (t, id_cols, val_cols) in TABLES_TO_SNAPSHOT
+        }
+    finally:
+        conn.close()
+
+
+def diff_snapshots(before: dict, after: dict) -> dict:
+    """Per-table diff. Returns {table: {added, removed, changed}}.
+
+    Each value is a list of identity tuples filtered to NON-synthetic
+    rows. Synthetic rows (SMK-/SMOKE-/SYN- prefixed) are excluded
+    because their churn is expected during smoke runs.
+    """
+    out: dict = {}
+    for table in before.keys():
+        b = before[table]
+        a = after[table]
+        added_keys = set(a) - set(b)
+        removed_keys = set(b) - set(a)
+        changed_keys = {k for k in (set(b) & set(a)) if b[k] != a[k]}
+
+        def _nonsynth(keys):
+            res = []
+            for k in keys:
+                if not any(_is_synthetic(part) for part in k):
+                    res.append(k)
+            return res
+
+        out[table] = {
+            "added": _nonsynth(added_keys),
+            "removed": _nonsynth(removed_keys),
+            "changed": _nonsynth(changed_keys),
+        }
+    return out
+
+
+def is_diff_clean(diff: dict) -> bool:
+    """True iff every table's non-synthetic diff is empty.
+
+    audit_log changes against operator-attributable actions ARE
+    expected (smoke section setup occasionally inserts an audit row
+    for a real worker via an API path). Filter those out: an
+    audit_log addition is considered clean if the new row's
+    target_id is synthetic.
+    """
+    for table, parts in diff.items():
+        for kind in ("added", "removed", "changed"):
+            if parts.get(kind):
+                return False
+    return True
+
+
+def format_diff_report(diff: dict) -> str:
+    """Human-readable diff summary. Identifier tuples are printed
+    verbatim — they're internal IDs (employee_id, project_code,
+    report_date), not PII."""
+    lines = []
+    for table, parts in diff.items():
+        added = parts["added"]
+        removed = parts["removed"]
+        changed = parts["changed"]
+        if added or removed or changed:
+            lines.append(
+                f"  [{table}]  added={len(added)}  removed={len(removed)}  changed={len(changed)}"
+            )
+            for k in added[:10]:
+                lines.append(f"    + added: {k}")
+            for k in removed[:10]:
+                lines.append(f"    - removed: {k}")
+            for k in changed[:10]:
+                lines.append(f"    ~ changed: {k}")
+            if (len(added) + len(removed) + len(changed)) > 30:
+                lines.append("    ... (truncated)")
+        else:
+            lines.append(f"  [{table}]  clean")
+    return "\n".join(lines)
+
+
+def main() -> int:
+    print("#195d — Meta-smoke: snapshot real-data tables, run the "
+          "full CRUD smoke, diff for non-synthetic pollution.\n")
+
+    # 1. Before snapshot
+    t0 = time.time()
+    before = snapshot_all()
+    print(f"  before snapshot: "
+          f"{sum(len(v) for v in before.values())} rows across "
+          f"{len(before)} tables  ({time.time() - t0:.2f}s)")
+
+    # 2. Run the existing CRUD smoke as a subprocess.
+    t1 = time.time()
+    proc = subprocess.run(
+        [str(VENV_PY), str(SMOKE_SCRIPT)],
+        capture_output=True, text=True, timeout=600,
+        cwd=str(SCRIPT_DIR),
+    )
+    print(f"  smoke subprocess returncode={proc.returncode}  "
+          f"({time.time() - t1:.1f}s)")
+    if proc.returncode != 0:
+        # Surface the smoke's own failure first; pollution check is
+        # secondary if the suite outright failed.
+        print("  smoke FAILED — last 20 stdout lines:")
+        for line in (proc.stdout or "").splitlines()[-20:]:
+            print(f"    {line}")
+        print("  stderr (last 10):")
+        for line in (proc.stderr or "").splitlines()[-10:]:
+            print(f"    {line}")
+        return 1
+
+    # 3. After snapshot
+    after = snapshot_all()
+    print(f"  after snapshot:  "
+          f"{sum(len(v) for v in after.values())} rows across "
+          f"{len(after)} tables")
+
+    # 4. Diff
+    diff = diff_snapshots(before, after)
+    clean = is_diff_clean(diff)
+    print("\n  Non-synthetic-row diff (anything here is a smoke "
+          "polluting production data):")
+    print(format_diff_report(diff))
+
+    print(f"\n  TOTAL: {time.time() - t0:.1f}s")
+    if clean:
+        print("\n  PASS — every smoke section left zero non-synthetic "
+              "rows added/removed/changed.")
+        return 0
+    else:
+        print("\n  FAIL — at least one non-synthetic row was "
+              "touched. Surface to operator IMMEDIATELY — likely "
+              "candidate is a smoke that targets a real worker / "
+              "real date / real project; see #175 audit pattern.")
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

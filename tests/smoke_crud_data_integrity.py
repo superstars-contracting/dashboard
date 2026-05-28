@@ -916,69 +916,95 @@ def test_photos():
 
 def test_weekly_hours():
     """Weekly Hours Log: hours are SOURCED from sign_in_log. The grid GET
-    is /api/payroll/hours; cell edit = sign-ins POST/PUT/DELETE."""
+    is /api/payroll/hours; cell edit = sign-ins POST/PUT/DELETE.
+
+    #175-reopen / #195 — earlier this test operated on `emps[2]` (real
+    worker, in practice Kevin = E-00003 = W-0003) on `D_LATE`
+    (2026-05-21, a real DCR-issued date). Every smoke run deleted
+    Kevin's 5-21 sign_in_log row before the test even started, then
+    deleted the test-created row at the end. After #192 inserted
+    Kevin's real 5-21 row, the very next smoke run silently destroyed
+    it — undetected for hours because the deletion bypassed
+    audit_log. Rewritten to scope to a synthetic SMK-#### worker on a
+    synthetic date so the production roster is never touched. Pattern
+    matches the #175-audit fixes to test_face_photo and
+    test_credential_issue (see _synth_worker / _synth_teardown).
+    """
     r = SectionResult("Weekly Hours Log (cell add/edit/delete)")
-    # Use D_LATE (2026-05-21 = Thursday). Monday of that week = 2026-05-18.
-    monday = "2026-05-18"
-    emps = requests.get(f"{BASE}/api/employees", timeout=10).json()["data"]
-    target_emp = emps[2]["employee_id"] if len(emps) > 2 else emps[0]["employee_id"]
-    test_date = D_LATE
-    # clean
-    conn = db()
+    # Synthetic date well outside any operator window — same family
+    # the roster-completeness smoke uses for the same reason.
+    SYN_MONDAY = "2030-03-11"
+    SYN_TEST_DATE = "2030-03-13"  # Thursday of the synthetic week
+    syn_id = _synth_worker("WkHrs")
+    if not syn_id:
+        r.create = r.edit = r.delete = r.shows = False
+        add_note(r, "synth worker create failed")
+        return r
     try:
-        conn.execute(
-            "DELETE FROM sign_in_log WHERE employee_id = ? AND date = ? AND project_code = ?",
-            (target_emp, test_date, PROJECT)
-        )
-        conn.commit()
+        # Defensive — no row could exist yet, but cleanup_marker
+        # patterns from prior history left this here. Limit DELETE to
+        # the synthetic worker so it can't bleed onto real data.
+        conn = db()
+        try:
+            conn.execute(
+                "DELETE FROM sign_in_log "
+                "WHERE employee_id = ? AND date = ? AND project_code = ?",
+                (syn_id, SYN_TEST_DATE, PROJECT)
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        # CREATE — POST a sign-in for the synthetic worker on the
+        # synthetic date.
+        cr = requests.post(f"{BASE}/api/sign-ins", json={
+            "employee_id": syn_id, "project_code": PROJECT,
+            "date": SYN_TEST_DATE, "time_in": "07:00", "time_out": "15:30",
+        }, timeout=10)
+        new_id = cr.json()["data"]["id"] if cr.status_code in (200, 201) else None
+        # /api/payroll/hours is week-scoped; the SYN_MONDAY week is
+        # well past any real data so no grid pollution.
+        grid = requests.get(f"{BASE}/api/payroll/hours",
+                            params={"week_start": SYN_MONDAY}, timeout=10).json()["data"]
+        found = False
+        for w in grid["workers"]:
+            if w["employee_id"] == syn_id:
+                for d in w["days"]:
+                    if d.get("date") == SYN_TEST_DATE and d.get("has_entry"):
+                        found = True
+        r.create = bool(new_id) and found
+        # EDIT — PUT (full replace) to change times → grid should reflect new hours
+        if new_id is not None:
+            ur = requests.put(f"{BASE}/api/sign-ins/{new_id}",
+                              json={"time_in": "08:00", "time_out": "12:00"}, timeout=10)
+            grid2 = requests.get(f"{BASE}/api/payroll/hours",
+                                 params={"week_start": SYN_MONDAY}, timeout=10).json()["data"]
+            new_hours = None
+            for w in grid2["workers"]:
+                if w["employee_id"] == syn_id:
+                    for d in w["days"]:
+                        if d.get("date") == SYN_TEST_DATE:
+                            new_hours = d.get("hours")
+            r.edit = (ur.status_code == 200 and new_hours not in (None, 0))
+        else:
+            r.edit = False
+        # DELETE — clearing a cell = DELETE the sign-in
+        if new_id is not None:
+            dr = requests.delete(f"{BASE}/api/sign-ins/{new_id}", timeout=10)
+            grid3 = requests.get(f"{BASE}/api/payroll/hours",
+                                 params={"week_start": SYN_MONDAY}, timeout=10).json()["data"]
+            gone = True
+            for w in grid3["workers"]:
+                if w["employee_id"] == syn_id:
+                    for d in w["days"]:
+                        if d.get("date") == SYN_TEST_DATE and d.get("has_entry"):
+                            gone = False
+            r.delete = (dr.status_code == 200 and gone)
+        else:
+            r.delete = False
+        # SHOWS = grid surfaces the entry while it's present (already verified in CREATE)
+        r.shows = r.create
     finally:
-        conn.close()
-    # CREATE — POST a sign-in
-    cr = requests.post(f"{BASE}/api/sign-ins", json={
-        "employee_id": target_emp, "project_code": PROJECT,
-        "date": test_date, "time_in": "07:00", "time_out": "15:30",
-    }, timeout=10)
-    new_id = cr.json()["data"]["id"] if cr.status_code in (200, 201) else None
-    grid = requests.get(f"{BASE}/api/payroll/hours",
-                        params={"week_start": monday}, timeout=10).json()["data"]
-    found = False
-    for w in grid["workers"]:
-        if w["employee_id"] == target_emp:
-            for d in w["days"]:
-                if d.get("date") == test_date and d.get("has_entry"):
-                    found = True
-    r.create = bool(new_id) and found
-    # EDIT — PUT (full replace) to change times → grid should reflect new hours
-    if new_id is not None:
-        ur = requests.put(f"{BASE}/api/sign-ins/{new_id}",
-                          json={"time_in": "08:00", "time_out": "12:00"}, timeout=10)
-        grid2 = requests.get(f"{BASE}/api/payroll/hours",
-                             params={"week_start": monday}, timeout=10).json()["data"]
-        new_hours = None
-        for w in grid2["workers"]:
-            if w["employee_id"] == target_emp:
-                for d in w["days"]:
-                    if d.get("date") == test_date:
-                        new_hours = d.get("hours")
-        r.edit = (ur.status_code == 200 and new_hours not in (None, 0))
-    else:
-        r.edit = False
-    # DELETE — clearing a cell = DELETE the sign-in
-    if new_id is not None:
-        dr = requests.delete(f"{BASE}/api/sign-ins/{new_id}", timeout=10)
-        grid3 = requests.get(f"{BASE}/api/payroll/hours",
-                             params={"week_start": monday}, timeout=10).json()["data"]
-        gone = True
-        for w in grid3["workers"]:
-            if w["employee_id"] == target_emp:
-                for d in w["days"]:
-                    if d.get("date") == test_date and d.get("has_entry"):
-                        gone = False
-        r.delete = (dr.status_code == 200 and gone)
-    else:
-        r.delete = False
-    # SHOWS = grid surfaces the entry while it's present (already verified in CREATE)
-    r.shows = r.create
+        _synth_teardown(syn_id)
     return r
 
 
