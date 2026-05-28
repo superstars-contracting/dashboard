@@ -390,11 +390,23 @@ def api_payroll_hours():
 
     Role-gated comp data (#158): if the requester's role is
     'admin' / 'c_suite', each worker carries `hourly_rate` and
-    `amount_owed` for THIS week (rate effective on the week's start
-    Monday, per worker_rates). For all other roles those keys are
+    `amount_owed` for THIS week. For all other roles those keys are
     OMITTED ENTIRELY (not zeroed, not "—") so a sniffed payload
     reveals nothing about pay (per CLAUDE.md comp-data rule + #146
     handoff).
+
+    #197 — Rate lookup is PER-DAY-WORKED, not as-of-week-start. Each
+    sign_in_log row gets joined to the rate effective on its own date.
+    `amount_owed` = SUM(day_hours * rate_effective_on(day_date)) across
+    the week. `rate_not_set` is True only when the worker has no
+    active rate on ANY day they actually worked.
+
+    Why: the prior as-of-week-start lookup mis-rendered "Rate not set"
+    for any worker whose `effective_from` fell mid-week — including
+    every new hire and every operator-side rate change that wasn't
+    aligned to a Monday. Mario W-0007's effective_from=2026-05-13
+    against week_start=2026-05-11 was the operator-reported instance.
+    The structural fix is per-day, not per-week.
     """
     from payroll_hours import last_completed_week, build_week_grid
     from worker_rates import get_rate_effective_on, role_can_see_rates
@@ -414,20 +426,53 @@ def api_payroll_hours():
             user = current_user() or {}
             if role_can_see_rates(user.get('role')):
                 grand_amount = 0.0
-                week_start_iso = grid['week_start']
                 for w in grid.get('workers', []):
-                    r = get_rate_effective_on(conn, w['employee_id'], week_start_iso)
-                    if r:
-                        w['hourly_rate'] = round(float(r['hourly_rate']), 2)
-                        w['rate_effective_from'] = r['effective_from']
-                        w['amount_owed'] = round(
-                            float(r['hourly_rate']) * float(w.get('weekly_total') or 0),
-                            2,
-                        )
+                    # Per-day rate lookup — accumulate amount_owed across
+                    # each day's hours-worked × that-day's effective rate.
+                    # Display rate (the column the operator reads) is the
+                    # rate effective on the FIRST day the worker worked
+                    # this week; this handles new hires whose effective_from
+                    # falls mid-week and rate changes mid-week alike.
+                    amount_owed = 0.0
+                    display_rate = None
+                    display_eff_from = None
+                    any_worked_day_has_rate = False
+                    worker_actually_worked = False
+                    for day in w.get('days', []):
+                        day_hours = float(day.get('hours') or 0)
+                        if day_hours <= 0:
+                            continue
+                        worker_actually_worked = True
+                        r = get_rate_effective_on(conn, w['employee_id'], day['date'])
+                        if r:
+                            day_rate = float(r['hourly_rate'])
+                            amount_owed += day_hours * day_rate
+                            any_worked_day_has_rate = True
+                            if display_rate is None:
+                                display_rate = day_rate
+                                display_eff_from = r['effective_from']
+                    if not worker_actually_worked:
+                        # Worker on roster but no hours this week — use
+                        # current rate (or first historically-set) for
+                        # display so the operator can still see what
+                        # they'd be paid if they did sign in. Sentinel
+                        # 'rate_not_set' only when literally no rate row.
+                        r = get_rate_effective_on(conn, w['employee_id'],
+                                                  grid['week_end'])
+                        if r:
+                            w['hourly_rate'] = round(float(r['hourly_rate']), 2)
+                            w['rate_effective_from'] = r['effective_from']
+                            w['amount_owed'] = 0.0
+                        else:
+                            w['rate_not_set'] = True
+                    elif any_worked_day_has_rate:
+                        w['hourly_rate'] = round(display_rate, 2)
+                        w['rate_effective_from'] = display_eff_from
+                        w['amount_owed'] = round(amount_owed, 2)
                         grand_amount += w['amount_owed']
                     else:
-                        # Worker has no rate set yet — hours visible, comp omitted
-                        # per row. UI renders "Rate not set" placeholder.
+                        # Worker has hours but no rate active on ANY of
+                        # the days worked — render "Rate not set."
                         w['rate_not_set'] = True
                 grid['grand_amount_owed'] = round(grand_amount, 2)
                 grid['rates_visible'] = True

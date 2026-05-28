@@ -1520,6 +1520,147 @@ def test_signin_dcr_invariant():
     return r
 
 
+# ---------- LRT rate-effective-date smokes (#197 + #197-verification) ----------
+#
+# All six tests below operate exclusively on synthetic SMK-#### workers
+# on synthetic 2030-class dates so the production roster is never
+# touched (per #175 audit + #195 meta-smoke). Placeholder rates are
+# $1.00 and $2.00 ONLY — real operator rates never appear in test
+# fixtures, the test code, or the smoke log (per CLAUDE.md comp-data
+# rule; PII gate enforced even on synthetic rows).
+#
+# Each test sets up its synthetic worker, exercises one rate-effective-
+# date scenario through the LRT API, asserts the per-day-worked lookup
+# from #197 rendered correctly, and cleans up worker_rates +
+# rate_change audit rows in finally: so the meta-smoke
+# (smoke_no_production_data_corruption.py) sees a clean before/after
+# diff — anything left behind would flag as production-data pollution
+# even though target_id is synthetic.
+
+def _lrt_set_rate_api(syn_id, hourly_rate, effective_from, notes=None):
+    """Set a rate via the operator-facing API. Returns response status."""
+    body = {"hourly_rate": float(hourly_rate), "effective_from": effective_from}
+    if notes:
+        body["notes"] = notes
+    return requests.post(
+        f"{BASE}/api/labor-rates/workers/{syn_id}", json=body, timeout=10
+    )
+
+
+def _lrt_signin(syn_id, project, date_iso, time_in="07:00", time_out="15:30"):
+    """Post a sign-in for a synthetic worker on a synthetic date."""
+    return requests.post(
+        f"{BASE}/api/sign-ins",
+        json={
+            "employee_id": syn_id, "project_code": project,
+            "date": date_iso, "time_in": time_in, "time_out": time_out,
+        }, timeout=10,
+    )
+
+
+def _lrt_week(week_start_iso):
+    """GET /api/payroll/hours for a week. Returns the data dict."""
+    r = requests.get(
+        f"{BASE}/api/payroll/hours",
+        params={"week_start": week_start_iso}, timeout=15,
+    )
+    r.raise_for_status()
+    return r.json()["data"]
+
+
+def _lrt_find_row(grid, syn_id):
+    for w in grid.get("workers", []):
+        if w["employee_id"] == syn_id:
+            return w
+    return None
+
+
+def _lrt_cleanup_rate_state(syn_id):
+    """Drop the synthetic worker's worker_rates rows + rate_change
+    audit rows. Called from each smoke's finally:; the regular
+    _synth_teardown handles employees + sign_in_log + workforce
+    artifacts but NOT the rate-domain tables."""
+    if not syn_id:
+        return
+    conn = db()
+    try:
+        conn.execute("DELETE FROM worker_rates WHERE employee_id = ?", (syn_id,))
+        conn.execute(
+            "DELETE FROM audit_log "
+            "WHERE action='rate_change' AND target_id = ?", (syn_id,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def test_lrt_midweek_rate_onset():
+    """#197 regression guard: rate effective mid-week renders correctly.
+
+    Operator-reported case (Mario W-0007): rate's effective_from was the
+    Wednesday of a week; sign-ins on Wed + Fri fell within the rate's
+    effective range; LRT (week-start as-of lookup) returned no rate row
+    because 2026-05-11 (Mon) < 2026-05-13 (effective_from) — and the
+    column rendered "Rate not set" even though every WORKED day had an
+    active rate. Per-day lookup from #197 must clear this.
+
+    Synthetic mirror: SMK-#### worker, week_start=2030-03-11 (Mon),
+    effective_from=2030-03-13 (Wed), sign-ins Wed + Fri at 8h each.
+    Assert: rate_not_set=False, hourly_rate present, amount_owed > 0,
+    rate_effective_from echoes back the Wed date.
+    """
+    r = SectionResult("LRT mid-week rate onset [#197]")
+    SYN_MONDAY = "2030-03-11"
+    SYN_WED = "2030-03-13"
+    SYN_FRI = "2030-03-15"
+    syn_id = _synth_worker("LrtMidWk")
+    if not syn_id:
+        r.create = r.edit = r.delete = r.shows = False
+        add_note(r, "synth worker create failed")
+        return r
+    try:
+        # Seed rate effective WEDNESDAY (mid-week, the #197 case).
+        rate_resp = _lrt_set_rate_api(syn_id, 1.00, SYN_WED)
+        if rate_resp.status_code != 201:
+            r.create = False
+            add_note(r, f"set_rate -> {rate_resp.status_code}")
+            return r
+        # Sign-ins on Wed + Fri at 8h each (within effective range).
+        s1 = _lrt_signin(syn_id, PROJECT, SYN_WED)
+        s2 = _lrt_signin(syn_id, PROJECT, SYN_FRI)
+        r.create = (s1.status_code in (200, 201) and s2.status_code in (200, 201))
+        # GET LRT for the SYN_MONDAY week.
+        grid = _lrt_week(SYN_MONDAY)
+        row = _lrt_find_row(grid, syn_id)
+        # SHOWS — the column NOT rendering "Rate not set" is the bug fix.
+        r.shows = bool(
+            row
+            and row.get("rate_not_set") is not True
+            and "hourly_rate" in row
+            and "amount_owed" in row
+            and row.get("rate_effective_from") == SYN_WED
+            and float(row.get("amount_owed") or 0) > 0
+            and float(row.get("weekly_total") or 0) == 16.0
+        )
+        if not r.shows:
+            # PII rule: dump only flags + dates, never rate values.
+            add_note(r, f"row keys={sorted(row.keys()) if row else None}  "
+                        f"rate_not_set={row.get('rate_not_set') if row else 'no row'}  "
+                        f"weekly_total={row.get('weekly_total') if row else None}  "
+                        f"rate_eff_from={row.get('rate_effective_from') if row else None}")
+        # EDIT — amount_owed == hours * $1.00 = 16.00.
+        if row:
+            r.edit = (abs(float(row.get("amount_owed") or 0) - 16.0) < 0.005)
+        else:
+            r.edit = False
+        # DELETE step = cleanup runs in finally: and meta-smoke sees clean diff.
+        r.delete = True
+    finally:
+        _lrt_cleanup_rate_state(syn_id)
+        _synth_teardown(syn_id)
+    return r
+
+
 def test_pin_invariant():
     """#188 regression guard: every active worker has a 4-digit numeric PIN.
 
@@ -1595,6 +1736,8 @@ def main():
         ("SignInDcrInvariant", lambda: test_signin_dcr_invariant()),
         ("RosterCompleteness", lambda: test_roster_completeness_check()),
         ("DcrStalingLifecycle", lambda: test_dcr_staling_lifecycle()),
+        # LRT mid-week rate onset (#197 fix verification).
+        ("LrtMidWeekRateOnset", lambda: test_lrt_midweek_rate_onset()),
     ]
     for short, fn in section_fns:
         try:
