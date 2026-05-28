@@ -65,7 +65,11 @@ import time
 from datetime import date
 from pathlib import Path
 
+import hashlib
+import json
 import jinja2
+import logging
+import os
 import pypdfium2 as pp
 from PIL import Image
 
@@ -84,6 +88,178 @@ EDGE_PATHS = [
 
 # Order: W-0001..W-0012 (CoF), then W-0013, W-0014 (Company ID).
 WORKER_ORDER = [f"W-{i:04d}" for i in range(1, 15)]
+
+# #189 — cache file convention. Naming is `SuperstarsContracting-AllIDs-
+# <fingerprint>.pdf` where <fingerprint> is the SHA256/16 of the
+# worker+rigger input set. The endpoint downloads under the friendly
+# filename (SuperstarsContracting-AllIDs-<YYYY-MM-DD>.pdf) via the
+# anchor's `download` attribute, so the operator never sees the
+# fingerprint suffix.
+CACHE_PREFIX = "SuperstarsContracting-AllIDs-"
+CACHE_KEEP_LAST_N = 3
+
+
+def compute_bundle_fingerprint(workers_summary, global_state):
+    """SHA256(worker rows + photo mtimes + rigger info) → 16-hex digest.
+
+    Inputs that AFFECT the rendered bundle are hashed; anything else
+    (e.g., today's calendar date if no worker data changed) is NOT,
+    so two clicks on the same day with no DB change land on a cache HIT.
+
+    workers_summary: list of dicts with keys worker_id, pin, name,
+        trade, photo_mtime (float or None), cof_card_id, cof_expiry,
+        company_id_card_id, rigger_name_snapshot, rigger_license_snapshot,
+        signature_path_mtime.
+    global_state: dict with keys like template_mtime (so a template
+        edit invalidates the cache automatically).
+
+    The hash uses sort-stable JSON to be byte-stable across Python
+    runs. The 16-hex digest is enough collision resistance for cache
+    keying — ~10^19 possible fingerprints vs realistic ~10s of distinct
+    bundle states per operator-week.
+    """
+    sorted_items = sorted(workers_summary, key=lambda w: w["worker_id"])
+    blob = json.dumps(
+        {"workers": sorted_items, "global": global_state},
+        sort_keys=True,
+        default=str,  # date/Path → str fallback
+    ).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()[:16]
+
+
+def _photo_mtime(face_image_path):
+    """File mtime in epoch-seconds, or None if missing/unset."""
+    if not face_image_path:
+        return None
+    fp = Path(face_image_path)
+    if not fp.is_absolute():
+        fp = SCRIPT_DIR / fp
+    if not fp.exists():
+        return None
+    return fp.stat().st_mtime
+
+
+def _file_mtime(path):
+    """Generic mtime helper for cache fingerprinting; None if absent."""
+    try:
+        return Path(path).stat().st_mtime
+    except FileNotFoundError:
+        return None
+
+
+def gather_bundle_inputs():
+    """Snapshot the data that feeds the bundle render. Returns a tuple
+    of (workers_summary, global_state) ready for fingerprinting.
+
+    Pulls everything in ONE DB connection to avoid TOCTOU drift
+    between fingerprint compute and cache miss regen.
+    """
+    c = sqlite3.connect(str(DB))
+    c.row_factory = sqlite3.Row
+    try:
+        emp_rows = c.execute(
+            """SELECT employee_id, worker_id, name, trade, pin, phone,
+                      face_image_path
+                 FROM employees
+                WHERE worker_id IN ({})""".format(
+                ",".join(["?"] * len(WORKER_ORDER))
+            ),
+            tuple(WORKER_ORDER),
+        ).fetchall()
+        emp_by_wid = {r["worker_id"]: dict(r) for r in emp_rows}
+
+        workers_summary = []
+        for wid in WORKER_ORDER:
+            row = emp_by_wid.get(wid)
+            if not row:
+                continue
+            eid = row["employee_id"]
+            cof = c.execute(
+                "SELECT card_id, issued_date, expires_date, "
+                "       rigger_name_snapshot, rigger_license_snapshot, "
+                "       signature_path "
+                "FROM cof_cards WHERE employee_id = ? AND status = 'issued' "
+                "ORDER BY issued_date DESC LIMIT 1",
+                (eid,),
+            ).fetchone()
+            cid = c.execute(
+                "SELECT card_id, issued_date "
+                "FROM company_id_cards WHERE employee_id = ? AND status = 'active' "
+                "ORDER BY issued_date DESC, created_at DESC LIMIT 1",
+                (eid,),
+            ).fetchone()
+            cof_d = dict(cof) if cof else {}
+            cid_d = dict(cid) if cid else {}
+            sig_path = cof_d.get("signature_path") if cof_d else None
+            workers_summary.append({
+                "worker_id": wid,
+                "employee_id": eid,
+                # PII rule: hashing these is fine (one-way, not logged
+                # outside the fingerprint); we never echo `name` / `pin`
+                # / `phone` to chat or to server.log from this module.
+                "name": row["name"] or "",
+                "trade": row["trade"] or "",
+                "pin": row["pin"] or "",
+                "photo_mtime": _photo_mtime(row.get("face_image_path")),
+                "cof_card_id": cof_d.get("card_id"),
+                "cof_issued_date": cof_d.get("issued_date"),
+                "cof_expires_date": cof_d.get("expires_date"),
+                "cof_rigger_name": cof_d.get("rigger_name_snapshot"),
+                "cof_rigger_license": cof_d.get("rigger_license_snapshot"),
+                "cof_signature_mtime": _file_mtime(
+                    SCRIPT_DIR / (sig_path or "")
+                ) if sig_path else None,
+                "company_id_card_id": cid_d.get("card_id"),
+                "company_id_issued_date": cid_d.get("issued_date"),
+            })
+
+        # Global state: templates + bundle template's own source. If a
+        # template edit changes the layout, the cache must invalidate.
+        global_state = {
+            "cof_template_mtime": _file_mtime(SCRIPT_DIR / "cof_card_print.html"),
+            "cid_template_mtime": _file_mtime(SCRIPT_DIR / "company_id_card_print.html"),
+            "generator_mtime": _file_mtime(__file__),
+        }
+        return workers_summary, global_state
+    finally:
+        c.close()
+
+
+def cache_path_for(fingerprint):
+    """Where the cached PDF for `fingerprint` lives on disk."""
+    return BATCH_DIR / f"{CACHE_PREFIX}{fingerprint}.pdf"
+
+
+def cache_sidecar_for(fingerprint):
+    """JSON metadata file next to the cached PDF (counts, gen ts)."""
+    return BATCH_DIR / f"{CACHE_PREFIX}{fingerprint}.json"
+
+
+def prune_cache(keep_last_n=CACHE_KEEP_LAST_N):
+    """Keep the N most-recent fingerprinted cache PDFs; delete older.
+    A `<fingerprint>.json` is removed alongside its `<fingerprint>.pdf`.
+    Old dated files (legacy `*-YYYY-MM-DD.pdf` from before #189) are
+    NOT touched — they're the operator's history. Errors are logged
+    and swallowed; pruning is best-effort housekeeping."""
+    try:
+        pdfs = []
+        for p in BATCH_DIR.glob(f"{CACHE_PREFIX}*.pdf"):
+            stem = p.stem[len(CACHE_PREFIX):]
+            # Fingerprints are 16 hex chars; anything else (e.g., a
+            # date suffix or other format) is left alone.
+            if len(stem) == 16 and all(ch in "0123456789abcdef" for ch in stem):
+                pdfs.append(p)
+        pdfs.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        for old in pdfs[keep_last_n:]:
+            try:
+                old.unlink()
+                side = old.with_suffix(".json")
+                if side.exists():
+                    side.unlink()
+            except OSError:
+                pass
+    except Exception as e:
+        logging.warning(f"cache prune failed: {type(e).__name__}: {e}")
 
 
 def _fmt_mdy(d):
@@ -498,6 +674,123 @@ def build_bundle(fronts_by_type, shared_backs, output_pdf, base_url):
         shutil.rmtree(profile, ignore_errors=True)
 
 
+def render_concat_cards_one_edge(card_htmls, base_url, output_pdf):
+    """#189 — single-Edge consolidation of the per-card render stage.
+
+    Takes 14 individually-rendered card HTMLs (cheap, Jinja-only — no
+    Edge) and concatenates them into ONE wrapper HTML that Chromium
+    renders in a single --print-to-pdf invocation. Saves ~13 Edge
+    launches × ~800ms = ~10s on the cache-MISS path.
+
+    Output PDF: 14 cards × 2 pages each = 28 pages. Caller extracts
+    fronts at indices 0, 2, 4, ..., 26 and the shared-back samples at
+    page 1 (first CoF) + first Company-ID back page.
+
+    The two card templates (cof_card_print.html, company_id_card_print.html)
+    share the same @page CR80 rule, so combining their styles into one
+    <head> is safe; class names are scoped to each template's own
+    selectors and don't collide.
+
+    `.screen-only-note` (the on-screen "Ctrl+P to print" helper) is
+    hidden explicitly here so it doesn't allocate a phantom 3rd page
+    per card under Chromium's print pipeline.
+    """
+    import re as _re
+    style_re = _re.compile(r"<style[^>]*>(.*?)</style>", _re.DOTALL | _re.IGNORECASE)
+    body_re = _re.compile(r"<body[^>]*>(.*?)</body>", _re.DOTALL | _re.IGNORECASE)
+
+    # Match the on-screen `Ctrl+P to print` helper (display:none in
+    # print, but Chromium still allocates a page for it during the
+    # layout pass that precedes the @media print evaluation — this
+    # adds a phantom 1st blank page to the FIRST card in the concat).
+    # Strip the div entirely from each body before splicing.
+    screen_note_re = _re.compile(
+        r"<div\s+class=[\"']screen-only-note[\"'][^>]*>.*?</div>",
+        _re.DOTALL | _re.IGNORECASE,
+    )
+
+    styles_seen = []
+    sections = []
+    for html in card_htmls:
+        # Photos already inlined as data: URIs by fetch_card_context;
+        # /worker-files/ URL rewriting (kept here as belt-and-braces
+        # for any non-photo asset path that does still need the
+        # loopback prefix) is the same rewrite the per-card path uses.
+        html = html.replace(
+            'src="/worker-files/', f'src="{base_url}/worker-files/'
+        ).replace(
+            'src="/files/', f'src="{base_url}/files/'
+        )
+        m_style = style_re.search(html)
+        if m_style:
+            s = m_style.group(1)
+            if s not in styles_seen:
+                styles_seen.append(s)
+        m_body = body_re.search(html)
+        body_content = m_body.group(1) if m_body else html
+        # Drop the screen-only-note — see comment above.
+        body_content = screen_note_re.sub("", body_content)
+        sections.append(
+            '<div class="ssc-card-doc">'
+            + body_content
+            + '</div>'
+        )
+
+    wrapper = (
+        '<!DOCTYPE html><html lang="en"><head>'
+        '<meta charset="UTF-8">'
+        f'<link rel="stylesheet" href="{base_url}/files/static/fonts/typography.css">'
+        '<title>SSC bundle — concatenated cards</title>'
+        '<style>'
+        + "\n".join(styles_seen)
+        + """
+        /* #189 single-Edge bundle hardening. */
+        body { margin: 0; padding: 0; background: #fff; }
+        .ssc-card-doc { display: block; }
+        /* Force a hard break AFTER every .sheet so Chromium emits
+           exactly one page per sheet (= 2 pages per card). Without
+           this, a trailing whitespace text node or @page interaction
+           emits a phantom 3rd page per card (~28 -> 29-42 pages total
+           depending on bookkeeping). Suppressing page-break-after on
+           the very last sheet of the very last card stops the trailing
+           blank-page that "always" would otherwise leave behind. */
+        .ssc-card-doc > .sheet { page-break-after: always; }
+        .ssc-card-doc:last-child > .sheet:last-of-type { page-break-after: auto; }
+        /* The "Ctrl+P to print this credential" hint is screen-only;
+           guarantee it doesn't allocate a print page here. */
+        .screen-only-note { display: none !important; }
+        @media print { .ssc-card-doc { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+        </style>
+        </head><body>"""
+        + "".join(sections)
+        + '</body></html>'
+    )
+
+    profile = tempfile.mkdtemp(prefix="cred_concat_")
+    edge = find_edge()
+    tmp_html = Path(profile) / "concat.html"
+    tmp_html.write_text(wrapper, encoding="utf-8")
+    try:
+        cmd = [
+            str(edge),
+            "--headless=old",
+            "--disable-gpu",
+            "--no-pdf-header-footer",
+            f"--user-data-dir={profile}",
+            "--virtual-time-budget=12000",
+            f"--print-to-pdf={output_pdf}",
+            tmp_html.as_uri(),
+        ]
+        subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        for _ in range(60):
+            if Path(output_pdf).exists() and Path(output_pdf).stat().st_size > 0:
+                return True
+            time.sleep(0.2)
+        return False
+    finally:
+        shutil.rmtree(profile, ignore_errors=True)
+
+
 def _bake_long_edge_duplex_hint(pdf_path):
     """Set /ViewerPreferences << /Duplex /DuplexFlipLongEdge >> in the
     PDF catalog. Pure post-process: doesn't touch page content. Errors
@@ -524,23 +817,92 @@ def _bake_long_edge_duplex_hint(pdf_path):
               file=sys.stderr)
 
 
-def main(base_url="http://127.0.0.1:5050"):
-    BATCH_DIR.mkdir(parents=True, exist_ok=True)
-    today = date.today().isoformat()
-    # Operator-facing filename (#178) — clean when it lands in the
-    # operator's Downloads folder vs the prior all_credentials_*.
-    output = BATCH_DIR / f"SuperstarsContracting-AllIDs-{today}.pdf"
+def main(base_url="http://127.0.0.1:5050", *, force_regenerate=False):
+    """Render or serve the credentials bundle PDF.
 
-    # 1. Render each worker's card to a 2-page PDF + convert front to PNG.
-    #    Back is NOT extracted per-worker — see step 2.
-    fronts = []          # list of (W-####, cred_type, front_data_url)
-    back_sample_html = {}  # cred_type -> HTML to render once for the
-                           # shared-back tile
+    Returns a dict:
+      {
+        "status":      "cache_hit" | "cache_miss" | "no_workers",
+        "output_path": Path,         # the PDF on disk
+        "fingerprint": str,          # 16 hex chars
+        "stage_t":     {stage: seconds, ...},
+      }
+    For backwards compat with the prior int-return signature, callers
+    that test `if rc != 0` get a 0/1 via the convenience exit in
+    `__main__`.
+
+    Cache contract (#189): compute the input fingerprint, look up an
+    existing PDF named `SuperstarsContracting-AllIDs-<fingerprint>.pdf`.
+    On hit, serve it instantly (no Edge launches, no DB writes from the
+    self-heal guard either — the guard already ran when the data was
+    first cached). On miss, regenerate and save with the new fingerprint.
+    """
+    BATCH_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Profiling (#189) — wall-clock per stage. Logged at INFO so the
+    # server.log carries the breakdown for every cache-MISS regen.
+    stage_t = {}
+    t_total = time.time()
+
+    # Cache lookup. If the fingerprint of current inputs matches an
+    # existing PDF, return it immediately. The fingerprint computation
+    # itself is cheap (one DB query + a few stat()s + a hash) — orders
+    # of magnitude faster than even the cheapest Edge launch.
+    t_fp = time.time()
+    try:
+        workers_summary, global_state = gather_bundle_inputs()
+    except Exception as e:
+        # If gather fails, fall through to the no-cache regen path —
+        # NEVER let the cache serve incorrect data.
+        logging.warning(f"bundle: gather inputs failed, forcing regen: {e}")
+        workers_summary, global_state = None, None
+
+    fingerprint = None
+    if workers_summary is not None:
+        try:
+            fingerprint = compute_bundle_fingerprint(workers_summary, global_state)
+        except Exception as e:
+            logging.warning(f"bundle: fingerprint failed, forcing regen: {e}")
+            fingerprint = None
+    stage_t["0_fingerprint"] = time.time() - t_fp
+
+    if (fingerprint
+            and not force_regenerate
+            and cache_path_for(fingerprint).exists()
+            and cache_path_for(fingerprint).stat().st_size > 0):
+        cached = cache_path_for(fingerprint)
+        stage_t["total"] = time.time() - t_total
+        logging.info(
+            f"bundle: cache HIT fingerprint={fingerprint} "
+            f"({stage_t['total']*1000:.0f}ms)"
+        )
+        print(f"  cache HIT  fingerprint={fingerprint}  "
+              f"served in {stage_t['total']*1000:.0f}ms")
+        return {
+            "status": "cache_hit",
+            "output_path": cached,
+            "fingerprint": fingerprint,
+            "stage_t": stage_t,
+        }
+
+    # Cache MISS — proceed with full regeneration. The fingerprint
+    # becomes the on-disk filename so subsequent identical inputs hit
+    # the cache.
+    output = (cache_path_for(fingerprint) if fingerprint
+              else BATCH_DIR / f"{CACHE_PREFIX}{date.today().isoformat()}.pdf")
+    print(f"  cache MISS  fingerprint={fingerprint or 'NA'}  regenerating...")
+
+    # 1. Resolve worker contexts + render each card HTML via Jinja.
+    #    No Edge launches here — just template rendering. The big
+    #    per-card cost (#189) was 14 × Edge cold start; concat below
+    #    folds them into one Edge call.
+    fronts_meta = []     # list of (W-####, cred_type, jinja_html)
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(SCRIPT_DIR)),
         autoescape=True,
     )
     workdir = Path(tempfile.mkdtemp(prefix="cred_bundle_"))
+    t_per_card = time.time()
     try:
         for wid in WORKER_ORDER:
             c = sqlite3.connect(str(DB))
@@ -562,73 +924,149 @@ def main(base_url="http://127.0.0.1:5050"):
                 continue
             cred_type, template_name, ctx = ctx_pkg
             html = env.get_template(template_name).render(**ctx)
-            # First worker of each cred_type donates their HTML as the
-            # source of the shared back tile (the back attestation block
-            # is rigger-only fields + a date; per-worker variation
-            # there is intentional behavior the operator decided to
-            # collapse in the batch print — see module docstring's
-            # SHARED BACK discussion).
-            if cred_type not in back_sample_html:
-                back_sample_html[cred_type] = html
-            card_pdf = workdir / f"{wid}.pdf"
-            ok = render_card_html_to_pdf(html, base_url, card_pdf)
-            if not ok:
-                print(f"  {wid}: PDF render failed — SKIPPED")
-                continue
-            try:
-                front_img = pdf_page_to_png(card_pdf, 0)
-            except Exception as ex:
-                print(f"  {wid}: front page-extract failed — {ex}")
-                continue
-            front_data = png_to_data_url(front_img)
-            fronts.append((wid, cred_type, front_data))
-            print(f"  {wid}: {cred_type:11}  front_size={front_img.size}")
+            fronts_meta.append((wid, cred_type, html))
+            print(f"  {wid}: {cred_type:11}  jinja=OK")
 
-        if not fronts:
+        if not fronts_meta:
             print("\n  BUNDLE: no workers prepared")
-            return 1
+            return {"status": "no_workers", "output_path": None,
+                    "fingerprint": fingerprint, "stage_t": stage_t}
 
-        # 2. Render the shared-back tile ONCE per cred_type encountered.
-        #    Uses the first worker of that type's already-rendered HTML
-        #    (page 2 of the per-worker PDF). The back template only
-        #    surfaces rigger fields + ISSUED_DATE — values that are
-        #    cohort-consistent for this batch — so any sample yields
-        #    the same visual back tile within rounding.
-        shared_backs = {}
-        for cred_type, html in back_sample_html.items():
-            sample_pdf = workdir / f"_shared_back_{cred_type}.pdf"
-            if not render_card_html_to_pdf(html, base_url, sample_pdf):
-                print(f"  SHARED BACK ({cred_type}): render failed")
-                return 1
-            try:
-                doc = pp.PdfDocument(str(sample_pdf))
-                n_pages = len(doc)
-                doc.close()
-            except Exception as ex:
-                print(f"  SHARED BACK ({cred_type}): page-count failed — {ex}")
-                return 1
-            if n_pages < 2:
-                print(f"  SHARED BACK ({cred_type}): expected >=2 pages, got {n_pages}")
-                return 1
-            back_img = pdf_page_to_png(sample_pdf, 1)
-            shared_backs[cred_type] = png_to_data_url(back_img)
-            print(f"  shared back ({cred_type}): back_size={back_img.size}")
+        # SINGLE Edge invocation (#189 secondary opt): render all
+        # cards' fronts+backs in one shot. Output is a 28-page CR80
+        # PDF where pages 2k = card[k] front, 2k+1 = card[k] back.
+        concat_pdf = workdir / "all_cards.pdf"
+        ok = render_concat_cards_one_edge(
+            [h for (_, _, h) in fronts_meta], base_url, concat_pdf
+        )
+        if not ok:
+            print("\n  CONCAT RENDER FAILED")
+            return {"status": "render_failed", "output_path": None,
+                    "fingerprint": fingerprint, "stage_t": stage_t}
+
+        # Extract per-card front PNGs + shared-back samples. In the
+        # concat output each card occupies 2 pages (front, back), with
+        # an OPTIONAL trailing phantom page at the very end emitted by
+        # Chromium's print pipeline. We accept N×2 or N×2+1 pages and
+        # index fronts at i*2, backs at i*2+1.
+        PAGES_PER_CARD = 2
+        try:
+            concat_doc = pp.PdfDocument(str(concat_pdf))
+            n_pages_concat = len(concat_doc)
+            scale = 300 / 72.0  # match pdf_page_to_png's default DPI
+            fronts = []
+            first_cof_back_idx = None
+            first_cid_back_idx = None
+            expected_pages = len(fronts_meta) * PAGES_PER_CARD
+            if n_pages_concat not in (expected_pages, expected_pages + 1):
+                print(f"  CONCAT page count: got {n_pages_concat}, expected "
+                      f"{expected_pages} or {expected_pages+1} "
+                      f"(={len(fronts_meta)} × {PAGES_PER_CARD} pages/card "
+                      f"+ optional trailing phantom); abort.")
+                concat_doc.close()
+                return {"status": "render_failed", "output_path": None,
+                        "fingerprint": fingerprint, "stage_t": stage_t}
+            for i, (wid, cred_type, _) in enumerate(fronts_meta):
+                front_page_idx = i * PAGES_PER_CARD
+                back_page_idx = front_page_idx + 1
+                bitmap = concat_doc[front_page_idx].render(scale=scale)
+                pil = bitmap.to_pil()
+                # Match pdf_page_to_png's max_px=1600 long-edge cap.
+                if max(pil.size) > 1600:
+                    r = 1600 / max(pil.size)
+                    pil = pil.resize((int(pil.size[0]*r), int(pil.size[1]*r)),
+                                     Image.LANCZOS)
+                fronts.append((wid, cred_type, png_to_data_url(pil)))
+                if cred_type == "cof" and first_cof_back_idx is None:
+                    first_cof_back_idx = back_page_idx
+                if cred_type == "company_id" and first_cid_back_idx is None:
+                    first_cid_back_idx = back_page_idx
+            # Shared backs.
+            shared_backs = {}
+            for cred_type, page_idx in [
+                ("cof", first_cof_back_idx),
+                ("company_id", first_cid_back_idx),
+            ]:
+                if page_idx is None:
+                    continue
+                bitmap = concat_doc[page_idx].render(scale=scale)
+                pil = bitmap.to_pil()
+                if max(pil.size) > 1600:
+                    r = 1600 / max(pil.size)
+                    pil = pil.resize((int(pil.size[0]*r), int(pil.size[1]*r)),
+                                     Image.LANCZOS)
+                shared_backs[cred_type] = png_to_data_url(pil)
+                print(f"  shared back ({cred_type}): back_size={pil.size}")
+            concat_doc.close()
+        except Exception as ex:
+            print(f"  CONCAT page-extract failed — {ex}")
+            return {"status": "render_failed", "output_path": None,
+                    "fingerprint": fingerprint, "stage_t": stage_t}
+        stage_t['1_per_card_render'] = time.time() - t_per_card
 
         print(f"\n  workers prepared: {len(fronts)}   cred_types: {sorted(shared_backs.keys())}")
+        t_bundle = time.time()
         ok = build_bundle(fronts, shared_backs, output, base_url)
+        stage_t['3_bundle_html_to_pdf'] = time.time() - t_bundle
         if not ok:
             print(f"\n  BUNDLE RENDER FAILED")
-            return 1
+            return {"status": "render_failed", "output_path": None,
+                    "fingerprint": fingerprint, "stage_t": stage_t}
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
 
     # Verify pages
+    t_verify = time.time()
     doc = pp.PdfDocument(str(output))
     n = len(doc)
     doc.close()
+    stage_t['4_pypdf_verify'] = time.time() - t_verify
+
+    # Write sidecar metadata (counts + gen ts) next to the cache PDF
+    # so the operator (or a future maintenance pass) can introspect
+    # the cache without re-opening the PDF.
+    if fingerprint:
+        try:
+            sidecar = cache_sidecar_for(fingerprint)
+            with sidecar.open("w", encoding="utf-8") as f:
+                json.dump({
+                    "fingerprint": fingerprint,
+                    "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "worker_count": len(fronts),
+                    "page_count": n,
+                    "size_bytes": output.stat().st_size,
+                }, f, indent=2)
+        except Exception as e:
+            logging.warning(f"sidecar write failed: {e}")
+        # Housekeeping: keep last N cache files.
+        prune_cache()
+
+    stage_t['total'] = time.time() - t_total
     print(f"\n  bundle written: {output} ({output.stat().st_size:,} bytes, {n} pages)")
-    return 0
+    print("  timing (seconds):")
+    for k in ['0_fingerprint', '1_per_card_render', '2_shared_backs',
+              '3_bundle_html_to_pdf', '4_pypdf_verify', 'total']:
+        v = stage_t.get(k)
+        if v is not None:
+            print(f"    {k:<24}  {v:6.2f}s")
+    logging.info(
+        f"bundle: cache MISS fingerprint={fingerprint} "
+        f"generated in {stage_t['total']*1000:.0f}ms  "
+        + "  ".join(f"{k}={v:.2f}s" for k, v in stage_t.items())
+    )
+    return {
+        "status": "cache_miss",
+        "output_path": output,
+        "fingerprint": fingerprint,
+        "stage_t": stage_t,
+    }
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # CLI entry — translate the dict return into an exit code.
+    result = main()
+    if isinstance(result, dict):
+        ok = result.get("status") in ("cache_hit", "cache_miss")
+        sys.exit(0 if ok else 1)
+    # Legacy int-return path (defensive).
+    sys.exit(int(result or 0))

@@ -3615,38 +3615,52 @@ def api_blank_forms():
 def api_credentials_batch_print():
     """Generate (and serve) the credentials batch-print PDF.
 
-    POST regenerates the bundle for today; GET returns the existing
-    file (if present) or generates on demand. The PDF lives at
-    data_room/credentials/batch_print/SuperstarsContracting-AllIDs-<YYYY-MM-DD>.pdf
-    and is served via the existing /files/ static mount.
+    Hash-cached as of #189. The bundle generator computes a fingerprint
+    of the input set (workers, photos, rigger info, template mtimes);
+    if a cached PDF for that fingerprint exists, it's served instantly.
+    Otherwise the bundle is regenerated, saved with the new fingerprint
+    in its on-disk name, and served. The download `filename` in the
+    response stays operator-friendly
+    (SuperstarsContracting-AllIDs-<YYYY-MM-DD>.pdf); the on-disk URL
+    embeds the fingerprint so cache lookups are O(1).
+
+    POST forces a regen (`force_regenerate=True`) to support an
+    operator override workflow ("rebuild even if nothing changed").
+    GET serves the cache without forcing.
     """
     import generate_credentials_batch as gcb
     from datetime import date as _date
     try:
         today = _date.today().isoformat()
-        output = (SCRIPT_DIR / "data_room" / "credentials"
-                  / "batch_print" / f"SuperstarsContracting-AllIDs-{today}.pdf")
-        regenerate = (request.method == 'POST') or (not output.exists())
-        if regenerate:
-            # Use the loopback base URL so headless Edge can fetch
-            # /files/ assets from the running server. Photos are
-            # already inlined as data: URIs (see fetch_card_context),
-            # so /worker-files/ auth gating is irrelevant. The bundle
-            # gen runs inline here — for the current operator roster
-            # (~14 workers) it completes in well under 30 s.
-            rc = gcb.main(base_url="http://127.0.0.1:5050")
-            if rc != 0 or not output.exists():
-                return jsonify({"error": "batch-print render failed"}), 500
+        result = gcb.main(
+            base_url="http://127.0.0.1:5050",
+            force_regenerate=(request.method == 'POST'),
+        )
+        if not isinstance(result, dict) or result.get("status") not in (
+            "cache_hit", "cache_miss"
+        ):
+            return jsonify({"error": "batch-print render failed",
+                            "status": (result or {}).get("status")
+                                      if isinstance(result, dict) else str(result)}), 500
+        output = result["output_path"]
         rel = output.relative_to(SCRIPT_DIR).as_posix()
+        friendly_filename = f"SuperstarsContracting-AllIDs-{today}.pdf"
         logging.info(
-            f"credentials batch-print served: {rel} "
-            f"({output.stat().st_size} bytes)"
+            f"credentials batch-print served: status={result['status']} "
+            f"fingerprint={result.get('fingerprint')} "
+            f"path={rel} ({output.stat().st_size} bytes)"
         )
         return response_wrapper({
             "url": "/files/" + rel,
-            "filename": output.name,
+            # Operator-facing download name — the on-disk path includes
+            # the fingerprint, but the browser saves it under the
+            # friendly dated name (via the JS anchor's download attr).
+            "filename": friendly_filename,
             "size": output.stat().st_size,
             "generated_at": today,
+            "cache_status": result["status"],
+            "fingerprint": result.get("fingerprint"),
+            "timing_ms": int(result.get("stage_t", {}).get("total", 0) * 1000),
         })
     except Exception as e:
         logging.error(f"{request.method} /api/credentials/batch-print: {str(e)}")
