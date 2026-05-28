@@ -98,9 +98,42 @@ WORKER_ORDER = [f"W-{i:04d}" for i in range(1, 15)]
 CACHE_PREFIX = "SuperstarsContracting-AllIDs-"
 CACHE_KEEP_LAST_N = 3
 
+# #190 — bundle output-format version, included in the cache
+# fingerprint so a code change that affects the rendered PDF
+# invalidates every cached file the moment the new code lands.
+#
+# **Protocol:** bump this constant in the SAME commit as any change
+# that affects the bundle PDF's output — new layout, new content, new
+# metadata, new viewer preferences, new card-template structure, new
+# render-time guard that could shift pixels, etc. Bumping moves the
+# fingerprint forward by exactly the version bytes, which guarantees
+# every existing cached file misses on the next click and is
+# regenerated from current code. The operator's first click after
+# deploy is a ~5s cache_miss; subsequent clicks hit the new file.
+#
+# History (also serves as a changelog of bundle-output-affecting commits):
+#   v1 (initial #174)  — Letter portrait, 8-up grid, mirrored backs
+#   v2 (#178)          — Letter landscape, 2x2 grid, 2.00" lamination spacing,
+#                        shared-back tiling
+#   v3 (#187)          — added /Duplex /DuplexFlipLongEdge viewer pref +
+#                        page-1 "Print 2-sided · Flip on long edge" footer
+#   v4 (#188)          — render-time PIN auto-generation guard (could
+#                        affect rendered card content via self-heal)
+#   v5 (#189)          — single-Edge consolidation of the per-card stage
+#                        (verified content-identical, but bump for safety
+#                        in case Chromium ever changes its pagination)
+#   v6 (#190)          — current — fingerprint now includes THIS version,
+#                        so pre-#190 cached PDFs (which lacked the v1..v5
+#                        output changes' downstream effects in their
+#                        fingerprint) get invalidated and replaced with
+#                        a fresh render that has every fix from v1..v5
+#                        baked in.
+BUNDLE_FORMAT_VERSION = "v6"
+
 
 def compute_bundle_fingerprint(workers_summary, global_state):
-    """SHA256(worker rows + photo mtimes + rigger info) → 16-hex digest.
+    """SHA256(worker rows + photo mtimes + rigger info + format version)
+    → 16-hex digest.
 
     Inputs that AFFECT the rendered bundle are hashed; anything else
     (e.g., today's calendar date if no worker data changed) is NOT,
@@ -111,7 +144,11 @@ def compute_bundle_fingerprint(workers_summary, global_state):
         company_id_card_id, rigger_name_snapshot, rigger_license_snapshot,
         signature_path_mtime.
     global_state: dict with keys like template_mtime (so a template
-        edit invalidates the cache automatically).
+        edit invalidates the cache automatically). BUNDLE_FORMAT_VERSION
+        is folded in here so a code change that affects the rendered
+        PDF (without touching worker data or template mtimes) still
+        invalidates the cache — see #190 and the BUNDLE_FORMAT_VERSION
+        constant docstring above.
 
     The hash uses sort-stable JSON to be byte-stable across Python
     runs. The 16-hex digest is enough collision resistance for cache
@@ -119,8 +156,12 @@ def compute_bundle_fingerprint(workers_summary, global_state):
     bundle states per operator-week.
     """
     sorted_items = sorted(workers_summary, key=lambda w: w["worker_id"])
+    # Make a copy with format_version added so we never mutate the
+    # caller's global_state dict.
+    global_state_with_version = dict(global_state or {})
+    global_state_with_version["format_version"] = BUNDLE_FORMAT_VERSION
     blob = json.dumps(
-        {"workers": sorted_items, "global": global_state},
+        {"workers": sorted_items, "global": global_state_with_version},
         sort_keys=True,
         default=str,  # date/Path → str fallback
     ).encode("utf-8")

@@ -3616,25 +3616,35 @@ def api_credentials_batch_print():
     """Generate (and serve) the credentials batch-print PDF.
 
     Hash-cached as of #189. The bundle generator computes a fingerprint
-    of the input set (workers, photos, rigger info, template mtimes);
-    if a cached PDF for that fingerprint exists, it's served instantly.
-    Otherwise the bundle is regenerated, saved with the new fingerprint
-    in its on-disk name, and served. The download `filename` in the
-    response stays operator-friendly
+    of the input set (workers, photos, rigger info, template mtimes,
+    BUNDLE_FORMAT_VERSION); if a cached PDF for that fingerprint exists,
+    it's served instantly. Otherwise the bundle is regenerated, saved
+    with the new fingerprint in its on-disk name, and served. The
+    download `filename` in the response stays operator-friendly
     (SuperstarsContracting-AllIDs-<YYYY-MM-DD>.pdf); the on-disk URL
     embeds the fingerprint so cache lookups are O(1).
 
-    POST forces a regen (`force_regenerate=True`) to support an
-    operator override workflow ("rebuild even if nothing changed").
-    GET serves the cache without forcing.
+    Cache decision (#190 fix — previously POST forced regen, which
+    meant every button click was a fresh 5s render and the cache
+    never benefited the operator). New rule:
+
+      POST and GET both serve from cache when the fingerprint matches.
+      Only `?force=1` triggers a forced regen (reserved for a future
+      "regenerate now" admin override; not exposed in the UI today).
+
+    The button keeps POST as its method — that's CSRF protection via
+    the existing session machinery, NOT a hint to bypass the cache.
     """
     import generate_credentials_batch as gcb
     from datetime import date as _date
     try:
         today = _date.today().isoformat()
+        # Force regen only on explicit ?force=1. Both POST and GET
+        # otherwise serve from cache when the fingerprint matches.
+        force = (request.args.get('force') == '1')
         result = gcb.main(
             base_url="http://127.0.0.1:5050",
-            force_regenerate=(request.method == 'POST'),
+            force_regenerate=force,
         )
         if not isinstance(result, dict) or result.get("status") not in (
             "cache_hit", "cache_miss"
