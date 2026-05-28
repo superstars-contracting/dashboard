@@ -230,7 +230,11 @@
     <div class="nav-tab" data-panel="cert-library" data-i18n="tab-cert-library">Cert Library</div>
     <div class="nav-tab" data-panel="compliance" data-i18n="tab-compliance">Compliance</div>
     <div class="nav-tab" data-panel="bid" data-i18n="tab-bid">Bid Tracker</div>
-    <div class="nav-tab" data-panel="labor-rate" data-i18n="tab-labor-rate">Labor Rate</div>
+    <!-- #193 — LRT relocated to the FR-BX-001 project-internal page
+         as the operator-facing entry point. Tab hidden here, panel
+         retained so /company-dashboard.html#labor-rate hash-routing
+         still activates it for the project page's nav-link. -->
+    <div class="nav-tab" data-panel="labor-rate" data-i18n="tab-labor-rate" style="display:none;">Labor Rate</div>
     <a class="nav-tab" id="nav-labor-rates-admin" href="/admin/labor-rates"
        style="display:none;text-decoration:none;color:inherit;"
        title="Set & audit per-worker hourly rates (admin/c_suite only)">Labor Rates</a>
@@ -1269,15 +1273,32 @@ applyLanguage();
   $('#today-date').textContent = new Date().toLocaleDateString(currentLang === 'es' ? 'es-MX' : 'en-US', {weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'});
 
   // Tabs
-  $$('.nav-tab').forEach(t => t.addEventListener('click', () => {
-    const target = t.getAttribute('data-panel');
-    $$('.nav-tab').forEach(x => x.classList.toggle('active', x === t));
+  function activatePanel(target) {
+    $$('.nav-tab').forEach(x => x.classList.toggle('active', x.getAttribute('data-panel') === target));
     $$('.panel').forEach(p => p.classList.toggle('active', p.getAttribute('data-panel') === target));
     if (target === 'workforce') loadWorkforce();
     if (target === 'cert-library') loadCertLibrary();
     if (target === 'labor-rate' && typeof window.LRT_loadGrid === 'function') window.LRT_loadGrid(null);
     if (target === 'specs' && typeof window.SPECS_loadCatalog === 'function') window.SPECS_loadCatalog();
+  }
+  $$('.nav-tab').forEach(t => t.addEventListener('click', () => {
+    activatePanel(t.getAttribute('data-panel'));
   }));
+  // #193 — hash routing. The project-internal LRT entry-point links
+  // here as `/company-dashboard.html#labor-rate`. Without a hash
+  // handler, the link would land on the default Projects tab and the
+  // operator would see nothing. The tab itself is display:none, so
+  // hash routing is the ONLY way to reach the LRT panel from outside.
+  function maybeActivateFromHash() {
+    var hash = (window.location.hash || '').replace(/^#/, '').trim();
+    if (!hash) return;
+    var panel = document.querySelector('.panel[data-panel="' + hash + '"]');
+    if (panel) activatePanel(hash);
+  }
+  window.addEventListener('hashchange', maybeActivateFromHash);
+  // Late-binding: panels initialize after this script's IIFE; defer
+  // the first hash check to the next tick so LRT_loadGrid is bound.
+  setTimeout(maybeActivateFromHash, 0);
 
   // Load company summary metrics
   async function loadMetrics() {

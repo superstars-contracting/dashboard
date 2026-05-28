@@ -484,6 +484,20 @@
       <div class="nav-group">
         <div class="nav-group-label">Financial & Compliance</div>
         <a class="nav-link" data-view="sov">Schedule of Values</a>
+        <!-- #193 — Labor Rate Tracker entry: routes to the existing LRT
+             view on the company console (kept there because the LRT JS
+             + grid live in company-dashboard.html). Hidden by default;
+             revealed only for admin/c_suite via lrt_nav_gate.js right
+             after auth_menu's ssc:user-loaded event fires. The server
+             still enforces /api/payroll/hours rate-column omission for
+             non-admin (#158); this is UX-only nav. -->
+        <a id="proj-lrt-nav-link" class="nav-link"
+           style="display:none;"
+           href="/company-dashboard.html#labor-rate"
+           title="Per-week hours worked × rate · check-cutting view (admin / c-suite only)">
+          Labor Rate Tracker
+          <span style="font-size:9px;font-weight:700;color:#76777E;letter-spacing:0.5px;margin-left:6px;padding:1px 5px;border:1px solid #D5D2C9;border-radius:2px;text-transform:uppercase;">Admin</span>
+        </a>
         <a class="nav-link" data-view="compliance">Compliance & Permits</a>
         <a class="nav-link" data-view="closeout">Warranty & Closeout</a>
       </div>
@@ -510,6 +524,28 @@
       </div>
     </header>
     <script src="/files/static/js/auth_menu.js" defer></script>
+    <script>
+      // #193 — reveal the Labor Rate Tracker entry surfaces (nav link
+      // + dashboard card) for admin / c_suite only. Server-side gate
+      // on /api/payroll/hours is the real authority — non-admin roles
+      // still get rate/amount fields entirely OMITTED from the API
+      // response (#158 / CLAUDE.md comp-data rule). This is UX-only.
+      (function maybeRevealLrt() {
+        function applyForRole(user) {
+          if (!user) return;
+          if (user.role !== 'admin' && user.role !== 'c_suite') return;
+          var link = document.getElementById('proj-lrt-nav-link');
+          var card = document.getElementById('proj-lrt-entry-card');
+          if (link) link.style.display = '';
+          if (card) card.style.display = '';
+        }
+        document.addEventListener('ssc:user-loaded', function (e) {
+          applyForRole(e.detail);
+        });
+        // Late-arrival: auth_menu may have fired before our listener attached.
+        if (window.__SSC_USER) applyForRole(window.__SSC_USER);
+      })();
+    </script>
 
     <div class="views-container">
       <!-- PROJECT HEALTH / DASHBOARD -->
@@ -551,6 +587,20 @@
             <button class="hero-btn hero-btn-primary" data-link="/WPS-FR-BX-001-2026-05-01-internal.html">Weekly Summary</button>
             <button class="hero-btn hero-btn-primary" data-link="/LA-FR-BX-001-2026-05-07.html">2-Week Lookahead</button>
             <button class="hero-btn hero-btn-primary" data-link="/rfi_submission_form.html">Submit RFI</button>
+          </div>
+          <!-- #193 — Labor Rate Tracker entry card. Matches the visual
+               cadence of the four hero-btn quick actions above (admin/
+               c-suite only). Hidden by default; revealed by the
+               lrt_nav_gate.js helper at user-loaded time. Routes to the
+               existing LRT view on the company console. -->
+          <div id="proj-lrt-entry-card" style="display:none;margin-top:14px;">
+            <button class="hero-btn hero-btn-primary"
+                    style="background:white;color:#B11E2E;border:1px solid #B11E2E;font-weight:700;letter-spacing:0.4px;"
+                    data-link="/company-dashboard.html#labor-rate"
+                    title="Per-week hours × hourly rate · check-cutting view">
+              💰 Labor Rate Tracker
+              <span style="font-size:9px;font-weight:700;color:#76777E;letter-spacing:0.5px;margin-left:6px;padding:1px 5px;border:1px solid #D5D2C9;border-radius:2px;text-transform:uppercase;">Admin / C-Suite</span>
+            </button>
           </div>
         </div>
 
