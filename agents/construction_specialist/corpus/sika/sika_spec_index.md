@@ -10,12 +10,12 @@
 _Extracted from `spec_products` (superstars.db) — 107 products across 10 categories. The DB is gitignored; this file is the version-controlled corpus of record._
 
 ## MVP deep-focus (operator decision Q7 — the frequent three)
-- **Concrete repair** — mortars, bonding agents, corrosion treatment.
-- **Sika / sealants** — sealing & bonding, joint design.
-- **Brick repointing** — overlaps masonry; deepened in a later batch.
+- **Concrete repair** — `products/concrete_repair.md` (C10).
+- **Sealants / joint design** — `products/sealants_joint_design.md` (C13); complements this Sika index.
+- **Brick repointing** — `products/brick_masonry_repointing.md` (C12).
 
-_Sto/EIFS, roofing, and the broader product-systems library (C10–C14)
-are v1, not this batch._
+_The frequent-three product write-ups are committed under `corpus/products/`
+(#198 Batch 2). Sto/EIFS (C11) and roofing (C14) remain v1, not this batch._
 
 ## Products by category
 

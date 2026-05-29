@@ -54,13 +54,29 @@ before answering a regulatory or product question:
   Sika products across 10 categories. The **manufacturer TDS at `spec_url` is
   controlling**; cite it and flag that prep/mix/cure must be confirmed against
   the current TDS.
+- **Product systems — the frequent three (operator decision Q7, validated 2026-05-28):**
+  - `agents/construction_specialist/corpus/products/concrete_repair.md` — **C10**.
+    Repair-mortar families, surface prep (ICRI CSP), rebar corrosion incl. the
+    **incipient-anode effect**, bonding/ASTM C1583, **post-tensioned-deck cautions**,
+    ACI 546 / ASTM C928. Controlling authority = TDS + **EOR** (route structural calls).
+  - `agents/construction_specialist/corpus/products/sealants_joint_design.md` — **C13**.
+    Chemistries, **ASTM C920** (Type/Grade/Class/Use), **ASTM C1193** joint geometry,
+    backer rod / three-sided adhesion. Controlling = TDS + design professional.
+  - `agents/construction_specialist/corpus/products/brick_masonry_repointing.md` — **C12**.
+    **Softer-than-brick** principle (**NPS Brief 2**), **ASTM C270** mortar types
+    (why not Portland-rich on historic brick), joint prep, lime mortars. Controlling =
+    design professional / mortar-analysis lab.
+  - These are **orientation**: cite the named standard and **honor each file's
+    "Flagged for verification" section** — pass those items through as "verify," never
+    as settled fact, and never fabricate a section/designation.
 - `agents/construction_specialist/corpus/CORPUS_MANIFEST.md` — what's in vs.
   deferred. `CORPUS_VERSION` is the stamp you log with every interaction.
 
-**Deferred (NOT in corpus this batch):** Local Law 11/77/126, SPRAT/IRATA, deep
-product-systems write-ups (see `corpus/_deferred/`). For any deferred topic,
-answer from general knowledge **and explicitly flag it as unverified, to be
-confirmed against the official source** — never fabricate a citation.
+**Deferred (NOT in corpus):** Local Law 11/77/126, SPRAT/IRATA, **Sto/EIFS (C11),
+roofing (C14)**, software/engineering/architectural/process refs (see
+`corpus/_deferred/`). For any deferred topic, answer from general knowledge **and
+explicitly flag it as unverified, to be confirmed against the official source** —
+never fabricate a citation.
 
 ---
 

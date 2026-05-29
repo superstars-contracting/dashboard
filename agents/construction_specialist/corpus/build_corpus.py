@@ -168,12 +168,12 @@ def build_sika_index() -> dict:
         f"version-controlled corpus of record._",
         "",
         "## MVP deep-focus (operator decision Q7 — the frequent three)",
-        "- **Concrete repair** — mortars, bonding agents, corrosion treatment.",
-        "- **Sika / sealants** — sealing & bonding, joint design.",
-        "- **Brick repointing** — overlaps masonry; deepened in a later batch.",
+        "- **Concrete repair** — `products/concrete_repair.md` (C10).",
+        "- **Sealants / joint design** — `products/sealants_joint_design.md` (C13); complements this Sika index.",
+        "- **Brick repointing** — `products/brick_masonry_repointing.md` (C12).",
         "",
-        "_Sto/EIFS, roofing, and the broader product-systems library (C10–C14)",
-        "are v1, not this batch._",
+        "_The frequent-three product write-ups are committed under `corpus/products/`",
+        "(#198 Batch 2). Sto/EIFS (C11) and roofing (C14) remain v1, not this batch._",
         "",
         "## Products by category",
         "",
@@ -209,7 +209,7 @@ def write_manifest_and_stamp(ch33: dict, sika: dict) -> str:
 
     manifest = {
         "corpus_name": "construction_specialist",
-        "phase": "A / v0 (MVP scaffolding, #198)",
+        "phase": "A / v0.2 (MVP scaffolding + frequent-three product systems, #198 Batch 2)",
         "built_date_local": today,
         "included": [
             {
@@ -231,6 +231,30 @@ def write_manifest_and_stamp(ch33: dict, sika: dict) -> str:
                 "categories": sika["categories"],
                 "note": "Controlling document per product is the manufacturer TDS at spec_url.",
             },
+            {
+                "id": "C10",
+                "title": "Concrete repair systems",
+                "source": "validated public/manufacturer technical literature (curated 2026-05-28)",
+                "files": ["products/concrete_repair.md"],
+                "note": "Frequent-three (decision Q7). Orientation; controlling authority = "
+                        "manufacturer TDS + EOR. Carries the incipient-anode + post-tension cautions.",
+            },
+            {
+                "id": "C13",
+                "title": "Sealants & joint design",
+                "source": "validated public/manufacturer technical literature (curated 2026-05-28)",
+                "files": ["products/sealants_joint_design.md"],
+                "note": "Frequent-three (decision Q7). Orientation; controlling authority = "
+                        "manufacturer TDS + design professional. Complements the Sika index (C2).",
+            },
+            {
+                "id": "C12",
+                "title": "Brick masonry & repointing",
+                "source": "validated public technical literature incl. NPS Brief 2 (curated 2026-05-28)",
+                "files": ["products/brick_masonry_repointing.md"],
+                "note": "Frequent-three (decision Q7). Orientation; controlling authority = "
+                        "design professional / mortar-analysis lab. Softer-than-brick principle.",
+            },
         ],
         "deferred_public_sources": [
             {"id": "C3", "title": "SPRAT reference summary", "source": "sprat.org (public)"},
@@ -238,7 +262,8 @@ def write_manifest_and_stamp(ch33: dict, sika: dict) -> str:
             {"id": "C5", "title": "Local Law 11 / FISP reference", "source": "NYC.gov / DOB, 1 RCNY §103-04"},
             {"id": "C6", "title": "Local Law 77 of 2023 summary", "source": "NYC.gov / DOB"},
             {"id": "C7", "title": "Local Law 126 / Parking Structure Inspection", "source": "NYC.gov / DOB, 1 RCNY §103-13"},
-            {"id": "C10-C14", "title": "Deep product-systems write-ups (concrete, Sto/EIFS, brick, sealants, roofing)", "source": "manufacturer + public technical literature"},
+            {"id": "C11", "title": "Sto & EIFS systems — deep write-up", "source": "Sto + public technical literature"},
+            {"id": "C14", "title": "Roofing membranes & assemblies — deep write-up", "source": "manufacturer public literature"},
             {"id": "C15-C20", "title": "Software / engineering / architectural / NYC-process references", "source": "public docs"},
         ],
         "deferred_note": "Deferred items are a SEPARATE later batch — NOT curated in #198. "
@@ -251,7 +276,7 @@ def write_manifest_and_stamp(ch33: dict, sika: dict) -> str:
     manifest_path.write_text(manifest_json, encoding="utf-8")
 
     digest = hashlib.sha256(manifest_json.encode("utf-8")).hexdigest()[:12]
-    corpus_version = f"v0-{today}-{digest}"
+    corpus_version = f"v0.2-{today}-{digest}"
     (HERE / "CORPUS_VERSION").write_text(corpus_version + "\n", encoding="utf-8")
     return corpus_version
 

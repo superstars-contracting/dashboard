@@ -32,6 +32,7 @@ in this runtime — see the callout above). Contract:
 | `corpus/CORPUS_MANIFEST.md` / `corpus_manifest.json` | What's in vs. deferred; the `CORPUS_VERSION` stamp. |
 | `corpus/chapter33/` | Chapter 33 orientation index (C1), from `toolbox_talks_data.py`. |
 | `corpus/sika/` | Sika spec index (C2), from the `spec_products` table. |
+| `corpus/products/` | Frequent-three product write-ups (validated #198 Batch 2): `concrete_repair.md` (C10), `sealants_joint_design.md` (C13), `brick_masonry_repointing.md` (C12). |
 | `corpus/_deferred/` | Clearly-marked placeholders (LL11/77/126, SPRAT/IRATA, deep product write-ups) — a separate later batch. |
 | `corpus/build_corpus.py` | Regenerates the corpus indexes + re-stamps `CORPUS_VERSION`. |
 | `.claude/commands/construction-specialist.md` | Slash-command body — **inert in current runtime** (`/construction-specialist` → "Unknown command"); kept as a copy-paste source for the manual prompt and for if/when slash commands resolve. |

@@ -13,10 +13,14 @@ rules below for THIS answer.
 
 1. Read `agents/construction_specialist/construction_specialist.md` — the full
    operating contract (persona §2, scope in/out §3, review gates §7, answer shape).
-2. Read the corpus index relevant to the question:
+2. Read the corpus index/files relevant to the question:
    - `agents/construction_specialist/corpus/chapter33/ch33_index.md` — Chapter 33 (C1)
    - `agents/construction_specialist/corpus/sika/sika_spec_index.md` — Sika products (C2)
+   - `agents/construction_specialist/corpus/products/concrete_repair.md` — concrete repair (C10)
+   - `agents/construction_specialist/corpus/products/sealants_joint_design.md` — sealants/joint design (C13)
+   - `agents/construction_specialist/corpus/products/brick_masonry_repointing.md` — brick repointing (C12)
    - `agents/construction_specialist/corpus/CORPUS_MANIFEST.md` — what's in vs. deferred
+   (For product files, honor each file's "Flagged for verification" section — pass those through as "verify," never as settled fact.)
 
 ## Persona & voice (spec §2)
 

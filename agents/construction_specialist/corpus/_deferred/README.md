@@ -20,10 +20,10 @@ When a later batch curates one of these, it must:
 | C5 | Local Law 11 / FISP reference (filing cycles, SWARMP/SAFE/Unsafe, QEWI) | NYC.gov / DOB, 1 RCNY §103-04 | **deferred** |
 | C6 | Local Law 77 of 2023 summary (Ch 33 construction-safety amendments) | NYC.gov / DOB | **deferred** |
 | C7 | Local Law 126 / Parking Structure Inspection (cadence, Safe/SREM/Unsafe, QPSI) | NYC.gov / DOB, 1 RCNY §103-13 | **deferred** |
-| C10 | Concrete & cementitious systems — deep write-up | manufacturer / public technical literature | **deferred** |
+| C10 | Concrete & cementitious systems — deep write-up | manufacturer / public technical literature | **DONE — `products/concrete_repair.md` (#198 Batch 2)** |
 | C11 | Sto & EIFS systems — deep write-up | Sto + public technical literature | **deferred** |
-| C12 | Brick & masonry systems — deep write-up | BIA + manufacturer data | **deferred** |
-| C13 | Sealants, coatings, water repellents — deep write-up | manufacturer data sheets | **deferred** |
+| C12 | Brick & masonry systems — deep write-up | BIA + manufacturer data | **DONE — `products/brick_masonry_repointing.md` (#198 Batch 2)** |
+| C13 | Sealants, coatings, water repellents — deep write-up | manufacturer data sheets | **DONE — `products/sealants_joint_design.md` (#198 Batch 2)** |
 | C14 | Roofing membranes & assemblies — deep write-up | manufacturer public literature | **deferred** |
 | C15 | Software reference — Bluebeam Revu | public docs | **deferred** |
 | C16 | Software reference — Revit / AutoCAD | public docs | **deferred** |
