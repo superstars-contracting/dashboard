@@ -17,10 +17,28 @@ PII-safe: no names; logged_by is surfaced verbatim as a W-####/id token.
 """
 from __future__ import annotations
 
+import math
 import sqlite3
 from typing import Optional, Union
 
 PENDING_RATES = "pending_rates"
+
+
+def ceil_tenth(value) -> Optional[float]:
+    """Round UP to the nearest tenth for DISPLAY (#202, operator 2026-05-29):
+    volume is never under-counted for ordering/billing. Full precision is
+    always stored; only the displayed value is ceil-rounded.
+
+    Examples: 2.61 -> 2.7, 2.60 -> 2.6, 2.0 -> 2.0, 1.6667 -> 1.7.
+    The round(v*10, 6) kills float artifacts (2.6*10 == 26.000000000000004
+    would otherwise ceil to 2.7). Non-numeric / None -> None (never raises)."""
+    if value is None:
+        return None
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    return math.ceil(round(v * 10, 6)) / 10
 
 # working-days variance tolerance (days) for the on_track band
 _VARIANCE_TOL = 0.5
@@ -75,16 +93,30 @@ def current_stage(conn: sqlite3.Connection, drop_id: str) -> Optional[dict]:
 # ---------------- quantities ----------------
 
 def drop_quantity_totals(conn: sqlite3.Connection, drop_id: str) -> list:
-    """SUM(quantity) and SUM(volume_cf) per SOV line for this drop."""
+    """SUM(quantity) and SUM(volume_cf) per SOV line for this drop.
+
+    volume_total is the FULL-precision sum; volume_total_display is the
+    ceil-to-tenth display value (#202). patch_count = entries with a
+    computed volume (dimensioned patches)."""
     rows = _rows(
         conn,
         "SELECT s.sov_id, s.sov_code, s.unit, "
-        "       ROUND(SUM(q.quantity), 4) AS qty_total, "
-        "       ROUND(SUM(q.volume_cf), 4) AS volume_total, "
-        "       COUNT(*) AS entry_count "
+        "       SUM(q.quantity) AS qty_total, "
+        "       SUM(q.volume_cf) AS volume_total, "
+        "       COUNT(*) AS entry_count, "
+        "       SUM(CASE WHEN q.volume_cf IS NOT NULL THEN 1 ELSE 0 END) AS patch_count "
         "FROM quantity_entries q JOIN sov_line_items s ON s.sov_id=q.sov_line_item "
         "WHERE q.drop_id=? GROUP BY s.sov_id ORDER BY s.sov_code", (drop_id,))
-    return [dict(r) for r in rows]
+    out = []
+    for r in rows:
+        d = dict(r)
+        vt = d.get("volume_total")
+        d["volume_total"] = round(vt, 6) if vt is not None else None  # full precision retained
+        d["volume_total_display"] = ceil_tenth(vt)                    # ceil-to-tenth (display)
+        if d.get("qty_total") is not None:
+            d["qty_total"] = round(d["qty_total"], 6)
+        out.append(d)
+    return out
 
 
 # ---------------- working days / variance ----------------
@@ -206,14 +238,22 @@ def project_rollup(conn: sqlite3.Connection, project_code: str, include_cost: bo
         appl += p["applicable_steps"]
     overall_pct = round(comp / appl * 100, 1) if appl else 0.0
 
-    qty_by_sov = [dict(r) for r in _rows(
+    qty_by_sov = []
+    for r in _rows(
         conn,
-        "SELECT s.sov_code, s.unit, ROUND(SUM(q.quantity),4) AS qty_total, "
-        "ROUND(SUM(q.volume_cf),4) AS volume_total "
+        "SELECT s.sov_code, s.unit, SUM(q.quantity) AS qty_total, "
+        "SUM(q.volume_cf) AS volume_total "
         "FROM quantity_entries q "
         "JOIN sov_line_items s ON s.sov_id=q.sov_line_item "
         "JOIN drops d ON d.drop_id=q.drop_id "
-        "WHERE d.project_code=? GROUP BY s.sov_id ORDER BY s.sov_code", (project_code,))]
+        "WHERE d.project_code=? GROUP BY s.sov_id ORDER BY s.sov_code", (project_code,)):
+        d = dict(r)
+        vt = d.get("volume_total")
+        d["volume_total"] = round(vt, 6) if vt is not None else None
+        d["volume_total_display"] = ceil_tenth(vt)
+        if d.get("qty_total") is not None:
+            d["qty_total"] = round(d["qty_total"], 6)
+        qty_by_sov.append(d)
 
     out = {
         "project_code": project_code,

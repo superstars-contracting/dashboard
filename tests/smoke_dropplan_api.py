@@ -177,12 +177,31 @@ def main() -> int:
         check("cost == 'pending_rates' when rate NULL (NOT 0)", det.get("cost") == "pending_rates",
               f"cost={det.get('cost')!r}")
 
-        # ---- volume via POST (area/depth -> volume_cf) ----
-        admin.post(f"{BASE}/api/dropplan/drops/{SMK_DROP}/quantity-entries",
-                   json={"sov_line_item": sid, "area_sf": 10, "depth_in": 8, "unit": "CF", "logged_by": "W-0001"}, timeout=10)
+        # ---- dimensioned patch via POST (#202: L x W x D, mixed ft/in) ----
+        # 10ft x 1ft x 8in = 6.6667 CF; volume_cf is the GENERATED column,
+        # volume_cf_display is ceil-to-tenth.
+        pv = admin.post(f"{BASE}/api/dropplan/drops/{SMK_DROP}/quantity-entries",
+                        json={"sov_line_item": sid, "length": 10, "width": 1, "depth": 8,
+                              "length_unit": "ft", "width_unit": "ft", "depth_unit": "in",
+                              "logged_by": "W-0001"}, timeout=10)
+        pvj = pv.json().get("data", {})
+        check("POST dimensioned patch -> 201 + volume_cf 6.6667",
+              pv.status_code == 201 and abs(pvj.get("volume_cf", 0) - 6.6667) < 0.001, f"{pv.status_code} {pvj.get('volume_cf')}")
+        check("POST response volume_cf_display = ceil-to-tenth = 6.7", pvj.get("volume_cf_display") == 6.7, f"{pvj.get('volume_cf_display')}")
         det2 = admin.get(f"{BASE}/api/dropplan/drops/{SMK_DROP}", timeout=10).json()["data"]
         qt2 = [q for q in det2["quantity_totals"] if q["sov_code"] == SMK_SOV][0]
-        check("volume_total = 6.6667 (10sf x 8in / 12)", abs(qt2["volume_total"] - 6.6667) < 0.001, f"{qt2['volume_total']}")
+        check("volume_total = 6.6667 (full precision)", abs(qt2["volume_total"] - 6.6667) < 0.001, f"{qt2['volume_total']}")
+        check("volume_total_display = ceil-to-tenth = 6.7", qt2["volume_total_display"] == 6.7, f"{qt2['volume_total_display']}")
+
+        # ---- edge cases: API rejects bad dimensions (does not crash) ----
+        def bad(json_body, label):
+            r = admin.post(f"{BASE}/api/dropplan/drops/{SMK_DROP}/quantity-entries", json=json_body, timeout=10)
+            check(label + " -> 400", r.status_code == 400, f"got {r.status_code}")
+        bad({"sov_line_item": sid, "length": 0, "width": 1, "depth": 1}, "zero dimension")
+        bad({"sov_line_item": sid, "length": -5, "width": 1, "depth": 1}, "negative dimension")
+        bad({"sov_line_item": sid, "length": "abc", "width": 1, "depth": 1}, "non-numeric dimension")
+        bad({"sov_line_item": sid, "length": 10}, "partial dimensions (length only)")
+        bad({"sov_line_item": sid}, "blank: no quantity and no dimensions")
 
         # ---- priced cost (set a synthetic rate, recompute) ----
         conn = sqlite3.connect(str(DB))

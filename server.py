@@ -6611,16 +6611,66 @@ def api_dropplan_rollup(project_code):
         return jsonify({"error": str(e)}), 500
 
 
+def _parse_dim(body, key):
+    """Parse one patch dimension. Returns (value_or_None, error_or_None).
+    Blank/missing -> None (not provided). Non-numeric or <= 0 -> error."""
+    raw = body.get(key)
+    if raw is None or (isinstance(raw, str) and raw.strip() == ''):
+        return None, None
+    try:
+        v = float(raw)
+    except (TypeError, ValueError):
+        return None, f"{key} must be a number"
+    if v <= 0:
+        return None, f"{key} must be greater than 0"
+    return v, None
+
+
 @app.route('/api/dropplan/drops/<drop_id>/quantity-entries', methods=['POST'])
 @requires_role(*_DROPPLAN_ROLES)
 def api_dropplan_post_quantity(drop_id):
-    """APPEND one quantity entry. Never overwrites a stored total. volume_cf
-    is computed (generated column). logged_on defaults to LOCAL today."""
+    """APPEND one quantity entry (#202 dimensioned patch model). Never
+    overwrites a stored total. An entry is EITHER a dimensioned concrete
+    patch (length+width+depth, each with its own ft/in unit; volume_cf is a
+    GENERATED column normalizing each dim to feet) OR a simple quantity/unit.
+    logged_on defaults to LOCAL today. Full precision stored; ceil-to-tenth
+    is display-only (dropplan_rollups.ceil_tenth)."""
     try:
         body = request.get_json(silent=True) or {}
         sov_line = body.get('sov_line_item')
         if sov_line is None:
             return jsonify({"error": "sov_line_item required"}), 400
+
+        # Dimensions (concrete patch). All three required together if any present.
+        length, e1 = _parse_dim(body, 'length')
+        width, e2 = _parse_dim(body, 'width')
+        depth, e3 = _parse_dim(body, 'depth')
+        for e in (e1, e2, e3):
+            if e:
+                return jsonify({"error": e}), 400
+        dims_present = [d is not None for d in (length, width, depth)]
+        is_patch = any(dims_present)
+        if is_patch and not all(dims_present):
+            return jsonify({"error": "a concrete patch needs all of length, width, depth"}), 400
+
+        def _unit(key):
+            u = (body.get(key) or 'ft')
+            return u if u in ('ft', 'in') else 'ft'
+        length_unit, width_unit, depth_unit = _unit('length_unit'), _unit('width_unit'), _unit('depth_unit')
+
+        # Simple quantity (non-patch lines).
+        quantity = body.get('quantity')
+        if quantity is not None and (not isinstance(quantity, str) or quantity.strip() != ''):
+            try:
+                quantity = float(quantity) if quantity != '' else None
+            except (TypeError, ValueError):
+                return jsonify({"error": "quantity must be a number"}), 400
+        else:
+            quantity = None
+
+        if not is_patch and quantity is None:
+            return jsonify({"error": "provide a quantity, or length+width+depth for a concrete patch"}), 400
+
         logged_on = (body.get('logged_on') or '').strip() or date.today().isoformat()
         logged_by = body.get('logged_by') or _dropplan_actor()
         conn = db()
@@ -6631,19 +6681,27 @@ def api_dropplan_post_quantity(drop_id):
                 return jsonify({"error": "sov_line_item not found"}), 404
             cur = conn.execute(
                 "INSERT INTO quantity_entries(drop_id, sov_line_item, step_no, quantity, unit, "
-                "area_sf, depth_in, logged_on, logged_by, note) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                (drop_id, sov_line, body.get('step_no'), body.get('quantity'), body.get('unit'),
-                 body.get('area_sf'), body.get('depth_in'), logged_on, logged_by, body.get('note')))
+                "length, width, depth, length_unit, width_unit, depth_unit, logged_on, logged_by, note) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (drop_id, sov_line, body.get('step_no'), quantity, body.get('unit'),
+                 length, width, depth, length_unit, width_unit, depth_unit,
+                 logged_on, logged_by, body.get('note')))
             conn.commit()
             row = dict(conn.execute(
-                "SELECT entry_id, drop_id, sov_line_item, step_no, quantity, unit, area_sf, depth_in, "
-                "volume_cf, logged_on, logged_by, note FROM quantity_entries WHERE entry_id=?",
-                (cur.lastrowid,)).fetchone())
+                "SELECT entry_id, drop_id, sov_line_item, step_no, quantity, unit, length, width, depth, "
+                "length_unit, width_unit, depth_unit, volume_cf, logged_on, logged_by, note "
+                "FROM quantity_entries WHERE entry_id=?", (cur.lastrowid,)).fetchone())
         finally:
             conn.close()
+        # Display helper: ceil-to-tenth (full precision retained in volume_cf).
+        try:
+            from dropplan_rollups import ceil_tenth
+            row['volume_cf_display'] = ceil_tenth(row.get('volume_cf'))
+        except Exception:
+            pass
         return response_wrapper(row), 201
     except Exception as e:
-        logging.error(f"POST /api/drops/{drop_id}/quantity-entries: {str(e)}")
+        logging.error(f"POST /api/dropplan/drops/{drop_id}/quantity-entries: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 

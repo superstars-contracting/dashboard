@@ -91,7 +91,13 @@ CREATE TABLE IF NOT EXISTS sov_line_items (
   FOREIGN KEY (project_code) REFERENCES projects(project_code)
 );
 
--- 3.5 quantity_entries (APPEND-ONLY; volume_cf generated)
+-- 3.5 quantity_entries (APPEND-ONLY; dimensioned concrete-patch model #202)
+-- An entry is EITHER a dimensioned concrete patch (length x width x depth,
+-- each with its own ft/in unit; volume_cf auto-computed by normalizing each
+-- dimension to feet and multiplying) OR a simple quantity/unit (NON-patch
+-- lines: rebar LF, block SF, etc.). Full precision stored; ceil-to-tenth is
+-- a DISPLAY-only transform (dropplan_rollups.ceil_tenth). The legacy
+-- area_sf/depth_in model was dropped in apply_dropplan_patchmodel.py.
 CREATE TABLE IF NOT EXISTS quantity_entries (
   entry_id INTEGER PRIMARY KEY AUTOINCREMENT,
   drop_id TEXT NOT NULL,
@@ -99,11 +105,19 @@ CREATE TABLE IF NOT EXISTS quantity_entries (
   step_no INTEGER,
   quantity REAL,
   unit TEXT,
-  area_sf REAL,
-  depth_in REAL,
-  volume_cf REAL GENERATED ALWAYS AS
-    (CASE WHEN area_sf IS NOT NULL AND depth_in IS NOT NULL
-          THEN area_sf * depth_in / 12.0 ELSE NULL END) VIRTUAL,
+  length REAL,
+  width REAL,
+  depth REAL,
+  length_unit TEXT DEFAULT 'ft',
+  width_unit  TEXT DEFAULT 'ft',
+  depth_unit  TEXT DEFAULT 'ft',
+  volume_cf REAL GENERATED ALWAYS AS (
+    CASE WHEN length IS NOT NULL AND width IS NOT NULL AND depth IS NOT NULL
+      THEN (length * (CASE length_unit WHEN 'in' THEN 1.0/12.0 ELSE 1.0 END))
+         * (width  * (CASE width_unit  WHEN 'in' THEN 1.0/12.0 ELSE 1.0 END))
+         * (depth  * (CASE depth_unit  WHEN 'in' THEN 1.0/12.0 ELSE 1.0 END))
+      ELSE NULL END
+  ) VIRTUAL,
   logged_on TEXT NOT NULL,
   logged_by TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

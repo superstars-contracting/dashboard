@@ -29,6 +29,7 @@ import time
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(SCRIPT_DIR))  # so `import dropplan_rollups` (repo root) resolves
 DB = SCRIPT_DIR / "superstars.db"
 PROJECT = "FR-BX-001"
 PASS, FAIL = 0, 0
@@ -113,15 +114,51 @@ def main() -> int:
         check("APPEND: two qty entries persist as 2 rows (no overwrite)", n_entries == 2, f"rows={n_entries}")
         check("APPEND: total = SUM(entries) = 8.0", abs(total - 8.0) < 1e-9, f"sum={total}")
 
-        # ---- generated volume_cf ----
-        conn.execute("INSERT INTO quantity_entries(drop_id,sov_line_item,area_sf,depth_in,unit,logged_on,logged_by) "
-                     "VALUES('SMK-DP-T1',?,10,8,'CF',?, 'W-0001')", (sid, today))
-        vol = conn.execute("SELECT volume_cf FROM quantity_entries WHERE drop_id='SMK-DP-T1' AND area_sf=10 AND depth_in=8").fetchone()[0]
-        check("volume_cf = area*depth/12 (10sf,8in -> 6.6667)", vol is not None and abs(vol - 6.6667) < 0.001, f"vol={vol}")
-        conn.execute("INSERT INTO quantity_entries(drop_id,sov_line_item,area_sf,unit,logged_on,logged_by) "
-                     "VALUES('SMK-DP-T1',?,10,'CF',?, 'W-0001')", (sid, today))
-        vol_nodepth = conn.execute("SELECT volume_cf FROM quantity_entries WHERE drop_id='SMK-DP-T1' AND area_sf=10 AND depth_in IS NULL").fetchone()[0]
-        check("volume_cf NULL when depth missing", vol_nodepth is None)
+        # ---- dimensioned concrete-patch volume_cf (mixed ft/in) #202 ----
+        from dropplan_rollups import ceil_tenth
+
+        def patch(l, lu, w, wu, d, du):
+            conn.execute(
+                "INSERT INTO quantity_entries(drop_id,sov_line_item,length,width,depth,"
+                "length_unit,width_unit,depth_unit,logged_on,logged_by) "
+                "VALUES('SMK-DP-T1',?,?,?,?,?,?,?,?, 'W-0001')", (sid, l, w, d, lu, wu, du, today))
+            return conn.execute("SELECT volume_cf FROM quantity_entries WHERE drop_id='SMK-DP-T1' "
+                                "ORDER BY entry_id DESC LIMIT 1").fetchone()[0]
+        v1 = patch(18, 'in', 12, 'in', 8, 'in')
+        check("vol 18in x 12in x 8in = 1.00 CF (full precision)", abs(v1 - 1.0) < 1e-6, f"{v1}")
+        v2 = patch(3, 'ft', 2, 'ft', 4, 'in')
+        check("vol 3ft x 2ft x 4in = 2.00 CF", abs(v2 - 2.0) < 1e-6, f"{v2}")
+        v3 = patch(4, 'ft', 18, 'in', 2, 'in')
+        check("vol 4ft x 18in x 2in = 1.00 CF", abs(v3 - 1.0) < 1e-6, f"{v3}")
+        # NULL volume_cf when no dimensions (a plain quantity entry)
+        conn.execute("INSERT INTO quantity_entries(drop_id,sov_line_item,quantity,unit,logged_on,logged_by) "
+                     "VALUES('SMK-DP-T1',?,7,'LF',?, 'W-0001')", (sid, today))
+        vnull = conn.execute("SELECT volume_cf FROM quantity_entries WHERE drop_id='SMK-DP-T1' AND quantity=7 "
+                             "ORDER BY entry_id DESC LIMIT 1").fetchone()[0]
+        check("volume_cf NULL when no dimensions", vnull is None)
+
+        # ---- ceil-to-tenth display ROUNDS UP, not nearest (#202) ----
+        check("ceil_tenth round-UP: 2.61 -> 2.7", ceil_tenth(2.61) == 2.7, str(ceil_tenth(2.61)))
+        check("ceil_tenth exact tenth: 2.60 -> 2.6 (not 2.7)", ceil_tenth(2.60) == 2.6, str(ceil_tenth(2.60)))
+        check("ceil_tenth repeating: 1.6667 -> 1.7", ceil_tenth(1.6667) == 1.7, str(ceil_tenth(1.6667)))
+        check("ceil_tenth whole: 2.0 -> 2.0", ceil_tenth(2.0) == 2.0, str(ceil_tenth(2.0)))
+
+        # ---- patch APPEND + full-precision total + ceil-to-tenth display total ----
+        conn.execute("INSERT INTO sov_line_items(project_code,sov_code,unit) VALUES(?, 'SMK-SOV-PATCH','CF')", (PROJECT,))
+        sidp = conn.execute("SELECT sov_id FROM sov_line_items WHERE sov_code='SMK-SOV-PATCH'").fetchone()[0]
+        for _ in range(2):  # 2ft x 2ft x 2in = 0.6667 CF each -> sum 1.3333 -> display 1.4
+            conn.execute("INSERT INTO quantity_entries(drop_id,sov_line_item,length,width,depth,"
+                         "length_unit,width_unit,depth_unit,logged_on,logged_by) "
+                         "VALUES('SMK-DP-T1',?,2,2,2,'ft','ft','in',?, 'W-0001')", (sidp, today))
+        cnt, vsum = conn.execute("SELECT COUNT(*), SUM(volume_cf) FROM quantity_entries "
+                                 "WHERE drop_id='SMK-DP-T1' AND sov_line_item=?", (sidp,)).fetchone()
+        check("patch APPEND: 2 rows (no overwrite)", cnt == 2, f"rows={cnt}")
+        check("patch total = SUM at full precision (~1.3333)", abs(vsum - 1.3333333) < 1e-4, f"sum={vsum}")
+        check("patch total DISPLAY = ceil-to-tenth(sum) = 1.4", ceil_tenth(vsum) == 1.4, str(ceil_tenth(vsum)))
+
+        # ---- edge: blank/non-numeric handled by the display helper without crashing ----
+        check("ceil_tenth(None) -> None (no crash)", ceil_tenth(None) is None)
+        check("ceil_tenth('abc') -> None (no crash)", ceil_tenth('abc') is None)
 
         # ---- LOCAL-date round-trip (no UTC off-by-one) ----
         rt = conn.execute("SELECT logged_on FROM quantity_entries WHERE drop_id='SMK-DP-T1' ORDER BY entry_id LIMIT 1").fetchone()[0]
