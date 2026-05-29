@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drop Plan — Superstars Contracting</title>
+<style>
+  :root {
+    --ink: #14161C; --ink-soft: #54505A; --mute: #76777E;
+    --brand-red: #B11E2E; --brand-red-dark: #8B1623;
+    --bg: #FAF7F1; --card: #FFFFFF; --border: #E8E4DD;
+    --ok: #2F7C57; --warn: #B68838;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    background: var(--bg); color: var(--ink); font-size: 14px; line-height: 1.4;
+  }
+  .header {
+    background: var(--ink); color: white; padding: 16px 28px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark { width: 30px; height: 30px; color: var(--brand-red); }
+  .brand-name { font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; font-size: 13px; }
+  .brand-sub { font-size: 10px; color: #9b9ca0; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 2px; }
+  .header-actions { display: flex; align-items: center; gap: 16px; }
+  .role-chip {
+    background: #2a2c34; color: #fff; padding: 4px 10px; border-radius: 3px;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700;
+  }
+  .back-link { color: #9b9ca0; font-size: 12px; text-decoration: none; font-weight: 600; }
+  .back-link:hover { color: white; }
+  main { padding: 28px; max-width: 1180px; margin: 0 auto; }
+  .eyebrow { font-size: 11px; color: var(--mute); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; }
+  h1 { margin: 2px 0 2px; font-size: 26px; }
+  .client-sub { font-size: 12px; color: var(--brand-red); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; }
+  .actionbar { display: flex; gap: 10px; align-items: center; margin: 18px 0; flex-wrap: wrap; }
+  .rollup {
+    margin-left: auto; display: flex; align-items: center; gap: 14px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 5px; padding: 8px 14px;
+  }
+  .rollup .rk { font-size: 11px; color: var(--mute); text-transform: uppercase; letter-spacing: 0.06em; }
+  .rollup .rv { font-weight: 800; font-size: 18px; }
+
+  .btn {
+    background: white; color: var(--ink); border: 1px solid var(--border); border-radius: 4px;
+    padding: 8px 14px; font-size: 12px; font-weight: 700; letter-spacing: 0.05em;
+    text-transform: uppercase; cursor: pointer;
+  }
+  .btn:hover { background: var(--bg); border-color: var(--brand-red); }
+  .btn-primary { background: var(--brand-red); color: white; border-color: var(--brand-red); }
+  .btn-primary:hover { background: var(--brand-red-dark); border-color: var(--brand-red-dark); }
+  .btn-sm { padding: 5px 10px; font-size: 11px; }
+
+  .elev-section { margin-bottom: 26px; }
+  .elev-head {
+    display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px;
+    border-bottom: 2px solid var(--ink); padding-bottom: 6px;
+  }
+  .elev-head h2 { margin: 0; font-size: 16px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .elev-head .cnt { font-size: 12px; color: var(--mute); }
+  .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .drop-card {
+    background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--brand-red);
+    border-radius: 5px; padding: 12px 14px;
+  }
+  .drop-card.scaffold_active { border-left-color: var(--ok); }
+  .drop-card.awaiting_paint { border-left-color: var(--warn); }
+  .drop-card.closed { border-left-color: var(--mute); }
+  .dc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .dc-label { font-weight: 800; font-size: 15px; }
+  .dc-id { font-size: 10px; color: var(--mute); letter-spacing: 0.04em; }
+  .dc-stage { font-size: 12px; color: var(--ink-soft); margin: 8px 0 6px; min-height: 16px; }
+  .dc-stage b { color: var(--ink); }
+  .progress-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--ok); border-radius: 4px; transition: width .3s ease; }
+  .progress-fill.behind { background: var(--brand-red); }
+  .dc-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+  .dc-pct { font-size: 12px; color: var(--mute); font-weight: 700; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+  .badge-ok { background: #e6f0ea; color: #2F7C57; }
+  .badge-warn { background: #fbf2dd; color: #8a6516; }
+  .badge-bad { background: #f7e0e2; color: #B11E2E; }
+  .badge-mute { background: #efece5; color: #76777E; }
+
+  .detail { grid-column: 1 / -1; display: none; }
+  .detail.open { display: block; }
+  .detail-panel {
+    background: var(--card); border: 1px solid var(--border); border-radius: 5px;
+    padding: 16px 18px; margin-top: 4px;
+  }
+  .detail-panel h3 { margin: 0 0 10px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); }
+  .step-row {
+    display: grid; grid-template-columns: 28px 1.5fr 120px 120px 120px 90px auto;
+    gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid #f2efe7; font-size: 12px;
+  }
+  .step-row .sn { font-weight: 800; color: var(--brand-red); }
+  .step-row .nm { font-weight: 600; }
+  .step-row .nm .gate { font-size: 9px; color: var(--warn); font-weight: 700; text-transform: uppercase; margin-left: 6px; }
+  .step-row select, .step-row input { width: 100%; padding: 5px 6px; border: 1px solid var(--border); border-radius: 3px; font-family: inherit; font-size: 12px; }
+  .step-row label.na { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--mute); white-space: nowrap; }
+  .qty-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+  .qty-table th { text-align: left; background: var(--ink); color: white; padding: 6px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .qty-table td { padding: 6px 8px; border-bottom: 1px solid #f2efe7; }
+  .cost-block { margin-top: 12px; padding: 10px 12px; background: #fbf7ef; border: 1px solid var(--border); border-radius: 4px; }
+  .cost-block .cv { font-weight: 800; font-size: 18px; }
+  .cost-pending { color: var(--warn); font-weight: 800; }
+
+  /* Modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(20,22,28,0.45); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .modal-bg.open { display: flex; }
+  .modal { background: white; width: 480px; max-width: 94vw; border-radius: 6px; padding: 22px 24px; box-shadow: 0 12px 36px rgba(0,0,0,0.25); }
+  .modal h2 { margin: 0 0 14px; font-size: 18px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 11px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; margin-bottom: 4px; }
+  .field input, .field select, .field textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 3px; font-family: inherit; font-size: 14px; color: var(--ink); }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--brand-red); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .volume-live { font-size: 13px; font-weight: 700; color: var(--ok); margin-top: 4px; min-height: 18px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  .err { color: var(--brand-red); font-size: 12px; margin-top: 8px; min-height: 16px; }
+  .err.ok { color: var(--ok); }
+  .hint { font-size: 11px; color: var(--mute); margin-top: 2px; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <polygon points="12,2 14.6,8.6 21.5,9.3 16.2,13.9 18,20.5 12,17 6,20.5 7.8,13.9 2.5,9.3 9.4,8.6"/>
+      </svg>
+      <div>
+        <div class="brand-name">Superstars Contracting</div>
+        <div class="brand-sub">Drop Plan</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span class="role-chip" id="hdr-role">…</span>
+      <span id="hdr-user" style="font-size:12px;color:#9b9ca0;"></span>
+      <a class="back-link" href="/">← Dashboard</a>
+    </div>
+  </div>
+
+  <main>
+    <div class="eyebrow">Project Drop Plan</div>
+    <h1 id="proj-title">890 E 135th St · FR-BX-001</h1>
+    <div class="client-sub">Compass Point, LLC</div>
+
+    <div class="actionbar">
+      <button class="btn btn-primary" type="button" id="btn-qty">+ Log Quantity</button>
+      <button class="btn" type="button" id="btn-expense" style="display:none;">+ Log Expense</button>
+      <div class="rollup" id="rollup">
+        <div><div class="rk">Overall progress</div><div class="rv" id="rv-progress">—</div></div>
+        <div><div class="rk">Drops</div><div class="rv" id="rv-drops">—</div></div>
+        <div id="rv-spend-wrap" style="display:none;"><div class="rk">Spend</div><div class="rv" id="rv-spend">—</div></div>
+      </div>
+    </div>
+
+    <div id="board"><div style="padding:18px;color:var(--mute);">Loading drops…</div></div>
+  </main>
+
+  <!-- Quantity modal -->
+  <div class="modal-bg" id="qty-bg">
+    <div class="modal" role="dialog" aria-modal="true">
+      <h2>Log Quantity</h2>
+      <div class="field">
+        <label for="q-drop">Drop</label>
+        <select id="q-drop"></select>
+      </div>
+      <div class="field">
+        <label for="q-sov">SOV line item</label>
+        <select id="q-sov"></select>
+      </div>
+      <div class="field-row">
+        <div class="field" style="margin-bottom:0;">
+          <label for="q-qty">Quantity</label>
+          <input type="number" id="q-qty" step="0.01" min="0" inputmode="decimal" placeholder="0">
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="q-unit">Unit</label>
+          <input type="text" id="q-unit" readonly placeholder="—">
+        </div>
+      </div>
+      <div id="patch-fields" style="display:none;margin-top:14px;">
+        <div class="field-row">
+          <div class="field" style="margin-bottom:0;">
+            <label for="q-area">Area (SF)</label>
+            <input type="number" id="q-area" step="0.01" min="0" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label for="q-depth">Depth (in)</label>
+            <input type="number" id="q-depth" step="0.01" min="0" inputmode="decimal" placeholder="0">
+          </div>
+        </div>
+        <div class="volume-live" id="q-volume"></div>
+        <div class="hint">Volume = area × depth ÷ 12 (computed and stored as CF).</div>
+      </div>
+      <div class="field" style="margin-top:14px;">
+        <label for="q-date">Logged on</label>
+        <input type="date" id="q-date" class="dp">
+      </div>
+      <div class="field">
+        <label for="q-note">Note (optional)</label>
+        <input type="text" id="q-note" placeholder="…">
+      </div>
+      <div class="hint">Each entry is APPENDED — totals are the sum of entries, never overwritten.</div>
+      <div class="err" id="q-err"></div>
+      <div class="modal-actions">
+        <button class="btn" type="button" id="q-cancel">Cancel</button>
+        <button class="btn btn-primary" type="button" id="q-save">Save entry</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Expense modal (admin/c_suite) -->
+  <div class="modal-bg" id="exp-bg">
+    <div class="modal" role="dialog" aria-modal="true">
+      <h2>Log Expense</h2>
+      <div class="field-row">
+        <div class="field"><label for="e-cat">Category</label>
+          <select id="e-cat"><option value="material">Material</option><option value="labor">Labor</option><option value="equipment">Equipment</option><option value="other">Other</option></select>
+        </div>
+        <div class="field"><label for="e-amount">Amount (USD)</label>
+          <input type="number" id="e-amount" step="0.01" min="0" inputmode="decimal" placeholder="0.00"></div>
+      </div>
+      <div class="field"><label for="e-drop">Drop (optional)</label><select id="e-drop"></select></div>
+      <div class="field"><label for="e-vendor">Vendor (optional)</label><input type="text" id="e-vendor"></div>
+      <div class="field"><label for="e-date">Logged on</label><input type="date" id="e-date" class="dp"></div>
+      <div class="field"><label for="e-note">Note (optional)</label><input type="text" id="e-note"></div>
+      <div class="err" id="e-err"></div>
+      <div class="modal-actions">
+        <button class="btn" type="button" id="e-cancel">Cancel</button>
+        <button class="btn btn-primary" type="button" id="e-save">Save expense</button>
+      </div>
+    </div>
+  </div>
+
+<script src="/files/static/js/datepicker.js"></script>
+<script>
+(function() {
+  const $ = (id) => document.getElementById(id);
+  const PROJECT = new URLSearchParams(location.search).get('project') || 'FR-BX-001';
+  const ELEVS = ['North', 'West', 'South', 'East'];
+  const esc = (s) => (s == null ? '' : String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'));
+  const fmtMoney = (n) => (n == null || isNaN(n)) ? '—'
+    : '$' + Number(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  function todayLocal() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function readDate(el) {
+    // SSCDatePicker stores canonical YYYY-MM-DD in dataset.iso; native date input .value is already local YYYY-MM-DD.
+    return (el && (el.dataset.iso || el.value)) || '';
+  }
+  function wireDate(el) {
+    try { if (window.SSCDatePicker && SSCDatePicker.wire) SSCDatePicker.wire(el, {}); } catch (e) {}
+  }
+
+  let ROLE = null;
+  let SEES_COST = false;
+  let DROPS = [];   // cached summaries
+  let SOV = [];     // sov line items
+
+  async function loadMe() {
+    try {
+      const r = await fetch('/api/auth/me', {credentials: 'include'});
+      const j = await r.json();
+      if (j && j.user) {
+        ROLE = j.user.role || null;
+        $('hdr-role').textContent = ROLE || '—';
+        $('hdr-user').textContent = j.user.full_name || j.user.email || '';
+        SEES_COST = (ROLE === 'admin' || ROLE === 'c_suite');
+        if (SEES_COST) $('btn-expense').style.display = '';
+      }
+    } catch (e) {}
+  }
+
+  function lifecycleBadge(lc) {
+    const map = {scaffold_active: 'badge-ok', awaiting_paint: 'badge-warn', closed: 'badge-mute', not_started: 'badge-mute'};
+    return `<span class="badge ${map[lc] || 'badge-mute'}">${esc((lc || '').replace(/_/g,' '))}</span>`;
+  }
+  function varianceChip(wd) {
+    if (!wd || wd.status === 'no_actuals') return '';
+    const map = {ahead: 'badge-ok', on_track: 'badge-mute', behind: 'badge-bad'};
+    const label = wd.status === 'on_track' ? 'on track' : wd.status;
+    return ` <span class="badge ${map[wd.status] || 'badge-mute'}" title="planned ${wd.planned_to_date_days}d vs actual ${wd.actual_to_date_days}d">${esc(label)}</span>`;
+  }
+
+  function cardHtml(d) {
+    const pct = (d.progress && d.progress.pct != null) ? d.progress.pct : 0;
+    const stage = d.current_stage ? `<b>Step ${d.current_stage.step_no}:</b> ${esc(d.current_stage.name)}` : '<span style="color:var(--mute);">— all steps done / none active</span>';
+    const behind = (d.working_days && d.working_days.status === 'behind') ? ' behind' : '';
+    const label = 'Drop ' + d.sequence_no;
+    return `<div class="drop-card ${esc(d.lifecycle)}">
+        <div class="dc-top">
+          <div><div class="dc-label">${esc(label)}</div><div class="dc-id">${esc(d.drop_id)}</div></div>
+          <div>${lifecycleBadge(d.lifecycle)}${varianceChip(d.working_days)}</div>
+        </div>
+        <div class="dc-stage">${stage}</div>
+        <div class="progress-bar"><div class="progress-fill${behind}" data-bar="${esc(d.drop_id)}" style="width:${pct}%;"></div></div>
+        <div class="dc-meta">
+          <span class="dc-pct" data-pct="${esc(d.drop_id)}">${pct}% · ${d.progress ? d.progress.complete_steps : 0}/${d.progress ? d.progress.applicable_steps : 0} steps</span>
+          <button class="btn btn-sm" type="button" data-open="${esc(d.drop_id)}">Open</button>
+        </div>
+        <div class="detail" data-detail="${esc(d.drop_id)}"></div>
+      </div>`;
+  }
+
+  async function loadBoard() {
+    const board = $('board');
+    try {
+      const r = await fetch(`/api/dropplan/projects/${encodeURIComponent(PROJECT)}/drops`, {credentials: 'include'});
+      if (r.status === 401) { location.href = '/login?next=/dropplan'; return; }
+      if (r.status === 403) { board.innerHTML = '<div style="padding:18px;color:var(--brand-red);">Forbidden — your role cannot view the drop plan.</div>'; return; }
+      const j = await r.json();
+      DROPS = (j && j.data) || [];
+      let html = '';
+      for (const elev of ELEVS) {
+        const ds = DROPS.filter(d => d.elevation === elev);
+        if (!ds.length) continue;
+        html += `<div class="elev-section"><div class="elev-head"><h2>${esc(elev)}</h2><span class="cnt">${ds.length} drops</span></div><div class="board">${ds.map(cardHtml).join('')}</div></div>`;
+      }
+      board.innerHTML = html || '<div style="padding:18px;color:var(--mute);">No drops.</div>';
+    } catch (e) {
+      board.innerHTML = '<div style="padding:18px;color:var(--brand-red);">Network error — retry.</div>';
+    }
+  }
+
+  async function loadRollup() {
+    try {
+      const r = await fetch(`/api/dropplan/projects/${encodeURIComponent(PROJECT)}/rollup`, {credentials: 'include'});
+      const j = await r.json();
+      const d = (j && j.data) || {};
+      $('rv-progress').textContent = (d.overall_progress_pct != null ? d.overall_progress_pct : 0) + '%';
+      $('rv-drops').textContent = d.drop_count != null ? d.drop_count : '—';
+      // total_spend key is OMITTED for non admin/c_suite — only render when present.
+      if ('total_spend' in d) {
+        $('rv-spend-wrap').style.display = '';
+        $('rv-spend').textContent = (d.total_spend === 'pending_rates') ? 'Pending rates' : fmtMoney(d.total_spend);
+      }
+    } catch (e) {}
+  }
+
+  function stepRow(dropId, s) {
+    const gate = s.is_cure_gate ? '<span class="gate">cure gate</span>' : (s.is_signoff_gate ? '<span class="gate">sign-off</span>' : '');
+    const sel = (v) => s.status === v ? ' selected' : '';
+    const na = s.status === 'n_a';
+    return `<div class="step-row" data-step="${s.step_no}">
+      <div class="sn">${s.step_no}</div>
+      <div class="nm">${esc(s.name)}${gate}</div>
+      <select data-f="status" ${na ? 'disabled' : ''}>
+        <option value="not_started"${sel('not_started')}>not started</option>
+        <option value="in_progress"${sel('in_progress')}>in progress</option>
+        <option value="complete"${sel('complete')}>complete</option>
+      </select>
+      <input type="date" class="dp" data-f="started_on" value="${esc(s.started_on || '')}">
+      <input type="date" class="dp" data-f="completed_on" value="${esc(s.completed_on || '')}">
+      <input type="number" step="0.5" min="0" data-f="working_days_actual" placeholder="days" value="${s.working_days_actual != null ? s.working_days_actual : ''}">
+      <div style="display:flex;gap:6px;align-items:center;white-space:nowrap;">
+        <label class="na"><input type="checkbox" data-f="na" ${na ? 'checked' : ''}> N/A</label>
+        <button class="btn btn-sm" type="button" data-savestep="${s.step_no}" data-drop="${esc(dropId)}">Save</button>
+      </div>
+    </div>`;
+  }
+
+  function costBlock(d) {
+    // cost / expense_total keys are OMITTED by the API for non admin/c_suite.
+    if (!('cost' in d)) return '';
+    const costStr = (d.cost === 'pending_rates')
+      ? '<span class="cost-pending">Pending rates</span>'
+      : `<span class="cv">${fmtMoney(d.cost)}</span>`;
+    return `<div class="cost-block">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--mute);">Drop cost (admin / c-suite)</div>
+      <div style="margin-top:4px;">Cost: ${costStr} &nbsp;·&nbsp; Logged expenses: ${fmtMoney(d.expense_total)}</div>
+    </div>`;
+  }
+
+  async function openDetail(dropId, container) {
+    container.innerHTML = '<div class="detail-panel">Loading…</div>';
+    container.classList.add('open');
+    try {
+      const r = await fetch(`/api/dropplan/drops/${encodeURIComponent(dropId)}`, {credentials: 'include'});
+      const j = await r.json();
+      const d = (j && j.data) || {};
+      const steps = (d.stages || []).map(s => stepRow(dropId, s)).join('');
+      const qt = (d.quantity_totals || []);
+      const qtHtml = qt.length
+        ? `<table class="qty-table"><thead><tr><th>SOV line</th><th>Qty</th><th>Volume (CF)</th><th>Entries</th></tr></thead><tbody>`
+          + qt.map(q => `<tr><td>${esc(q.sov_code)} <span style="color:var(--mute);">(${esc(q.unit || '')})</span></td><td>${q.qty_total != null ? q.qty_total : '—'}</td><td>${q.volume_total != null ? q.volume_total : '—'}</td><td>${q.entry_count}</td></tr>`).join('')
+          + `</tbody></table>`
+        : '<div style="color:var(--mute);font-size:12px;">No quantities logged yet.</div>';
+      container.innerHTML = `<div class="detail-panel">
+        <h3>Stage pipeline</h3>
+        <div class="pipeline">${steps}</div>
+        <h3 style="margin-top:16px;">Quantity totals</h3>
+        ${qtHtml}
+        ${costBlock(d)}
+      </div>`;
+      container.querySelectorAll('input.dp').forEach(wireDate);
+    } catch (e) {
+      container.innerHTML = '<div class="detail-panel" style="color:var(--brand-red);">Failed to load detail.</div>';
+    }
+  }
+
+  async function saveStep(dropId, stepNo, rowEl) {
+    const body = {};
+    const naBox = rowEl.querySelector('[data-f="na"]');
+    if (naBox && naBox.checked) {
+      body.status = 'n_a';
+    } else {
+      body.status = rowEl.querySelector('[data-f="status"]').value;
+    }
+    body.started_on = readDate(rowEl.querySelector('[data-f="started_on"]')) || null;
+    body.completed_on = readDate(rowEl.querySelector('[data-f="completed_on"]')) || null;
+    const wd = rowEl.querySelector('[data-f="working_days_actual"]').value;
+    body.working_days_actual = wd === '' ? null : parseFloat(wd);
+    const r = await fetch(`/api/dropplan/drops/${encodeURIComponent(dropId)}/stages/${stepNo}`, {
+      method: 'PATCH', credentials: 'include',
+      headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+    });
+    if (r.ok) {
+      // Reload board (progress bars are DB-driven) + reopen this detail.
+      await loadBoard(); await loadRollup();
+      const det = document.querySelector(`[data-detail="${CSS.escape(dropId)}"]`);
+      if (det) openDetail(dropId, det);
+    } else {
+      const j = await r.json().catch(() => ({}));
+      alert('Save failed: ' + ((j && j.error) || r.status));
+    }
+  }
+
+  // ---------- quantity modal ----------
+  function selectedSov() { return SOV.find(s => String(s.sov_id) === $('q-sov').value); }
+  function refreshQtyForm() {
+    const s = selectedSov();
+    $('q-unit').value = s ? (s.unit || '') : '';
+    const isPatch = s && (s.unit === 'CF');
+    $('patch-fields').style.display = isPatch ? '' : 'none';
+    refreshVolume();
+  }
+  function refreshVolume() {
+    const a = parseFloat($('q-area').value), d = parseFloat($('q-depth').value);
+    $('q-volume').textContent = (!isNaN(a) && !isNaN(d)) ? ('Volume: ' + (a * d / 12).toFixed(4) + ' CF') : '';
+  }
+  function openQty() {
+    $('q-drop').innerHTML = DROPS.map(d => `<option value="${esc(d.drop_id)}">Drop ${d.sequence_no} — ${esc(d.elevation)} (${esc(d.drop_id)})</option>`).join('');
+    $('q-sov').innerHTML = SOV.map(s => `<option value="${s.sov_id}">${esc(s.sov_code)} — ${esc((s.description || '').slice(0,40))} (${esc(s.unit || '')})</option>`).join('');
+    $('q-qty').value = ''; $('q-area').value = ''; $('q-depth').value = ''; $('q-note').value = '';
+    $('q-date').value = todayLocal(); $('q-err').textContent = ''; $('q-err').className = 'err';
+    refreshQtyForm();
+    $('qty-bg').classList.add('open');
+  }
+  async function saveQty() {
+    const err = $('q-err'); err.textContent = ''; err.className = 'err';
+    const dropId = $('q-drop').value;
+    const sov = selectedSov();
+    if (!dropId || !sov) { err.textContent = 'Pick a drop and SOV line.'; return; }
+    const body = {sov_line_item: sov.sov_id, unit: sov.unit, logged_on: readDate($('q-date')) || todayLocal(), note: $('q-note').value.trim() || null};
+    const isPatch = (sov.unit === 'CF');
+    if (isPatch && $('q-area').value && $('q-depth').value) {
+      body.area_sf = parseFloat($('q-area').value); body.depth_in = parseFloat($('q-depth').value);
+    }
+    if ($('q-qty').value) body.quantity = parseFloat($('q-qty').value);
+    if (body.quantity == null && body.area_sf == null) { err.textContent = 'Enter a quantity (or area + depth for a patch).'; return; }
+    try {
+      const r = await fetch(`/api/dropplan/drops/${encodeURIComponent(dropId)}/quantity-entries`, {
+        method: 'POST', credentials: 'include',
+        headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+      });
+      const j = await r.json();
+      if (!r.ok) { err.textContent = (j && j.error) || ('Save failed (' + r.status + ')'); return; }
+      err.className = 'err ok'; err.textContent = 'Entry appended.';
+      await loadBoard(); await loadRollup();
+      const det = document.querySelector(`[data-detail="${CSS.escape(dropId)}"]`);
+      if (det && det.classList.contains('open')) openDetail(dropId, det);
+      setTimeout(() => $('qty-bg').classList.remove('open'), 400);
+    } catch (e) { err.textContent = 'Network error.'; }
+  }
+
+  // ---------- expense modal ----------
+  function openExp() {
+    $('e-drop').innerHTML = '<option value="">(project-level)</option>' + DROPS.map(d => `<option value="${esc(d.drop_id)}">Drop ${d.sequence_no} (${esc(d.drop_id)})</option>`).join('');
+    $('e-amount').value = ''; $('e-vendor').value = ''; $('e-note').value = '';
+    $('e-date').value = todayLocal(); $('e-err').textContent = ''; $('e-err').className = 'err';
+    $('exp-bg').classList.add('open');
+  }
+  async function saveExp() {
+    const err = $('e-err'); err.textContent = ''; err.className = 'err';
+    const amount = parseFloat($('e-amount').value);
+    if (!amount || amount <= 0) { err.textContent = 'Enter a positive amount.'; return; }
+    const body = {category: $('e-cat').value, amount: amount, drop_id: $('e-drop').value || null,
+                  vendor: $('e-vendor').value.trim() || null, logged_on: readDate($('e-date')) || todayLocal(),
+                  note: $('e-note').value.trim() || null};
+    try {
+      const r = await fetch(`/api/dropplan/projects/${encodeURIComponent(PROJECT)}/expense-entries`, {
+        method: 'POST', credentials: 'include',
+        headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+      });
+      const j = await r.json();
+      if (!r.ok) { err.textContent = (j && j.error) || ('Save failed (' + r.status + ')'); return; }
+      err.className = 'err ok'; err.textContent = 'Expense logged.';
+      await loadRollup();
+      setTimeout(() => $('exp-bg').classList.remove('open'), 400);
+    } catch (e) { err.textContent = 'Network error.'; }
+  }
+
+  async function loadSov() {
+    try {
+      const r = await fetch(`/api/dropplan/projects/${encodeURIComponent(PROJECT)}/sov-lines`, {credentials: 'include'});
+      const j = await r.json();
+      SOV = (j && j.data) || [];
+    } catch (e) {}
+  }
+
+  // ---------- events ----------
+  document.addEventListener('click', (e) => {
+    const open = e.target.closest('[data-open]');
+    if (open) {
+      const dropId = open.getAttribute('data-open');
+      const det = document.querySelector(`[data-detail="${CSS.escape(dropId)}"]`);
+      if (det.classList.contains('open')) { det.classList.remove('open'); det.innerHTML = ''; open.textContent = 'Open'; }
+      else { open.textContent = 'Close'; openDetail(dropId, det); }
+      return;
+    }
+    const ss = e.target.closest('[data-savestep]');
+    if (ss) { saveStep(ss.getAttribute('data-drop'), parseInt(ss.getAttribute('data-savestep'), 10), ss.closest('.step-row')); return; }
+  });
+  document.addEventListener('change', (e) => {
+    if (e.target.closest('[data-f="na"]')) {
+      const row = e.target.closest('.step-row');
+      const sel = row.querySelector('[data-f="status"]');
+      sel.disabled = e.target.checked;
+    }
+  });
+  $('btn-qty').addEventListener('click', openQty);
+  $('btn-expense').addEventListener('click', openExp);
+  $('q-cancel').addEventListener('click', () => $('qty-bg').classList.remove('open'));
+  $('q-save').addEventListener('click', saveQty);
+  $('q-sov').addEventListener('change', refreshQtyForm);
+  $('q-area').addEventListener('input', refreshVolume);
+  $('q-depth').addEventListener('input', refreshVolume);
+  $('e-cancel').addEventListener('click', () => $('exp-bg').classList.remove('open'));
+  $('e-save').addEventListener('click', saveExp);
+  [$('qty-bg'), $('exp-bg')].forEach(bg => bg.addEventListener('click', (e) => { if (e.target === bg) bg.classList.remove('open'); }));
+
+  (async function init() {
+    await loadMe();
+    await Promise.all([loadBoard(), loadRollup(), loadSov()]);
+    document.querySelectorAll('input.dp').forEach(wireDate);
+  })();
+})();
+</script>
+</body>
+</html>

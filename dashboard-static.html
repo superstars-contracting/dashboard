@@ -462,6 +462,13 @@
         <a class="nav-link" data-view="drawings">Drawing Markup</a>
         <a class="nav-link" data-view="documents">Project Documents</a>
         <a class="nav-link" data-view="drop-plans">Drop Plans</a>
+        <!-- #201 — NEW authoritative Drop Plan (project-scoped: stages,
+             quantities, progress, role-gated cost). Real href to the
+             standalone /dropplan page — intentionally NO data-view so the
+             #195 nav interceptor lets the browser navigate (not swallow it).
+             The legacy data-view="drop-plans" sample above is superseded;
+             retire it in a future cleanup batch. -->
+        <a class="nav-link" href="/dropplan" title="Project Drop Plan — stages, quantities, progress (admin/c-suite also see cost)">Drop Plan</a>
         <a class="nav-link" data-view="schedule">Schedule</a>
       </div>
       <div class="nav-group">

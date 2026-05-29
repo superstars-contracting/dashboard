@@ -6748,6 +6748,37 @@ def api_dropplan_patch_paint(phase_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/dropplan/projects/<project_code>/sov-lines', methods=['GET'])
+@requires_role(*_DROPPLAN_ROLES)
+def api_dropplan_sov_lines(project_code):
+    """SOV line items for the project's quantity-entry dropdown. Returns
+    code/description/unit only — NO unit_rate (no dollars in the picker)."""
+    try:
+        conn = db()
+        try:
+            rows = conn.execute(
+                "SELECT sov_id, sov_code, description, unit FROM sov_line_items "
+                "WHERE project_code=? ORDER BY sov_code", (project_code,)).fetchall()
+            out = rows_to_dicts(rows)
+        finally:
+            conn.close()
+        return response_wrapper(out, count=len(out))
+    except Exception as e:
+        logging.error(f"GET /api/dropplan/projects/{project_code}/sov-lines: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/dropplan', methods=['GET'])
+@requires_role(*_DROPPLAN_ROLES)
+def dropplan_page():
+    """Serve the project-scoped Drop Plan UI (Batch C #201). Login + the four
+    operational roles; dollar fields are omitted by the API for pm/super."""
+    page = SCRIPT_DIR / 'dropplan.html'
+    if not page.exists():
+        return jsonify({"error": "drop plan page not found"}), 404
+    return send_file(str(page))
+
+
 # ============= STATIC SERVING =============
 
 
