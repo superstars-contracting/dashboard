@@ -42,6 +42,9 @@
   .board { display:grid; grid-template-columns:repeat(auto-fill,minmax(252px,1fr)); gap:12px; }
   .drop-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:14px; cursor:pointer; display:flex; gap:14px; align-items:center; transition:border-color .15s, box-shadow .15s; }
   .drop-card:hover { border-color:var(--brand-red); box-shadow:0 2px 10px rgba(0,0,0,.05); }
+  .drop-card.lean { cursor:default; justify-content:space-between; background:#fcfbf8; }
+  .drop-card.lean:hover { border-color:var(--border); box-shadow:none; }
+  .dc-quiet { font-size:12px; color:var(--mute); margin-top:4px; }
   .dc-info { flex:1; min-width:0; }
   .dc-label { font-weight:800; font-size:15px; }
   .dc-stage { font-size:12px; color:var(--ink-soft); margin-top:4px; }
@@ -214,16 +217,32 @@
   function varianceChip(wd){ if(!wd||wd.status==='no_actuals') return ''; const lbl=wd.status==='on_track'?'on track':wd.status; return `<span class="chip chip-${esc(wd.status)}" title="planned ${wd.planned_to_date_days}d / actual ${wd.actual_to_date_days}d">${esc(lbl)} ${wd.planned_to_date_days}/${wd.actual_to_date_days}d</span>`; }
 
   function cardHtml(d){
+    // Activate model (#204): only ACTIVE drops (lifecycle beyond not_started)
+    // show a ring + current stage. Not-started drops are lean, quiet cards
+    // with an Activate button (no ring, no redundant stage label).
+    const active = d.lifecycle && d.lifecycle !== 'not_started';
+    if(!active){
+      return `<div class="drop-card lean">
+        <div class="dc-info"><div class="dc-label">Drop ${d.sequence_no}</div>
+          <div class="dc-quiet">${esc(d.elevation||'')} · not started</div></div>
+        <button type="button" class="btn btn-sm" data-activate="${esc(d.drop_id)}">Activate</button></div>`;
+    }
     const pct=(d.progress&&d.progress.pct!=null)?d.progress.pct:0;
     const comp=d.progress?d.progress.complete_steps:0, app=d.progress?d.progress.applicable_steps:0;
-    const stage=d.current_stage?`Step ${d.current_stage.step_no}: ${esc(d.current_stage.name)}`:'all steps done / none active';
-    return `<div class="drop-card" data-open="${esc(d.drop_id)}">
+    const stage=d.current_stage?`Step ${d.current_stage.step_no} · ${esc(d.current_stage.name)}`:'all steps done';
+    return `<div class="drop-card active" data-open="${esc(d.drop_id)}">
       ${ringSVG(pct,comp,app,false)}
       <div class="dc-info">
         <div class="dc-label">Drop ${d.sequence_no}</div>
         <div class="dc-stage">${stage}</div>
         <div class="dc-row">${lifecyclePill(d.lifecycle)}${varianceChip(d.working_days)}</div>
       </div></div>`;
+  }
+  async function activateDrop(id){
+    try{
+      const r=await fetch(`/api/dropplan/drops/${encodeURIComponent(id)}`,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({lifecycle:'scaffold_active'})});
+      if(r.ok){ await loadBoard(); await loadRollup(); }
+    }catch(e){}
   }
 
   async function loadBoard(){
@@ -281,11 +300,26 @@
 
   // ---------- per-drop detail ----------
   let CUR_DROP=null;
-  async function openDrop(dropId){
+  async function openDrop(dropId, skipPush){
     CUR_DROP=dropId;
+    // URL-driven so a fresh load / reload of /dropplan?drop=<id> renders the
+    // detail directly (deep-link + reload-safe) — never a blank page (#204).
+    if(!skipPush){ try{ history.pushState({drop:dropId}, '', '/dropplan?drop='+encodeURIComponent(dropId)); }catch(e){} }
     $('board-view').style.display='none'; $('detail-view').style.display='';
-    const body=$('detail-body'); body.innerHTML='Loading…';
-    const d=((await (await fetch(`/api/dropplan/drops/${encodeURIComponent(dropId)}`,{credentials:'include'})).json()).data)||{};
+    const body=$('detail-body'); body.innerHTML='<div class="panel">Loading…</div>';
+    let d;
+    try {
+      const resp = await fetch(`/api/dropplan/drops/${encodeURIComponent(dropId)}`,{credentials:'include'});
+      if(resp.status===401){ location.href='/login?next='+encodeURIComponent('/dropplan?drop='+dropId); return; }
+      if(!resp.ok){ throw new Error('detail HTTP '+resp.status); }
+      d=((await resp.json()).data)||null;
+      if(!d){ throw new Error('no drop data'); }
+    } catch(err){
+      // Defensive: surface an explicit error + retry — NEVER a silent blank page.
+      body.innerHTML='<div class="panel" style="color:var(--brand-red);">Could not load Drop '+esc(dropId)+' — <button type="button" class="btn btn-sm" id="retry-drop">Retry</button></div>';
+      const rb=document.getElementById('retry-drop'); if(rb) rb.addEventListener('click',()=>openDrop(dropId,true));
+      return;
+    }
     const pr=d.progress||{}, wd=d.working_days||{};
     const stageRows=(d.stages||[]).map(stepRowHtml).join('');
     body.innerHTML=`
@@ -306,7 +340,7 @@
     bindSteps();
     await loadPatches();
   }
-  function backToBoard(){ $('detail-view').style.display='none'; $('board-view').style.display=''; loadBoard(); loadRollup(); }
+  function backToBoard(skipPush){ if(!skipPush){ try{ history.pushState({}, '', '/dropplan'); }catch(e){} } $('detail-view').style.display='none'; $('board-view').style.display=''; loadBoard(); loadRollup(); }
 
   function stepRowHtml(s){
     const gate = s.is_cure_gate?'<span class="gate">cure gate</span>':(s.is_signoff_gate?'<span class="gate">sign-off</span>':'');
@@ -446,10 +480,18 @@
   }
 
   // events
-  document.addEventListener('click',(e)=>{ const c=e.target.closest('[data-open]'); if(c) openDrop(c.getAttribute('data-open')); });
-  $('back-to-board').addEventListener('click',backToBoard);
+  document.addEventListener('click',(e)=>{
+    const c=e.target.closest('[data-open]'); if(c){ openDrop(c.getAttribute('data-open')); return; }
+    const a=e.target.closest('[data-activate]'); if(a){ activateDrop(a.getAttribute('data-activate')); return; }
+  });
+  $('back-to-board').addEventListener('click',()=>backToBoard());
+  window.addEventListener('popstate',()=>{ const d=new URLSearchParams(location.search).get('drop'); if(d) openDrop(d,true); else backToBoard(true); });
 
-  (async function init(){ await loadMe(); await loadSov(); await Promise.all([loadBoard(), loadRollup()]); })();
+  (async function init(){
+    await loadMe(); await loadSov(); await Promise.all([loadBoard(), loadRollup()]);
+    const dq=new URLSearchParams(location.search).get('drop');
+    if(dq) openDrop(dq, true);   // fresh-load / reload of /dropplan?drop=<id> renders the detail directly
+  })();
 })();
 </script>
 </body>

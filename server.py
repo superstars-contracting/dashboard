@@ -6750,6 +6750,45 @@ def api_dropplan_list_quantity(drop_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/dropplan/drops/<drop_id>', methods=['PATCH'])
+@requires_role(*_DROPPLAN_ROLES)
+def api_dropplan_patch_drop(drop_id):
+    """Update a drop's lifecycle (the 'Activate' action #204) and/or notes.
+    Activating sets lifecycle='scaffold_active' so the board shows its ring.
+    Audit-logged."""
+    try:
+        body = request.get_json(silent=True) or {}
+        fields = {}
+        if 'lifecycle' in body:
+            if body['lifecycle'] not in ('not_started', 'scaffold_active', 'awaiting_paint', 'closed'):
+                return jsonify({"error": "bad lifecycle"}), 400
+            fields['lifecycle'] = body['lifecycle']
+        if 'notes' in body:
+            fields['notes'] = body['notes']
+        if not fields:
+            return jsonify({"error": "no fields to update"}), 400
+        conn = db()
+        try:
+            old = conn.execute("SELECT lifecycle, notes FROM drops WHERE drop_id=?", (drop_id,)).fetchone()
+            if old is None:
+                return jsonify({"error": "drop not found"}), 404
+            old = dict(old)
+            sets = ", ".join(f"{k}=?" for k in fields)  # keys from the fixed whitelist above
+            conn.execute(f"UPDATE drops SET {sets}, updated_at=CURRENT_TIMESTAMP WHERE drop_id=?",
+                         (*fields.values(), drop_id))
+            _dropplan_audit(conn, 'dropplan_drop_update', 'drop', drop_id, before=old, after=fields, note='drop update')
+            conn.commit()
+            row = dict(conn.execute("SELECT drop_id, project_code, elevation, sequence_no, lifecycle, "
+                                    "window_count, structural_signoff_at, closed_at FROM drops WHERE drop_id=?",
+                                    (drop_id,)).fetchone())
+        finally:
+            conn.close()
+        return response_wrapper(row)
+    except Exception as e:
+        logging.error(f"PATCH /api/dropplan/drops/{drop_id}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/dropplan/quantity-entries/<int:entry_id>', methods=['PATCH'])
 @requires_role(*_DROPPLAN_ROLES)
 def api_dropplan_patch_quantity(entry_id):
