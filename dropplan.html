@@ -68,8 +68,10 @@
   .chip-behind { background:#f7e0e2; color:#B11E2E; }
   .chip-on_track { background:#eef1f4; color:#54505A; }
 
-  /* detail view */
-  #detail-view { display:none; }
+  /* inline detail panel (accordion expand — NO navigation, NO URL change) */
+  .drop-expand { grid-column:1 / -1; background:var(--bg); border:1px solid var(--brand-red); border-radius:var(--radius); padding:16px 18px; margin:2px 0 8px; }
+  .detail-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+  .detail-head .eyebrow { color:var(--ink-soft); }
   .detail-top { display:flex; gap:24px; align-items:center; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:20px 24px; margin-bottom:18px; flex-wrap:wrap; }
   .detail-stats { display:flex; gap:28px; flex-wrap:wrap; }
   .stat .k { font-size:11px; color:var(--mute); text-transform:uppercase; letter-spacing:.06em; }
@@ -163,16 +165,13 @@
       <div class="kpis">
         <div class="kpi"><div class="k">Overall progress</div><div class="v" id="kpi-progress">—</div></div>
         <div class="kpi"><div class="k">Drops</div><div class="v" id="kpi-drops">—</div></div>
-        <div class="kpi" id="kpi-spend-wrap" style="display:none;"><div class="k">Spend</div><div class="v" id="kpi-spend">—</div></div>
       </div>
       <div id="board"><div style="color:var(--mute);">Loading drops…</div></div>
     </div>
 
-    <!-- DETAIL VIEW -->
-    <div id="detail-view">
-      <a class="back-link" id="back-to-board" style="color:var(--brand-red);">← Back to all drops</a>
-      <div id="detail-body" style="margin-top:14px;"></div>
-    </div>
+    <footer id="build-stamp" style="margin-top:32px;padding-top:14px;border-top:1px solid var(--border);color:var(--mute);font-size:11px;letter-spacing:.04em;">
+      build #205 · 2026-05-29 · inline drop detail
+    </footer>
   </main>
 
 <script>
@@ -185,9 +184,8 @@
   function todayLocal(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   function fmtMDY(iso){ if(!iso) return ''; const p=String(iso).slice(0,10).split('-'); return p.length===3 ? `${p[1]}/${p[2]}/${p[0]}` : iso; }
   function jsCeilTenth(v){ if(v==null||isNaN(v)) return null; return Math.ceil(Number((Number(v)*10).toFixed(6)))/10; }
-  function fmtMoney(n){ return (n==null||isNaN(n))?'—':'$'+Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
 
-  let ROLE=null, SEES_COST=false, DROPS=[], SOV=[], PATCH_SOV=null;
+  let ROLE=null, DROPS=[], SOV=[], PATCH_SOV=null;
 
   function ringSVG(pct, complete, applicable, large){
     const size = large?150:54, stroke = large?14:7;
@@ -205,7 +203,7 @@
 
   async function loadMe(){
     try{ const j=await (await fetch('/api/auth/me',{credentials:'include'})).json();
-      if(j&&j.user){ ROLE=j.user.role||null; $('hdr-role').textContent=ROLE||'—'; $('hdr-user').textContent=j.user.full_name||j.user.email||''; SEES_COST=(ROLE==='admin'||ROLE==='c_suite'); }
+      if(j&&j.user){ ROLE=j.user.role||null; $('hdr-role').textContent=ROLE||'—'; $('hdr-user').textContent=j.user.full_name||j.user.email||''; }
     }catch(e){}
   }
   async function loadSov(){
@@ -252,6 +250,7 @@
       if(r.status===401){ location.href='/login?next=/dropplan'; return; }
       if(r.status===403){ board.innerHTML='<div style="color:var(--brand-red);">Forbidden — your role cannot view the drop plan.</div>'; return; }
       DROPS=((await r.json()).data)||[];
+      collapseDrop();   // rebuilding the board wipes any open panel — reset accordion state
       let html='';
       for(const e of ELEVS){ const ds=DROPS.filter(d=>d.elevation===e); if(!ds.length) continue;
         html+=`<div class="elev-section"><div class="elev-head"><h2>${esc(e)}</h2><span class="cnt">${ds.length} drops</span></div><div class="board">${ds.map(cardHtml).join('')}</div></div>`; }
@@ -262,7 +261,8 @@
     try{ const d=((await (await fetch(`/api/dropplan/projects/${encodeURIComponent(PROJECT)}/rollup`,{credentials:'include'})).json()).data)||{};
       $('kpi-progress').textContent=(d.overall_progress_pct!=null?d.overall_progress_pct:0)+'%';
       $('kpi-drops').textContent=d.drop_count!=null?d.drop_count:'—';
-      if('total_spend' in d){ $('kpi-spend-wrap').style.display=''; $('kpi-spend').textContent=(d.total_spend==='pending_rates')?'Pending rates':fmtMoney(d.total_spend); }
+      // Cost / spend deliberately NOT shown on this page (#205): drops + quantities
+      // only. Cost lives in the future Spend module; the API still omits it for pm/super.
     }catch(e){}
   }
 
@@ -298,36 +298,28 @@
     draw();
   }
 
-  // ---------- per-drop detail ----------
-  let CUR_DROP=null;
-  async function openDrop(dropId, skipPush){
-    CUR_DROP=dropId;
-    // URL-driven so a fresh load / reload of /dropplan?drop=<id> renders the
-    // detail directly (deep-link + reload-safe) — never a blank page (#204).
-    if(!skipPush){ try{ history.pushState({drop:dropId}, '', '/dropplan?drop='+encodeURIComponent(dropId)); }catch(e){} }
-    $('board-view').style.display='none'; $('detail-view').style.display='';
-    const body=$('detail-body'); body.innerHTML='<div class="panel">Loading…</div>';
-    let d;
-    try {
-      const resp = await fetch(`/api/dropplan/drops/${encodeURIComponent(dropId)}`,{credentials:'include'});
-      if(resp.status===401){ location.href='/login?next='+encodeURIComponent('/dropplan?drop='+dropId); return; }
-      if(!resp.ok){ throw new Error('detail HTTP '+resp.status); }
-      d=((await resp.json()).data)||null;
-      if(!d){ throw new Error('no drop data'); }
-    } catch(err){
-      // Defensive: surface an explicit error + retry — NEVER a silent blank page.
-      body.innerHTML='<div class="panel" style="color:var(--brand-red);">Could not load Drop '+esc(dropId)+' — <button type="button" class="btn btn-sm" id="retry-drop">Retry</button></div>';
-      const rb=document.getElementById('retry-drop'); if(rb) rb.addEventListener('click',()=>openDrop(dropId,true));
-      return;
-    }
+  // ---------- per-drop INLINE expand (accordion — NO navigation, NO URL change) ----------
+  // Clicking an active card injects a full-width panel as the card's NEXT SIBLING
+  // inside the board grid (grid-column:1/-1). The board + every other card stay in
+  // the DOM and the URL never changes — clicking again or the collapse control just
+  // removes the panel. This replaces the #204 URL-driven view-swap (history.pushState
+  // + show/hide #detail-view) that read as "a different page" and went blank on the
+  // operator's real browser. There is no navigation here, so navigate-to-blank is
+  // structurally impossible.
+  let CUR_DROP=null, CUR_PANEL=null;
+
+  function detailInnerHtml(d){
     const pr=d.progress||{}, wd=d.working_days||{};
     const stageRows=(d.stages||[]).map(stepRowHtml).join('');
-    body.innerHTML=`
+    return `
+      <div class="detail-head">
+        <div class="eyebrow">${esc(d.drop_id||'')} · ${esc(d.elevation||'')} · Drop ${esc(d.sequence_no)}</div>
+        <button type="button" class="btn btn-sm" data-collapse>▲ Collapse</button>
+      </div>
       <div class="detail-top">
         ${ringSVG(pr.pct||0, pr.complete_steps||0, pr.applicable_steps||0, true)}
         <div style="flex:1;">
-          <div class="eyebrow">${esc(dropId)} · ${esc(d.elevation||'')}</div>
-          <h1 style="margin:2px 0 8px;">Drop ${d.sequence_no}</h1>
+          <h1 style="margin:2px 0 8px;">Drop ${esc(d.sequence_no)}</h1>
           <div class="detail-stats">
             <div class="stat"><div class="k">Lifecycle</div><div class="v">${lifecyclePill(d.lifecycle)}</div></div>
             <div class="stat"><div class="k">Current stage</div><div class="v">${d.current_stage?('Step '+d.current_stage.step_no):'—'}</div></div>
@@ -337,10 +329,70 @@
       </div>
       <div class="panel"><h3>Stage pipeline</h3><div id="steps">${stageRows}</div></div>
       <div class="panel"><h3>Concrete patches · ${esc(PATCH_SOV?PATCH_SOV.sov_code:'')}</h3><div id="patch-section"></div></div>`;
+  }
+
+  async function fetchDrop(dropId){
+    const resp = await fetch(`/api/dropplan/drops/${encodeURIComponent(dropId)}`,{credentials:'include'});
+    if(resp.status===401){ location.href='/login?next='+encodeURIComponent('/dropplan'); return null; }
+    if(!resp.ok){ throw new Error('detail HTTP '+resp.status); }
+    const d=((await resp.json()).data)||null;
+    if(!d){ throw new Error('no drop data'); }
+    return d;
+  }
+
+  // Render (or re-render) the expanded panel's contents IN PLACE. Returns the
+  // drop detail so callers can keep the board card's small ring in sync.
+  async function renderPanel(panel, dropId){
+    panel.innerHTML='<div class="panel" style="margin:0;">Loading…</div>';
+    let d;
+    try { d=await fetchDrop(dropId); if(!d) return null; }
+    catch(err){
+      // Defensive: explicit error + retry, NEVER a silent blank (the panel stays
+      // on the board, so the board is never lost even on a fetch failure).
+      panel.innerHTML='<div class="panel" style="margin:0;color:var(--brand-red);">Could not load Drop '+esc(dropId)+' — <button type="button" class="btn btn-sm" data-retry>Retry</button></div>';
+      const rb=panel.querySelector('[data-retry]'); if(rb) rb.addEventListener('click',()=>renderPanel(panel,dropId));
+      return null;
+    }
+    panel.innerHTML=detailInnerHtml(d);
     bindSteps();
     await loadPatches();
+    return d;
   }
-  function backToBoard(skipPush){ if(!skipPush){ try{ history.pushState({}, '', '/dropplan'); }catch(e){} } $('detail-view').style.display='none'; $('board-view').style.display=''; loadBoard(); loadRollup(); }
+
+  function collapseDrop(){
+    if(CUR_PANEL){ CUR_PANEL.remove(); CUR_PANEL=null; }
+    CUR_DROP=null;
+  }
+
+  // Re-render just this card from fresh detail data so its ring / current-stage /
+  // pill reflect inline edits — without rebuilding the whole board (which would
+  // tear down the open panel). Returns the replacement node.
+  function refreshCard(cardEl, d){
+    const tmp=document.createElement('div'); tmp.innerHTML=cardHtml(d).trim();
+    const fresh=tmp.firstElementChild;
+    if(fresh && cardEl && cardEl.parentNode){ cardEl.replaceWith(fresh); return fresh; }
+    return cardEl;
+  }
+
+  async function toggleDrop(cardEl, dropId){
+    if(CUR_DROP===dropId && CUR_PANEL){ collapseDrop(); return; }  // same card → close
+    collapseDrop();                                                // accordion: close any other
+    CUR_DROP=dropId;
+    const panel=document.createElement('div');
+    panel.className='drop-expand';
+    panel.setAttribute('data-detail', dropId);
+    cardEl.insertAdjacentElement('afterend', panel);   // full-width sibling, beneath the card
+    CUR_PANEL=panel;
+    await renderPanel(panel, dropId);
+  }
+
+  // After an inline edit: re-render the open panel AND refresh its board card.
+  async function reloadOpen(){
+    if(!CUR_PANEL||!CUR_DROP) return;
+    const card=CUR_PANEL.previousElementSibling;
+    const d=await renderPanel(CUR_PANEL, CUR_DROP);
+    if(d && card) refreshCard(card, d);
+  }
 
   function stepRowHtml(s){
     const gate = s.is_cure_gate?'<span class="gate">cure gate</span>':(s.is_signoff_gate?'<span class="gate">sign-off</span>':'');
@@ -384,14 +436,15 @@
   }
   async function saveStep(step){
     const stepNo=step.dataset.step;
-    const status=(step.querySelector('.pill-opt.active')||{}).getAttribute? step.querySelector('.pill-opt.active').getAttribute('data-st') : null;
+    const activePill=step.querySelector('.pill-opt.active');
+    const status=activePill?activePill.getAttribute('data-st'):null;
     const iso=step.querySelector('.cal').dataset.iso||'';
     const err=step.querySelector('[data-err="'+stepNo+'"]');
     const body={status: status||'not_started'};
     // map the single chosen date to the field that matches the status
     if(iso){ if((status||'')==='complete') body.completed_on=iso; else body.started_on=iso; }
     const r=await fetch(`/api/dropplan/drops/${encodeURIComponent(CUR_DROP)}/stages/${stepNo}`,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    if(r.ok){ await openDrop(CUR_DROP); } else { const j=await r.json().catch(()=>({})); err.textContent='Save failed: '+((j&&j.error)||r.status); }
+    if(r.ok){ await reloadOpen(); } else { const j=await r.json().catch(()=>({})); err.textContent='Save failed: '+((j&&j.error)||r.status); }
   }
 
   // ---------- concrete patches ----------
@@ -479,18 +532,18 @@
     row.querySelector('[data-cancelpatch]').addEventListener('click',loadPatches);
   }
 
-  // events
+  // events — card click toggles the inline panel; collapse control closes it.
+  // The panel is a SIBLING of the card (not inside [data-open]), so its own
+  // clicks never re-trigger this handler. No popstate / no back-link: there is
+  // no navigation to react to.
   document.addEventListener('click',(e)=>{
-    const c=e.target.closest('[data-open]'); if(c){ openDrop(c.getAttribute('data-open')); return; }
+    if(e.target.closest('[data-collapse]')){ collapseDrop(); return; }
+    const c=e.target.closest('[data-open]'); if(c){ toggleDrop(c, c.getAttribute('data-open')); return; }
     const a=e.target.closest('[data-activate]'); if(a){ activateDrop(a.getAttribute('data-activate')); return; }
   });
-  $('back-to-board').addEventListener('click',()=>backToBoard());
-  window.addEventListener('popstate',()=>{ const d=new URLSearchParams(location.search).get('drop'); if(d) openDrop(d,true); else backToBoard(true); });
 
   (async function init(){
     await loadMe(); await loadSov(); await Promise.all([loadBoard(), loadRollup()]);
-    const dq=new URLSearchParams(location.search).get('drop');
-    if(dq) openDrop(dq, true);   // fresh-load / reload of /dropplan?drop=<id> renders the detail directly
   })();
 })();
 </script>

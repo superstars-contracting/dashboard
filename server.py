@@ -7005,7 +7005,18 @@ def dropplan_page():
     page = SCRIPT_DIR / 'dropplan.html'
     if not page.exists():
         return jsonify({"error": "drop plan page not found"}), 404
-    return send_file(str(page))
+    # Serve no-store with NO ETag/conditional handling (#205): the operator's
+    # recurring "Preview passes / my browser shows old markup" gap is most
+    # consistent with a stale cache. /dropplan does not end in .html, so the
+    # global no-cache after_request hook does not match it — set the headers
+    # here and disable conditional/etag so a stale validator can never 304 old
+    # bytes back. The build-version stamp in the page is how the operator
+    # confirms at a glance which build is live.
+    resp = send_file(str(page), conditional=False, etag=False, max_age=0)
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 
 # ============= STATIC SERVING =============
