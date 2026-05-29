@@ -6531,6 +6531,223 @@ def api_compliance_pulse():
         return jsonify({"error": str(e)}), 400
 
 
+# ============= DROP PLAN (Batch B #200) =============
+# Roll-up reads + append-only writes for the drop-plan system. Security
+# per DROP_PLAN_SYSTEM_DESIGN.md §6 / banked #158: cost/rate/expense
+# fields are OMITTED ENTIRELY (never zeroed) for non admin/c_suite. The
+# four operational roles may read stages/quantities/progress and log
+# quantities + stage status; external/client roles get 403 via
+# requires_role. Money writes (expenses) are admin/c_suite only.
+import dropplan_rollups as _rollups
+
+_DROPPLAN_ROLES = ('admin', 'c_suite', 'pm', 'super')
+_DROPPLAN_COST_ROLES = ('admin', 'c_suite')
+
+
+def _dropplan_can_see_cost():
+    return (current_user() or {}).get('role') in _DROPPLAN_COST_ROLES
+
+
+def _dropplan_actor():
+    """PII-safe logged_by fallback: the acting user's numeric id, never a name."""
+    uid = (current_user() or {}).get('id')
+    return f"uid:{uid}" if uid is not None else None
+
+
+@app.route('/api/dropplan/projects/<project_code>/drops', methods=['GET'])
+@requires_role(*_DROPPLAN_ROLES)
+def api_dropplan_drops(project_code):
+    """Project drops list: elevation, sequence, lifecycle, current stage,
+    progress %, planned-vs-actual working days + variance. No dollars."""
+    try:
+        conn = db()
+        try:
+            ids = [r['drop_id'] for r in conn.execute(
+                "SELECT drop_id FROM drops WHERE project_code=? ORDER BY sequence_no",
+                (project_code,)).fetchall()]
+            out = [_rollups.drop_summary(conn, did, include_cost=False) for did in ids]
+        finally:
+            conn.close()
+        return response_wrapper(out, count=len(out))
+    except Exception as e:
+        logging.error(f"GET /api/projects/{project_code}/drops: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/dropplan/drops/<drop_id>', methods=['GET'])
+@requires_role(*_DROPPLAN_ROLES)
+def api_dropplan_drop_detail(drop_id):
+    """Drop detail: stage status per step (incl. N/A), quantity totals per
+    SOV line. cost + expense_total ONLY for admin/c_suite (keys omitted
+    otherwise); cost is 'pending_rates' when contributing rates are NULL."""
+    try:
+        conn = db()
+        try:
+            detail = _rollups.drop_detail(conn, drop_id, include_cost=_dropplan_can_see_cost())
+        finally:
+            conn.close()
+        if detail is None:
+            return jsonify({"error": "drop not found"}), 404
+        return response_wrapper(detail)
+    except Exception as e:
+        logging.error(f"GET /api/drops/{drop_id}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/dropplan/projects/<project_code>/rollup', methods=['GET'])
+@requires_role(*_DROPPLAN_ROLES)
+def api_dropplan_rollup(project_code):
+    """Project roll-up: overall progress + qty by SOV (always); total spend
+    + expenses ONLY for admin/c_suite (omitted otherwise)."""
+    try:
+        conn = db()
+        try:
+            roll = _rollups.project_rollup(conn, project_code, include_cost=_dropplan_can_see_cost())
+        finally:
+            conn.close()
+        return response_wrapper(roll)
+    except Exception as e:
+        logging.error(f"GET /api/projects/{project_code}/dropplan-rollup: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/dropplan/drops/<drop_id>/quantity-entries', methods=['POST'])
+@requires_role(*_DROPPLAN_ROLES)
+def api_dropplan_post_quantity(drop_id):
+    """APPEND one quantity entry. Never overwrites a stored total. volume_cf
+    is computed (generated column). logged_on defaults to LOCAL today."""
+    try:
+        body = request.get_json(silent=True) or {}
+        sov_line = body.get('sov_line_item')
+        if sov_line is None:
+            return jsonify({"error": "sov_line_item required"}), 400
+        logged_on = (body.get('logged_on') or '').strip() or date.today().isoformat()
+        logged_by = body.get('logged_by') or _dropplan_actor()
+        conn = db()
+        try:
+            if conn.execute("SELECT 1 FROM drops WHERE drop_id=?", (drop_id,)).fetchone() is None:
+                return jsonify({"error": "drop not found"}), 404
+            if conn.execute("SELECT 1 FROM sov_line_items WHERE sov_id=?", (sov_line,)).fetchone() is None:
+                return jsonify({"error": "sov_line_item not found"}), 404
+            cur = conn.execute(
+                "INSERT INTO quantity_entries(drop_id, sov_line_item, step_no, quantity, unit, "
+                "area_sf, depth_in, logged_on, logged_by, note) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (drop_id, sov_line, body.get('step_no'), body.get('quantity'), body.get('unit'),
+                 body.get('area_sf'), body.get('depth_in'), logged_on, logged_by, body.get('note')))
+            conn.commit()
+            row = dict(conn.execute(
+                "SELECT entry_id, drop_id, sov_line_item, step_no, quantity, unit, area_sf, depth_in, "
+                "volume_cf, logged_on, logged_by, note FROM quantity_entries WHERE entry_id=?",
+                (cur.lastrowid,)).fetchone())
+        finally:
+            conn.close()
+        return response_wrapper(row), 201
+    except Exception as e:
+        logging.error(f"POST /api/drops/{drop_id}/quantity-entries: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/dropplan/projects/<project_code>/expense-entries', methods=['POST'])
+@requires_role('admin', 'c_suite')
+def api_dropplan_post_expense(project_code):
+    """APPEND one expense entry. admin/c_suite ONLY. The amount (comp data)
+    is NEVER written to the server log."""
+    try:
+        body = request.get_json(silent=True) or {}
+        category = body.get('category')
+        if category not in ('material', 'labor', 'equipment', 'other'):
+            return jsonify({"error": "category must be material/labor/equipment/other"}), 400
+        logged_on = (body.get('logged_on') or '').strip() or date.today().isoformat()
+        conn = db()
+        try:
+            cur = conn.execute(
+                "INSERT INTO expense_entries(project_code, drop_id, category, amount, vendor, "
+                "logged_on, logged_by, source, note) VALUES (?,?,?,?,?,?,?,?,?)",
+                (project_code, body.get('drop_id'), category, body.get('amount'), body.get('vendor'),
+                 logged_on, body.get('logged_by') or _dropplan_actor(),
+                 body.get('source') or 'manual', body.get('note')))
+            conn.commit()
+            eid = cur.lastrowid
+        finally:
+            conn.close()
+        logging.info(f"dropplan: expense_entry project={project_code} category={category} id={eid}")
+        return response_wrapper({"entry_id": eid, "logged_on": logged_on}), 201
+    except Exception as e:
+        logging.error(f"POST /api/projects/{project_code}/expense-entries: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/dropplan/drops/<drop_id>/stages/<int:step_no>', methods=['PATCH'])
+@requires_role(*_DROPPLAN_ROLES)
+def api_dropplan_patch_stage(drop_id, step_no):
+    """Update a drop's stage status (status incl. n_a, dates, working days)."""
+    try:
+        body = request.get_json(silent=True) or {}
+        fields = {}
+        if 'status' in body:
+            if body['status'] not in ('not_started', 'in_progress', 'complete', 'n_a'):
+                return jsonify({"error": "bad status"}), 400
+            fields['status'] = body['status']
+        for k in ('started_on', 'completed_on', 'working_days_actual', 'note'):
+            if k in body:
+                fields[k] = body[k]
+        if not fields:
+            return jsonify({"error": "no fields to update"}), 400
+        conn = db()
+        try:
+            if conn.execute("SELECT 1 FROM drop_stage_status WHERE drop_id=? AND step_no=?",
+                            (drop_id, step_no)).fetchone() is None:
+                return jsonify({"error": "stage row not found"}), 404
+            # Column names come from the fixed whitelist above, not user input.
+            sets = ", ".join(f"{k}=?" for k in fields)
+            conn.execute(f"UPDATE drop_stage_status SET {sets} WHERE drop_id=? AND step_no=?",
+                         (*fields.values(), drop_id, step_no))
+            conn.commit()
+            row = dict(conn.execute(
+                "SELECT drop_id, step_no, status, started_on, completed_on, working_days_actual, note "
+                "FROM drop_stage_status WHERE drop_id=? AND step_no=?", (drop_id, step_no)).fetchone())
+        finally:
+            conn.close()
+        return response_wrapper(row)
+    except Exception as e:
+        logging.error(f"PATCH /api/drops/{drop_id}/stages/{step_no}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/dropplan/paint-phases/<int:phase_id>', methods=['PATCH'])
+@requires_role(*_DROPPLAN_ROLES)
+def api_dropplan_patch_paint(phase_id):
+    """Update an elevation paint phase status / dates."""
+    try:
+        body = request.get_json(silent=True) or {}
+        fields = {}
+        if 'status' in body:
+            if body['status'] not in ('not_ready', 'ready', 'in_progress', 'complete'):
+                return jsonify({"error": "bad status"}), 400
+            fields['status'] = body['status']
+        for k in ('started_on', 'completed_on'):
+            if k in body:
+                fields[k] = body[k]
+        if not fields:
+            return jsonify({"error": "no fields to update"}), 400
+        conn = db()
+        try:
+            if conn.execute("SELECT 1 FROM paint_phases WHERE phase_id=?", (phase_id,)).fetchone() is None:
+                return jsonify({"error": "paint phase not found"}), 404
+            sets = ", ".join(f"{k}=?" for k in fields)
+            conn.execute(f"UPDATE paint_phases SET {sets} WHERE phase_id=?", (*fields.values(), phase_id))
+            conn.commit()
+            row = dict(conn.execute(
+                "SELECT phase_id, project_code, elevation, status, started_on, completed_on "
+                "FROM paint_phases WHERE phase_id=?", (phase_id,)).fetchone())
+        finally:
+            conn.close()
+        return response_wrapper(row)
+    except Exception as e:
+        logging.error(f"PATCH /api/paint-phases/{phase_id}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ============= STATIC SERVING =============
 
 

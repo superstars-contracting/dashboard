@@ -49,12 +49,15 @@ STEPS = [
     (5,  "Pour new window sills", 1.5, 0, 0, "Level the surface."),
     (6,  "Demo rusted concrete", 4.0, 0, 0, "Sounding + remove all rusted facade concrete."),
     (7,  "Apply Sika Armatec + coat rebar", 2.0, 0, 0, "Bonding / anticorrosion."),
-    (8,  "Board & patch", 3.0, 0, 1,
-     "Sika patch into formed areas. 7-DAY CURE GATE FOLLOWS this step (per design "
-     "section 4, between steps 8 and 9): the poured patch cures ~7 days before the "
-     "next step — a calendar wait, NOT working days."),
-    (9,  "Install block + horizontal rebar", 4.0, 0, 0, "Build up blocked openings."),
-    (10, "Strip forms + quick parge", 1.0, 0, 0, "Remove boards; quick parge of front facade."),
+    (8,  "Board & patch", 3.0, 0, 0,
+     "Sika patch into formed areas. The poured patch then cures while step 9 (block) "
+     "proceeds; the 7-day cure gate is enforced before step 10 (strip forms)."),
+    (9,  "Install block + horizontal rebar", 4.0, 0, 0,
+     "Build up blocked openings. Proceeds during the patch cure."),
+    (10, "Strip forms + quick parge", 1.0, 0, 1,
+     "Remove boards; quick parge of front facade. 7-DAY CURE GATE PRECEDES this step "
+     "(design section 4 clarification): the poured patch must cure ~7 days before forms "
+     "strip — a calendar wait, NOT working days; blocking (step 9) runs during the cure."),
     (11, "Remove scaffold", 1.0, 1, 0,
      "Then relocate to next drop. STRUCTURAL SIGN-OFF GATE FOLLOWS this step: "
      "engineer/AOR sign-off ends the scaffold cycle; drop -> awaiting_paint."),
