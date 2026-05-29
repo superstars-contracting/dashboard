@@ -6686,6 +6686,10 @@ def api_dropplan_post_quantity(drop_id):
                 (drop_id, sov_line, body.get('step_no'), quantity, body.get('unit'),
                  length, width, depth, length_unit, width_unit, depth_unit,
                  logged_on, logged_by, body.get('note')))
+            _dropplan_audit(conn, 'dropplan_quantity_add', 'quantity_entry', cur.lastrowid,
+                            after={'drop_id': drop_id, 'sov_line_item': sov_line,
+                                   'length': length, 'width': width, 'depth': depth,
+                                   'quantity': quantity}, note='add')
             conn.commit()
             row = dict(conn.execute(
                 "SELECT entry_id, drop_id, sov_line_item, step_no, quantity, unit, length, width, depth, "
@@ -6702,6 +6706,130 @@ def api_dropplan_post_quantity(drop_id):
         return response_wrapper(row), 201
     except Exception as e:
         logging.error(f"POST /api/dropplan/drops/{drop_id}/quantity-entries: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+def _dropplan_audit(conn, action, target_type, target_id, before=None, after=None, note=None):
+    """Append an audit_log row for a drop-plan mutation (#203). PII-safe:
+    actor is the numeric user id + role; no names. before/after are small
+    JSON snapshots of the changed row."""
+    u = current_user() or {}
+    conn.execute(
+        "INSERT INTO audit_log (action, actor_user_id, actor_role, target_type, target_id, "
+        "before_json, after_json, note, created_at) VALUES (?,?,?,?,?,?,?,?, CURRENT_TIMESTAMP)",
+        (action, u.get('id'), u.get('role'), target_type, str(target_id),
+         json.dumps(before, default=str) if before is not None else None,
+         json.dumps(after, default=str) if after is not None else None, note))
+
+
+@app.route('/api/dropplan/drops/<drop_id>/quantity-entries', methods=['GET'])
+@requires_role(*_DROPPLAN_ROLES)
+def api_dropplan_list_quantity(drop_id):
+    """List the individual quantity entries (patches) for a drop — the patch
+    table the UI renders (each row editable/removable). volume_cf_display is
+    ceil-to-tenth; full precision is in volume_cf."""
+    try:
+        conn = db()
+        try:
+            rows = conn.execute(
+                "SELECT q.entry_id, q.sov_line_item, s.sov_code, q.step_no, q.quantity, q.unit, "
+                "q.length, q.width, q.depth, q.length_unit, q.width_unit, q.depth_unit, q.volume_cf, "
+                "q.logged_on, q.logged_by, q.note "
+                "FROM quantity_entries q JOIN sov_line_items s ON s.sov_id=q.sov_line_item "
+                "WHERE q.drop_id=? ORDER BY q.entry_id", (drop_id,)).fetchall()
+            out = []
+            for r in rows:
+                d = dict(r)
+                d['volume_cf_display'] = _rollups.ceil_tenth(d.get('volume_cf'))
+                out.append(d)
+        finally:
+            conn.close()
+        return response_wrapper(out, count=len(out))
+    except Exception as e:
+        logging.error(f"GET /api/dropplan/drops/{drop_id}/quantity-entries: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/dropplan/quantity-entries/<int:entry_id>', methods=['PATCH'])
+@requires_role(*_DROPPLAN_ROLES)
+def api_dropplan_patch_quantity(entry_id):
+    """Edit a discrete patch's dimensions (length/width/depth + units) and/or
+    note. Editing a discrete row is allowed — append-only protects aggregate
+    totals, not individual line items. Audit-logged."""
+    try:
+        body = request.get_json(silent=True) or {}
+        length, e1 = _parse_dim(body, 'length')
+        width, e2 = _parse_dim(body, 'width')
+        depth, e3 = _parse_dim(body, 'depth')
+        for e in (e1, e2, e3):
+            if e:
+                return jsonify({"error": e}), 400
+        dims = [length, width, depth]
+        if any(d is not None for d in dims) and not all(d is not None for d in dims):
+            return jsonify({"error": "a concrete patch needs all of length, width, depth"}), 400
+
+        def _unit(key, cur):
+            u = body.get(key)
+            if u is None:
+                return cur
+            return u if u in ('ft', 'in') else 'ft'
+
+        conn = db()
+        try:
+            old = conn.execute(
+                "SELECT drop_id, length, width, depth, length_unit, width_unit, depth_unit, note "
+                "FROM quantity_entries WHERE entry_id=?", (entry_id,)).fetchone()
+            if old is None:
+                return jsonify({"error": "quantity entry not found"}), 404
+            old = dict(old)
+            new_len = length if length is not None else old['length']
+            new_wid = width if width is not None else old['width']
+            new_dep = depth if depth is not None else old['depth']
+            conn.execute(
+                "UPDATE quantity_entries SET length=?, width=?, depth=?, length_unit=?, width_unit=?, "
+                "depth_unit=?, note=COALESCE(?, note) WHERE entry_id=?",
+                (new_len, new_wid, new_dep,
+                 _unit('length_unit', old['length_unit']), _unit('width_unit', old['width_unit']),
+                 _unit('depth_unit', old['depth_unit']), body.get('note'), entry_id))
+            new = dict(conn.execute(
+                "SELECT entry_id, drop_id, sov_line_item, length, width, depth, length_unit, width_unit, "
+                "depth_unit, volume_cf, logged_on, logged_by, note FROM quantity_entries WHERE entry_id=?",
+                (entry_id,)).fetchone())
+            _dropplan_audit(conn, 'dropplan_quantity_edit', 'quantity_entry', entry_id,
+                            before=old, after={'length': new_len, 'width': new_wid, 'depth': new_dep}, note='edit')
+            conn.commit()
+        finally:
+            conn.close()
+        new['volume_cf_display'] = _rollups.ceil_tenth(new.get('volume_cf'))
+        return response_wrapper(new)
+    except Exception as e:
+        logging.error(f"PATCH /api/dropplan/quantity-entries/{entry_id}: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/dropplan/quantity-entries/<int:entry_id>', methods=['DELETE'])
+@requires_role(*_DROPPLAN_ROLES)
+def api_dropplan_delete_quantity(entry_id):
+    """Remove a discrete patch row. Allowed (append-only protects aggregate
+    totals, not individual line items). Audit-logged."""
+    try:
+        conn = db()
+        try:
+            old = conn.execute(
+                "SELECT drop_id, sov_line_item, length, width, depth, volume_cf "
+                "FROM quantity_entries WHERE entry_id=?", (entry_id,)).fetchone()
+            if old is None:
+                return jsonify({"error": "quantity entry not found"}), 404
+            old = dict(old)
+            conn.execute("DELETE FROM quantity_entries WHERE entry_id=?", (entry_id,))
+            _dropplan_audit(conn, 'dropplan_quantity_delete', 'quantity_entry', entry_id,
+                            before=old, note='deleted')
+            conn.commit()
+        finally:
+            conn.close()
+        return response_wrapper({"deleted": entry_id, "drop_id": old['drop_id']})
+    except Exception as e:
+        logging.error(f"DELETE /api/dropplan/quantity-entries/{entry_id}: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -6753,13 +6881,17 @@ def api_dropplan_patch_stage(drop_id, step_no):
             return jsonify({"error": "no fields to update"}), 400
         conn = db()
         try:
-            if conn.execute("SELECT 1 FROM drop_stage_status WHERE drop_id=? AND step_no=?",
-                            (drop_id, step_no)).fetchone() is None:
+            old = conn.execute("SELECT status, started_on, completed_on, working_days_actual "
+                               "FROM drop_stage_status WHERE drop_id=? AND step_no=?",
+                               (drop_id, step_no)).fetchone()
+            if old is None:
                 return jsonify({"error": "stage row not found"}), 404
             # Column names come from the fixed whitelist above, not user input.
             sets = ", ".join(f"{k}=?" for k in fields)
             conn.execute(f"UPDATE drop_stage_status SET {sets} WHERE drop_id=? AND step_no=?",
                          (*fields.values(), drop_id, step_no))
+            _dropplan_audit(conn, 'dropplan_stage_update', 'drop_stage_status',
+                            f"{drop_id}#{step_no}", before=dict(old), after=fields, note='stage update')
             conn.commit()
             row = dict(conn.execute(
                 "SELECT drop_id, step_no, status, started_on, completed_on, working_days_actual, note "

@@ -103,6 +103,10 @@ def db_setup():
 
 
 def db_cleanup(conn):
+    # dropplan audit rows for SMK targets (stage audits use 'SMK-...#n' target_ids;
+    # quantity audits target the entry_id of an SMK-drop entry).
+    conn.execute("DELETE FROM audit_log WHERE action LIKE 'dropplan_%' AND (target_id LIKE 'SMK-%' "
+                 "OR target_id IN (SELECT CAST(entry_id AS TEXT) FROM quantity_entries WHERE drop_id LIKE 'SMK-%'))")
     conn.execute("DELETE FROM quantity_entries WHERE drop_id LIKE 'SMK-%' "
                  "OR sov_line_item IN (SELECT sov_id FROM sov_line_items WHERE sov_code LIKE 'SMK-%')")
     conn.execute("DELETE FROM expense_entries WHERE drop_id LIKE 'SMK-%' OR note LIKE 'SMK-%'")
@@ -125,6 +129,9 @@ def users_cleanup():
 
 def main() -> int:
     sid = db_setup()
+    _c = sqlite3.connect(str(DB))
+    AUDIT_BASE = _c.execute("SELECT COALESCE(MAX(id),0) FROM audit_log").fetchone()[0]
+    _c.close()
     try:
         admin = session_for("admin")
         pm = session_for("pm")
@@ -203,6 +210,32 @@ def main() -> int:
         bad({"sov_line_item": sid, "length": 10}, "partial dimensions (length only)")
         bad({"sov_line_item": sid}, "blank: no quantity and no dimensions")
 
+        # ---- GET entries list + PATCH edit + DELETE (#203) ----
+        patch_id = pvj.get("entry_id")
+        lst = admin.get(f"{BASE}/api/dropplan/drops/{SMK_DROP}/quantity-entries", timeout=10).json()["data"]
+        check("GET entries list includes patch w/ volume_cf_display 6.7",
+              any(e["entry_id"] == patch_id and e.get("volume_cf_display") == 6.7 for e in lst), f"{len(lst)} entries")
+        ed = admin.patch(f"{BASE}/api/dropplan/quantity-entries/{patch_id}",
+                         json={"length": 12, "width": 1, "depth": 6, "length_unit": "ft", "width_unit": "ft", "depth_unit": "in"}, timeout=10)
+        edj = ed.json().get("data", {})
+        check("PATCH edit patch dims -> volume_cf 6.0", ed.status_code == 200 and abs(edj.get("volume_cf", 0) - 6.0) < 1e-6, f"{ed.status_code} {edj.get('volume_cf')}")
+        lst2 = admin.get(f"{BASE}/api/dropplan/drops/{SMK_DROP}/quantity-entries", timeout=10).json()["data"]
+        check("edit persisted (length now 12)", any(e["entry_id"] == patch_id and e["length"] == 12 for e in lst2))
+        dl = admin.delete(f"{BASE}/api/dropplan/quantity-entries/{patch_id}", timeout=10)
+        check("DELETE patch -> 200", dl.status_code == 200, f"{dl.status_code}")
+        lst3 = admin.get(f"{BASE}/api/dropplan/drops/{SMK_DROP}/quantity-entries", timeout=10).json()["data"]
+        check("patch gone after DELETE", not any(e["entry_id"] == patch_id for e in lst3))
+        # PATCH/DELETE on a non-existent entry -> 404
+        check("PATCH missing entry -> 404",
+              admin.patch(f"{BASE}/api/dropplan/quantity-entries/999999", json={"length": 1, "width": 1, "depth": 1}, timeout=10).status_code == 404)
+        check("DELETE missing entry -> 404",
+              admin.delete(f"{BASE}/api/dropplan/quantity-entries/999999", timeout=10).status_code == 404)
+        # audit rows written for add/edit/delete of that patch
+        cc = sqlite3.connect(str(DB))
+        naudit = cc.execute("SELECT COUNT(*) FROM audit_log WHERE action LIKE 'dropplan_quantity_%' AND target_id=?", (str(patch_id),)).fetchone()[0]
+        cc.close()
+        check("audit rows written for patch add/edit/delete (>=3)", naudit >= 3, f"{naudit}")
+
         # ---- priced cost (set a synthetic rate, recompute) ----
         conn = sqlite3.connect(str(DB))
         conn.execute("UPDATE sov_line_items SET unit_rate=2.0 WHERE sov_code=?", (SMK_SOV,))
@@ -232,13 +265,18 @@ def main() -> int:
         conn = sqlite3.connect(str(DB), timeout=60.0)
         conn.execute("PRAGMA busy_timeout=60000;")
         db_cleanup(conn)
+        # belt-and-suspenders: remove every dropplan audit row this run created
+        # (covers the DELETE'd patch whose entry no longer exists for the join-based cleanup).
+        conn.execute("DELETE FROM audit_log WHERE id > ? AND action LIKE 'dropplan_%'", (AUDIT_BASE,))
+        conn.commit()
         smk = conn.execute("SELECT COUNT(*) FROM drops WHERE drop_id LIKE 'SMK-%'").fetchone()[0]
         real = conn.execute("SELECT COUNT(*) FROM drops WHERE project_code=? AND drop_id NOT LIKE 'SMK-%'", (PROJECT,)).fetchone()[0]
+        audit_left = conn.execute("SELECT COUNT(*) FROM audit_log WHERE id > ? AND action LIKE 'dropplan_%'", (AUDIT_BASE,)).fetchone()[0]
         conn.close()
         users_cleanup()
         print()
-        print(f"  cleanup: SMK- drops left={smk}; real drops={real}; test users removed")
-        check("cleanup: 0 synthetic drops; 35 real intact", smk == 0 and real == 35)
+        print(f"  cleanup: SMK- drops left={smk}; real drops={real}; dropplan audit rows left={audit_left}; test users removed")
+        check("cleanup: 0 synthetic drops; 35 real intact; 0 test audit rows", smk == 0 and real == 35 and audit_left == 0)
 
     print()
     print(f"=== Drop Plan API smoke: {PASS} passed, {FAIL} failed ===")
