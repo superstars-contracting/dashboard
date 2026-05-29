@@ -1,0 +1,858 @@
+[
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Admixtures",
+    "product_line": "Plasticizers / retarders",
+    "product_name": "Plastiment series",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/concrete.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Admixtures",
+    "product_line": "Other",
+    "product_name": "Sika Control (SRA)",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/concrete.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Admixtures",
+    "product_line": "Superplasticizers",
+    "product_name": "Sika ViscoCrete series",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/concrete.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Admixtures",
+    "product_line": "Superplasticizers",
+    "product_name": "Sika ViscoFlow",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/concrete.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Admixtures",
+    "product_line": "Other",
+    "product_name": "Sika accelerators",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/concrete.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Admixtures",
+    "product_line": "Other",
+    "product_name": "Sika air-entrainers",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/concrete.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Admixtures",
+    "product_line": "Other",
+    "product_name": "Sikament",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/concrete.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Coatings & Water Repellents",
+    "product_line": "SikaGard",
+    "product_name": "SikaGard-550W Elastic",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/coatings-water-repellents.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Coatings & Water Repellents",
+    "product_line": "SikaGard",
+    "product_name": "SikaGard-62",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/coatings-water-repellents.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Coatings & Water Repellents",
+    "product_line": "SikaGard",
+    "product_name": "SikaGard-670W",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/coatings-water-repellents.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Coatings & Water Repellents",
+    "product_line": "SikaGard",
+    "product_name": "SikaGard-700S",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/coatings-water-repellents.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Coatings & Water Repellents",
+    "product_line": "SikaGard",
+    "product_name": "SikaGard-705L",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/coatings-water-repellents.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Coatings & Water Repellents",
+    "product_line": "SikaGard",
+    "product_name": "SikaGard-706 Thixo",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/coatings-water-repellents.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Coatings & Water Repellents",
+    "product_line": "SikaGard",
+    "product_name": "SikaGard-7600",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/coatings-water-repellents.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Coatings & Water Repellents",
+    "product_line": "SikaGard",
+    "product_name": "SikaGard-905W",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/coatings-water-repellents.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Coatings & Water Repellents",
+    "product_line": "Sikagard PW",
+    "product_name": "Sikagard PW",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/coatings-water-repellents.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "Bonding agents / corrosion",
+    "product_name": "Sika Armatec-110 EpoCem",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "Bonding agents / corrosion",
+    "product_name": "Sika FerroGard-901",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "Bonding agents / corrosion",
+    "product_name": "Sika FerroGard-903+",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "Sika MonoTop",
+    "product_name": "Sika MonoTop-211",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "Sika MonoTop",
+    "product_name": "Sika MonoTop-4012",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "Sika MonoTop",
+    "product_name": "Sika MonoTop-611",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "Sika MonoTop",
+    "product_name": "Sika MonoTop-612",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "Sika MonoTop",
+    "product_name": "Sika MonoTop-615 HB",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "Bonding agents / corrosion",
+    "product_name": "SikaLatex",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "Bonding agents / corrosion",
+    "product_name": "SikaLatex R",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "SikaQuick",
+    "product_name": "SikaQuick VOH",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "SikaQuick",
+    "product_name": "SikaQuick-1000",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "SikaQuick",
+    "product_name": "SikaQuick-2500",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "SikaRepair",
+    "product_name": "SikaRepair-222",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "SikaRepair",
+    "product_name": "SikaRepair-223",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "SikaRepair",
+    "product_name": "SikaRepair-224",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "SikaTop",
+    "product_name": "SikaTop-111 Plus",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "SikaTop",
+    "product_name": "SikaTop-122 Plus",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Concrete Repair & Protection — Mortars",
+    "product_line": "SikaTop",
+    "product_name": "SikaTop-123 Plus",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/mortars.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Flooring",
+    "product_line": "Sikafloor",
+    "product_name": "Sikafloor levelers & primers",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/flooring.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Flooring",
+    "product_line": "Sikafloor",
+    "product_name": "Sikafloor-156 (epoxy primer)",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/flooring.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Flooring",
+    "product_line": "Sikafloor",
+    "product_name": "Sikafloor-161",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/flooring.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Flooring",
+    "product_line": "Sikafloor",
+    "product_name": "Sikafloor-264",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/flooring.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Flooring",
+    "product_line": "Sikafloor",
+    "product_name": "Sikafloor-3 QuartzTop",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/flooring.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Flooring",
+    "product_line": "Sikafloor",
+    "product_name": "Sikafloor-359 N",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/flooring.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Flooring",
+    "product_line": "Sikafloor",
+    "product_name": "Sikafloor-375",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/flooring.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Grouting & Anchoring",
+    "product_line": "Sika AnchorFix",
+    "product_name": "Sika AnchorFix-1",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/grouting.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Grouting & Anchoring",
+    "product_line": "Sika AnchorFix",
+    "product_name": "Sika AnchorFix-2",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/grouting.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Grouting & Anchoring",
+    "product_line": "Sika AnchorFix",
+    "product_name": "Sika AnchorFix-3+",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/grouting.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Grouting & Anchoring",
+    "product_line": "Sika AnchorFix",
+    "product_name": "Sika AnchorFix-3001+",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/grouting.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Grouting & Anchoring",
+    "product_line": "SikaGrout",
+    "product_name": "SikaGrout-212",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/grouting.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Grouting & Anchoring",
+    "product_line": "SikaGrout",
+    "product_name": "SikaGrout-300 PT",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/grouting.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Grouting & Anchoring",
+    "product_line": "SikaGrout",
+    "product_name": "SikaGrout-328",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/grouting.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Industry — Sealing & Bonding",
+    "product_line": "SikaDamp",
+    "product_name": "SikaDamp (acoustic)",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/industry/products-solutions/adhesives-and-sealants.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Industry — Sealing & Bonding",
+    "product_line": "SikaForce",
+    "product_name": "SikaForce (PU structural)",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/industry/products-solutions/adhesives-and-sealants.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Industry — Sealing & Bonding",
+    "product_line": "SikaMelt",
+    "product_name": "SikaMelt (hot-melt)",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/industry/products-solutions/adhesives-and-sealants.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Industry — Sealing & Bonding",
+    "product_line": "SikaPower",
+    "product_name": "SikaPower (epoxy structural)",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/industry/products-solutions/adhesives-and-sealants.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Industry — Sealing & Bonding",
+    "product_line": "SikaTack",
+    "product_name": "SikaTack (direct glazing)",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/industry/products-solutions/adhesives-and-sealants.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Industry — Sealing & Bonding",
+    "product_line": "Sikaflex (industrial)",
+    "product_name": "Sikaflex (industrial)",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/industry/products-solutions/adhesives-and-sealants.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Roofing",
+    "product_line": "RhinoBond",
+    "product_name": "RhinoBond induction attachment",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/sarnafil/en/products-systems.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Roofing",
+    "product_line": "Sarnafil",
+    "product_name": "Sarnafil PVC membranes",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/sarnafil/en/products-systems.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Roofing",
+    "product_line": "Insulation",
+    "product_name": "Sika roof insulation",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/sarnafil/en/products-systems.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Roofing",
+    "product_line": "Sikalastic",
+    "product_name": "Sikalastic RoofPro",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/sarnafil/en/products-systems.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Roofing",
+    "product_line": "Sikaplan",
+    "product_name": "Sikaplan PVC/TPO membranes",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/sarnafil/en/products-systems.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Ancillaries",
+    "product_name": "Sika Backer Rod",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Ancillaries",
+    "product_name": "Sika Primer-3N",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Ancillaries",
+    "product_name": "Sika Primer-429",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "SikaBond",
+    "product_name": "SikaBond Construction Adhesive",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "SikaBond",
+    "product_name": "SikaBond-T55",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Sikaflex",
+    "product_name": "Sikaflex Construction",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Sikaflex",
+    "product_name": "Sikaflex Self-Leveling",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Sikaflex",
+    "product_name": "Sikaflex-15 LM",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Sikaflex",
+    "product_name": "Sikaflex-1a",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Sikaflex",
+    "product_name": "Sikaflex-201 US",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Sikaflex",
+    "product_name": "Sikaflex-227",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Sikaflex",
+    "product_name": "Sikaflex-2c NS",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Sikaflex",
+    "product_name": "Sikaflex-2c SL",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Sikaflex",
+    "product_name": "Sikaflex-429",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Sikasil",
+    "product_name": "Sikasil GP",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Sikasil",
+    "product_name": "Sikasil N Plus",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Sikasil",
+    "product_name": "Sikasil SG",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Sikasil",
+    "product_name": "Sikasil WS-290",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Sikasil",
+    "product_name": "Sikasil WS-295",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Sikasil",
+    "product_name": "Sikasil-728 NS",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Sealing & Bonding",
+    "product_line": "Sikasil",
+    "product_name": "Sikasil-728 SL",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/sealing-bonding.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Structural Strengthening",
+    "product_line": "Sika CarboDur",
+    "product_name": "Sika CarboDur M",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/structural-strengthening.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Structural Strengthening",
+    "product_line": "Sika CarboDur",
+    "product_name": "Sika CarboDur Rods (NSM)",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/structural-strengthening.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Structural Strengthening",
+    "product_line": "Sika CarboDur",
+    "product_name": "Sika CarboDur S",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/structural-strengthening.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Structural Strengthening",
+    "product_line": "SikaWrap",
+    "product_name": "SikaWrap Hex series",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/structural-strengthening.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Structural Strengthening",
+    "product_line": "Sikadur",
+    "product_name": "Sikadur AnchorFix",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/structural-strengthening.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Structural Strengthening",
+    "product_line": "Sikadur",
+    "product_name": "Sikadur-30",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/structural-strengthening.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Structural Strengthening",
+    "product_line": "Sikadur",
+    "product_name": "Sikadur-300",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/structural-strengthening.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Structural Strengthening",
+    "product_line": "Sikadur",
+    "product_name": "Sikadur-31 Hi-Mod Gel",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/structural-strengthening.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Structural Strengthening",
+    "product_line": "Sikadur",
+    "product_name": "Sikadur-32 Hi-Mod",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/structural-strengthening.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Structural Strengthening",
+    "product_line": "Sikadur",
+    "product_name": "Sikadur-330",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/structural-strengthening.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Structural Strengthening",
+    "product_line": "Sikadur",
+    "product_name": "Sikadur-35 Hi-Mod LV",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/structural-strengthening.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Structural Strengthening",
+    "product_line": "Sikadur",
+    "product_name": "Sikadur-52",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/repair-protection/structural-strengthening.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Waterproofing",
+    "product_line": "Cementitious",
+    "product_name": "Sika MonoTop-107 Seal",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/waterproofing-coatings.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Waterproofing",
+    "product_line": "Admixtures",
+    "product_name": "Sika WT-200 P",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/waterproofing-coatings.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Waterproofing",
+    "product_line": "Waterstops",
+    "product_name": "Sika Waterbar (PVC)",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/waterproofing-coatings.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Waterproofing",
+    "product_line": "Waterstops",
+    "product_name": "Sika Waterbar (TPO)",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/waterproofing-coatings.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Waterproofing",
+    "product_line": "Cementitious",
+    "product_name": "Sika-1 Pre-Bagged System",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/waterproofing-coatings.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Waterproofing",
+    "product_line": "SikaProof",
+    "product_name": "SikaProof A+",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/waterproofing-coatings.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Waterproofing",
+    "product_line": "SikaProof",
+    "product_name": "SikaProof-808",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/waterproofing-coatings.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Waterproofing",
+    "product_line": "Waterstops",
+    "product_name": "SikaSwell",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/waterproofing-coatings.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Waterproofing",
+    "product_line": "Cementitious",
+    "product_name": "SikaTop Seal-107",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/waterproofing-coatings.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Waterproofing",
+    "product_line": "Sikalastic",
+    "product_name": "Sikalastic-1K",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/waterproofing-coatings.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Waterproofing",
+    "product_line": "Sikalastic",
+    "product_name": "Sikalastic-590",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/waterproofing-coatings.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Waterproofing",
+    "product_line": "Sikalastic",
+    "product_name": "Sikalastic-601 BC",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/waterproofing-coatings.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Waterproofing",
+    "product_line": "Sikalastic",
+    "product_name": "Sikalastic-621 TC",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/waterproofing-coatings.html"
+  },
+  {
+    "manufacturer": "Sika",
+    "category": "Waterproofing",
+    "product_line": "Sikalastic",
+    "product_name": "Sikalastic-641 Lo-VOC",
+    "product_code": null,
+    "spec_url": "https://usa.sika.com/en/construction/waterproofing-coatings.html"
+  }
+]

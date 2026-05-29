@@ -82,6 +82,22 @@ TABLES_TO_SNAPSHOT: list[Tuple[str, list[str], list[str]]] = [
     ("cof_cards", ["card_id"], ["employee_id", "status"]),
     ("company_id_cards", ["card_id"], ["employee_id", "status"]),
     ("project_assignments", ["employee_id", "project_code"], ["status"]),
+    # construction_agent_provenance (#198): the Construction Specialist
+    # Agent's audit trail. This table legitimately GROWS during normal
+    # operator use (one row per substantive Q&A) — that growth is NOT
+    # corruption. It is snapshotted here as a backstop, not because the
+    # CRUD smoke writes to it (it does not): the construction-agent path
+    # is exercised only by tests/smoke_construction_agent.py, never by
+    # smoke_crud_data_integrity.py (the subprocess this meta-smoke runs).
+    # So within a meta-smoke run the before/after slices are identical
+    # and this table reports "clean" — no false failure. The value of
+    # snapshotting it: if any FUTURE smoke ever writes a NON-synthetic
+    # provenance row during the CRUD run, it surfaces immediately.
+    # Identity = interaction_id (TEXT) so SMK-/SYN-prefixed test rows are
+    # auto-filtered as expected smoke residue. value_cols are status-only
+    # (never question_text / answer_summary, which stay un-serialized).
+    ("construction_agent_provenance", ["interaction_id"],
+     ["operator_disposition", "corpus_version"]),
 ]
 
 

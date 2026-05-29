@@ -103,7 +103,15 @@ server.log
 logs/
 
 # ===== CLAUDE / AI WORK ARTIFACTS =====
-.claude/
+# Ignore everything under .claude/ EXCEPT version-controlled sub-agent
+# discovery stubs (#198): the thin pointer stubs that make Task-tool
+# sub-agents auto-discoverable (construction-specialist, and future roster
+# agents) must travel with the repo so discovery works on any clone. Local
+# settings (launch.json, settings.local.json) stay ignored. The contents-
+# glob + re-include idiom is required because git cannot re-include a file
+# whose parent directory is wholesale-excluded.
+.claude/*
+!.claude/agents/
 .cursor/
 
 # ===== TEMP =====

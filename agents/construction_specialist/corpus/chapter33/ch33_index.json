@@ -1,0 +1,572 @@
+[
+  {
+    "topic_number": 1,
+    "slug": "01-pre-shift-safety-meeting",
+    "category": "Site",
+    "ch33_ref": "§3301.12",
+    "title_en": "Pre-Shift Safety Meeting — Why We're Here",
+    "why_en": "Every workday on a NYC construction site starts with a pre-shift safety meeting before any tool comes out. It is when we name today's hazards, assign jobs, and confirm every worker — new or experienced — knows what to watch for. Skipping it is how people get hurt.",
+    "rules_en": [
+      {
+        "text": "Daily pre-shift safety meeting before any work begins.",
+        "ref": "§3301.12"
+      },
+      {
+        "text": "Foreman or Site Safety Coordinator runs the meeting.",
+        "ref": "§3301.12"
+      },
+      {
+        "text": "Cover today's hazards, work locations, and assignments.",
+        "ref": "§3301.12"
+      },
+      {
+        "text": "Every worker signs the attendance log — no exceptions.",
+        "ref": "§3301.12"
+      },
+      {
+        "text": "A new worker gets the site-specific orientation FIRST.",
+        "ref": "§3301.12 / §3321"
+      }
+    ]
+  },
+  {
+    "topic_number": 2,
+    "slug": "02-incident-response",
+    "category": "Site",
+    "ch33_ref": "§3301.6 / §3301.7 / §3301.8",
+    "title_en": "Incident Response — What To Do When Something Happens",
+    "why_en": "When someone gets hurt — or almost gets hurt — the first ten minutes decide everything. Confused, late, or missing reports turn fixable incidents into hospital stays, FDNY complaints, and DOB violations. This is what every crew member must know cold.",
+    "rules_en": [
+      {
+        "text": "Call 911 first if injury is serious — bleeding, unconscious, fall.",
+        "ref": "§3301.6"
+      },
+      {
+        "text": "Notify the Site Safety Coordinator immediately on any incident.",
+        "ref": "§3301.6 / §3301.8"
+      },
+      {
+        "text": "DOB must be notified of any reportable accident.",
+        "ref": "§3301.6"
+      },
+      {
+        "text": "Preserve the scene — do not move equipment or debris.",
+        "ref": "§3301.7"
+      },
+      {
+        "text": "Get witness statements the SAME day, while memory is fresh.",
+        "ref": "§3301.7"
+      }
+    ]
+  },
+  {
+    "topic_number": 3,
+    "slug": "03-sst-cards-qualifications",
+    "category": "Site",
+    "ch33_ref": "§3321",
+    "title_en": "Site Safety Training (SST) Cards & Worker Qualifications",
+    "why_en": "NYC law requires every construction worker on a covered site to carry a valid SST card. No card means no work — period. Foremen and Supervisors carry the higher-tier SST Supervisor card. A lost, expired, or wrong-tier card stops work for the whole crew.",
+    "rules_en": [
+      {
+        "text": "Every worker carries a valid SST card on their person.",
+        "ref": "§3321"
+      },
+      {
+        "text": "Workers: 40-hour SST or active SST Trainee card.",
+        "ref": "§3321"
+      },
+      {
+        "text": "Foremen / Supervisors: 62-hour SST Supervisor card.",
+        "ref": "§3321"
+      },
+      {
+        "text": "Refresher: 8 hours every 5 years (workers); 16 hours (supervisors).",
+        "ref": "§3321"
+      },
+      {
+        "text": "The Site Safety Plan documents which card each role needs.",
+        "ref": "§3321"
+      }
+    ]
+  },
+  {
+    "topic_number": 4,
+    "slug": "04-adjoining-property-protection",
+    "category": "Site",
+    "ch33_ref": "§3309",
+    "title_en": "Adjoining Property Protection — Windows, Sills, Neighbors",
+    "why_en": "Facade restoration in a row of NYC buildings means our drop, our scaffold, and our tools are inches from someone else's window, garden, fire escape, or air conditioner. One brick the wrong way, one falling tool, and the building owner has a lawsuit and we have a DOB stop-work.",
+    "rules_en": [
+      {
+        "text": "Inspect adjoining property before work starts — photo evidence.",
+        "ref": "§3309.1"
+      },
+      {
+        "text": "Owner of the project protects neighboring property from damage.",
+        "ref": "§3309.1"
+      },
+      {
+        "text": "Notice to adjoining property owners required before work.",
+        "ref": "§3309.2"
+      },
+      {
+        "text": "Damage to adjoining property reported within 48 hours.",
+        "ref": "§3309.4"
+      },
+      {
+        "text": "Protective netting / catch platforms over neighboring windows.",
+        "ref": "§3309.5 / §3308"
+      }
+    ]
+  },
+  {
+    "topic_number": 5,
+    "slug": "05-sidewalk-shed-pedestrian-protection",
+    "category": "Site",
+    "ch33_ref": "§3307",
+    "title_en": "Sidewalk Shed & Pedestrian Protection — Daily Check",
+    "why_en": "The sidewalk shed is the one piece of our site every passerby trusts with their life. A loose panel, a missing light, a cracked deck — pedestrians don't see the danger, they just walk under it. We check the shed every morning so nothing falls on the public.",
+    "rules_en": [
+      {
+        "text": "Sidewalk shed required when work is >40 ft above grade or per code.",
+        "ref": "§3307.6"
+      },
+      {
+        "text": "Daily inspection — Foreman or competent person, documented.",
+        "ref": "§3307.6.5"
+      },
+      {
+        "text": "Lighting on the shed: minimum 2 foot-candles, on dusk to dawn.",
+        "ref": "§3307.6.4"
+      },
+      {
+        "text": "Decking watertight; no gaps wider than 1 inch.",
+        "ref": "§3307.6.2"
+      },
+      {
+        "text": "Parapet / netting prevents tools or debris from going over.",
+        "ref": "§3307.6.3"
+      }
+    ]
+  },
+  {
+    "topic_number": 6,
+    "slug": "06-housekeeping-combustible-debris",
+    "category": "Site",
+    "ch33_ref": "§3303.4 / §3303.5",
+    "title_en": "Housekeeping & Combustible Debris Control",
+    "why_en": "Most jobsite fires start in trash. Wood, cardboard, oily rags, and resin tubs left in a pile near a torch or grinder are how a clean facade job ends up on the FDNY news at six. Housekeeping is not just tidy — it's the cheapest fire control we have.",
+    "rules_en": [
+      {
+        "text": "Combustible waste removed from work area at end of each shift.",
+        "ref": "§3303.4"
+      },
+      {
+        "text": "Metal cans with lids for oily rags — emptied daily.",
+        "ref": "§3303.5"
+      },
+      {
+        "text": "Smoking only in designated areas — never near combustibles.",
+        "ref": "§3303.4"
+      },
+      {
+        "text": "Walkways and exits kept clear of debris at all times.",
+        "ref": "§3303.4"
+      },
+      {
+        "text": "Flammable liquids stored in approved containers, away from heat.",
+        "ref": "§3303.5"
+      }
+    ]
+  },
+  {
+    "topic_number": 7,
+    "slug": "07-fire-safety-hot-work",
+    "category": "Site",
+    "ch33_ref": "§3303.7 / §3303.8",
+    "title_en": "Fire Safety During Construction — Hot Work, Extinguishers, Standpipe",
+    "why_en": "Hot work — torch cutting, welding, grinding sparks — is the single highest-risk activity on a facade job. A spark drops three floors into a pile of cardboard, smolders for two hours, ignites after we leave. Most construction fires are not discovered until it's too late.",
+    "rules_en": [
+      {
+        "text": "Hot work permit required before any cutting, welding, brazing.",
+        "ref": "§3303.7.2"
+      },
+      {
+        "text": "Fire watch posted during hot work and 30 min after.",
+        "ref": "§3303.7.4"
+      },
+      {
+        "text": "Portable extinguisher within 25 ft of every hot-work station.",
+        "ref": "§3303.7.5"
+      },
+      {
+        "text": "Working standpipe required when building is >75 ft.",
+        "ref": "§3303.8"
+      },
+      {
+        "text": "FDNY S-56 Certificate of Fitness holder must be on site.",
+        "ref": "§3303.7.1"
+      }
+    ]
+  },
+  {
+    "topic_number": 8,
+    "slug": "08-unenclosed-perimeter-protection",
+    "category": "Fall",
+    "ch33_ref": "§3308",
+    "title_en": "Unenclosed Perimeter Protection — Guards & Netting",
+    "why_en": "Every open edge above 6 feet is a fall waiting to happen — for us and for anything we drop. Guardrails and perimeter netting are not decoration. A loose rail or a sagging net is the line between a normal Tuesday and a coroner's report. Check the perimeter every shift.",
+    "rules_en": [
+      {
+        "text": "Guardrails at every open edge >6 ft above lower level.",
+        "ref": "§3308.4"
+      },
+      {
+        "text": "Top rail 42 inches ±3, mid-rail at 21 inches, 4-inch toe board.",
+        "ref": "§3308.4.1"
+      },
+      {
+        "text": "Perimeter netting on every floor above grade during construction.",
+        "ref": "§3308.5"
+      },
+      {
+        "text": "Netting inspected weekly + after any drop event.",
+        "ref": "§3308.5.3"
+      },
+      {
+        "text": "Holes / openings >2 inches covered, marked, and secured.",
+        "ref": "§3308.6"
+      }
+    ]
+  },
+  {
+    "topic_number": 9,
+    "slug": "09-personal-fall-arrest-systems",
+    "category": "Fall",
+    "ch33_ref": "§3314 + OSHA 1926 Subpart M",
+    "title_en": "Personal Fall Arrest Systems — Harness, Lanyard, Rope Grab",
+    "why_en": "On a suspended scaffold our harness is the difference between a scare and a funeral. A harness worn loose, an unrated anchor, a rope grab installed upside down — all kill the system silently. Inspect every piece every time. The fall doesn't care that you're in a hurry.",
+    "rules_en": [
+      {
+        "text": "100% tie-off above 6 ft — every worker, every time.",
+        "ref": "§3314.4.10"
+      },
+      {
+        "text": "Independent vertical lifeline + rope grab for every scaffold occupant.",
+        "ref": "§3314.4.10"
+      },
+      {
+        "text": "Anchor rated for 5,000 lb per worker, or 2× max arrest force.",
+        "ref": "OSHA 1926.502(d)(15)"
+      },
+      {
+        "text": "Harness inspected before each use — webbing, D-ring, buckles.",
+        "ref": "§3314.4.10 / OSHA"
+      },
+      {
+        "text": "Shock-absorbing lanyard ≤6 ft; rope grab oriented per manufacturer.",
+        "ref": "OSHA 1926.502(d)"
+      }
+    ]
+  },
+  {
+    "topic_number": 10,
+    "slug": "10-suspended-scaffold-daily-inspection",
+    "category": "Scaffold",
+    "ch33_ref": "§3314",
+    "title_en": "Suspended Scaffold — Daily Inspection (Companion to the Checklist)",
+    "why_en": "Every shift our scaffold rises and falls on equipment that wasn't inspected by us when we left yesterday. The competent person walks the drop, the motors, the wire rope, the harness anchors, and the cage — every morning. The daily checklist is the receipt. No checklist, no work.",
+    "rules_en": [
+      {
+        "text": "Suspended scaffold inspected daily by a competent person before use.",
+        "ref": "§3314.4.7"
+      },
+      {
+        "text": "Pre-shift inspection of wire rope, motors, stirrups, tiebacks, lifelines.",
+        "ref": "§3314.4.7"
+      },
+      {
+        "text": "Drop platform load tested to 4× working load at rig-up.",
+        "ref": "§3314.4.5"
+      },
+      {
+        "text": "Document daily inspection — signature + date on the log.",
+        "ref": "§3314.4.7"
+      },
+      {
+        "text": "Out-of-service scaffolds tagged and the drop secured.",
+        "ref": "§3314.4.8"
+      }
+    ]
+  },
+  {
+    "topic_number": 11,
+    "slug": "11-suspended-scaffold-tiebacks-lifelines",
+    "category": "Scaffold",
+    "ch33_ref": "§3314",
+    "title_en": "Suspended Scaffold — Tiebacks, Lifelines, Anchorage",
+    "why_en": "Counterweights hold the scaffold up. Tiebacks keep it from tipping when the wind hits or a worker moves. Lifelines catch us if the scaffold itself fails. These are three separate systems — not interchangeable, not optional, not for improvisation. Every anchor we use was designed for THIS load.",
+    "rules_en": [
+      {
+        "text": "Tieback installed at every suspension point before lifting workers.",
+        "ref": "§3314.4.6"
+      },
+      {
+        "text": "Tieback angle 0–45° from horizontal, opposite of overturning.",
+        "ref": "§3314.4.6.2"
+      },
+      {
+        "text": "Lifelines independent of suspension lines, anchored separately.",
+        "ref": "§3314.4.10"
+      },
+      {
+        "text": "Anchorage rated 5,000 lb per worker (or 2× max arrest force).",
+        "ref": "§3314.4.10 / OSHA"
+      },
+      {
+        "text": "Building anchors PE-stamped on the C-hook / parapet clamp plan.",
+        "ref": "§3314.4.6"
+      }
+    ]
+  },
+  {
+    "topic_number": 12,
+    "slug": "12-counterweights-outriggers-mudsills",
+    "category": "Scaffold",
+    "ch33_ref": "§3314",
+    "title_en": "Suspended Scaffold — Counterweights, Outriggers, Mudsills",
+    "why_en": "On a parapet-clamp or outrigger drop, the counterweights are the only thing keeping the rig from rotating off the roof. Missing one weight, an outrigger on a soft spot, a mudsill on uneven asphalt — the math fails and the rig goes over the edge. Verify the math before workers go below.",
+    "rules_en": [
+      {
+        "text": "Counterweight = 4× the suspended load (working load × 4 safety factor).",
+        "ref": "§3314.4.5"
+      },
+      {
+        "text": "Counterweights of equal-weight pieces, not flowable material.",
+        "ref": "§3314.4.5.2"
+      },
+      {
+        "text": "Outriggers bear on a mudsill that distributes the load to the deck.",
+        "ref": "§3314.4.5.3"
+      },
+      {
+        "text": "Outrigger anchored / secured against displacement.",
+        "ref": "§3314.4.5.3"
+      },
+      {
+        "text": "Counterweights labeled with their weight; no missing pieces.",
+        "ref": "§3314.4.5.2"
+      }
+    ]
+  },
+  {
+    "topic_number": 13,
+    "slug": "13-wire-rope-termination",
+    "category": "Scaffold",
+    "ch33_ref": "§3314",
+    "title_en": "Wire Rope Termination — Fistgrips, Shackles, Thimbles",
+    "why_en": "Every fall arrest and every scaffold suspension ends in a wire-rope termination. Get the fistgrip orientation wrong, skip the thimble, undersize the shackle — and a perfectly good rope slips at the worst moment. The terminations are what the engineers calculated; we don't get creative with them.",
+    "rules_en": [
+      {
+        "text": "Minimum 3 fistgrips on 3/8-in or smaller wire rope; more for larger.",
+        "ref": "§3314.4.5.6"
+      },
+      {
+        "text": "Saddle of the fistgrip on the LIVE side, U-bolt on the dead end.",
+        "ref": "§3314.4.5.6"
+      },
+      {
+        "text": "Thimble required in every eye-loop — no kinking the rope around shackles.",
+        "ref": "§3314.4.5.6"
+      },
+      {
+        "text": "Shackle pin oriented so vibration doesn't unscrew it; mouse it.",
+        "ref": "§3314.4.5.6"
+      },
+      {
+        "text": "Re-torque fistgrip nuts after the first load (rope settles).",
+        "ref": "§3314.4.5.6"
+      }
+    ]
+  },
+  {
+    "topic_number": 14,
+    "slug": "14-demolition-safety",
+    "category": "Demo",
+    "ch33_ref": "§3306",
+    "title_en": "Demolition Safety — Sequence, Dust, Falling Material",
+    "why_en": "Demolition is the most dangerous phase of any job. The structure was designed to stand up — every cut, every break, shifts loads in ways the original engineer didn't picture. The demo plan exists because eyeballing it kills people. We follow the plan, top down, no improvising.",
+    "rules_en": [
+      {
+        "text": "Engineering survey required before demolition begins.",
+        "ref": "§3306.2"
+      },
+      {
+        "text": "Demolition plan filed with DOB; pre-construction meeting held.",
+        "ref": "§3306.4"
+      },
+      {
+        "text": "Demolish top-down or per the filed sequence — never improvise.",
+        "ref": "§3306.5"
+      },
+      {
+        "text": "Dust mitigation — water spray, screening, debris chutes.",
+        "ref": "§3306.6"
+      },
+      {
+        "text": "Falling material protected — chutes, netting, or enclosed enclosures.",
+        "ref": "§3306.6.2"
+      }
+    ]
+  },
+  {
+    "topic_number": 15,
+    "slug": "15-powder-actuated-tools",
+    "category": "Demo",
+    "ch33_ref": "§3311",
+    "title_en": "Powder-Actuated Tools — Safe Use & Training",
+    "why_en": "A powder-actuated tool fires a fastener like a bullet — into concrete, into steel, sometimes into a worker on the other side of a wall. They are FDNY-permitted, training-restricted tools. Wrong load color, wrong fastener length, no eye protection — every one of those is a hospital trip.",
+    "rules_en": [
+      {
+        "text": "Operator licensed / certified by the tool manufacturer.",
+        "ref": "§3311.2"
+      },
+      {
+        "text": "Tool inspected before each shift; defective tools tagged out.",
+        "ref": "§3311.3"
+      },
+      {
+        "text": "Eye protection AND hearing protection required when firing.",
+        "ref": "§3311.3 / OSHA"
+      },
+      {
+        "text": "Match load color (power level) to the substrate — never over-power.",
+        "ref": "§3311.3"
+      },
+      {
+        "text": "Never fire through unsupported material or into a hollow wall.",
+        "ref": "§3311.4"
+      }
+    ]
+  },
+  {
+    "topic_number": 16,
+    "slug": "16-material-hoisting-rigging",
+    "category": "Demo",
+    "ch33_ref": "§3316",
+    "title_en": "Material Hoisting & Rigging Basics",
+    "why_en": "A pallet of brick, a bundle of conduit, a hoisted A/C compressor — every load above grade is a potential drop. The rigger calculates capacity, the signaler controls the lift, and every worker below stays out of the swing path. One bad sling and a load lands on someone's shift change.",
+    "rules_en": [
+      {
+        "text": "Licensed rigger / climber for any hoisting >2,000 lb or >75 ft.",
+        "ref": "§3316.5"
+      },
+      {
+        "text": "Sling capacity rated; tags legible at the slings.",
+        "ref": "§3316.7"
+      },
+      {
+        "text": "Designated signal-person at every lift — one signaler, one operator.",
+        "ref": "§3316.6"
+      },
+      {
+        "text": "Tagline on loads that could swing.",
+        "ref": "§3316.7"
+      },
+      {
+        "text": "No load over personnel — the swing radius is a no-go zone.",
+        "ref": "§3316.7"
+      }
+    ]
+  },
+  {
+    "topic_number": 17,
+    "slug": "17-ppe-essentials",
+    "category": "General",
+    "ch33_ref": "general (touches §3303)",
+    "title_en": "PPE Essentials — Hard Hat, Eye, Hand, Foot, Hearing",
+    "why_en": "PPE is the LAST line of defense — after engineering controls, after admin controls, after we've done everything else right. It only works if it fits, if it's the right rating, and if we actually wear it. Walking onto an SSC site without the full kit means going home.",
+    "rules_en": [
+      {
+        "text": "Hard hat ANSI Z89.1 — every worker, every step on site.",
+        "ref": "general / §3303"
+      },
+      {
+        "text": "Eye protection Z87.1 — anytime there's grinding, cutting, drilling.",
+        "ref": "general / OSHA"
+      },
+      {
+        "text": "Gloves matched to the task — cut, chemical, or impact rating.",
+        "ref": "general"
+      },
+      {
+        "text": "Steel- or composite-toe boots ASTM F2413 — 365 days a year.",
+        "ref": "general"
+      },
+      {
+        "text": "Hearing protection NRR ≥25 above 85 dB exposure.",
+        "ref": "OSHA 1910.95"
+      }
+    ]
+  },
+  {
+    "topic_number": 18,
+    "slug": "18-heat-illness-prevention",
+    "category": "General",
+    "ch33_ref": "OSHA / NYC general industry",
+    "title_en": "Heat Illness Prevention — Water, Rest, Shade",
+    "why_en": "A 90°F day on a black-tar roof with a swing-stage drop is 120°F at the work surface. Heat exhaustion sneaks up — headache, dizziness, then collapse. Heat stroke is a medical emergency. We pre-hydrate, we rotate, and we watch each other for early signs. Nobody works through it.",
+    "rules_en": [
+      {
+        "text": "Cool water within 100 ft of every work station — refilled hourly.",
+        "ref": "OSHA heat guidance"
+      },
+      {
+        "text": "Shaded rest area, 10-min break minimum every 2 hours above 90°F.",
+        "ref": "OSHA / NYC"
+      },
+      {
+        "text": "Acclimatize new workers — 20% load on day 1, full load by day 5.",
+        "ref": "OSHA"
+      },
+      {
+        "text": "Buddy system: each worker watches their partner for symptoms.",
+        "ref": "OSHA"
+      },
+      {
+        "text": "Heat-stroke training annually for foremen.",
+        "ref": "OSHA"
+      }
+    ]
+  },
+  {
+    "topic_number": 19,
+    "slug": "19-cold-weather-work",
+    "category": "General",
+    "ch33_ref": "OSHA / NYC general industry",
+    "title_en": "Cold Weather Work — Frostbite, Slips, Hydration",
+    "why_en": "NYC winter on a parapet — wind 30+ mph, wet hands on cold steel, fingers numb in five minutes. Cold injuries are slower than heat illness but just as serious. Hypothermia kills, frostbite scars, and slick scaffold decks turn a minor stumble into a six-floor fall.",
+    "rules_en": [
+      {
+        "text": "Warm-up shelter on site whenever wind chill ≤ 20°F.",
+        "ref": "OSHA"
+      },
+      {
+        "text": "Layered clothing: wicking, insulating, wind/waterproof outer.",
+        "ref": "OSHA"
+      },
+      {
+        "text": "Inspect / clear ice from scaffold deck before every shift.",
+        "ref": "general / §3314"
+      },
+      {
+        "text": "Hot (non-alcoholic) drinks available; hot food at lunch.",
+        "ref": "OSHA"
+      },
+      {
+        "text": "Pair work for any exposure under 0°F wind chill.",
+        "ref": "OSHA"
+      }
+    ]
+  }
+]
