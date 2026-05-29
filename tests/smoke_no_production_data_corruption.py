@@ -98,6 +98,24 @@ TABLES_TO_SNAPSHOT: list[Tuple[str, list[str], list[str]]] = [
     # (never question_text / answer_summary, which stay un-serialized).
     ("construction_agent_provenance", ["interaction_id"],
      ["operator_disposition", "corpus_version"]),
+    # Drop Plan tables (#199 Batch A). Same backstop logic as the
+    # provenance table above: the CRUD smoke subprocess never touches any
+    # drop-plan table, so within a meta-smoke run before==after and each
+    # reports "clean" — no false failure. They're snapshotted so that if a
+    # FUTURE smoke writes a NON-synthetic drop-plan row during the CRUD
+    # run, it surfaces immediately. Identity columns lead with a TEXT
+    # natural key (drop_id / sov_code / elevation / template name) so the
+    # drop-plan smoke's SMK--prefixed rows are auto-filtered as expected
+    # residue. Money lives in expense_entries.amount — NOT serialized here
+    # (value_cols stay status/category only, mirroring worker_rates).
+    ("drops", ["drop_id"], ["lifecycle", "sequence_no", "elevation"]),
+    ("stage_templates", ["project_code", "name"], []),
+    ("stage_template_steps", ["template_id", "step_no"], ["name"]),
+    ("drop_stage_status", ["drop_id", "step_no"], ["status", "started_on", "completed_on"]),
+    ("sov_line_items", ["project_code", "sov_code"], ["unit"]),
+    ("quantity_entries", ["entry_id", "drop_id"], ["quantity", "logged_on"]),
+    ("expense_entries", ["entry_id", "drop_id"], ["category", "logged_on"]),
+    ("paint_phases", ["phase_id", "project_code", "elevation"], ["status"]),
 ]
 
 
