@@ -112,6 +112,7 @@ logs/
 # whose parent directory is wholesale-excluded.
 .claude/*
 !.claude/agents/
+!.claude/commands/
 .cursor/
 
 # ===== TEMP =====
