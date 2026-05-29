@@ -1,9 +1,26 @@
 # agents/construction_specialist/ — Construction Specialist Agent (Phase A / v0)
 
+> ## Working invocation in this runtime (read first)
+>
+> - **Working invocation — manual prompt.** Instruct Claude Code (directly, or via a
+>   coordinating Cowork session that hands Claude Code the message) to **read
+>   `agents/construction_specialist/`** (persona + scope + corpus) and **act as the
+>   Construction Specialist Agent for the duration of that response** — answer with
+>   citation discipline and write one PII-safe provenance row. This is the only path
+>   verified to work today.
+> - **NOT supported in current runtime:** the `/construction-specialist` **slash
+>   command** — returns "Unknown command" (verified 2026-05-28).
+> - **NOT supported in current runtime:** Claude Code **Task-tool subagent
+>   auto-discovery** — `Task(subagent_type="construction-specialist")` returns
+>   "Agent type … not found" (verified 2026-05-28).
+> - **Future work:** re-evaluate both auto-discovery paths when runtime capabilities
+>   change.
+
 Co-located **definition + corpus** for SSC's foundational AI specialist (spec
-decision Q4). Discoverable to Claude Code's Task tool via the thin stub at
-`.claude/agents/construction-specialist.md`. Contract: `CONSTRUCTION_SPECIALIST_AGENT_SPEC.md`
-(v1.2) in the Superstars Dashboard project folder.
+decision Q4). The directory is the **corpus + persona reference** that the
+manual-prompt invocation reads (the `.claude/` discovery files exist but are inert
+in this runtime — see the callout above). Contract:
+`CONSTRUCTION_SPECIALIST_AGENT_SPEC.md` (v1.4) in the Superstars Dashboard project folder.
 
 ## Layout
 
@@ -17,31 +34,35 @@ decision Q4). Discoverable to Claude Code's Task tool via the thin stub at
 | `corpus/sika/` | Sika spec index (C2), from the `spec_products` table. |
 | `corpus/_deferred/` | Clearly-marked placeholders (LL11/77/126, SPRAT/IRATA, deep product write-ups) — a separate later batch. |
 | `corpus/build_corpus.py` | Regenerates the corpus indexes + re-stamps `CORPUS_VERSION`. |
-| `.claude/commands/construction-specialist.md` | **Slash-command invocation (MVP working path).** |
-| `.claude/agents/construction-specialist.md` | Subagent stub — works only in the interactive Claude Code CLI's subagent feature (see note). |
+| `.claude/commands/construction-specialist.md` | Slash-command body — **inert in current runtime** (`/construction-specialist` → "Unknown command"); kept as a copy-paste source for the manual prompt and for if/when slash commands resolve. |
+| `.claude/agents/construction-specialist.md` | Subagent stub — **inert in current runtime** (Task-tool auto-discovery not supported); kept for a pure interactive Claude Code CLI that supports filesystem subagents. |
 
-## Invoke (MVP)
+## Invoke (MVP) — manual prompt
 
-**Use the slash command** (the verified path, #198):
+The working invocation is a plain message to Claude Code (no `/command`, no Task
+subagent). For example:
 
 ```
-/construction-specialist <your construction question>
+Read agents/construction_specialist/ and act as the Construction Specialist —
+follow its rules (cite sources or flag as general-knowledge-unverified, never
+fabricate, route engineering/architect/legal/attestation out, W-#### only), answer
+<my question>, then log one provenance row via
+agents/construction_specialist/provenance.py.
 ```
 
-The command runs in the main session (a slash command is an injected prompt, not a
-sub-agent): it reads this contract + the relevant corpus index, answers
+Claude Code then reads this contract + the relevant corpus index, answers
 citation-anchored with an adjacency prompt, hard-declines/routes anything out of
 scope (EOR/architect/attorney/attestation; procurement = draft+analyze only), and
-writes **exactly one** PII-safe row to `construction_agent_provenance`.
+writes **exactly one** PII-safe row to `construction_agent_provenance`. The body of
+`.claude/commands/construction-specialist.md` is a ready-made source for that prompt.
 
-**Why not the Task sub-agent:** the spec's original mechanism
-(`Task(subagent_type="construction-specialist", …)`) does NOT resolve under the
-Claude Agent SDK / FleetView runtime — that runtime loads only programmatic +
-built-in subagents, never project `.claude/agents/*.md` (verified #198: "Agent type
-'construction-specialist' not found", even cold). Filesystem subagents are an
-interactive-CLI-only feature. The slash command (slash commands = skills in this
-build) is the portable, working substitute. The `.claude/agents/` stub is retained
-for operators who run the pure interactive CLI; it is harmless where unsupported.
+**Why not the slash command or Task sub-agent (#198 finding):** this runtime (the
+Claude Agent SDK / FleetView environment) auto-discovers **neither** project
+`.claude/commands/*.md` slash commands **nor** project `.claude/agents/*.md` Task
+subagents. Verified 2026-05-28: `/construction-specialist` → "Unknown command", and
+`Task(subagent_type="construction-specialist")` → "Agent type … not found" (even
+cold). Both are interactive-CLI-only features. Until runtime capabilities change,
+use the manual prompt above; revisit the auto-discovery shortcuts in v2.
 
 ## Audit trail
 
