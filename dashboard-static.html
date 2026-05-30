@@ -5,6 +5,87 @@
 <link rel="stylesheet" href="/files/static/fonts/typography.css">
 <script src="/files/static/js/datepicker.js"></script>
 <script src="/files/static/js/timepicker.js"></script>
+<!-- Chart.js 4.4.6 vendored LOCALLY (#208) — served from the repo, not a CDN,
+     so the field-reachable (Tailscale, offline) dashboard still renders charts.
+     A CDN would blank the charts offline — the exact failure to avoid. -->
+<script src="/files/static/vendor/chart.umd.min.js"></script>
+<style>
+  /* ===== Project Health redesign (#208) — new design language, modular DRAG-READY widgets ===== */
+  .ph-wrap { color:#14161C; }
+  .ph-head { margin:4px 0 18px; }
+  .ph-head .ph-eyebrow { font-size:11px; color:#76777E; text-transform:uppercase; letter-spacing:.12em; font-weight:700; }
+  .ph-head h1 { font-size:24px; margin:2px 0; line-height:1.2; }
+  .ph-head .ph-sub { font-size:12px; color:#B11E2E; text-transform:uppercase; letter-spacing:.1em; font-weight:700; }
+  .ph-actions { display:flex; flex-wrap:wrap; gap:10px; margin:14px 0 4px; }
+  .ph-actions .ph-btn { background:#B11E2E; color:#fff; border:none; border-radius:8px; padding:9px 14px; font-size:12px; font-weight:700; letter-spacing:.03em; cursor:pointer; }
+  .ph-actions .ph-btn.ghost { background:#fff; color:#B11E2E; border:1px solid #B11E2E; }
+  .ph-actions .ph-btn:hover { filter:brightness(.96); }
+
+  /* KPI tiles */
+  .ph-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin:16px 0 20px; }
+  .ph-kpi { background:#fff; border:1px solid #E8E4DD; border-radius:12px; padding:16px 18px; display:flex; align-items:center; gap:14px; }
+  .ph-kpi-k { font-size:11px; color:#76777E; text-transform:uppercase; letter-spacing:.06em; }
+  .ph-kpi-v { font-weight:800; font-size:26px; line-height:1; margin-top:4px; }
+  .ph-kpi-sub { font-size:11px; color:#76777E; margin-top:4px; }
+
+  /* uniform DRAG-READY widget wrapper — a future drag-grid (GridStack/Muuri) wraps
+     EACH .ph-widget node 1:1 as a grid item; nothing inside changes. The .ph-grip
+     is the pre-placed drag handle (inert until a grid is mounted). */
+  .ph-grid { display:grid; grid-template-columns:repeat(12,1fr); gap:16px; align-items:start; }
+  .ph-widget { background:#fff; border:1px solid #E8E4DD; border-radius:12px; display:flex; flex-direction:column; overflow:hidden; }
+  .ph-widget-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 18px 0; }
+  .ph-widget-head h3 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:#54505A; margin:0; }
+  .ph-grip { color:#CDC9C0; font-size:15px; line-height:1; cursor:grab; user-select:none; }
+  .ph-widget-body { padding:14px 18px 18px; flex:1; }
+  .ph-col-12 { grid-column:span 12; } .ph-col-8 { grid-column:span 8; } .ph-col-6 { grid-column:span 6; } .ph-col-4 { grid-column:span 4; }
+  @media (max-width:920px){ .ph-grid > .ph-widget { grid-column:span 12 !important; } }
+
+  /* rings */
+  .ph-ring text { font-family:inherit; }
+
+  /* active-drops panel */
+  .ph-active-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px; }
+  .ph-drop { display:flex; align-items:center; gap:12px; border:1px solid #EFEBE3; border-radius:10px; padding:10px 12px; background:#FCFBF8; }
+  .ph-drop-label { font-weight:800; font-size:14px; }
+  .ph-drop-stage { font-size:11px; color:#54505A; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ph-drop-elev { font-size:10px; color:#76777E; text-transform:uppercase; letter-spacing:.05em; margin-top:2px; }
+  .ph-more { font-size:12px; color:#76777E; margin-top:10px; }
+
+  /* donut + legend */
+  .ph-donut-wrap { position:relative; height:180px; }
+  .ph-donut-center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none; }
+  .ph-donut-center .n { font-size:26px; font-weight:800; line-height:1; }
+  .ph-donut-center .l { font-size:10px; color:#76777E; text-transform:uppercase; letter-spacing:.06em; }
+  .ph-legend { margin-top:12px; display:flex; flex-direction:column; gap:7px; }
+  .ph-leg { display:flex; align-items:center; gap:8px; font-size:13px; color:#54505A; }
+  .ph-leg .dot { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
+  .ph-leg b { margin-left:auto; color:#14161C; font-weight:800; }
+
+  /* bar */
+  .ph-bar-wrap { position:relative; height:220px; }
+
+  /* roster (W-#### only) */
+  .ph-roster { width:100%; border-collapse:collapse; font-size:13px; }
+  .ph-roster th { text-align:left; background:#14161C; color:#fff; padding:7px 10px; font-size:10px; text-transform:uppercase; letter-spacing:.05em; }
+  .ph-roster td { padding:7px 10px; border-bottom:1px solid #F2EFE7; }
+  .ph-wid { font-weight:700; color:#B11E2E; }
+  .ph-stillin { color:#B68838; font-weight:600; }
+
+  /* certs */
+  .ph-cert-row { display:flex; align-items:baseline; gap:10px; padding:8px 0; border-bottom:1px solid #F2EFE7; }
+  .ph-cert-n { font-size:22px; font-weight:800; min-width:34px; }
+  .ph-cert-l { font-size:12px; color:#54505A; }
+  .ph-cert-foot { font-size:11px; color:#76777E; margin-top:10px; }
+
+  /* empty / loading states — clean, never blank */
+  .ph-empty { text-align:center; padding:22px 12px; color:#76777E; }
+  .ph-empty-title { font-weight:700; color:#54505A; font-size:14px; }
+  .ph-empty-sub { font-size:12px; margin-top:4px; }
+  .ph-loading { color:#76777E; font-size:13px; padding:8px 0; }
+
+  /* build-version stamp */
+  .ph-build { margin:30px 0 8px; padding-top:14px; border-top:1px solid #E8E4DD; color:#76777E; font-size:11px; letter-spacing:.04em; }
+</style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Superstars Contracting - Project Console</title>
   <style>
@@ -557,235 +638,76 @@
     <div class="views-container">
       <!-- PROJECT HEALTH / DASHBOARD -->
       <section class="view active" data-view="dashboard">
-        <div class="hero">
-          <div class="eyebrow">Project Health · Week 13</div>
-          <h1>890 East 135th Street</h1>
-          <div class="hero-subtitle">890 E 135th Street</div>
-          <div class="hero-meta">
-            <div>
-              <div class="eyebrow" style="margin-bottom: 4px;">Project Manager</div>
-              <div style="font-weight: 600;">Susan Park</div>
-            </div>
-            <div>
-              <div class="eyebrow" style="margin-bottom: 4px;">Foreman</div>
-              <div style="font-weight: 600;">John Doe</div>
-            </div>
-            <div>
-              <div class="eyebrow" style="margin-bottom: 4px;">Superintendent</div>
-              <div style="font-weight: 600;">Robert Caldwell</div>
+        <div class="ph-wrap">
+          <div class="ph-head">
+            <div class="ph-eyebrow">Project Health</div>
+            <h1>890 E 135th St · FR-BX-001</h1>
+            <div class="ph-sub">Compass Point, LLC</div>
+            <div class="ph-actions">
+              <button class="ph-btn" data-link="/dropplan">Drop Plan</button>
+              <button class="ph-btn ghost" data-link="/WPS-FR-BX-001-2026-05-01-internal.html">Weekly Summary</button>
+              <button class="ph-btn ghost" data-link="/LA-FR-BX-001-2026-05-07.html">2-Week Lookahead</button>
+              <button class="ph-btn ghost" data-link="/rfi_submission_form.html">Submit RFI</button>
             </div>
           </div>
-          <div class="hero-stats">
-            <div class="stat-item">
-              <div class="stat-number">42%</div>
-              <div class="stat-label">Complete</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-number">$1.71M</div>
-              <div class="stat-label">Earned</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-number" data-stat="workers-today">10 of 12</div>
-              <div class="stat-label">On Site</div>
-            </div>
-          </div>
-          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 32px;">
-            <button class="hero-btn hero-btn-primary" id="ph-today-dcr-btn" type="button">View Today's DCR</button>
-            <button class="hero-btn hero-btn-primary" data-link="/WPS-FR-BX-001-2026-05-01-internal.html">Weekly Summary</button>
-            <button class="hero-btn hero-btn-primary" data-link="/LA-FR-BX-001-2026-05-07.html">2-Week Lookahead</button>
-            <button class="hero-btn hero-btn-primary" data-link="/rfi_submission_form.html">Submit RFI</button>
-          </div>
-          <!-- #193 — Labor Rate Tracker entry card. Matches the visual
-               cadence of the four hero-btn quick actions above (admin/
-               c-suite only). Hidden by default; revealed by the
-               lrt_nav_gate.js helper at user-loaded time. Routes to the
-               existing LRT view on the company console. -->
-          <div id="proj-lrt-entry-card" style="display:none;margin-top:14px;">
-            <button class="hero-btn hero-btn-primary"
-                    style="background:white;color:#B11E2E;border:1px solid #B11E2E;font-weight:700;letter-spacing:0.4px;"
-                    data-link="/company-dashboard.html#labor-rate"
-                    title="Per-week hours × hourly rate · check-cutting view">
-              💰 Labor Rate Tracker
-              <span style="font-size:9px;font-weight:700;color:#76777E;letter-spacing:0.5px;margin-left:6px;padding:1px 5px;border:1px solid #D5D2C9;border-radius:2px;text-transform:uppercase;">Admin / C-Suite</span>
-            </button>
-          </div>
-        </div>
 
-        <div class="kpi-strip">
-          <div class="kpi-card">
-            <div class="kpi-header">Workers Today</div>
-            <div class="kpi-content">
-              <div class="kpi-stat" data-stat="workers-today">10/12</div>
-              <div class="kpi-sublabel"><span data-stat="total-hours">82.25</span> hours</div>
-            </div>
+          <!-- hidden stub kept so lrt_nav_gate.js (admin/c-suite reveal) never null-throws -->
+          <div id="proj-lrt-entry-card" style="display:none;"></div>
+
+          <!-- WIDGET: KPI tiles (live) -->
+          <div class="ph-kpis" data-widget="kpis">
+            <div class="ph-kpi"><div><div class="ph-kpi-k">Workers on site</div><div class="ph-kpi-v" id="ph-kpi-workers">—</div><div class="ph-kpi-sub" id="ph-kpi-workers-sub">today</div></div></div>
+            <div class="ph-kpi"><div><div class="ph-kpi-k">Certs expiring ≤30d</div><div class="ph-kpi-v" id="ph-kpi-certs">—</div><div class="ph-kpi-sub" id="ph-kpi-certs-sub">incl. expired</div></div></div>
+            <div class="ph-kpi"><div><div class="ph-kpi-k">Active drops</div><div class="ph-kpi-v" id="ph-kpi-active">—</div><div class="ph-kpi-sub">of <span id="ph-kpi-active-total">—</span> drops</div></div></div>
+            <div class="ph-kpi"><span id="ph-kpi-progress-ring"></span><div><div class="ph-kpi-k">Overall progress</div><div class="ph-kpi-v" id="ph-kpi-progress">—</div><div class="ph-kpi-sub">drop plan</div></div></div>
           </div>
-          <div class="kpi-card" id="ph-today-dcr-tile" style="cursor:pointer;">
-            <div class="kpi-header">Today's Report</div>
-            <div class="kpi-content">
-              <div class="kpi-stat" id="ph-today-dcr-id">—</div>
-              <div class="kpi-sublabel" id="ph-today-dcr-status">Loading…</div>
-            </div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-header">Weather</div>
-            <div class="kpi-content" style="position:relative;">
-              <div style="display:flex;align-items:center;gap:10px;">
-                <div id="wx-icon" style="width:42px;height:42px;flex-shrink:0;">
-                  <!-- modern multi-tone weather SVG injected by JS based on
-                       Open-Meteo WMO condition_code. Each icon ships its own
-                       fill/stroke colors (sun=amber, cloud=slate, rain=blue,
-                       storm=slate+amber, etc.) — no currentColor inheritance
-                       from this container, so a stray parent color (e.g. the
-                       brand-red leak that turned the cloud red, #114) can
-                       never re-tint the glyph. -->
+
+          <!-- WIDGET GRID — each .ph-widget is a self-contained, drag-ready unit -->
+          <div class="ph-grid">
+            <section class="ph-widget ph-col-8" data-widget="active-drops">
+              <div class="ph-widget-head"><h3>Active drops</h3><span class="ph-grip" title="drag-ready (drag not enabled yet)">⠿</span></div>
+              <div class="ph-widget-body" id="ph-active-body"><div class="ph-loading">Loading…</div></div>
+            </section>
+
+            <section class="ph-widget ph-col-4" data-widget="drops-status">
+              <div class="ph-widget-head"><h3>Drops by status</h3><span class="ph-grip" title="drag-ready (drag not enabled yet)">⠿</span></div>
+              <div class="ph-widget-body">
+                <div class="ph-donut-wrap"><canvas id="ph-donut"></canvas><div class="ph-donut-center"><div class="n" id="ph-donut-total">—</div><div class="l">drops</div></div></div>
+                <div class="ph-legend" id="ph-donut-legend"></div>
+              </div>
+            </section>
+
+            <section class="ph-widget ph-col-8" data-widget="progress-elevation">
+              <div class="ph-widget-head"><h3>Progress by elevation</h3><span class="ph-grip" title="drag-ready (drag not enabled yet)">⠿</span></div>
+              <div class="ph-widget-body"><div class="ph-bar-wrap"><canvas id="ph-bar"></canvas></div><div id="ph-bar-note" class="ph-empty-sub" style="text-align:center;margin-top:8px;"></div></div>
+            </section>
+
+            <section class="ph-widget ph-col-4" data-widget="weather">
+              <div class="ph-widget-head"><h3>Weather</h3><span class="ph-grip" title="drag-ready (drag not enabled yet)">⠿</span></div>
+              <div class="ph-widget-body">
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <div id="wx-icon" style="width:46px;height:46px;flex-shrink:0;"></div>
+                  <div style="flex:1;min-width:0;"><div class="ph-kpi-v" id="wx-temp" style="font-size:30px;">—°</div><div class="ph-kpi-sub" id="wx-cond">Loading…</div></div>
                 </div>
-                <div style="flex:1;min-width:0;">
-                  <div class="kpi-stat" id="wx-temp" style="font-size:28px;line-height:1;">—°</div>
-                  <div class="kpi-sublabel" id="wx-cond" style="margin-top:4px;font-size:11px;color:#76777E;">Loading…</div>
+                <div style="display:flex;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:1px solid #F1EEE8;font-size:11px;color:#76777E;">
+                  <span><strong style="color:#14161C;" id="wx-hilo">—°/—°</strong> hi/lo</span>
+                  <span><strong style="color:#14161C;" id="wx-wind">— mph</strong> <span id="wx-wind-dir">—</span></span>
                 </div>
               </div>
-              <div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid #F1EEE8;font-size:11px;color:#76777E;">
-                <span><strong style="color:#14161C;font-weight:700;" id="wx-hilo">—°/—°</strong> hi/lo</span>
-                <span style="display:inline-flex;align-items:center;gap:5px;">
-                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h11a3 3 0 1 0-3-3"/><path d="M3 13h17a3 3 0 1 1-3 3"/><path d="M3 18h9"/></svg>
-                  <strong style="color:#14161C;font-weight:700;" id="wx-wind">— mph</strong>
-                  <span id="wx-wind-dir">—</span>
-                </span>
-              </div>
-            </div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-header">Cert Alerts</div>
-            <div class="kpi-content">
-              <div class="kpi-stat" data-stat="cert-alerts">2</div>
-              <div class="kpi-sublabel">Expiring &lt;30d</div>
-            </div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-header">Schedule</div>
-            <div class="kpi-content">
-              <div class="kpi-stat" data-stat="schedule">42%</div>
-              <div class="kpi-sublabel"><span class="badge badge-warn">vs 47% plan</span></div>
-            </div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-header">Budget</div>
-            <div class="kpi-content">
-              <div class="kpi-stat" data-stat="budget">$1.71M</div>
-              <div class="kpi-sublabel"><span class="badge badge-ok">On track</span></div>
-            </div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-header">Operations</div>
-            <div class="kpi-content">
-              <div class="kpi-stat">Open</div>
-              <div class="kpi-sublabel"><span class="badge badge-warn">Closure pending</span></div>
-            </div>
-          </div>
-        </div>
+            </section>
 
-        <div class="section">
-          <h2>Phase Progress</h2>
-          <div class="phase-list">
-            <div class="phase-item">
-              <div class="phase-name">Mobilization</div>
-              <div class="progress-bar"><div class="progress-fill" style="width: 100%;"></div></div>
-              <div class="phase-pct">100%</div>
-            </div>
-            <div class="phase-item">
-              <div class="phase-name">Inspection</div>
-              <div class="progress-bar"><div class="progress-fill" style="width: 100%;"></div></div>
-              <div class="phase-pct">100%</div>
-            </div>
-            <div class="phase-item">
-              <div class="phase-name">Demo</div>
-              <div class="progress-bar"><div class="progress-fill" style="width: 78%;"></div></div>
-              <div class="phase-pct">78%</div>
-            </div>
-            <div class="phase-item">
-              <div class="phase-name">Masonry Repair</div>
-              <div class="progress-bar"><div class="progress-fill warn" style="width: 32%;"></div></div>
-              <div class="phase-pct">32%</div>
-            </div>
-            <div class="phase-item">
-              <div class="phase-name">Waterproofing</div>
-              <div class="progress-bar"><div class="progress-fill gray" style="width: 0%;"></div></div>
-              <div class="phase-pct">0%</div>
-            </div>
-            <div class="phase-item">
-              <div class="phase-name">Coatings</div>
-              <div class="progress-bar"><div class="progress-fill gray" style="width: 0%;"></div></div>
-              <div class="phase-pct">0%</div>
-            </div>
-            <div class="phase-item">
-              <div class="phase-name">Punch</div>
-              <div class="progress-bar"><div class="progress-fill gray" style="width: 0%;"></div></div>
-              <div class="phase-pct">0%</div>
-            </div>
-            <div class="phase-item">
-              <div class="phase-name">Demob</div>
-              <div class="progress-bar"><div class="progress-fill gray" style="width: 0%;"></div></div>
-              <div class="phase-pct">0%</div>
-            </div>
-          </div>
-        </div>
+            <section class="ph-widget ph-col-8" data-widget="roster">
+              <div class="ph-widget-head"><h3>Today on site · roster (W-#### only)</h3><span class="ph-grip" title="drag-ready (drag not enabled yet)">⠿</span></div>
+              <div class="ph-widget-body" id="ph-roster-body"><div class="ph-loading">Loading…</div></div>
+            </section>
 
-        <div class="section">
-          <h2>Today on Site</h2>
-          <!-- Live from the shared /on-site endpoint (#115). Foreman + signed-in
-               + hours update on the same refresh loop as the KPI strip; refreshes
-               every 30s plus on every dashboard load. -->
-          <div class="site-card">
-            <div class="site-item">
-              <div class="site-label">Foreman</div>
-              <div class="site-value" id="tos-foreman-name">—</div>
-              <div style="font-size: 12px; color: #76777E; margin-top: 4px;" id="tos-foreman-id">Loading…</div>
-            </div>
-            <div class="site-item">
-              <div class="site-label">Workers Signed In</div>
-              <div class="site-value" id="tos-signed-in">—</div>
-              <div style="font-size: 12px; color: #76777E; margin-top: 4px;" id="tos-hours">— hrs</div>
-            </div>
-            <div class="site-item">
-              <div class="site-label">Working Zone</div>
-              <div class="site-value">—</div>
-              <div style="font-size: 12px; color: #76777E; margin-top: 4px;">Zone tagging on sign-ins · pending Phase 2B</div>
-            </div>
+            <section class="ph-widget ph-col-4" data-widget="certs">
+              <div class="ph-widget-head"><h3>Cert alerts</h3><span class="ph-grip" title="drag-ready (drag not enabled yet)">⠿</span></div>
+              <div class="ph-widget-body" id="ph-certs-body"><div class="ph-loading">Loading…</div></div>
+            </section>
           </div>
-          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px;">
-            <div id="ph-today-dcr-card" style="background: white; border: 1px solid #E8E4DD; border-radius: 4px; padding: 20px; cursor:pointer;">
-              <div class="eyebrow">Today's Report</div>
-              <div id="ph-today-dcr-card-id" style="font-size: 16px; font-weight: 600; color: #14161C; margin: 8px 0;">—</div>
-              <div id="ph-today-dcr-card-meta" style="font-size: 11px; color: #76777E;">Loading…</div>
-            </div>
-            <div style="background: white; border: 1px solid #E8E4DD; border-radius: 4px; padding: 20px;">
-              <div class="eyebrow">Closure Status</div>
-              <div style="font-size: 16px; font-weight: 600; color: #14161C; margin: 8px 0;">Pending</div>
-              <span class="badge badge-warn">Cutoff 5 PM</span>
-            </div>
-          </div>
-        </div>
 
-        <div class="section">
-          <h2>Daily Sign-In</h2>
-          <div class="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>Emp #</th>
-                  <th>Worker</th>
-                  <th>Trade</th>
-                  <th>Time In</th>
-                  <th>Time Out</th>
-                  <th>Hours</th>
-                  <th>Area</th>
-                </tr>
-              </thead>
-              <tbody id="daily-signin-tbody">
-                <tr><td colspan="7" style="padding:18px;text-align:center;color:#76777E;">Loading…</td></tr>
-              </tbody>
-            </table>
-          </div>
+          <div class="ph-build" id="ph-build-stamp">build #208 · 2026-05-30 · project health redesign</div>
         </div>
       </section>
 
@@ -4650,6 +4572,122 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
       window.showLightbox(zoomEl.getAttribute('data-zoom-src'));
     }
   });
+})();
+</script>
+
+<script>
+/* ===== Project Health widgets (#208) — self-contained, DRAG-READY module.
+   Each render* fn owns exactly one .ph-widget and loads live data; never blanks
+   or crashes (clean empty states). Analytical charts use locally-vendored
+   Chart.js; progress rings are hand-rolled SVG (matches the Drop Plan #205 look).
+   Independent of the legacy refresh()/loadWeather() IIFEs (which still populate
+   the kept wx-* weather hooks and the RFI on-site header). A future drag-grid
+   wraps each [data-widget] node 1:1 — this module needs no change for that. */
+(function(){
+  const $=(id)=>document.getElementById(id);
+  const PROJECT=(location.pathname.match(/\/projects\/([^\/]+)/)||[])[1]||'FR-BX-001';
+  const C={red:'#B11E2E',ok:'#2F7C57',ink:'#14161C',mute:'#76777E',track:'#EDEAE3',ns:'#D9D4CA',warn:'#B68838'};
+  function todayLocal(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function fmtMDY(iso){if(!iso)return '';const p=String(iso).slice(0,10).split('-');return p.length===3?`${p[1]}/${p[2]}/${p[0]}`:iso;}
+  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function ringSVG(pct,size,stroke){const r=(size-stroke)/2,cx=size/2,Ci=2*Math.PI*r,p=Math.max(0,Math.min(100,Math.round(pct||0))),arc=p/100*Ci;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="ph-ring"><circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${C.track}" stroke-width="${stroke}"/><circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${C.ok}" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${arc.toFixed(2)} ${(Ci-arc).toFixed(2)}" transform="rotate(-90 ${cx} ${cx})"/><text x="${cx}" y="${cx}" dy="0.35em" text-anchor="middle" style="font-size:${Math.round(size*0.3)}px;font-weight:800;fill:${C.ink}">${p}%</text></svg>`;}
+  function statusOf(d){const lc=(d.lifecycle||'');if(lc==='not_started')return 'not_started';const pct=(d.progress&&d.progress.pct)||0;if(pct>=100||/complete|closed|done/.test(lc))return 'complete';return 'active';}
+  const jget=(u)=>fetch(u,{credentials:'include'}).then(r=>r.ok?r.json():null).catch(()=>null);
+  let donut=null, bar=null;
+
+  async function load(){
+    const t=todayLocal();
+    const [rollup,drops,onSite,workers]=await Promise.all([
+      jget(`/api/dropplan/projects/${encodeURIComponent(PROJECT)}/rollup`),
+      jget(`/api/dropplan/projects/${encodeURIComponent(PROJECT)}/drops`),
+      jget(`/api/projects/${encodeURIComponent(PROJECT)}/on-site?date=${t}`),
+      jget(`/api/projects/${encodeURIComponent(PROJECT)}/workers`),
+    ]);
+    const D=(drops&&drops.data)||[], R=(rollup&&rollup.data)||{};
+    try{ renderKpis(R,D,onSite,workers); }catch(e){ console.warn('[PH] kpis',e); }
+    try{ renderActive(D); }catch(e){ console.warn('[PH] active',e); }
+    try{ renderDonut(D); }catch(e){ console.warn('[PH] donut',e); }
+    try{ renderBar(D); }catch(e){ console.warn('[PH] bar',e); }
+    try{ renderRoster(onSite); }catch(e){ console.warn('[PH] roster',e); }
+    try{ renderCerts(workers); }catch(e){ console.warn('[PH] certs',e); }
+  }
+
+  function renderKpis(R,D,onSite,workers){
+    const site=(onSite&&onSite.data)||{headcount:0,total_hours:0};
+    const W=(workers&&workers.data)||[]; const roster=W.length;
+    if($('ph-kpi-workers'))$('ph-kpi-workers').textContent=roster>0?`${site.headcount}/${roster}`:String(site.headcount||0);
+    if($('ph-kpi-workers-sub'))$('ph-kpi-workers-sub').textContent=`${Number(site.total_hours||0).toFixed(1)} hrs · ${fmtMDY(todayLocal())}`;
+    let exp=0,exd=0;W.forEach(w=>{exp+=(w.certs_expiring_30d||0);exd+=(w.certs_expired||0);});
+    if($('ph-kpi-certs'))$('ph-kpi-certs').textContent=String(exp+exd);
+    if($('ph-kpi-certs-sub'))$('ph-kpi-certs-sub').textContent=exd?`${exp} soon · ${exd} expired`:'incl. expired';
+    const active=D.filter(d=>statusOf(d)==='active').length;
+    if($('ph-kpi-active'))$('ph-kpi-active').textContent=String(active);
+    if($('ph-kpi-active-total'))$('ph-kpi-active-total').textContent=String(D.length||(R.drop_count||0));
+    const pct=(R.overall_progress_pct!=null?R.overall_progress_pct:0);
+    if($('ph-kpi-progress'))$('ph-kpi-progress').textContent=pct+'%';
+    if($('ph-kpi-progress-ring'))$('ph-kpi-progress-ring').innerHTML=ringSVG(pct,46,6);
+  }
+
+  function renderActive(D){
+    const body=$('ph-active-body'); if(!body)return;
+    const active=D.filter(d=>statusOf(d)==='active');
+    if(!active.length){body.innerHTML='<div class="ph-empty"><div class="ph-empty-title">No active drops yet</div><div class="ph-empty-sub">Activate drops in the <a href="/dropplan" style="color:#B11E2E;font-weight:700;text-decoration:none;">Drop Plan</a> to see live progress here.</div></div>';return;}
+    const shown=active.slice(0,10);
+    body.innerHTML='<div class="ph-active-grid">'+shown.map(d=>{
+      const pct=(d.progress&&d.progress.pct)||0;
+      const stage=d.current_stage?`Step ${d.current_stage.step_no} · ${esc(d.current_stage.name)}`:'all steps done';
+      return `<div class="ph-drop">${ringSVG(pct,52,7)}<div style="min-width:0;"><div class="ph-drop-label">Drop ${esc(d.sequence_no)}</div><div class="ph-drop-stage">${stage}</div><div class="ph-drop-elev">${esc(d.elevation||'')}</div></div></div>`;
+    }).join('')+'</div>'+(active.length>10?`<div class="ph-more">+ ${active.length-10} more active (showing 10)</div>`:'');
+  }
+
+  function renderDonut(D){
+    const counts={active:0,complete:0,not_started:0};
+    D.forEach(d=>{counts[statusOf(d)]++;});
+    const total=D.length;
+    if($('ph-donut-total'))$('ph-donut-total').textContent=String(total);
+    const legend=$('ph-donut-legend');
+    if(legend)legend.innerHTML=[['Active',counts.active,C.ok],['Complete',counts.complete,C.ink],['Not started',counts.not_started,C.ns]]
+      .map(([l,n,c])=>`<div class="ph-leg"><span class="dot" style="background:${c}"></span>${l}<b>${n}</b></div>`).join('');
+    const cv=$('ph-donut'); if(!cv)return;
+    if(typeof Chart==='undefined'){const w=cv.closest('.ph-donut-wrap'); if(w)w.innerHTML='<div class="ph-empty">chart unavailable</div>'; return;}
+    if(total===0){if(donut){donut.destroy();donut=null;} return;}
+    if(donut)donut.destroy();
+    donut=new Chart(cv,{type:'doughnut',data:{labels:['Active','Complete','Not started'],datasets:[{data:[counts.active,counts.complete,counts.not_started],backgroundColor:[C.ok,C.ink,C.ns],borderWidth:2,borderColor:'#fff'}]},options:{cutout:'68%',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{enabled:true}}}});
+  }
+
+  function renderBar(D){
+    const elevs=['North','West','South','East'];
+    const avg=elevs.map(e=>{const ds=D.filter(d=>d.elevation===e);if(!ds.length)return 0;return Math.round(ds.reduce((a,d)=>a+((d.progress&&d.progress.pct)||0),0)/ds.length);});
+    const note=$('ph-bar-note'); if(note)note.textContent=avg.some(v=>v>0)?'':'No progress logged yet — activate drops to track progress by elevation.';
+    const cv=$('ph-bar'); if(!cv)return;
+    if(typeof Chart==='undefined'){const w=cv.closest('.ph-bar-wrap'); if(w)w.innerHTML='<div class="ph-empty">chart unavailable</div>'; return;}
+    if(bar)bar.destroy();
+    bar=new Chart(cv,{type:'bar',data:{labels:elevs,datasets:[{label:'Avg progress',data:avg,backgroundColor:C.red,borderRadius:4,maxBarThickness:48}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%'}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+'%'}}}}});
+  }
+
+  function renderRoster(onSite){
+    const body=$('ph-roster-body'); if(!body)return;
+    const site=(onSite&&onSite.data)||{workers:[]};
+    const ws=site.workers||[];
+    if(!ws.length){body.innerHTML='<div class="ph-empty"><div class="ph-empty-title">No sign-ins yet today</div><div class="ph-empty-sub">'+fmtMDY(todayLocal())+'</div></div>';return;}
+    const fore=site.foreman?`<div style="font-size:11px;color:#76777E;margin-bottom:8px;">Foreman on site: <span class="ph-wid">${esc(site.foreman.worker_id||'—')}</span></div>`:'';
+    body.innerHTML=fore+'<table class="ph-roster"><thead><tr><th>Worker</th><th>Trade</th><th>In</th><th>Out</th><th>Hrs</th></tr></thead><tbody>'+
+      ws.map(w=>`<tr><td class="ph-wid">${esc(w.worker_id||'—')}</td><td>${esc(w.trade||'—')}</td><td>${esc(w.time_in||'—')}</td><td>${w.time_out?esc(w.time_out):'<span class="ph-stillin">still in</span>'}</td><td>${w.hours!=null?Number(w.hours).toFixed(2):'—'}</td></tr>`).join('')+
+      '</tbody></table>';
+  }
+
+  function renderCerts(workers){
+    const body=$('ph-certs-body'); if(!body)return;
+    const W=(workers&&workers.data)||[];
+    let exp=0,exd=0;W.forEach(w=>{exp+=(w.certs_expiring_30d||0);exd+=(w.certs_expired||0);});
+    body.innerHTML=`<div class="ph-cert-row"><div class="ph-cert-n" style="color:${C.warn}">${exp}</div><div class="ph-cert-l">Expiring &le;30 days</div></div>`+
+      `<div class="ph-cert-row"><div class="ph-cert-n" style="color:${C.red}">${exd}</div><div class="ph-cert-l">Expired</div></div>`+
+      `<div class="ph-cert-foot">${W.length} workers on roster</div>`;
+  }
+
+  function boot(){ load(); setInterval(load, 60000); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
 </script>
 

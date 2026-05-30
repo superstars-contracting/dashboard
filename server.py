@@ -56,16 +56,31 @@ def index():
     return send_file(str(DASHBOARD_PATH))
 
 
+def _serve_dashboard_no_store():
+    """Serve the per-project dashboard (Project Health surface) with NO-STORE
+    and NO ETag/conditional handling (#208, applying the #205 cache lesson
+    proactively). /projects/<code> and /dashboard do not end in .html, so the
+    global no-cache after_request hook does not match them — set the headers
+    here and disable conditional/etag so a stale validator can never 304 old
+    markup/JS back. The visible build-version stamp in the page footer is how
+    the operator confirms which build is live."""
+    resp = send_file(str(DASHBOARD_PATH), conditional=False, etag=False, max_age=0)
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
+
+
 @app.route('/projects/<project_code>')
 def project_dashboard(project_code):
     """Project-specific dashboard. Project context passed via URL → JS reads it from location.pathname."""
-    return send_file(str(DASHBOARD_PATH))
+    return _serve_dashboard_no_store()
 
 
 @app.route('/dashboard')
 def legacy_dashboard():
     """Legacy redirect — old URLs land on the project dashboard for the default project."""
-    return send_file(str(DASHBOARD_PATH))
+    return _serve_dashboard_no_store()
 
 
 # Logging setup
