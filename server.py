@@ -83,6 +83,129 @@ def legacy_dashboard():
     return _serve_dashboard_no_store()
 
 
+# ============= DASHBOARD WIDGET LAYOUTS (#209) — generic, per-user =============
+# Drag/resize positions for a user's widgets on a given page. GENERIC: page_key
+# lets Project Health, the company console, and future surfaces share one table
+# + one JS module. PII discipline: layout_json is sanitized to a list of
+# {id,x,y,w,h} — widget ids + grid positions ONLY, never names/rates/PINs.
+_LAYOUT_PAGE_KEYS = {'project_health', 'company_console'}
+_LAYOUT_WIDGET_IDS = {
+    'project_health': {'active-drops', 'drops-status', 'progress-elevation',
+                       'weather', 'roster', 'certs'},
+    # company_console widgets enumerated when that surface adopts this (reuse).
+}
+
+
+def _sanitize_layout(page_key, raw):
+    """Coerce arbitrary input into a safe layout: a list of {id,x,y,w,h} with
+    integer positions and known widget ids only. Returns None if not a list.
+    Unknown ids are dropped so layout_json can never carry injected data."""
+    if not isinstance(raw, list):
+        return None
+    allowed = _LAYOUT_WIDGET_IDS.get(page_key)
+
+    def _int(v, lo, hi, dflt):
+        try:
+            n = int(v)
+        except (TypeError, ValueError):
+            return dflt
+        return max(lo, min(hi, n))
+
+    out = []
+    seen = set()
+    for it in raw:
+        if not isinstance(it, dict):
+            continue
+        wid = it.get('id')
+        if not isinstance(wid, str) or wid in seen:
+            continue
+        if allowed is not None and wid not in allowed:
+            continue
+        seen.add(wid)
+        out.append({
+            'id': wid,
+            'x': _int(it.get('x'), 0, 11, 0),
+            'y': _int(it.get('y'), 0, 999, 0),
+            'w': _int(it.get('w'), 1, 12, 4),
+            'h': _int(it.get('h'), 1, 50, 2),
+        })
+    return out
+
+
+@app.route('/api/dashboard/layout', methods=['GET'])
+def api_dashboard_layout_get():
+    """Return THIS user's saved layout for page_key, or data:null (use default)."""
+    user = current_user()
+    if not user:
+        return jsonify({"error": "auth required"}), 401
+    page_key = request.args.get('page_key', '')
+    if page_key not in _LAYOUT_PAGE_KEYS:
+        return jsonify({"error": "unknown page_key"}), 400
+    conn = db()
+    try:
+        row = conn.execute(
+            "SELECT layout_json, updated_at FROM dashboard_layouts "
+            "WHERE user_id=? AND page_key=?", (user['id'], page_key)).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return response_wrapper(None)
+    try:
+        layout = json.loads(row['layout_json'])
+    except (ValueError, TypeError):
+        layout = None
+    return response_wrapper({"page_key": page_key, "layout": layout,
+                             "updated_at": row['updated_at']})
+
+
+@app.route('/api/dashboard/layout', methods=['PUT', 'POST'])
+def api_dashboard_layout_save():
+    """Upsert THIS user's layout for page_key (one row per user+page)."""
+    user = current_user()
+    if not user:
+        return jsonify({"error": "auth required"}), 401
+    body = request.get_json(silent=True) or {}
+    page_key = body.get('page_key', '')
+    if page_key not in _LAYOUT_PAGE_KEYS:
+        return jsonify({"error": "unknown page_key"}), 400
+    layout = _sanitize_layout(page_key, body.get('layout'))
+    if layout is None:
+        return jsonify({"error": "layout must be a list of {id,x,y,w,h}"}), 400
+    conn = db()
+    try:
+        conn.execute(
+            "INSERT INTO dashboard_layouts (user_id, page_key, layout_json, updated_at) "
+            "VALUES (?,?,?, CURRENT_TIMESTAMP) "
+            "ON CONFLICT(user_id, page_key) DO UPDATE SET "
+            "layout_json=excluded.layout_json, updated_at=CURRENT_TIMESTAMP",
+            (user['id'], page_key, json.dumps(layout)))
+        conn.commit()
+    finally:
+        conn.close()
+    return response_wrapper({"page_key": page_key, "saved": len(layout)})
+
+
+@app.route('/api/dashboard/layout', methods=['DELETE'])
+def api_dashboard_layout_reset():
+    """Delete THIS user's saved layout for page_key — page reverts to default."""
+    user = current_user()
+    if not user:
+        return jsonify({"error": "auth required"}), 401
+    page_key = request.args.get('page_key', '')
+    if page_key not in _LAYOUT_PAGE_KEYS:
+        return jsonify({"error": "unknown page_key"}), 400
+    conn = db()
+    try:
+        cur = conn.execute(
+            "DELETE FROM dashboard_layouts WHERE user_id=? AND page_key=?",
+            (user['id'], page_key))
+        conn.commit()
+        deleted = cur.rowcount
+    finally:
+        conn.close()
+    return response_wrapper({"page_key": page_key, "reset": True, "deleted": deleted})
+
+
 # Logging setup
 logging.basicConfig(
     filename=str(SCRIPT_DIR / "server.log"),

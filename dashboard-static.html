@@ -9,6 +9,11 @@
      so the field-reachable (Tailscale, offline) dashboard still renders charts.
      A CDN would blank the charts offline — the exact failure to avoid. -->
 <script src="/files/static/vendor/chart.umd.min.js"></script>
+<!-- GridStack 10.3.1 vendored LOCALLY (#209) — drag/resize + layout serialization.
+     Same offline reasoning as Chart.js: field devices are offline on Tailscale,
+     a CDN would fail and the grid would not initialize. -->
+<link rel="stylesheet" href="/files/static/vendor/gridstack.min.css">
+<script src="/files/static/vendor/gridstack-all.js"></script>
 <style>
   /* ===== Project Health redesign (#208) — new design language, modular DRAG-READY widgets ===== */
   .ph-wrap { color:#14161C; }
@@ -85,6 +90,20 @@
 
   /* build-version stamp */
   .ph-build { margin:30px 0 8px; padding-top:14px; border-top:1px solid #E8E4DD; color:#76777E; font-size:11px; letter-spacing:.04em; }
+
+  /* ===== GridStack integration (#209) — real drag + resize, per-user layouts ===== */
+  .ph-gridbar { display:flex; align-items:center; gap:12px; margin:8px 0 4px; }
+  .ph-reset { background:#fff; color:#54505A; border:1px solid #E8E4DD; border-radius:8px; padding:7px 12px; font-size:12px; font-weight:700; cursor:pointer; }
+  .ph-reset:hover { border-color:#B11E2E; color:#B11E2E; }
+  .ph-gridbar-hint { font-size:11px; color:#76777E; }
+  .grid-stack { background:transparent; }
+  /* the .ph-widget card IS the visible surface; the grid item-content is just its box */
+  .grid-stack-item-content { background:transparent; border:0; padding:0; overflow:hidden; display:flex; }
+  .grid-stack-item-content > .ph-widget { width:100%; height:100%; overflow:auto; }
+  .ph-grip { cursor:grab; }
+  .grid-stack-item.ui-draggable-dragging { opacity:.9; }
+  .grid-stack-item.ui-draggable-dragging .ph-grip { cursor:grabbing; }
+  .grid-stack-item > .ui-resizable-handle { z-index:6; }
 </style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Superstars Contracting - Project Console</title>
@@ -662,52 +681,84 @@
             <div class="ph-kpi"><span id="ph-kpi-progress-ring"></span><div><div class="ph-kpi-k">Overall progress</div><div class="ph-kpi-v" id="ph-kpi-progress">—</div><div class="ph-kpi-sub">drop plan</div></div></div>
           </div>
 
-          <!-- WIDGET GRID — each .ph-widget is a self-contained, drag-ready unit -->
-          <div class="ph-grid">
-            <section class="ph-widget ph-col-8" data-widget="active-drops">
-              <div class="ph-widget-head"><h3>Active drops</h3><span class="ph-grip" title="drag-ready (drag not enabled yet)">⠿</span></div>
-              <div class="ph-widget-body" id="ph-active-body"><div class="ph-loading">Loading…</div></div>
-            </section>
-
-            <section class="ph-widget ph-col-4" data-widget="drops-status">
-              <div class="ph-widget-head"><h3>Drops by status</h3><span class="ph-grip" title="drag-ready (drag not enabled yet)">⠿</span></div>
-              <div class="ph-widget-body">
-                <div class="ph-donut-wrap"><canvas id="ph-donut"></canvas><div class="ph-donut-center"><div class="n" id="ph-donut-total">—</div><div class="l">drops</div></div></div>
-                <div class="ph-legend" id="ph-donut-legend"></div>
-              </div>
-            </section>
-
-            <section class="ph-widget ph-col-8" data-widget="progress-elevation">
-              <div class="ph-widget-head"><h3>Progress by elevation</h3><span class="ph-grip" title="drag-ready (drag not enabled yet)">⠿</span></div>
-              <div class="ph-widget-body"><div class="ph-bar-wrap"><canvas id="ph-bar"></canvas></div><div id="ph-bar-note" class="ph-empty-sub" style="text-align:center;margin-top:8px;"></div></div>
-            </section>
-
-            <section class="ph-widget ph-col-4" data-widget="weather">
-              <div class="ph-widget-head"><h3>Weather</h3><span class="ph-grip" title="drag-ready (drag not enabled yet)">⠿</span></div>
-              <div class="ph-widget-body">
-                <div style="display:flex;align-items:center;gap:12px;">
-                  <div id="wx-icon" style="width:46px;height:46px;flex-shrink:0;"></div>
-                  <div style="flex:1;min-width:0;"><div class="ph-kpi-v" id="wx-temp" style="font-size:30px;">—°</div><div class="ph-kpi-sub" id="wx-cond">Loading…</div></div>
-                </div>
-                <div style="display:flex;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:1px solid #F1EEE8;font-size:11px;color:#76777E;">
-                  <span><strong style="color:#14161C;" id="wx-hilo">—°/—°</strong> hi/lo</span>
-                  <span><strong style="color:#14161C;" id="wx-wind">— mph</strong> <span id="wx-wind-dir">—</span></span>
-                </div>
-              </div>
-            </section>
-
-            <section class="ph-widget ph-col-8" data-widget="roster">
-              <div class="ph-widget-head"><h3>Today on site · roster (W-#### only)</h3><span class="ph-grip" title="drag-ready (drag not enabled yet)">⠿</span></div>
-              <div class="ph-widget-body" id="ph-roster-body"><div class="ph-loading">Loading…</div></div>
-            </section>
-
-            <section class="ph-widget ph-col-4" data-widget="certs">
-              <div class="ph-widget-head"><h3>Cert alerts</h3><span class="ph-grip" title="drag-ready (drag not enabled yet)">⠿</span></div>
-              <div class="ph-widget-body" id="ph-certs-body"><div class="ph-loading">Loading…</div></div>
-            </section>
+          <!-- layout controls -->
+          <div class="ph-gridbar">
+            <button class="ph-reset" id="ph-reset-layout" type="button" title="Revert to the default layout">↺ Reset layout</button>
+            <span class="ph-gridbar-hint" id="ph-layout-hint">Drag a widget by its ⠿ handle; drag an edge/corner to resize — your layout saves automatically.</span>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #208 · 2026-05-30 · project health redesign</div>
+          <!-- WIDGET GRID — GridStack: each widget is a draggable+resizable grid item.
+               The .ph-widget inside is the same self-contained Batch D unit (#208);
+               gs-id is the stable widget key the saved layout maps to. -->
+          <div class="grid-stack" id="ph-grid">
+            <div class="grid-stack-item" gs-id="active-drops" gs-x="0" gs-y="0" gs-w="8" gs-h="3">
+              <div class="grid-stack-item-content">
+                <section class="ph-widget" data-widget="active-drops">
+                  <div class="ph-widget-head"><h3>Active drops</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
+                  <div class="ph-widget-body" id="ph-active-body"><div class="ph-loading">Loading…</div></div>
+                </section>
+              </div>
+            </div>
+
+            <div class="grid-stack-item" gs-id="drops-status" gs-x="8" gs-y="0" gs-w="4" gs-h="4">
+              <div class="grid-stack-item-content">
+                <section class="ph-widget" data-widget="drops-status">
+                  <div class="ph-widget-head"><h3>Drops by status</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
+                  <div class="ph-widget-body">
+                    <div class="ph-donut-wrap"><canvas id="ph-donut"></canvas><div class="ph-donut-center"><div class="n" id="ph-donut-total">—</div><div class="l">drops</div></div></div>
+                    <div class="ph-legend" id="ph-donut-legend"></div>
+                  </div>
+                </section>
+              </div>
+            </div>
+
+            <div class="grid-stack-item" gs-id="progress-elevation" gs-x="0" gs-y="3" gs-w="8" gs-h="4">
+              <div class="grid-stack-item-content">
+                <section class="ph-widget" data-widget="progress-elevation">
+                  <div class="ph-widget-head"><h3>Progress by elevation</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
+                  <div class="ph-widget-body"><div class="ph-bar-wrap"><canvas id="ph-bar"></canvas></div><div id="ph-bar-note" class="ph-empty-sub" style="text-align:center;margin-top:8px;"></div></div>
+                </section>
+              </div>
+            </div>
+
+            <div class="grid-stack-item" gs-id="weather" gs-x="8" gs-y="4" gs-w="4" gs-h="2">
+              <div class="grid-stack-item-content">
+                <section class="ph-widget" data-widget="weather">
+                  <div class="ph-widget-head"><h3>Weather</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
+                  <div class="ph-widget-body">
+                    <div style="display:flex;align-items:center;gap:12px;">
+                      <div id="wx-icon" style="width:46px;height:46px;flex-shrink:0;"></div>
+                      <div style="flex:1;min-width:0;"><div class="ph-kpi-v" id="wx-temp" style="font-size:30px;">—°</div><div class="ph-kpi-sub" id="wx-cond">Loading…</div></div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:1px solid #F1EEE8;font-size:11px;color:#76777E;">
+                      <span><strong style="color:#14161C;" id="wx-hilo">—°/—°</strong> hi/lo</span>
+                      <span><strong style="color:#14161C;" id="wx-wind">— mph</strong> <span id="wx-wind-dir">—</span></span>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
+
+            <div class="grid-stack-item" gs-id="roster" gs-x="0" gs-y="7" gs-w="8" gs-h="3">
+              <div class="grid-stack-item-content">
+                <section class="ph-widget" data-widget="roster">
+                  <div class="ph-widget-head"><h3>Today on site · roster (W-#### only)</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
+                  <div class="ph-widget-body" id="ph-roster-body"><div class="ph-loading">Loading…</div></div>
+                </section>
+              </div>
+            </div>
+
+            <div class="grid-stack-item" gs-id="certs" gs-x="8" gs-y="6" gs-w="4" gs-h="2">
+              <div class="grid-stack-item-content">
+                <section class="ph-widget" data-widget="certs">
+                  <div class="ph-widget-head"><h3>Cert alerts</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
+                  <div class="ph-widget-body" id="ph-certs-body"><div class="ph-loading">Loading…</div></div>
+                </section>
+              </div>
+            </div>
+          </div>
+
+          <div class="ph-build" id="ph-build-stamp">build #209 · 2026-05-30 · draggable + resizable widgets, saved layouts</div>
         </div>
       </section>
 
@@ -4686,7 +4737,50 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
       `<div class="ph-cert-foot">${W.length} workers on roster</div>`;
   }
 
-  function boot(){ load(); setInterval(load, 60000); }
+  // ---- GridStack: real drag + resize + per-user saved layouts (#209) ----
+  // GENERIC: PAGE_KEY parameterizes everything, so the company console reuses
+  // this same module + the dashboard_layouts table by swapping PAGE_KEY + ids.
+  // Persisted layout = [{id,x,y,w,h}] — widget ids + positions only (no PII).
+  const PAGE_KEY='project_health';
+  const DEFAULT_LAYOUT=[
+    {id:'active-drops',x:0,y:0,w:8,h:3},
+    {id:'drops-status',x:8,y:0,w:4,h:4},
+    {id:'progress-elevation',x:0,y:3,w:8,h:4},
+    {id:'weather',x:8,y:4,w:4,h:2},
+    {id:'roster',x:0,y:7,w:8,h:3},
+    {id:'certs',x:8,y:6,w:4,h:2},
+  ];
+  let grid=null, saveTimer=null, suppressSave=false;
+  function hint(t){ const h=$('ph-layout-hint'); if(h)h.textContent=t; }
+  function resizeCharts(){ try{ if(donut)donut.resize(); if(bar)bar.resize(); }catch(e){} }
+  function serializeLayout(){ return grid.save(false).map(n=>({id:n.id,x:n.x,y:n.y,w:n.w,h:n.h})); }
+  async function saveLayout(){
+    try{
+      await fetch('/api/dashboard/layout',{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({page_key:PAGE_KEY,layout:serializeLayout()})});
+      hint('Layout saved · '+fmtMDY(todayLocal()));
+    }catch(e){ hint('Save failed — will retry on next move'); }
+  }
+  function scheduleSave(){ if(suppressSave)return; clearTimeout(saveTimer); saveTimer=setTimeout(saveLayout,500); }
+  function applyLayout(layout){ suppressSave=true; grid.load(layout); setTimeout(()=>{suppressSave=false; resizeCharts();},60); }
+  async function loadSavedLayout(){
+    const j=await fetch('/api/dashboard/layout?page_key='+PAGE_KEY,{credentials:'include'}).then(r=>r.ok?r.json():null).catch(()=>null);
+    const layout=j&&j.data&&j.data.layout;
+    if(Array.isArray(layout)&&layout.length){ applyLayout(layout); hint('Your saved layout restored'); return true; }
+    hint('Default layout'); return false;
+  }
+  async function resetLayout(){
+    try{ await fetch('/api/dashboard/layout?page_key='+PAGE_KEY,{method:'DELETE',credentials:'include'}); }catch(e){}
+    applyLayout(DEFAULT_LAYOUT); hint('Reset to default layout');
+  }
+  function initGrid(){
+    if(typeof GridStack==='undefined'){ hint('Drag library unavailable — layout is fixed'); return; }
+    grid=GridStack.init({column:12,cellHeight:88,margin:8,handle:'.ph-grip',draggable:{handle:'.ph-grip'},resizable:{handles:'e,se,s,sw,w'},float:false});
+    grid.on('change',()=>{ scheduleSave(); resizeCharts(); });
+    const rb=$('ph-reset-layout'); if(rb)rb.addEventListener('click',resetLayout);
+    loadSavedLayout();
+  }
+
+  function boot(){ initGrid(); load(); setInterval(load, 60000); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
 </script>

@@ -116,6 +116,14 @@ TABLES_TO_SNAPSHOT: list[Tuple[str, list[str], list[str]]] = [
     ("quantity_entries", ["entry_id", "drop_id"], ["quantity", "logged_on"]),
     ("expense_entries", ["entry_id", "drop_id"], ["category", "logged_on"]),
     ("paint_phases", ["phase_id", "project_code", "elevation"], ["status"]),
+    # dashboard_layouts (#209): per-user widget drag/resize positions. Same
+    # backstop logic as the drop-plan tables — the CRUD smoke subprocess never
+    # writes layouts, so within a meta-smoke run before==after and this reports
+    # "clean". Identity = (user_id, page_key); value_cols=[] (presence only) so
+    # benign updated_at churn never false-flags. layout_json holds widget ids +
+    # positions ONLY (no PII), so it is not serialized here. Surfaces immediately
+    # if any FUTURE smoke writes a layout row for a real user during the CRUD run.
+    ("dashboard_layouts", ["user_id", "page_key"], []),
 ]
 
 
