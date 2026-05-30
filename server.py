@@ -49,26 +49,28 @@ ALLOWED_DOC_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.h
 
 @app.route('/')
 def index():
-    """Company Overview Console — top-level entry point."""
-    if COMPANY_DASHBOARD_PATH.exists():
-        return send_file(str(COMPANY_DASHBOARD_PATH))
-    # Fallback to project dashboard if company console not yet generated
-    return send_file(str(DASHBOARD_PATH))
+    """Company Overview Console — top-level entry point (#210 redesign)."""
+    page = COMPANY_DASHBOARD_PATH if COMPANY_DASHBOARD_PATH.exists() else DASHBOARD_PATH
+    return _serve_html_no_store(page)
 
 
-def _serve_dashboard_no_store():
-    """Serve the per-project dashboard (Project Health surface) with NO-STORE
-    and NO ETag/conditional handling (#208, applying the #205 cache lesson
-    proactively). /projects/<code> and /dashboard do not end in .html, so the
-    global no-cache after_request hook does not match them — set the headers
-    here and disable conditional/etag so a stale validator can never 304 old
-    markup/JS back. The visible build-version stamp in the page footer is how
-    the operator confirms which build is live."""
-    resp = send_file(str(DASHBOARD_PATH), conditional=False, etag=False, max_age=0)
+def _serve_html_no_store(path):
+    """Serve an HTML page NO-STORE with NO ETag/conditional handling (#205 cache
+    lesson, generalized in #210 for the company console). `/` and /projects/<code>
+    do not end in .html, so the global no-cache after_request hook does not also
+    strip ETag — disable conditional/etag here so a stale validator can never 304
+    old markup/JS back. The visible build-version stamp tells the operator which
+    build is live."""
+    resp = send_file(str(path), conditional=False, etag=False, max_age=0)
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     resp.headers['Pragma'] = 'no-cache'
     resp.headers['Expires'] = '0'
     return resp
+
+
+def _serve_dashboard_no_store():
+    """Project Health surface (per-project dashboard), served no-store."""
+    return _serve_html_no_store(DASHBOARD_PATH)
 
 
 @app.route('/projects/<project_code>')
@@ -92,7 +94,8 @@ _LAYOUT_PAGE_KEYS = {'project_health', 'company_console'}
 _LAYOUT_WIDGET_IDS = {
     'project_health': {'active-drops', 'drops-status', 'progress-elevation',
                        'weather', 'roster', 'certs'},
-    # company_console widgets enumerated when that surface adopts this (reuse).
+    'company_console': {'active-project', 'compliance', 'on-site',
+                        'quick-actions', 'recent-activity'},  # #210 reuse
 }
 
 
@@ -204,6 +207,43 @@ def api_dashboard_layout_reset():
     finally:
         conn.close()
     return response_wrapper({"page_key": page_key, "reset": True, "deleted": deleted})
+
+
+# Comp-sensitive actions are kept OFF the general activity feed (the audit rows
+# still exist for the dedicated comp surfaces). PII/comp discipline.
+_ACTIVITY_DENY_ACTIONS = {'rate_change', 'hours_correction'}
+
+
+@app.route('/api/activity/recent', methods=['GET'])
+def api_activity_recent():
+    """Recent audit-log events for the company console activity feed. PII-SAFE:
+    returns action + target_type + target_id (codes/ids — W-####/E-#####/project/
+    drop codes, NEVER names) + actor_role + timestamp ONLY. before_json/after_json
+    (which can hold row snapshots / comp values) and actor_user_id are NEVER
+    serialized. Comp-sensitive actions are filtered out. Requires a logged-in user."""
+    if not current_user():
+        return jsonify({"error": "auth required"}), 401
+    try:
+        limit = max(1, min(50, int(request.args.get('limit', 12))))
+    except (TypeError, ValueError):
+        limit = 12
+    conn = db()
+    try:
+        rows = conn.execute(
+            "SELECT action, target_type, target_id, actor_role, created_at "
+            "FROM audit_log ORDER BY id DESC LIMIT 200").fetchall()
+    finally:
+        conn.close()
+    out = []
+    for r in rows:
+        if r['action'] in _ACTIVITY_DENY_ACTIONS:
+            continue
+        out.append({'action': r['action'], 'target_type': r['target_type'],
+                    'target_id': r['target_id'], 'actor_role': r['actor_role'],
+                    'created_at': r['created_at']})
+        if len(out) >= limit:
+            break
+    return response_wrapper(out)
 
 
 # Logging setup

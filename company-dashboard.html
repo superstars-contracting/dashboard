@@ -5,6 +5,13 @@
 <link rel="stylesheet" href="/files/static/fonts/typography.css">
 <script src="/files/static/js/datepicker.js"></script>
 <script src="/files/static/js/timepicker.js"></script>
+<!-- #210 company console redesign — REUSES the #209 drag framework:
+     vendored GridStack (offline-safe, no CDN) + the shared widget design language
+     + the shared per-user layout helper (DashLayout → /api/dashboard/layout). -->
+<link rel="stylesheet" href="/files/static/vendor/gridstack.min.css">
+<link rel="stylesheet" href="/files/static/css/widgets.css">
+<script src="/files/static/vendor/gridstack-all.js"></script>
+<script src="/files/static/js/dash_layout.js" defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Superstars Contracting · Office Console</title>
 <style>
@@ -198,27 +205,86 @@
 
 <div class="container">
 
-  <!-- Top metrics -->
-  <div class="metrics">
-    <div class="metric">
-      <div class="metric-label" data-i18n="m-active-projects">Active Projects</div>
-      <div class="metric-value" id="m-projects">—</div>
-      <div class="metric-sub"><span id="m-projects-all">0</span> <span data-i18n="m-total-ever">total ever</span></div>
+  <!-- ===== #210 redesigned Company Overview — new design language + draggable widgets ===== -->
+  <!-- Hidden stubs so the legacy loadMetrics() (try/catch'd) never null-throws;
+       the live values are shown by the redesigned KPI tiles + widgets below. -->
+  <div style="display:none" aria-hidden="true">
+    <span id="m-projects"></span><span id="m-projects-all"></span><span id="m-workers"></span>
+    <span id="m-certs-valid"></span><span id="m-certs-total"></span><span id="m-certs-expiring"></span><span id="m-certs-expired"></span>
+  </div>
+
+  <div class="cc-overview-head" style="margin:6px 0 2px;">
+    <div style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:.12em;font-weight:700;">Company Overview</div>
+    <h1 style="font-size:24px;margin:2px 0;">Superstars Contracting</h1>
+  </div>
+
+  <!-- KPI tiles (live) -->
+  <div class="ph-kpis" data-widget="kpis">
+    <div class="ph-kpi"><div><div class="ph-kpi-k">Active projects</div><div class="ph-kpi-v" id="cc-kpi-projects">—</div><div class="ph-kpi-sub" id="cc-kpi-projects-sub">&nbsp;</div></div></div>
+    <div class="ph-kpi"><div><div class="ph-kpi-k">Workers</div><div class="ph-kpi-v" id="cc-kpi-workers">—</div><div class="ph-kpi-sub">in the system</div></div></div>
+    <div class="ph-kpi"><div><div class="ph-kpi-k">Active drops</div><div class="ph-kpi-v" id="cc-kpi-drops">—</div><div class="ph-kpi-sub">of <span id="cc-kpi-drops-total">—</span> drops</div></div></div>
+    <div class="ph-kpi"><div><div class="ph-kpi-k">Certs expiring ≤30d</div><div class="ph-kpi-v" id="cc-kpi-certs">—</div><div class="ph-kpi-sub" id="cc-kpi-certs-sub">incl. expired</div></div></div>
+  </div>
+
+  <!-- layout controls -->
+  <div class="ph-gridbar">
+    <button class="ph-reset" id="cc-reset-layout" type="button" title="Revert to the default layout">↺ Reset layout</button>
+    <span class="ph-gridbar-hint" id="cc-layout-hint">Drag a widget by its ⠿ handle; drag an edge/corner to resize — your layout saves automatically.</span>
+  </div>
+
+  <!-- WIDGET GRID — GridStack (reuses #209 framework, page_key=company_console) -->
+  <div class="grid-stack" id="cc-grid">
+    <div class="grid-stack-item" gs-id="active-project" gs-x="0" gs-y="0" gs-w="5" gs-h="3">
+      <div class="grid-stack-item-content">
+        <section class="ph-widget" data-widget="active-project">
+          <div class="ph-widget-head"><h3>Active project</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
+          <div class="ph-widget-body" id="cc-active-body"><div class="ph-loading">Loading…</div></div>
+        </section>
+      </div>
     </div>
-    <div class="metric">
-      <div class="metric-label" data-i18n="m-workforce">Workforce</div>
-      <div class="metric-value" id="m-workers">—</div>
-      <div class="metric-sub" data-i18n="m-workers-sub">workers in the system</div>
+
+    <div class="grid-stack-item" gs-id="compliance" gs-x="5" gs-y="0" gs-w="4" gs-h="3">
+      <div class="grid-stack-item-content">
+        <section class="ph-widget" data-widget="compliance">
+          <div class="ph-widget-head"><h3>Compliance</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
+          <div class="ph-widget-body" id="cc-compliance-body"><div class="ph-loading">Loading…</div></div>
+        </section>
+      </div>
     </div>
-    <div class="metric">
-      <div class="metric-label" data-i18n="m-valid-certs">Valid Certs</div>
-      <div class="metric-value ok" id="m-certs-valid">—</div>
-      <div class="metric-sub" id="m-certs-total"><span data-i18n="m-of">of</span> 0 <span data-i18n="m-total">total</span></div>
+
+    <div class="grid-stack-item" gs-id="on-site" gs-x="9" gs-y="0" gs-w="3" gs-h="4">
+      <div class="grid-stack-item-content">
+        <section class="ph-widget" data-widget="on-site">
+          <div class="ph-widget-head"><h3>On site today · W-#### only</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
+          <div class="ph-widget-body" id="cc-onsite-body"><div class="ph-loading">Loading…</div></div>
+        </section>
+      </div>
     </div>
-    <div class="metric">
-      <div class="metric-label" data-i18n="m-cert-alerts">Cert Alerts</div>
-      <div class="metric-value warn" id="m-certs-expiring">—</div>
-      <div class="metric-sub"><span id="m-certs-expired">0</span> <span data-i18n="m-already-expired">already expired</span></div>
+
+    <div class="grid-stack-item" gs-id="quick-actions" gs-x="0" gs-y="3" gs-w="5" gs-h="2">
+      <div class="grid-stack-item-content">
+        <section class="ph-widget" data-widget="quick-actions">
+          <div class="ph-widget-head"><h3>Quick actions</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
+          <div class="ph-widget-body">
+            <div class="cc-actions">
+              <a class="cc-action" href="/projects/FR-BX-001">Open project</a>
+              <a class="cc-action" href="/dropplan">Drop Plan</a>
+              <a class="cc-action" href="/projects/FR-BX-001#daily-report">New DCR</a>
+              <a class="cc-action" href="/rfi_submission_form.html">Submit RFI</a>
+              <a class="cc-action" id="cc-act-workforce" href="#">Workforce</a>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="grid-stack-item" gs-id="recent-activity" gs-x="5" gs-y="3" gs-w="7" gs-h="3">
+      <div class="grid-stack-item-content">
+        <section class="ph-widget" data-widget="recent-activity">
+          <div class="ph-widget-head"><h3>Recent activity</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
+          <div class="ph-widget-body" id="cc-activity-body"><div class="ph-loading">Loading…</div></div>
+        </section>
+      </div>
     </div>
   </div>
 
@@ -3478,6 +3544,140 @@ applyLanguage();
   document.addEventListener('ssc:user-loaded', (e) => _maybeRevealAdminTab(e.detail));
   // Late-arrival case: if auth_menu already fired before we hooked in.
   if (window.__SSC_USER) _maybeRevealAdminTab(window.__SSC_USER);
+})();
+</script>
+
+<div class="container"><div class="ph-build" id="cc-build-stamp">build #210 · 2026-05-30 · company console redesign + draggable widgets</div></div>
+
+<script>
+/* ===== Company console widgets (#210) — live data + reused #209 drag framework.
+   Each render* owns one .ph-widget; clean empty states, never blank/crash. SVG
+   rings (no Chart.js needed here). Drag/resize/persistence via the shared
+   DashLayout helper (page_key='company_console'). PII-safe: roster + activity
+   show codes only (W-####, drop/project codes), never names. ===== */
+(function(){
+  const $=(id)=>document.getElementById(id);
+  const C={red:'#B11E2E',ok:'#2F7C57',ink:'#14161C',mute:'#76777E',track:'#EDEAE3',warn:'#B68838'};
+  const PROJECT='FR-BX-001';
+  const DEFAULT_LAYOUT=[
+    {id:'active-project',x:0,y:0,w:5,h:3},
+    {id:'compliance',x:5,y:0,w:4,h:3},
+    {id:'on-site',x:9,y:0,w:3,h:4},
+    {id:'quick-actions',x:0,y:3,w:5,h:2},
+    {id:'recent-activity',x:5,y:3,w:7,h:3},
+  ];
+  const ACTION_LABELS={dropplan_stage_update:'Drop stage updated',dropplan_drop_update:'Drop updated',dropplan_quantity_add:'Patch added',dropplan_quantity_edit:'Patch edited',dropplan_quantity_delete:'Patch removed',dropplan_reset:'Drop plan reset',cof_issue:'CoF card issued',cof_issue_override:'CoF issued (override)',cof_metadata_refresh:'CoF metadata refresh',company_id_issue:'Company ID issued',face_photo_restore:'Photo restored',pin_backfill:'PIN backfilled',signin_operator_insert:'Sign-in recorded'};
+  const esc=(s)=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  function todayLocal(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function fmtMDY(iso){if(!iso)return '';const p=String(iso).slice(0,10).split('-');return p.length===3?`${p[1]}/${p[2]}/${p[0]}`:iso;}
+  function ringSVG(pct,size,stroke){const r=(size-stroke)/2,cx=size/2,Ci=2*Math.PI*r,p=Math.max(0,Math.min(100,Math.round(pct||0))),arc=p/100*Ci;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${C.track}" stroke-width="${stroke}"/><circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${C.ok}" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${arc.toFixed(2)} ${(Ci-arc).toFixed(2)}" transform="rotate(-90 ${cx} ${cx})"/><text x="${cx}" y="${cx}" dy="0.35em" text-anchor="middle" style="font-size:${Math.round(size*0.3)}px;font-weight:800;fill:${C.ink}">${p}%</text></svg>`;}
+  function statusOf(d){const lc=(d.lifecycle||'');if(lc==='not_started')return 'not_started';const pct=(d.progress&&d.progress.pct)||0;if(pct>=100||/complete|closed|done/.test(lc))return 'complete';return 'active';}
+  const jget=(u)=>fetch(u,{credentials:'include'}).then(r=>r.ok?r.json():null).catch(()=>null);
+
+  async function load(){
+    const t=todayLocal();
+    const [summary,projects,rollup,drops,onSite,compliance,activity]=await Promise.all([
+      jget('/api/company/summary'),
+      jget('/api/projects'),
+      jget(`/api/dropplan/projects/${PROJECT}/rollup`),
+      jget(`/api/dropplan/projects/${PROJECT}/drops`),
+      jget(`/api/projects/${PROJECT}/on-site?date=${t}`),
+      jget('/api/compliance/summary'),
+      jget('/api/activity/recent?limit=12'),
+    ]);
+    const S=(summary&&summary.data)||{}, D=(drops&&drops.data)||[], R=(rollup&&rollup.data)||{};
+    try{ renderKpis(S,D,R); }catch(e){ console.warn('[CC] kpis',e); }
+    try{ renderActiveProject(projects,R,D); }catch(e){ console.warn('[CC] active',e); }
+    try{ renderCompliance(S,compliance); }catch(e){ console.warn('[CC] compliance',e); }
+    try{ renderOnSite(onSite); }catch(e){ console.warn('[CC] onsite',e); }
+    try{ renderActivity(activity); }catch(e){ console.warn('[CC] activity',e); }
+  }
+
+  function renderKpis(S,D,R){
+    const certs=S.certs||{};
+    if($('cc-kpi-projects'))$('cc-kpi-projects').textContent=(S.active_projects!=null?S.active_projects:'—');
+    if($('cc-kpi-projects-sub'))$('cc-kpi-projects-sub').textContent=(S.all_projects!=null?S.all_projects+' total ever':' ');
+    if($('cc-kpi-workers'))$('cc-kpi-workers').textContent=(S.total_workers!=null?S.total_workers:'—');
+    const active=D.filter(d=>statusOf(d)==='active').length;
+    if($('cc-kpi-drops'))$('cc-kpi-drops').textContent=String(active);
+    if($('cc-kpi-drops-total'))$('cc-kpi-drops-total').textContent=String(D.length||(R.drop_count||0));
+    if($('cc-kpi-certs'))$('cc-kpi-certs').textContent=String(certs.expiring_30d!=null?certs.expiring_30d:'—');
+    if($('cc-kpi-certs-sub'))$('cc-kpi-certs-sub').textContent=(certs.expired?certs.expired+' already expired':'incl. expired');
+  }
+
+  function renderActiveProject(projects,R,D){
+    const body=$('cc-active-body'); if(!body)return;
+    const list=(projects&&projects.data)||[];
+    const p=list.find(x=>x.project_code===PROJECT)||{};
+    const pct=(R.overall_progress_pct!=null?R.overall_progress_pct:0);
+    const dropsN=(R.drop_count!=null?R.drop_count:D.length);
+    const active=D.filter(d=>statusOf(d)==='active').length;
+    body.innerHTML=`<div class="cc-active">
+      ${ringSVG(pct,72,8)}
+      <div class="cc-active-meta">
+        <div class="cc-active-name">${esc(p.name||'890 E 135th St')}</div>
+        <div class="cc-active-client">Compass Point, LLC</div>
+        <div class="cc-active-sub">${esc(p.address||'890 E 135th Street')} · ${esc(PROJECT)}</div>
+        <div class="cc-active-sub"><b>${dropsN}</b> drops · <b>${active}</b> active</div>
+        <a class="cc-open" href="/projects/${encodeURIComponent(PROJECT)}">Open project →</a>
+      </div></div>`;
+  }
+
+  function renderCompliance(S,compliance){
+    const body=$('cc-compliance-body'); if(!body)return;
+    const certs=S.certs||{};
+    let html=`<div class="cc-rows">
+      <div class="cc-row">Certs expiring ≤30d <b style="color:${C.warn}">${certs.expiring_30d!=null?certs.expiring_30d:'—'}</b></div>
+      <div class="cc-row">Certs expired <b style="color:${C.red}">${certs.expired!=null?certs.expired:'—'}</b></div>`;
+    const arr=(compliance&&compliance.data)||[];
+    const cp=arr.find(x=>x.project_code===PROJECT);
+    if(cp && cp.last_refresh){
+      const lightTxt={green:'No active DOB issues',yellow:'Attention — expiring/recent',red:'Active violation'}[cp.light]||cp.light;
+      html+=`<div class="cc-row">DOB status <span class="cc-light"><span class="cc-dot ${esc(cp.light)}"></span>${esc(lightTxt)}</span></div>
+        <div class="cc-row">Permits open / expiring ≤30d <b>${cp.permits.open} / ${cp.permits.expiring_30d}</b></div>
+        <div class="cc-row">Active violations <b>${cp.violations.active}</b></div></div>
+        <div class="cc-note">DOB pulled ${fmtMDY(cp.last_refresh)} (FISP/permits/violations live).</div>`;
+    } else {
+      // Do NOT fabricate compliance status — label clearly when no pull has run.
+      html+=`<div class="cc-row">DOB status <span class="cc-light"><span class="cc-dot gray"></span>Not yet pulled</span></div></div>
+        <div class="cc-note">FISP / permit / violation data not yet pulled for ${esc(PROJECT)} — run the DOB compliance pull. (Placeholder, not a clean bill.)</div>`;
+    }
+    body.innerHTML=html;
+  }
+
+  function renderOnSite(onSite){
+    const body=$('cc-onsite-body'); if(!body)return;
+    const site=(onSite&&onSite.data)||{workers:[]};
+    const ws=site.workers||[];
+    if(!ws.length){ body.innerHTML='<div class="ph-empty"><div class="ph-empty-title">No one signed in</div><div class="ph-empty-sub">'+fmtMDY(todayLocal())+'</div></div>'; return; }
+    const fore=site.foreman?`<div style="font-size:11px;color:#76777E;margin-bottom:8px;">Foreman: <span class="cc-wid">${esc(site.foreman.worker_id||'—')}</span></div>`:'';
+    body.innerHTML=fore+'<table class="cc-roster"><thead><tr><th>Worker</th><th>In</th><th>Hrs</th></tr></thead><tbody>'+
+      ws.map(w=>`<tr><td class="cc-wid">${esc(w.worker_id||'—')}</td><td>${esc(w.time_in||'—')}</td><td>${w.hours!=null?Number(w.hours).toFixed(1):(w.time_out?'—':'<span class="cc-stillin">in</span>')}</td></tr>`).join('')+
+      '</tbody></table>';
+  }
+
+  function renderActivity(activity){
+    const body=$('cc-activity-body'); if(!body)return;
+    const items=(activity&&activity.data)||[];
+    if(!items.length){ body.innerHTML='<div class="ph-empty"><div class="ph-empty-title">No recent activity</div></div>'; return; }
+    body.innerHTML='<div class="cc-feed">'+items.map(a=>{
+      const label=ACTION_LABELS[a.action]||esc(a.action);
+      const tgt=a.target_id?`<span class="cc-feed-tgt">${esc(a.target_type)} · ${esc(a.target_id)}</span>`:`<span class="cc-feed-tgt">${esc(a.target_type||'')}</span>`;
+      return `<div class="cc-feed-item"><span class="cc-feed-act">${esc(label)}</span>${tgt}<span class="cc-feed-time">${fmtMDY(a.created_at)}</span></div>`;
+    }).join('')+'</div>';
+  }
+
+  function boot(){
+    load();
+    // "Workforce" quick action → switch to the existing Workforce tab (same page)
+    const wf=$('cc-act-workforce');
+    if(wf) wf.addEventListener('click',(e)=>{ e.preventDefault(); const tab=document.querySelector('.nav-tab[data-panel="workforce"]'); if(tab){ tab.click(); tab.scrollIntoView({behavior:'smooth',block:'start'}); } });
+    // reuse the #209 drag framework (vendored GridStack + generic endpoints)
+    if(window.DashLayout) DashLayout.init({pageKey:'company_console', gridSelector:'#cc-grid', resetBtnId:'cc-reset-layout', hintId:'cc-layout-hint', defaultLayout:DEFAULT_LAYOUT});
+    setInterval(load, 60000);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
 </script>
 </body>

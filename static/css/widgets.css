@@ -1,0 +1,78 @@
+/* ===== Shared widget design language (#210) =====
+   Extracted from Project Health #208/#209 so the company console (and future
+   surfaces) reuse ONE source of truth: clean white cards, KPI tiles, circular
+   rings, generous whitespace + the GridStack drag/resize integration.
+   (Project Health still carries an inline copy from #208; a later batch can
+   migrate it to this file.) Class prefix .ph-* = "panel/health" shared kit. */
+
+/* KPI tiles */
+.ph-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin:16px 0 20px; }
+.ph-kpi { background:#fff; border:1px solid #E8E4DD; border-radius:12px; padding:16px 18px; display:flex; align-items:center; gap:14px; }
+.ph-kpi-k { font-size:11px; color:#76777E; text-transform:uppercase; letter-spacing:.06em; }
+.ph-kpi-v { font-weight:800; font-size:26px; line-height:1; margin-top:4px; color:#14161C; }
+.ph-kpi-sub { font-size:11px; color:#76777E; margin-top:4px; }
+
+/* uniform DRAG-READY widget wrapper */
+.grid-stack { background:transparent; }
+.ph-widget { background:#fff; border:1px solid #E8E4DD; border-radius:12px; display:flex; flex-direction:column; overflow:hidden; }
+.ph-widget-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 18px 0; }
+.ph-widget-head h3 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:#54505A; margin:0; }
+.ph-grip { color:#CDC9C0; font-size:15px; line-height:1; cursor:grab; user-select:none; }
+.ph-widget-body { padding:14px 18px 18px; flex:1; }
+
+/* GridStack integration */
+.grid-stack-item-content { background:transparent; border:0; padding:0; overflow:hidden; display:flex; }
+.grid-stack-item-content > .ph-widget { width:100%; height:100%; overflow:auto; }
+.grid-stack-item.ui-draggable-dragging { opacity:.9; }
+.grid-stack-item.ui-draggable-dragging .ph-grip { cursor:grabbing; }
+.grid-stack-item > .ui-resizable-handle { z-index:6; }
+
+/* layout controls */
+.ph-gridbar { display:flex; align-items:center; gap:12px; margin:8px 0 4px; }
+.ph-reset { background:#fff; color:#54505A; border:1px solid #E8E4DD; border-radius:8px; padding:7px 12px; font-size:12px; font-weight:700; cursor:pointer; }
+.ph-reset:hover { border-color:#B11E2E; color:#B11E2E; }
+.ph-gridbar-hint { font-size:11px; color:#76777E; }
+
+/* circular ring */
+.ph-ring text { font-family:inherit; }
+
+/* empty / loading — never blank */
+.ph-empty { text-align:center; padding:22px 12px; color:#76777E; }
+.ph-empty-title { font-weight:700; color:#54505A; font-size:14px; }
+.ph-empty-sub { font-size:12px; margin-top:4px; }
+.ph-loading { color:#76777E; font-size:13px; padding:8px 0; }
+
+/* build-version stamp */
+.ph-build { margin:24px 0 8px; padding-top:14px; border-top:1px solid #E8E4DD; color:#76777E; font-size:11px; letter-spacing:.04em; }
+
+/* ---- company-console widget specifics (#210) ---- */
+.cc-active { display:flex; align-items:center; gap:16px; }
+.cc-active-meta { min-width:0; }
+.cc-active-name { font-weight:800; font-size:17px; }
+.cc-active-client { font-size:12px; color:#B11E2E; text-transform:uppercase; letter-spacing:.08em; font-weight:700; margin-top:2px; }
+.cc-active-sub { font-size:12px; color:#54505A; margin-top:6px; }
+.cc-open { display:inline-block; margin-top:10px; font-size:12px; font-weight:700; color:#B11E2E; text-decoration:none; }
+
+.cc-light { display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:13px; }
+.cc-dot { width:11px; height:11px; border-radius:50%; flex-shrink:0; }
+.cc-dot.green { background:#2F7C57; } .cc-dot.yellow { background:#B68838; } .cc-dot.red { background:#B11E2E; } .cc-dot.gray { background:#C9C5BC; }
+.cc-rows { margin-top:10px; }
+.cc-row { display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid #F2EFE7; font-size:13px; color:#54505A; }
+.cc-row b { color:#14161C; font-weight:800; }
+.cc-note { font-size:11px; color:#76777E; margin-top:8px; }
+
+.cc-roster { width:100%; border-collapse:collapse; font-size:13px; }
+.cc-roster th { text-align:left; background:#14161C; color:#fff; padding:6px 10px; font-size:10px; text-transform:uppercase; letter-spacing:.05em; }
+.cc-roster td { padding:6px 10px; border-bottom:1px solid #F2EFE7; }
+.cc-wid { font-weight:700; color:#B11E2E; }
+.cc-stillin { color:#B68838; font-weight:600; }
+
+.cc-actions { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; }
+.cc-action { display:block; text-align:center; background:#FCFBF8; border:1px solid #E8E4DD; border-radius:9px; padding:12px 10px; font-size:12px; font-weight:700; color:#14161C; text-decoration:none; }
+.cc-action:hover { border-color:#B11E2E; color:#B11E2E; }
+
+.cc-feed { display:flex; flex-direction:column; }
+.cc-feed-item { display:flex; align-items:baseline; gap:10px; padding:7px 0; border-bottom:1px solid #F2EFE7; font-size:12px; }
+.cc-feed-act { font-weight:700; color:#14161C; }
+.cc-feed-tgt { color:#54505A; }
+.cc-feed-time { margin-left:auto; color:#76777E; font-size:11px; white-space:nowrap; }
