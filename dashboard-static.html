@@ -131,7 +131,31 @@
       top: 0;
       height: 100vh;
       overflow-y: auto;
+      display: flex;
+      flex-direction: column;
     }
+    /* #213 — account pinned to the sidebar bottom (Option 1 simple layout) */
+    .sidebar-grow { flex: 1; min-height: 8px; }
+    .sidebar-footer { flex: 0 0 auto; border-top: 1px solid #E8E4DD; padding-top: 8px; margin-top: 8px; position: relative; }
+    .acct { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px; border: none; background: transparent; border-radius: 9px; cursor: pointer; text-align: left; font: inherit; color: #14161C; }
+    .acct:hover { background: #F5F6F8; }
+    .acct-avatar { width: 30px; height: 30px; border-radius: 50%; background: #1E73E8; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; letter-spacing: .02em; }
+    .acct-info { min-width: 0; flex: 1; }
+    .acct-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .acct-role { color: #76777E; font-size: 11px; }
+    .acct-chev { width: 13px; height: 13px; color: #9CA0AA; margin-left: auto; flex-shrink: 0; transition: transform .15s; }
+    .acct[aria-expanded="true"] .acct-chev { transform: rotate(180deg); }
+    .acct-menu { position: absolute; bottom: calc(100% - 2px); left: 6px; right: 6px; background: #fff; border: 1px solid #E8E4DD; border-radius: 10px; box-shadow: 0 6px 22px rgba(0,0,0,.12); padding: 6px; z-index: 60; }
+    .acct-mi { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: none; background: transparent; border-radius: 7px; cursor: pointer; text-align: left; font: inherit; font-size: 13px; color: #14161C; text-decoration: none; }
+    .acct-mi:hover { background: #F5F6F8; }
+    .acct-mi .nav-ic { width: 16px; height: 16px; color: #76777E; }
+    .acct-mi.acct-signout { color: #B11E2E; } .acct-mi.acct-signout .nav-ic { color: #B11E2E; }
+    .acct-mi.acct-signout:hover { background: rgba(177,30,46,.06); }
+    .acct-mi:disabled { opacity: .6; cursor: not-allowed; }
+    /* content corner — faint "Live · date" (Option 1) */
+    .content-corner { display: flex; justify-content: flex-end; padding: 14px 28px 0; }
+    .cc-live { display: inline-flex; align-items: center; gap: 6px; color: #9CA0AA; font-size: 12px; }
+    .cc-dot { width: 7px; height: 7px; border-radius: 50%; background: #2F7C57; }
     .sidebar-header {
       display: flex;
       align-items: center;
@@ -593,6 +617,7 @@
   <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></symbol>
   <symbol id="i-dollar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M16 6H10a3 3 0 000 6h4a3 3 0 010 6H8"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></symbol>
 </defs></svg>
 
@@ -687,22 +712,33 @@
         </div>
       </div>
     </nav>
+    <div class="sidebar-grow"></div>
+    <!-- #213 — account block pinned to the sidebar bottom (was the top-bar user menu).
+         Sign out reuses the EXISTING logout action (POST /api/auth/logout -> /login). -->
+    <div class="sidebar-footer">
+      <button class="acct" id="acct-toggle" type="button" aria-haspopup="true" aria-expanded="false" title="Account">
+        <span class="acct-avatar" id="acct-avatar">··</span>
+        <span class="acct-info"><span class="acct-name" id="acct-name">Account</span><span class="acct-role" id="acct-role">—</span></span>
+        <svg class="acct-chev"><use href="#i-chev"/></svg>
+      </button>
+      <div class="acct-menu" id="acct-menu" role="menu" hidden>
+        <a class="acct-mi" data-view="settings" role="menuitem" href="#"><svg class="nav-ic"><use href="#i-users"/></svg>Profile</a>
+        <a class="acct-mi" data-view="settings" role="menuitem" href="#"><svg class="nav-ic"><use href="#i-gear"/></svg>Settings</a>
+        <button class="acct-mi acct-signout" id="acct-signout" type="button" role="menuitem"><svg class="nav-ic"><use href="#i-out"/></svg>Sign out</button>
+      </div>
+    </div>
   </aside>
 
   <!-- MAIN CONTENT -->
   <main class="main">
-    <header class="topbar">
-      <div>
-        <div class="eyebrow" id="topbar-breadcrumb">Overview</div>
-        <div class="topbar-title">890 E 135th St · FR-BX-001</div>
-      </div>
-      <div class="topbar-meta">
-        <span>Tue · May 6, 2026</span>
-        <span class="live-indicator">● Live</span>
-        <span id="user-menu" aria-live="polite"></span>
-      </div>
-    </header>
+    <!-- #213 — top utility strip removed (Option 1). The project name now lives
+         ONLY in the page hero. auth_menu.js still runs into this hidden host so
+         window.__SSC_USER + the ssc:user-loaded event still fire (the LRT reveal
+         and the sidebar-footer account block consume them); its Sign out action
+         is reused by the account block. -->
+    <span id="user-menu" style="display:none" aria-hidden="true"></span>
     <script src="/files/static/js/auth_menu.js" defer></script>
+    <div class="content-corner"><span class="cc-live"><span class="cc-dot"></span>Live · <span id="live-date">—</span></span></div>
     <script>
       // #193 — reveal the Labor Rate Tracker entry surfaces (nav link
       // + dashboard card) for admin / c_suite only. Server-side gate
@@ -830,7 +866,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #212 · 2026-06-01 · Drop Report + collapsible icon nav</div>
+          <div class="ph-build" id="ph-build-stamp">build #213 · 2026-06-01 · top bar removed · account in sidebar</div>
         </div>
       </section>
 
@@ -3389,7 +3425,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
 
     // Update breadcrumb
     const groupLabel = link.closest('.nav-group').querySelector('.nav-group-label')?.textContent || 'Overview';
-    document.getElementById('topbar-breadcrumb').textContent = groupLabel;
+    const _bc = document.getElementById('topbar-breadcrumb'); if (_bc) _bc.textContent = groupLabel; // #213 — breadcrumb host removed with the top bar; guard so this never throws
 
     // Switch views
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -4967,6 +5003,52 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   document.addEventListener('change', function(e){ if(e.target && e.target.id==='dr-select'){ renderReport(e.target.value); } });
   document.querySelectorAll('.nav-link[data-view="drop-report"]').forEach(function(l){
     l.addEventListener('click', function(){ if(!loaded){ loaded=true; loadDrops(); } });
+  });
+})();
+</script>
+
+<script>
+/* #213 — content-corner live date + sidebar-footer account block.
+   Sign out REUSES the existing logout action (POST /api/auth/logout -> /login),
+   the same call auth_menu.js makes. Account identity comes from the ssc:user-loaded
+   event / window.__SSC_USER that auth_menu.js publishes. PII-safe (shows only the
+   viewer's own name; LOCAL date via getMonth/getDate, never toISOString). */
+(function(){
+  function $(id){ return document.getElementById(id); }
+  function pad(n){ return String(n).padStart(2,'0'); }
+
+  // Live date — LOCAL components (CLAUDE.md dates rule: never toISOString)
+  (function(){ var d=new Date(); var el=$('live-date'); if(el) el.textContent=pad(d.getMonth()+1)+'/'+pad(d.getDate())+'/'+d.getFullYear(); })();
+
+  var ROLE={admin:'Admin',c_suite:'C-Suite',pm:'PM',super:'Super'};
+  function initials(name){
+    var parts=String(name||'').trim().split(/\s+/).filter(Boolean);
+    if(!parts.length) return '··';
+    if(parts.length===1) return parts[0].slice(0,2).toUpperCase();
+    return (parts[0][0]+parts[parts.length-1][0]).toUpperCase();
+  }
+  function fillAccount(user){
+    if(!user) return;
+    if($('acct-name'))  $('acct-name').textContent = user.full_name || user.email || 'Account';
+    if($('acct-role'))  $('acct-role').textContent = ROLE[user.role] || user.role || '';
+    if($('acct-avatar'))$('acct-avatar').textContent = initials(user.full_name || user.email);
+  }
+  document.addEventListener('ssc:user-loaded', function(e){ fillAccount(e.detail); });
+  if(window.__SSC_USER) fillAccount(window.__SSC_USER);
+
+  var toggle=$('acct-toggle'), menu=$('acct-menu');
+  if(toggle && menu){
+    toggle.addEventListener('click', function(e){ e.stopPropagation(); var willOpen=menu.hidden; menu.hidden=!willOpen; toggle.setAttribute('aria-expanded', String(willOpen)); });
+    menu.addEventListener('click', function(e){ e.stopPropagation(); });
+    document.addEventListener('click', function(){ if(menu && !menu.hidden){ menu.hidden=true; toggle.setAttribute('aria-expanded','false'); } });
+    menu.querySelectorAll('[data-view]').forEach(function(mi){ mi.addEventListener('click', function(ev){ ev.preventDefault(); menu.hidden=true; toggle.setAttribute('aria-expanded','false'); var nav=document.querySelector('.nav-link[data-view="'+mi.getAttribute('data-view')+'"]'); if(nav) nav.click(); }); });
+  }
+  var so=$('acct-signout');
+  if(so) so.addEventListener('click', function(){
+    so.disabled=true; so.textContent='Signing out…';
+    fetch('/api/auth/logout',{method:'POST',credentials:'same-origin',headers:{'Accept':'application/json'}})
+      .then(function(){ window.location.href='/login'; })
+      .catch(function(){ window.location.href='/login'; });
   });
 })();
 </script>
