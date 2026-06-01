@@ -1,0 +1,15 @@
+{
+  "vendor": "Joe's Masonry Supply",
+  "vendor_contact": null,
+  "doc_type": "Receipt",
+  "doc_number": "HW-0021",
+  "order_number": null,
+  "expense_date": "2026-05-18",
+  "stated_total": 230.00,
+  "page_count": 1,
+  "lines": [
+    {"item_id": null, "description": "mortar mix type S", "qty": 8, "unit": "bag", "unit_price": 12.50, "extended_price": 100.00, "product_class": "CEMENT_MORTAR", "normalized_product": "Type-S Mortar Mix", "is_refundable": false, "confidence": 0.55},
+    {"item_id": null, "description": "sand (qty illegible)", "qty": 2, "unit": "ton", "unit_price": 40.00, "extended_price": 80.00, "product_class": "CEMENT_MORTAR", "normalized_product": "Sand", "is_refundable": false, "confidence": 0.45},
+    {"item_id": null, "description": "misc tools", "qty": 1, "unit": "EA", "unit_price": 50.00, "extended_price": 50.00, "product_class": "TOOLS_CONSUMABLES", "normalized_product": "Misc tools", "is_refundable": false, "confidence": 0.62}
+  ]
+}

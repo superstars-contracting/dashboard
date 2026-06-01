@@ -1,0 +1,16 @@
+{
+  "vendor": "Extech Building Materials / LITSCO",
+  "vendor_contact": "61-89 Avenue K, Newark NJ 07105 · 973-274-3340",
+  "doc_type": "Pick Ticket",
+  "doc_number": "6073294",
+  "order_number": "4213938",
+  "expense_date": "2026-05-22",
+  "stated_total": 1953.90,
+  "page_count": 3,
+  "lines": [
+    {"item_id": "CP BL816AGMI", "description": "8x8x16 Std Hollow Block", "qty": 216, "unit": "PC", "unit_price": 2.15, "extended_price": 464.40, "product_class": "MASONRY", "normalized_product": "8x8x16 Std Hollow Block", "is_refundable": false, "confidence": 0.97},
+    {"item_id": "CP BL816BBKOAGMI", "description": "8x8x16 Bond Beam Knock outs", "qty": 270, "unit": "PC", "unit_price": 3.73, "extended_price": 1007.10, "product_class": "MASONRY", "normalized_product": "8x8x16 Bond Beam Knock-outs", "is_refundable": false, "confidence": 0.96},
+    {"item_id": "PALL", "description": "Pallet charge — refundable (25% fee)", "qty": 6, "unit": "EA", "unit_price": 26.00, "extended_price": 156.00, "product_class": "DEPOSIT_REFUNDABLE", "normalized_product": "Pallet deposit", "is_refundable": true, "confidence": 0.93},
+    {"item_id": "FR NJ-ZONE 3", "description": "Delivery charge — Zone 3", "qty": 1, "unit": "EA", "unit_price": 326.40, "extended_price": 326.40, "product_class": "DELIVERY_FREIGHT", "normalized_product": "Delivery — NJ Zone 3", "is_refundable": false, "confidence": 0.90}
+  ]
+}

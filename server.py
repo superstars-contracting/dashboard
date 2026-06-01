@@ -5,6 +5,7 @@ from pathlib import Path
 from datetime import datetime, date, timedelta
 import logging
 import json
+import os
 import uuid
 
 # Vision-based cert extraction (requires ANTHROPIC_API_KEY in env — launch
@@ -7443,15 +7444,21 @@ def _exp_store_receipt(project_code, file_storage):
 
 
 def _exp_unlink_receipt(rip):
-    """Delete a receipt file IFF it's inside the receipts base (never escapes)."""
+    """Delete a receipt IFF it's inside the receipts base (never escapes). For a
+    multi-page scan (scan_<uuid>/ folder) remove the whole folder (all pages)."""
     if not rip:
         return
     try:
         p = Path(rip)
-        if p.resolve().is_relative_to(_RECEIPTS_BASE.resolve()) and p.exists():
+        base = _RECEIPTS_BASE.resolve()
+        if not p.resolve().is_relative_to(base):
+            return
+        if p.parent.name.startswith('scan_') and p.parent.resolve().is_relative_to(base):
+            shutil.rmtree(str(p.parent), ignore_errors=True)
+        elif p.exists():
             p.unlink()
     except Exception as fe:
-        logging.warning(f"receipt unlink failed ({rip}): {fe}")
+        logging.warning(f"receipt unlink failed: {fe}")
 
 
 def _exp_read_payload():
@@ -7631,6 +7638,9 @@ def api_expenses_create(project_code):
              reviewed_by, reviewed_at))
         expense_id = cur.lastrowid
         _exp_insert_lines(conn, expense_id, norm)
+        # #219 — learn (vendor,item)->class from every confirmed save (manual or
+        # reviewed scan) so future scans of the same SKU auto-classify.
+        _exp_learn_aliases(conn, header.get('vendor'), norm)
         if receipt and receipt.filename:
             rip, err = _exp_store_receipt(project_code, receipt)
             if err:
@@ -7701,15 +7711,20 @@ def api_expense_patch(expense_id):
             else:
                 sets += ["reviewed_by_uid=?", "reviewed_at=?"]
                 params += [None, None]
+        norm_for_learn = None
         if isinstance(body.get('lines'), list):
-            norm = [_exp_normalize_line(ln, i) for i, ln in enumerate(body['lines'])]
+            norm_for_learn = [_exp_normalize_line(ln, i) for i, ln in enumerate(body['lines'])]
             conn.execute("DELETE FROM expense_line_items WHERE expense_id=?", (expense_id,))
-            _exp_insert_lines(conn, expense_id, norm)
+            _exp_insert_lines(conn, expense_id, norm_for_learn)
             sets.append("total=?")
-            params.append(_exp_compute_total(norm))
+            params.append(_exp_compute_total(norm_for_learn))
         if sets:
             params.append(expense_id)
             conn.execute(f"UPDATE expenses SET {', '.join(sets)} WHERE id=?", params)
+        # #219 — alias learning on edit/approve (the user just confirmed these lines)
+        if norm_for_learn is not None:
+            vrow = conn.execute("SELECT vendor FROM expenses WHERE id=?", (expense_id,)).fetchone()
+            _exp_learn_aliases(conn, vrow['vendor'] if vrow else None, norm_for_learn)
         conn.commit()
         return response_wrapper(_exp_detail_dict(conn, expense_id))
     except Exception as e:
@@ -7783,6 +7798,12 @@ def api_expense_receipt_get(expense_id):
         if not rip:
             return jsonify({"error": "No receipt on file"}), 404
         p = Path(rip)
+        # #219 — ?page=N serves page N of a multi-page scan (page 1 = the stored path)
+        page = request.args.get('page', type=int)
+        if page and page > 1 and p.parent.name.startswith('scan_'):
+            cand = sorted(p.parent.glob(f"page_{page:03d}.*"))
+            if cand:
+                p = cand[0]
         if not (p.resolve().is_relative_to(_RECEIPTS_BASE.resolve()) and p.exists()):
             return jsonify({"error": "Receipt file missing"}), 404
         return send_file(str(p), mimetype=_RECEIPT_MIME.get(p.suffix.lower(), 'application/octet-stream'))
@@ -7843,6 +7864,190 @@ def api_expense_product_usage(project_code):
             "totals": {"cost_total": float(_exp_q2(cost_total)),
                        "refundable_total": float(_exp_q2(refund_total))},
         })
+    finally:
+        conn.close()
+
+
+# ---- #219 Batch B — AI receipt scan + alias memory ----
+
+def _exp_store_receipt_pages(project_code, files):
+    """Store ALL pages under data_room/receipts/<project>/scan_<uuid>/page_NNN.<ext>.
+    Returns (first_page_path, page_count, error)."""
+    base = _RECEIPTS_BASE.resolve()
+    rdir = _RECEIPTS_BASE / project_code / f"scan_{uuid.uuid4().hex}"
+    if not rdir.resolve().is_relative_to(base):
+        return None, 0, "Invalid path"
+    rdir.mkdir(parents=True, exist_ok=True)
+    first, n = None, 0
+    for i, f in enumerate(files, 1):
+        ext = Path(f.filename or '').suffix.lower()
+        if ext not in _RECEIPT_EXT:
+            return None, 0, f"Unsupported file type {ext} — use JPG, PNG, HEIC, or PDF"
+        f.seek(0, os.SEEK_END)
+        size = f.tell()
+        f.seek(0)
+        if size > 12 * 1024 * 1024:
+            return None, 0, "A page is too large (max 12 MB/page)"
+        p = rdir / f"page_{i:03d}{ext}"
+        f.save(str(p))
+        if first is None:
+            first = str(p)
+        n += 1
+    return first, n, None
+
+
+def _exp_page_paths(first_path, page_count):
+    """Ordered page paths for a (possibly multi-page) receipt."""
+    if not first_path:
+        return []
+    parent = Path(first_path).parent
+    if parent.name.startswith('scan_'):
+        pages = sorted(parent.glob('page_*'))
+        return [str(x) for x in pages] or [first_path]
+    return [first_path]
+
+
+def _exp_alias_lookup(conn, vendor):
+    """{item_key_lower: {product_class, normalized_product}} for one vendor."""
+    if not vendor:
+        return {}
+    out = {}
+    for r in conn.execute(
+        "SELECT item_key, product_class, normalized_product FROM expense_class_alias WHERE vendor=?",
+        (vendor,)):
+        if r['item_key']:
+            out[r['item_key'].strip().lower()] = {
+                "product_class": r['product_class'], "normalized_product": r['normalized_product']}
+    return out
+
+
+def _exp_learn_aliases(conn, vendor, norm_lines):
+    """Upsert (vendor, item_key) -> class + normalized for confirmed lines so
+    future scans of the same SKU auto-classify. item_key = item_id else
+    normalized description. Skips OTHER / empty keys. PII-safe (no amounts)."""
+    if not vendor:
+        return
+    now = datetime.now().isoformat()
+    for ln in norm_lines:
+        pc = ln.get('product_class')
+        if not pc or pc == 'OTHER':
+            continue
+        key = (ln.get('item_id') or '').strip() or (ln.get('normalized_product') or ln.get('description') or '').strip()
+        if not key:
+            continue
+        key_l = key.lower()
+        existing = conn.execute(
+            "SELECT id FROM expense_class_alias WHERE vendor=? AND item_key=?", (vendor, key_l)).fetchone()
+        if existing:
+            conn.execute("UPDATE expense_class_alias SET product_class=?, normalized_product=?, updated_at=? WHERE id=?",
+                         (pc, ln.get('normalized_product'), now, existing['id']))
+        else:
+            conn.execute("INSERT INTO expense_class_alias (vendor, item_key, product_class, normalized_product, updated_at) VALUES (?,?,?,?,?)",
+                         (vendor, key_l, pc, ln.get('normalized_product'), now))
+
+
+@app.route('/api/expenses/scan', methods=['POST'])
+@requires_role(*_EXPENSE_COST_ROLES)
+def api_expense_scan():
+    """Accept 1..N pages (images and/or a multi-page PDF) in one request, store
+    them all on a new DRAFT expense, send them to the vision model in a SINGLE
+    call, validate + classify + alias-override, land status=needs_review, and
+    return the draft for review. Key is read from ENV only; missing key -> clean
+    503 so the UI falls back to manual entry. Never leaks any *_path."""
+    import expense_scanner as scanner
+    files = (request.files.getlist('files') or request.files.getlist('pages')
+             or request.files.getlist('receipt'))
+    files = [f for f in files if f and f.filename]
+    if not files:
+        return jsonify({"error": "No files in request"}), 400
+    if len(files) > scanner.MAX_PAGES:
+        return jsonify({"error": f"Too many pages — max {scanner.MAX_PAGES}"}), 400
+    for f in files:
+        if Path(f.filename or '').suffix.lower() not in _RECEIPT_EXT:
+            return jsonify({"error": "Unsupported file type — use JPG, PNG, HEIC, or PDF"}), 400
+    project_code = request.form.get('project_code') or 'FR-BX-001'
+    # EXPENSE_SCAN_FAKE (test-only, NEVER set in prod) bypasses the live model.
+    fake_path = os.environ.get('EXPENSE_SCAN_FAKE')
+    if not os.environ.get('ANTHROPIC_API_KEY') and not fake_path:
+        return jsonify({"error": "AI scan disabled — ANTHROPIC_API_KEY not configured. Enter the expense manually.",
+                        "ai_available": False}), 503
+    conn = db()
+    try:
+        if not validate_project_exists(conn, project_code):
+            return jsonify({"error": "Project not found"}), 404
+        # 1) DRAFT + store every page (originals always kept, tied to the expense)
+        now = datetime.now().isoformat()
+        uid = _exp_actor_uid()
+        cur = conn.execute(
+            "INSERT INTO expenses (project_code, status, total, created_at, created_by_uid) VALUES (?,?,?,?,?)",
+            (project_code, 'draft', 0, now, uid))
+        expense_id = cur.lastrowid
+        first_path, page_count, err = _exp_store_receipt_pages(project_code, files)
+        if err:
+            conn.rollback()
+            return jsonify({"error": err}), 400
+        conn.execute("UPDATE expenses SET receipt_image_path=?, receipt_page_count=? WHERE id=?",
+                     (first_path, page_count, expense_id))
+        conn.commit()
+        # 2) ONE vision call across all pages (or test-fake)
+        specs = [scanner.file_spec(p) for p in _exp_page_paths(first_path, page_count)]
+        try:
+            if fake_path:
+                with open(fake_path, encoding='utf-8') as fh:
+                    raw = json.load(fh)
+            else:
+                raw = scanner.call_vision_model(specs, EXPENSE_PRODUCT_CLASSES, EXPENSE_UNITS)
+        except scanner.ScanUnavailable:
+            return jsonify({"error": "AI scan disabled — enter manually.", "ai_available": False,
+                            "draft_id": expense_id}), 503
+        except scanner.ScanError:
+            return jsonify({"error": "Couldn't read the receipt automatically — enter it manually or try again.",
+                            "scan_failed": True, "draft_id": expense_id}), 502
+        # 3) validate + classify + alias override (using THIS vendor's alias memory)
+        alias_map = _exp_alias_lookup(conn, raw.get('vendor'))
+        processed = scanner.process_scan_result(
+            raw, EXPENSE_PRODUCT_CLASSES, EXPENSE_UNITS, alias_map,
+            _EXP_REFUNDABLE_CLASSES, _EXP_OUT_OF_COST_CLASSES)
+        h = processed['header']
+        norm = [_exp_normalize_line(l, i) for i, l in enumerate(processed['lines'])]
+        total = _exp_compute_total(norm)
+        exp_date = h.get('expense_date') or date.today().isoformat()
+        try:
+            datetime.strptime(exp_date, '%Y-%m-%d')
+        except ValueError:
+            exp_date = date.today().isoformat()
+        notes = ('vendor_contact: ' + str(h.get('vendor_contact'))) if h.get('vendor_contact') else None
+        conn.execute(
+            "UPDATE expenses SET vendor=?, doc_type=?, doc_number=?, order_number=?, expense_date=?, "
+            "status='needs_review', total=?, notes=? WHERE id=?",
+            (h.get('vendor'), h.get('doc_type'), h.get('doc_number'), h.get('order_number'),
+             exp_date, total, notes, expense_id))
+        conn.execute("DELETE FROM expense_line_items WHERE expense_id=?", (expense_id,))
+        _exp_insert_lines(conn, expense_id, norm)
+        conn.commit()
+        # 4) return draft + transient scan artifacts (confidence/warnings) — no *_path
+        out = _exp_detail_dict(conn, expense_id)
+        for i, li in enumerate(out.get('line_items', [])):
+            if i < len(processed['lines']):
+                li['confidence'] = processed['lines'][i]['confidence']
+                li['low_confidence'] = processed['lines'][i]['low_confidence']
+                li['alias_applied'] = processed['lines'][i]['alias_applied']
+        out['scan'] = {
+            "warnings": processed['warnings'],
+            "low_confidence_count": processed['low_confidence_count'],
+            "stated_total": h.get('stated_total'),
+            "lines_sum_all": processed['lines_sum_all'],
+            "page_count": page_count,
+            "model": (raw.get('_meta') or {}).get('model') or scanner.MODEL,
+        }
+        return response_wrapper(out), 201
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        logging.error(f"POST expenses/scan: {type(e).__name__}: {e}")
+        return jsonify({"error": "Scan failed — enter manually or try again."}), 500
     finally:
         conn.close()
 

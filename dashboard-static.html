@@ -338,6 +338,22 @@
     .exp-qb { display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:600; color:#76777E; border:1px dashed #E8E4DD; border-radius:8px; padding:5px 10px; }
     .exp-legend { display:flex; gap:8px; flex-wrap:wrap; margin:2px 0 14px; }
     .exp-refflag { color:#76777E; }
+    /* #219 Batch B — AI scan: staged pages, reading state, confidence cues */
+    .exp-staged { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0 4px; }
+    .exp-thumb { position:relative; width:70px; height:88px; border:1px solid #E8E4DD; border-radius:8px; overflow:hidden; background:#f5f6f8; display:flex; align-items:center; justify-content:center; }
+    .exp-thumb img { width:100%; height:100%; object-fit:cover; }
+    .exp-thumb .pg { position:absolute; bottom:0; left:0; right:0; font-size:9px; text-align:center; background:rgba(20,22,26,.72); color:#fff; padding:1px 0; }
+    .exp-thumb .pdf { font-size:10px; font-weight:700; color:#76777E; text-align:center; padding:4px; }
+    .exp-thumb .x { position:absolute; top:2px; right:2px; width:16px; height:16px; border-radius:50%; background:rgba(20,22,26,.7); color:#fff; border:none; font-size:11px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+    .exp-reading { display:flex; align-items:center; gap:10px; color:#1E73E8; font-weight:600; font-size:14px; padding:14px; }
+    .exp-spin { width:18px; height:18px; border:2px solid rgba(30,115,232,.3); border-top-color:#1E73E8; border-radius:50%; animation:exp-spin .7s linear infinite; }
+    @keyframes exp-spin { to { transform:rotate(360deg); } }
+    .exp-aibanner-review { display:flex; align-items:center; gap:9px; background:rgba(30,115,232,.07); border:1px solid rgba(30,115,232,.42); border-radius:10px; padding:10px 13px; font-size:12.5px; color:#1E73E8; font-weight:600; margin-bottom:14px; }
+    .exp-warn { background:#FFF8F0; border:1px solid #E8AC6A; border-radius:8px; padding:9px 12px; font-size:12px; color:#7A2E1B; margin-bottom:12px; }
+    .exp-warn ul { margin:4px 0 0; padding-left:18px; }
+    .exp-litbl tr.exp-li-lowconf td { background:#FFF8F0; }
+    .exp-li-checkchip { display:inline-block; margin-left:6px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#BA7517; background:rgba(186,117,23,.14); border-radius:999px; padding:1px 6px; vertical-align:middle; }
+    .exp-li-aliaschip { display:inline-block; margin-left:6px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#0F6E56; background:rgba(15,110,86,.12); border-radius:999px; padding:1px 6px; vertical-align:middle; }
     .sidebar-header {
       display: flex;
       align-items: center;
@@ -1084,7 +1100,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #218 · 2026-06-01 · Expenses module (capture · manual entry · product usage · admin-gated)</div>
+          <div class="ph-build" id="ph-build-stamp">build #219 · 2026-06-01 · Expenses AI scan (multi-page + handwritten read, auto-classify, alias memory)</div>
         </div>
       </section>
 
@@ -3425,19 +3441,27 @@
               <div><h1>Scan Receipt</h1><div class="sub">Take a photo or upload — attach the image, then enter the fields</div></div>
               <button id="exp-capture-back" class="exp-ghost" type="button">← Back to list</button>
             </div>
-            <div class="exp-aibanner"><svg class="exp-ic"><use href="#i-spark"/></svg>AI auto-read — reads the receipt &amp; fills every field for you<span class="soon">Coming soon</span></div>
+            <div class="exp-aibanner"><svg class="exp-ic"><use href="#i-spark"/></svg>AI auto-read — attach every page, then <strong>Read receipt</strong>. You review &amp; confirm before it saves.</div>
             <div class="exp-drop">
               <svg class="big"><use href="#i-upload"/></svg>
               <div><b>Take a photo or upload a receipt</b></div>
-              <div>JPG, PNG, HEIC or PDF · the original image is always kept</div>
+              <div>JPG, PNG, HEIC or PDF · add multiple pages · the originals are always kept</div>
               <div class="exp-capture-paths">
                 <button id="exp-path-camera" class="exp-primary" type="button"><svg class="exp-ic"><use href="#i-camera"/></svg>Take photo</button>
-                <button id="exp-path-upload" class="exp-ghost" type="button"><svg class="exp-ic"><use href="#i-upload"/></svg>Upload file</button>
+                <button id="exp-path-upload" class="exp-ghost" type="button"><svg class="exp-ic"><use href="#i-upload"/></svg>Upload file(s)</button>
                 <button id="exp-path-manual" class="exp-ghost" type="button"><svg class="exp-ic"><use href="#i-plus"/></svg>Add manually</button>
               </div>
             </div>
+            <div id="exp-staged" class="exp-staged" style="display:none;"></div>
+            <div id="exp-scan-error" class="exp-warn" style="display:none;"></div>
+            <div id="exp-capture-actionbar" class="exp-saverow" style="display:none;">
+              <span id="exp-staged-count" class="exp-muted" style="margin-right:auto;font-size:12px;"></span>
+              <button id="exp-scan-manual" class="exp-ghost" type="button">Enter manually instead</button>
+              <button id="exp-scan-read" class="exp-primary" type="button"><svg class="exp-ic"><use href="#i-spark"/></svg>Read receipt</button>
+            </div>
+            <div id="exp-reading" class="exp-reading" style="display:none;"><span class="exp-spin"></span>Reading your receipt with AI…</div>
             <input id="exp-capture-camera" type="file" accept="image/*" capture="environment" style="display:none;">
-            <input id="exp-capture-file" type="file" accept=".jpg,.jpeg,.png,.heic,.heif,.pdf,image/*,application/pdf" style="display:none;">
+            <input id="exp-capture-file" type="file" accept=".jpg,.jpeg,.png,.heic,.heif,.pdf,image/*,application/pdf" multiple style="display:none;">
           </div>
 
           <!-- State 3: ADD/EDIT FORM (Screen 3; split w/ captured image when present) -->
@@ -3446,6 +3470,8 @@
               <div><h1 id="exp-form-title">Add Expense</h1><div class="sub" id="exp-form-sub">Enter it by hand — attach a photo any time</div></div>
               <button id="exp-form-back" class="exp-ghost" type="button">← Back to list</button>
             </div>
+            <div id="exp-ai-review-banner" class="exp-aibanner-review" style="display:none;"><svg class="exp-ic"><use href="#i-spark"/></svg><span>AI read this receipt — review &amp; confirm. Flagged fields need a quick check.</span></div>
+            <div id="exp-scan-warnings" class="exp-warn" style="display:none;"></div>
             <div class="exp-split" id="exp-form-split">
               <div class="exp-receipt-pane" id="exp-receipt-pane" style="display:none;">
                 <div class="imgtag"><svg class="exp-ic" style="width:14px;height:14px;"><use href="#i-eye"/></svg>Captured image</div>
@@ -3940,27 +3966,96 @@ document.querySelectorAll('.nav-link').forEach(link => {
     $('exp-form-view').style.display = which==='form'?'':'none';
   }
 
-  // ---------- CAPTURE ----------
-  function openCapture(){ pendingReceipt=null; showState('capture'); }
-  function onCaptureFile(file){ if(!file) return; pendingReceipt=file; openForm(null); }
+  // ---------- CAPTURE (Batch B: stage pages -> AI scan or manual) ----------
+  let stagedFiles = [];
+  function openCapture(){ stagedFiles=[]; pendingReceipt=null; renderStaged(); $('exp-scan-error').style.display='none'; $('exp-reading').style.display='none'; showState('capture'); }
+  function stageFiles(fileList){
+    Array.from(fileList||[]).forEach(f=>{ if(f) stagedFiles.push(f); });
+    if(stagedFiles.length>10) stagedFiles = stagedFiles.slice(0,10);
+    renderStaged();
+  }
+  function renderStaged(){
+    const wrap=$('exp-staged'), bar=$('exp-capture-actionbar');
+    if(!stagedFiles.length){ wrap.style.display='none'; wrap.innerHTML=''; bar.style.display='none'; return; }
+    wrap.style.display=''; bar.style.display='';
+    $('exp-staged-count').textContent = stagedFiles.length+' page'+(stagedFiles.length===1?'':'s')+' attached';
+    wrap.innerHTML = stagedFiles.map((f,i)=>{
+      const isPdf = f.type==='application/pdf' || /\.pdf$/i.test(f.name||'');
+      const inner = isPdf ? '<div class="pdf">PDF</div>' : '<img src="'+URL.createObjectURL(f)+'" alt="">';
+      return '<div class="exp-thumb">'+inner+'<span class="pg">p'+(i+1)+'</span><button class="x" type="button" data-unstage="'+i+'">&times;</button></div>';
+    }).join('');
+  }
+  $('exp-staged').addEventListener('click',(e)=>{ const x=e.target.closest('[data-unstage]'); if(!x) return; stagedFiles.splice(+x.getAttribute('data-unstage'),1); renderStaged(); });
+  async function onScanRead(){
+    if(!stagedFiles.length) return;
+    $('exp-scan-error').style.display='none';
+    $('exp-capture-actionbar').style.display='none';
+    $('exp-reading').style.display='';
+    const fd=new FormData(); fd.append('project_code', PROJECT);
+    stagedFiles.forEach(f=>fd.append('files', f));
+    try{
+      const r=await fetch('/api/expenses/scan',{method:'POST',credentials:'include',body:fd});
+      const j=await r.json().catch(()=>({}));
+      $('exp-reading').style.display='none';
+      if(r.status===201 && j.data){
+        stagedFiles=[]; pendingReceipt=null;
+        openForm(j.data.id, j.data);            // review the AI-read draft
+      } else if(r.status===503){
+        scanFallbackToManual('AI scan is unavailable right now — enter the expense manually. Your photo stays attached.');
+      } else if(j.draft_id){
+        stagedFiles=[];
+        openForm(j.draft_id, null, j.error || 'Couldn’t read this one automatically — enter the fields manually. Your pages are attached.');
+      } else {
+        scanFallbackToManual(j.error || 'Couldn’t read automatically — enter manually or try again.');
+      }
+    }catch(e){ $('exp-reading').style.display='none'; scanFallbackToManual('Network error — enter manually or try again.'); }
+  }
+  function scanFallbackToManual(msg){
+    const keep = stagedFiles[0] || null;
+    pendingReceipt = keep; stagedFiles=[];
+    openForm(null, null, msg);
+  }
+  function statusPillHtml(s){ return s==='reviewed'?'<span class="exp-pill ok">Reviewed</span>':s==='draft'?'<span class="exp-pill draft">Draft</span>':'<span class="exp-pill rev">Needs review</span>'; }
 
   // ---------- FORM ----------
   function blankLine(){ return {item_id:'',description:'',product_class:'OTHER',normalized_product:'',qty:'',unit:'EA',unit_price:'',extended_price:'',is_refundable:false}; }
-  async function openForm(id){
+  async function openForm(id, scanData, notice){
     await ensureTaxonomy();
     editingId = id || null;
-    $('exp-form-title').textContent = editingId ? 'Edit Expense' : 'Add Expense';
-    $('exp-form-sub').textContent = editingId ? 'Edit fields & lines — total recomputes live' : 'Enter it by hand — attach a photo any time';
+    const isScan = !!scanData;
+    $('exp-form-title').textContent = isScan ? 'Review Scanned Expense' : (editingId ? 'Edit Expense' : 'Add Expense');
+    $('exp-form-sub').textContent = isScan ? 'AI read it — check the flagged fields, then Save' : (editingId ? 'Edit fields & lines — total recomputes live' : 'Enter it by hand — attach a photo any time');
+    // AI banner + warnings/notice
+    $('exp-ai-review-banner').style.display = isScan ? '' : 'none';
+    const warnEl=$('exp-scan-warnings'); const warns=(scanData && scanData.scan && scanData.scan.warnings)||[];
+    if(notice){ warnEl.style.display=''; warnEl.innerHTML=esc(notice); }
+    else if(warns.length){ warnEl.style.display=''; warnEl.innerHTML='<strong>Heads up:</strong><ul>'+warns.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul>'; }
+    else { warnEl.style.display='none'; warnEl.innerHTML=''; }
     ['exp-f-vendor','exp-f-docnum','exp-f-order','exp-f-costcode','exp-f-doctype'].forEach(k=>{ if($(k)) $(k).value=''; });
     $('exp-f-category').value='Materials';
-    if(window.SSCDatePicker){ SSCDatePicker.wire($('exp-f-date')); SSCDatePicker.setISO($('exp-f-date'), editingId?'':todayLocalISO()); }
-    else $('exp-f-date').value = editingId?'':todayLocalISO();
+    if(window.SSCDatePicker) SSCDatePicker.wire($('exp-f-date'));
     $('exp-approve-btn').style.display='none';
     $('exp-form-statuswrap').style.display='none';
     setReceiptPane(null);
-    if(!editingId && pendingReceipt) previewLocalReceipt(pendingReceipt);
-    if(editingId){ loadForEdit(editingId); }
-    else { formLines=[blankLine()]; renderLines(); recalcTotal(); }
+    if(isScan){
+      // populate straight from the /scan response (draft already saved server-side)
+      $('exp-f-vendor').value=scanData.vendor||''; $('exp-f-doctype').value=scanData.doc_type||''; $('exp-f-docnum').value=scanData.doc_number||'';
+      $('exp-f-order').value=scanData.order_number||''; $('exp-f-category').value=scanData.category||'Materials'; $('exp-f-costcode').value=scanData.cost_code||'';
+      if(window.SSCDatePicker) SSCDatePicker.setISO($('exp-f-date'), scanData.expense_date||'');
+      formLines=(scanData.line_items||[]).map(li=>({item_id:li.item_id||'',description:li.description||'',product_class:li.product_class||'OTHER',normalized_product:li.normalized_product||'',qty:li.qty,unit:li.unit||'EA',unit_price:li.unit_price,extended_price:li.extended_price,is_refundable:!!li.is_refundable,low_confidence:!!li.low_confidence,confidence:li.confidence,alias_applied:!!li.alias_applied}));
+      if(!formLines.length) formLines=[blankLine()];
+      renderLines(); recalcTotal();
+      setReceiptPane(scanData.has_receipt ? ('/api/expenses/'+id+'/receipt') : null);
+      const wrap=$('exp-form-statuswrap'); wrap.style.display=''; wrap.innerHTML=statusPillHtml(scanData.status);
+      $('exp-approve-btn').style.display = scanData.status!=='reviewed' ? '' : 'none';
+    } else if(editingId){
+      if(window.SSCDatePicker) SSCDatePicker.setISO($('exp-f-date'), '');
+      loadForEdit(editingId);
+    } else {
+      if(window.SSCDatePicker) SSCDatePicker.setISO($('exp-f-date'), todayLocalISO()); else $('exp-f-date').value=todayLocalISO();
+      if(pendingReceipt) previewLocalReceipt(pendingReceipt);
+      formLines=[blankLine()]; renderLines(); recalcTotal();
+    }
     showState('form');
   }
   async function loadForEdit(id){
@@ -3981,10 +4076,13 @@ document.querySelectorAll('.nav-link').forEach(link => {
   function classOptions(sel){ return TAX.classes.map(c=>'<option value="'+c.code+'"'+(c.code===sel?' selected':'')+'>'+esc(c.label)+'</option>').join(''); }
   function unitOptions(sel){ let opts=TAX.units.slice(); if(sel && opts.indexOf(sel)<0) opts.unshift(sel); return opts.map(u=>'<option'+(u===sel?' selected':'')+'>'+esc(u)+'</option>').join(''); }
   function renderLines(){
-    $('exp-li-tbody').innerHTML = formLines.map((ln,i)=>(
-      '<tr data-i="'+i+'">'
+    $('exp-li-tbody').innerHTML = formLines.map((ln,i)=>{
+      const low = !!ln.low_confidence;
+      const chip = low ? '<span class="exp-li-checkchip" title="Low AI confidence — verify this line">check</span>'
+                       : (ln.alias_applied ? '<span class="exp-li-aliaschip" title="Auto-classified from a saved alias (a correction you made before)">learned</span>' : '');
+      return '<tr data-i="'+i+'"'+(low?' class="exp-li-lowconf"':'')+'>'
       +'<td><input data-f="item_id" value="'+esc(ln.item_id)+'" placeholder="SKU"></td>'
-      +'<td><input data-f="description" value="'+esc(ln.description)+'" placeholder="Line item…"></td>'
+      +'<td><input data-f="description" value="'+esc(ln.description)+'" placeholder="Line item…">'+chip+'</td>'
       +'<td><select data-f="product_class">'+classOptions(ln.product_class)+'</select></td>'
       +'<td class="r"><input data-f="qty" class="r" value="'+esc(ln.qty)+'" placeholder="0"></td>'
       +'<td><select data-f="unit">'+unitOptions(ln.unit)+'</select></td>'
@@ -3992,8 +4090,8 @@ document.querySelectorAll('.nav-link').forEach(link => {
       +'<td class="r"><input data-f="extended_price" class="r" value="'+esc(ln.extended_price)+'" placeholder="0.00"></td>'
       +'<td><label class="exp-li-refund"><input type="checkbox" data-f="is_refundable"'+(ln.is_refundable?' checked':'')+'>↩</label></td>'
       +'<td><button class="exp-li-del" type="button" data-delline="'+i+'" title="Remove line">✕</button></td>'
-      +'</tr>'
-    )).join('');
+      +'</tr>';
+    }).join('');
   }
   function onLineEdit(ev){
     const tr=ev.target.closest('tr[data-i]'); if(!tr) return;
@@ -4097,14 +4195,16 @@ document.querySelectorAll('.nav-link').forEach(link => {
 
   // ---------- wiring ----------
   $('exp-scan-btn').addEventListener('click', openCapture);
-  $('exp-addmanual-btn').addEventListener('click', ()=>{ pendingReceipt=null; openForm(null); });
+  $('exp-addmanual-btn').addEventListener('click', ()=>{ pendingReceipt=null; stagedFiles=[]; openForm(null); });
   $('exp-capture-back').addEventListener('click', ()=>showState('list'));
   $('exp-form-back').addEventListener('click', ()=>showState('list'));
   $('exp-path-camera').addEventListener('click', ()=>$('exp-capture-camera').click());
   $('exp-path-upload').addEventListener('click', ()=>$('exp-capture-file').click());
-  $('exp-path-manual').addEventListener('click', ()=>{ pendingReceipt=null; openForm(null); });
-  $('exp-capture-camera').addEventListener('change', (e)=>onCaptureFile(e.target.files[0]));
-  $('exp-capture-file').addEventListener('change', (e)=>onCaptureFile(e.target.files[0]));
+  $('exp-path-manual').addEventListener('click', ()=>{ stagedFiles=[]; pendingReceipt=null; openForm(null); });
+  $('exp-capture-camera').addEventListener('change', (e)=>{ stageFiles(e.target.files); e.target.value=''; });
+  $('exp-capture-file').addEventListener('change', (e)=>{ stageFiles(e.target.files); e.target.value=''; });
+  $('exp-scan-read').addEventListener('click', onScanRead);
+  $('exp-scan-manual').addEventListener('click', ()=>{ pendingReceipt = stagedFiles[0]||null; stagedFiles=[]; openForm(null); });
   $('exp-addline-btn').addEventListener('click', ()=>{ formLines.push(blankLine()); renderLines(); recalcTotal(); });
   $('exp-attach-btn').addEventListener('click', ()=>$('exp-attach-file').click());
   $('exp-attach-file').addEventListener('change', (e)=>{ const f=e.target.files[0]; if(!f) return; pendingReceipt=f; previewLocalReceipt(f); });

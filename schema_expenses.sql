@@ -62,3 +62,8 @@ CREATE INDEX IF NOT EXISTS idx_expenses_date      ON expenses(expense_date);
 CREATE INDEX IF NOT EXISTS idx_expli_expense      ON expense_line_items(expense_id);
 CREATE INDEX IF NOT EXISTS idx_expli_class        ON expense_line_items(product_class);
 CREATE INDEX IF NOT EXISTS idx_expalias_lookup    ON expense_class_alias(vendor, item_key);
+
+-- #219 Batch B — multi-page AI scans store every page; receipt_image_path points
+-- at page 1 and receipt_page_count records how many pages live in its folder.
+-- ALTER is idempotent here: the migration runner skips "duplicate column".
+ALTER TABLE expenses ADD COLUMN receipt_page_count INTEGER;
