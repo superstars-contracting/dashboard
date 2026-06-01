@@ -158,9 +158,8 @@
     .cc-dot { width: 7px; height: 7px; border-radius: 50%; background: #2F7C57; }
 
     /* #214 Daily Construction Reports list — approved dcr_combined.html design (blue/white) */
-    .dcr-corner { display:flex; justify-content:flex-end; color:#76777E; font-size:12px; margin-bottom:4px; }
-    .dcr-corner .live { display:inline-flex; align-items:center; gap:6px; }
-    .dcr-gdot { width:8px; height:8px; border-radius:50%; background:#2F7C57; }
+    /* #215 — per-view live-date corner removed (the page-level .content-corner is the
+       single live-date); table header darkened below. */
     .dcr-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin:4px 0 16px; }
     .dcr-head h1 { margin:0; font-size:24px; }
     .dcr-head .sub { color:#76777E; font-size:13px; margin-top:2px; }
@@ -180,7 +179,7 @@
     .dcr-count { margin-left:auto; color:#76777E; }
     .dcr-card { background:#fff; border:1px solid #E8E4DD; border-radius:14px; overflow:hidden; }
     .dcr-table { width:100%; border-collapse:collapse; font-size:13.5px; }
-    .dcr-table thead th { background:#f7f8fa; text-align:left; color:#76777E; font-weight:600; font-size:11px; letter-spacing:.04em; text-transform:uppercase; padding:11px 16px; border-bottom:1px solid #E8E4DD; }
+    .dcr-table thead th { background:#14161a; text-align:left; color:#EAECEF; font-weight:600; font-size:11px; letter-spacing:.04em; text-transform:uppercase; padding:11px 16px; border-bottom:1px solid #14161a; }
     .dcr-table td { padding:12px 16px; border-bottom:1px solid #F3F3F5; }
     .dcr-table tr:last-child td { border-bottom:none; }
     .dcr-table tr:hover td { background:#FAFBFC; }
@@ -912,7 +911,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #214 · 2026-06-01 · DCR list restyled · KPI Total+Latest · icon actions</div>
+          <div class="ph-build" id="ph-build-stamp">build #215 · 2026-06-01 · DCR dark table header · single live-date</div>
         </div>
       </section>
 
@@ -1275,11 +1274,12 @@
       <section class="view" data-view="daily-report">
         <!-- State 1: Archive list (default) -->
         <div id="dcr-archive-view" class="section">
-          <!-- #214 — restyled to the approved dcr_combined.html design: live-date corner,
+          <!-- #214 — restyled to the approved dcr_combined.html design:
                KPI tiles (Total + Latest, no "Issued"), search + From/To (standard
-               SSCDatePicker) + Apply + live count, clean white table with green Issued
-               pill + icon actions (View · Edit · Delete). Reuses the existing endpoints. -->
-          <div class="dcr-corner"><span class="live"><span class="dcr-gdot"></span>Live · <span id="dcr-live-date">—</span></span></div>
+               SSCDatePicker) + Apply + live count, clean white table + green Issued
+               pill + icon actions (View · Edit · Delete). Reuses the existing endpoints.
+               #215 — the duplicate per-view live-date corner was removed; the single
+               live-date is the page-level .content-corner. Table header darkened. -->
           <div class="dcr-head">
             <div>
               <h1>Daily Construction Reports</h1>
@@ -2575,14 +2575,8 @@
               searchEl.addEventListener('input', () => renderDcrList());
               searchEl.dataset.wired = '1';
             }
-            // Live-date corner — local MM/DD/YYYY (never toISOString, which is UTC).
-            const liveEl = document.getElementById('dcr-live-date');
-            if (liveEl) {
-              const d = new Date();
-              const mm = String(d.getMonth() + 1).padStart(2, '0');
-              const dd = String(d.getDate()).padStart(2, '0');
-              liveEl.textContent = mm + '/' + dd + '/' + d.getFullYear();
-            }
+            // #215 — the per-view live-date corner was removed (it duplicated the
+            // page-level .content-corner #live-date). No setter needed here anymore.
             if (applyBtn) applyBtn.addEventListener('click', () => loadArchive());
             if (newBtn) newBtn.addEventListener('click', () => showEntry());
           }
