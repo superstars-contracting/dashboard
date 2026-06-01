@@ -6434,12 +6434,28 @@ _WMO_LABELS = {
 }
 
 
+# #217 — weather cache. Weather is the one inherently-online widget; cache
+# each (lat,lng,date) fetch for ~30 min so repeated widget loads + every
+# concurrent operator don't hammer Open-Meteo, and so a provider outage can
+# fall back to the last-good value (marked stale) instead of breaking the page.
+_WEATHER_CACHE = {}
+_WEATHER_TTL_SECONDS = 1800  # 30 min
+_WEEKDAY_ABBR = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+
+
 def fetch_open_meteo_weather(lat, lng, date_str=None):
-    """Fetch weather for a date (YYYY-MM-DD). For today/future, uses the
-    forecast endpoint (with current + daily). For dates >5 days back, uses
-    the archive endpoint. For 1-5 days back, uses forecast with date filter.
-    Returns the same dict shape regardless of source so callers don't care
-    which Open-Meteo endpoint was hit. Raises ValueError on bad date_str."""
+    """Fetch weather for a date (YYYY-MM-DD).
+
+    For TODAY: returns current conditions (temp, feels-like, wind, condition,
+    today's high/low + rain chance) AND a 5-day daily forecast — each day with
+    weekday, weather_code, high/low, and precipitation probability (#217).
+    For dates >5 days back: the archive endpoint. For 1-5 days back / future:
+    the forecast endpoint with a date filter. Same dict shape regardless of
+    source so callers (incl. the DCR aggregator) don't care which was hit.
+
+    Cached per (lat,lng,date) for ~30 min; on a provider failure, degrades to
+    the last-good cached value (marked stale) so the widget never breaks the
+    page offline. Raises only if there is nothing cached to fall back to."""
     import urllib.request, urllib.parse
 
     target_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else date.today()
@@ -6448,32 +6464,50 @@ def fetch_open_meteo_weather(lat, lng, date_str=None):
     is_archive = days_back > 5
     is_today = target_date == today
 
+    cache_key = (round(float(lat), 4), round(float(lng), 4), target_date.isoformat())
+    now = datetime.utcnow()
+    cached = _WEATHER_CACHE.get(cache_key)
+    if cached and (now - cached["ts"]).total_seconds() < _WEATHER_TTL_SECONDS:
+        return cached["data"]
+
     endpoint = "https://archive-api.open-meteo.com/v1/archive" if is_archive \
         else "https://api.open-meteo.com/v1/forecast"
+
+    # precipitation_probability_max is a FORECAST-only daily variable — the
+    # archive endpoint rejects it (400), so only request it off-archive.
+    daily_vars = "temperature_2m_max,temperature_2m_min,weather_code"
+    if not is_archive:
+        daily_vars += ",precipitation_probability_max"
 
     params = {
         "latitude": lat, "longitude": lng,
         "start_date": target_date.isoformat(),
         "end_date": target_date.isoformat(),
-        "daily": "temperature_2m_max,temperature_2m_min,weather_code",
-        "hourly": "temperature_2m,wind_speed_10m,wind_direction_10m,weather_code",
+        "daily": daily_vars,
         "temperature_unit": "fahrenheit",
         "wind_speed_unit": "mph",
         "timezone": "America/New_York",
     }
     if is_today:
-        params["current"] = "temperature_2m,wind_speed_10m,wind_direction_10m,weather_code"
+        # Current block (incl. feels-like) + a 5-day daily window for the row.
+        params["current"] = "temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,weather_code"
+        params["end_date"] = (today + timedelta(days=4)).isoformat()
+    else:
+        # Past/future single day: pick a representative hourly reading.
+        params["hourly"] = "temperature_2m,wind_speed_10m,wind_direction_10m,weather_code"
 
     url = endpoint + "?" + urllib.parse.urlencode(params)
-    # 5s ceiling — fail fast when Open-Meteo is unreachable. The DCR
-    # aggregator catches the timeout and degrades to source='unavailable'
-    # (the UI renders "Weather data unavailable for this date"). At 10s
-    # the smoke + the operator both waited a full 10s on every backdated
-    # DCR during a provider outage; 5s is more than enough for a healthy
-    # response (~200-500ms typical) and tight enough that the aggregator
-    # stays comfortably inside the smoke's 15s ceiling.
-    with urllib.request.urlopen(url, timeout=5) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
+    # 5s ceiling — fail fast when Open-Meteo is unreachable (the DCR aggregator
+    # stays inside the smoke's 15s ceiling). On failure, degrade to last-good.
+    try:
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        if cached:
+            stale = dict(cached["data"])
+            stale["stale"] = True
+            return stale
+        raise
 
     cur = data.get("current", {}) or {}
     daily = data.get("daily", {}) or {}
@@ -6484,6 +6518,7 @@ def fetch_open_meteo_weather(lat, lng, date_str=None):
         wind_mph = cur.get("wind_speed_10m")
         wind_dir_deg = cur.get("wind_direction_10m")
         condition_code = cur.get("weather_code")
+        feels_like = cur.get("apparent_temperature")
     else:
         # Past/future day: pick noon (or midpoint) as the representative reading.
         temps = hourly.get("temperature_2m", []) or []
@@ -6495,23 +6530,56 @@ def fetch_open_meteo_weather(lat, lng, date_str=None):
         wind_mph = winds[idx] if winds else None
         wind_dir_deg = wdirs[idx] if wdirs else None
         condition_code = codes[idx] if codes else None
+        feels_like = None
+
+    dmax = daily.get("temperature_2m_max") or []
+    dmin = daily.get("temperature_2m_min") or []
+    dcode = daily.get("weather_code") or []
+    dprob = daily.get("precipitation_probability_max") or []
+    ddate = daily.get("time") or []
 
     out = {
         "temp_now": temp_now,
+        "feels_like": feels_like,
         "wind_mph": wind_mph,
         "wind_dir_deg": wind_dir_deg,
         "condition_code": condition_code,
-        "temp_max": (daily.get("temperature_2m_max") or [None])[0],
-        "temp_min": (daily.get("temperature_2m_min") or [None])[0],
+        "temp_max": dmax[0] if dmax else None,
+        "temp_min": dmin[0] if dmin else None,
+        "precip_prob_today": dprob[0] if dprob else None,
         "fetched_at": datetime.utcnow().isoformat() + "Z",
         "date": target_date.isoformat(),
         "source": "open-meteo-archive" if is_archive else "open-meteo-forecast",
     }
+
+    # 5-day daily forecast (today only). Weekday is derived from the
+    # America/New_York date STRING (no UTC timestamp) so MON..SUN are correct
+    # locally per the dates rule.
+    forecast = []
+    if is_today:
+        for i in range(min(5, len(ddate))):
+            try:
+                di = datetime.strptime(ddate[i], '%Y-%m-%d').date()
+                wd = _WEEKDAY_ABBR[di.weekday()]
+            except Exception:
+                wd = ''
+            forecast.append({
+                "date": ddate[i],
+                "weekday": wd,
+                "code": dcode[i] if i < len(dcode) else None,
+                "temp_max": dmax[i] if i < len(dmax) else None,
+                "temp_min": dmin[i] if i < len(dmin) else None,
+                "precip_prob": dprob[i] if i < len(dprob) else None,
+            })
+    out["forecast"] = forecast
+
     deg = out.get("wind_dir_deg")
     if deg is not None:
         compass = ["N","NE","E","SE","S","SW","W","NW","N"]
         out["wind_dir"] = compass[int((deg + 22.5) // 45)]
     out["condition_label"] = _WMO_LABELS.get(out.get("condition_code"), "—")
+
+    _WEATHER_CACHE[cache_key] = {"data": out, "ts": now}
     return out
 
 

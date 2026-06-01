@@ -223,6 +223,28 @@
     .tbx-cat-scaffold { --c:#C8102E; --cbg:rgba(200,16,46,.09); }
     .tbx-cat-demo     { --c:#6b7280; --cbg:rgba(107,114,128,.12); }
     .tbx-cat-general  { --c:#1E73E8; --cbg:rgba(30,115,232,.10); }
+
+    /* #217 Weather widget — current conditions (calm-blue inward tile) + 5-day
+       forecast row with colored glyphs + blue rain-%. Icons carry their own
+       colors via the w-* symbols; rain blue is #2f86d6 per the mockup. */
+    .wx-now { display:flex; align-items:center; gap:12px; padding:11px 13px; border:1px solid rgba(30,115,232,.42); border-radius:13px; box-shadow:inset 0 0 13px rgba(30,115,232,.14),0 1px 4px rgba(0,0,0,.04); margin-bottom:13px; }
+    .wx-now-ico { width:44px; height:44px; flex-shrink:0; }
+    .wx-now-ico svg { width:44px; height:44px; display:block; }
+    .wx-now-meta { flex:1; min-width:0; }
+    .wx-now-temp { font-size:34px; font-weight:600; line-height:1; color:#14161C; }
+    .wx-now-cond { font-weight:600; font-size:14px; color:#14161C; margin-top:3px; }
+    .wx-now-sub { color:#76777E; font-size:12px; margin-top:2px; }
+    .wx-now-rain { display:flex; align-items:center; gap:5px; color:#2f86d6; font-weight:600; font-size:13px; margin-top:4px; }
+    .wx-drop { width:13px; height:13px; flex-shrink:0; }
+    .wx-fc-label { font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:#76777E; margin:0 2px 9px; }
+    .wx-days { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+    .wx-day { border:1px solid #E8E4DD; border-radius:11px; padding:10px 4px; text-align:center; }
+    .wx-day .wx-dn { font-weight:700; font-size:12px; color:#14161C; }
+    .wx-day .wx-di { width:26px; height:26px; display:block; margin:7px auto 6px; }
+    .wx-day .wx-hi { font-weight:600; font-size:13px; color:#14161C; }
+    .wx-day .wx-lo { color:#76777E; font-size:12px; }
+    .wx-day .wx-rn { display:inline-flex; align-items:center; gap:3px; color:#2f86d6; font-weight:600; font-size:11.5px; margin-top:7px; }
+    .wx-day .wx-rn .wx-drop { width:11px; height:11px; }
     .sidebar-header {
       display: flex;
       align-items: center;
@@ -691,6 +713,16 @@
   <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></symbol>
   <symbol id="i-ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5H5V6h5"/></symbol>
+  <!-- #217 weather glyphs — each hard-codes its own natural colors (sun amber,
+       cloud gray, rain blue drops) so no parent color can re-tint it. w-drop
+       uses currentColor so the rain-% droplet picks up the blue from its row. -->
+  <symbol id="w-sun" viewBox="0 0 24 24"><g stroke="#F6A609" stroke-width="2" stroke-linecap="round"><path d="M12 2v2.4M12 19.6V22M2 12h2.4M19.6 12H22M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M19.4 4.6l-1.7 1.7M6.3 17.7l-1.7 1.7"/></g><circle cx="12" cy="12" r="4.6" fill="#FDB813" stroke="#F6A609" stroke-width="1"/></symbol>
+  <symbol id="w-pcloud" viewBox="0 0 24 24"><g stroke="#F6A609" stroke-width="1.6" stroke-linecap="round"><path d="M8 1.6v1.6M2 7.5h1.6M3.6 3.1l1.1 1.1M12.4 3.1l-1.1 1.1"/></g><circle cx="8" cy="7.5" r="3.2" fill="#FDB813" stroke="#F6A609" stroke-width="1"/><path d="M9 18.5h8a3.6 3.6 0 000-7.2 4.6 4.6 0 00-8.9 1.2A3.1 3.1 0 009 18.5z" fill="#C2C9D2" stroke="#AEB6C0" stroke-width="1"/></symbol>
+  <symbol id="w-cloud" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 000-8 5 5 0 00-9.6 1.3A3.5 3.5 0 007 18z" fill="#B4BBC4" stroke="#9AA3AE" stroke-width="1"/></symbol>
+  <symbol id="w-rain" viewBox="0 0 24 24"><path d="M7 14h10a4 4 0 000-8 5 5 0 00-9.6 1.3A3.5 3.5 0 007 14z" fill="#9AA3AE" stroke="#828B97" stroke-width="1"/><g stroke="#2f86d6" stroke-width="2" stroke-linecap="round"><path d="M8 17.5l-1 2.5M12 17.5l-1 2.5M16 17.5l-1 2.5"/></g></symbol>
+  <symbol id="w-snow" viewBox="0 0 24 24"><path d="M7 14h10a4 4 0 000-8 5 5 0 00-9.6 1.3A3.5 3.5 0 007 14z" fill="#9AA3AE" stroke="#828B97" stroke-width="1"/><g fill="#7FB3E8"><circle cx="8" cy="18.6" r="1.3"/><circle cx="12" cy="19.6" r="1.3"/><circle cx="16" cy="18.6" r="1.3"/></g></symbol>
+  <symbol id="w-storm" viewBox="0 0 24 24"><path d="M7 14h10a4 4 0 000-8 5 5 0 00-9.6 1.3A3.5 3.5 0 007 14z" fill="#9AA3AE" stroke="#828B97" stroke-width="1"/><path d="M13 14.5l-3 4.5h2.4l-1 4 4.6-5.6h-2.6l1.6-2.9z" fill="#FDB813" stroke="#F6A609" stroke-width="0.5"/></symbol>
+  <symbol id="w-drop" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3s6 7 6 11a6 6 0 01-12 0c0-4 6-11 6-11z"/></symbol>
 </defs></svg>
 
 <div class="app-shell">
@@ -901,19 +933,22 @@
               </div>
             </div>
 
-            <div class="grid-stack-item" gs-id="weather" gs-x="8" gs-y="4" gs-w="4" gs-h="2">
+            <div class="grid-stack-item" gs-id="weather" gs-x="8" gs-y="4" gs-w="4" gs-h="5">
               <div class="grid-stack-item-content">
                 <section class="ph-widget" data-widget="weather">
                   <div class="ph-widget-head"><h3>Weather</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
                   <div class="ph-widget-body">
-                    <div style="display:flex;align-items:center;gap:12px;">
-                      <div id="wx-icon" style="width:46px;height:46px;flex-shrink:0;"></div>
-                      <div style="flex:1;min-width:0;"><div class="ph-kpi-v" id="wx-temp" style="font-size:30px;">—°</div><div class="ph-kpi-sub" id="wx-cond">Loading…</div></div>
+                    <div class="wx-now">
+                      <div class="wx-now-ico" id="wx-icon"></div>
+                      <div class="wx-now-meta">
+                        <div class="wx-now-temp" id="wx-temp">—°</div>
+                        <div class="wx-now-cond" id="wx-cond">Loading…</div>
+                        <div class="wx-now-sub" id="wx-sub">Feels —° · Wind — · H —°/L —°</div>
+                        <div class="wx-now-rain"><svg class="wx-drop"><use href="#w-drop"/></svg><span id="wx-rain-today">—% chance of rain today</span></div>
+                      </div>
                     </div>
-                    <div style="display:flex;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:1px solid #F1EEE8;font-size:11px;color:#76777E;">
-                      <span><strong style="color:#14161C;" id="wx-hilo">—°/—°</strong> hi/lo</span>
-                      <span><strong style="color:#14161C;" id="wx-wind">— mph</strong> <span id="wx-wind-dir">—</span></span>
-                    </div>
+                    <div class="wx-fc-label">Next 5 days</div>
+                    <div class="wx-days" id="wx-days"></div>
                   </div>
                 </section>
               </div>
@@ -928,7 +963,7 @@
               </div>
             </div>
 
-            <div class="grid-stack-item" gs-id="certs" gs-x="8" gs-y="6" gs-w="4" gs-h="2">
+            <div class="grid-stack-item" gs-id="certs" gs-x="8" gs-y="9" gs-w="4" gs-h="2">
               <div class="grid-stack-item-content">
                 <section class="ph-widget" data-widget="certs">
                   <div class="ph-widget-head"><h3>Cert alerts</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
@@ -938,7 +973,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #216 · 2026-06-01 · Toolbox Talks color-coded cards (Option 1)</div>
+          <div class="ph-build" id="ph-build-stamp">build #217 · 2026-06-01 · Weather 5-day forecast + daily rain %</div>
         </div>
       </section>
 
@@ -4045,150 +4080,84 @@ document.querySelectorAll('.nav-link').forEach(link => {
 
 
 // =====================================================================
-// Live Weather Widget — Open-Meteo via /api/weather
+// Live Weather Widget — Open-Meteo via /api/weather (#217: 5-day + rain%)
 // =====================================================================
 (function() {
-  // Modern multi-tone weather icon set (#114). Each icon hard-codes its own
-  // fill/stroke colors — sun in amber, cloud in slate, rain in blue, etc. —
-  // so no parent `color:` can re-tint the glyph (that's what made the cloud
-  // brand-red before). Consistent 64x64 viewBox, 2.5px stroke, line+fill
-  // hybrid so the outline reads cleanly on white.
-  const COLOR = {
-    sunFill:    '#F5B82E', sunStroke:  '#D29412',  // amber/gold
-    cloudFill:  '#E5E7EB', cloudStroke:'#6B7280',  // soft slate body, darker outline
-    rainStroke: '#3B82F6',                          // mid blue
-    snowFill:   '#DBEAFE',                          // very light blue dots
-    boltFill:   '#F5B82E', boltStroke:'#D29412',    // amber
-    fogStroke:  '#6B7280',                          // slate
-    windStroke: '#6B7280',                          // slate
-    nightFill:  '#1E293B', nightStroke:'#0F172A',   // deep slate-blue (clear night)
-  };
-
-  // Helper to keep the inline SVG strings readable.
-  function wrap(inner) {
-    return '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+  // Map a WMO weather code (Open-Meteo) to one of the inline <symbol> ids.
+  // Each symbol carries its own natural colors (sun amber, cloud gray, rain
+  // blue drops) so no parent color can re-tint it. snow/thunder have their
+  // own glyphs; fog + anything unmapped fall back to cloud — never blank.
+  function _wxSym(code) {
+    if (code == null) return 'w-cloud';
+    if (code === 0) return 'w-sun';                                              // clear sky
+    if (code === 1 || code === 2) return 'w-pcloud';                             // mainly clear / partly cloudy
+    if (code === 3) return 'w-cloud';                                            // overcast
+    if (code === 45 || code === 48) return 'w-cloud';                            // fog → cloud
+    if ([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)) return 'w-rain';  // drizzle / rain / showers
+    if ([71,73,75,77,85,86].includes(code)) return 'w-snow';                     // snow / snow showers
+    if ([95,96,99].includes(code)) return 'w-storm';                             // thunderstorm
+    return 'w-cloud';
   }
-
-  // Reusable cloud body (slate fill + darker outline). Used by cloud/rain/
-  // snow/storm so the silhouette stays consistent across precipitation types.
-  function cloudBody(opts) {
-    opts = opts || {};
-    const yShift = opts.yShift || 0;   // -ve = nudges cloud up for precip variants
-    const d = `M48 ${52+yShift}H18a12 12 0 0 1 0-24 14 14 0 0 1 27 4h3a10 10 0 0 1 0 20Z`;
-    return `<path d="${d}" fill="${COLOR.cloudFill}" stroke="${COLOR.cloudStroke}" stroke-width="2.5"/>`;
-  }
-
-  const ICONS = {
-    // Sun — amber disc + amber rays.
-    sun: wrap(
-      '<g stroke="' + COLOR.sunStroke + '" stroke-width="3">' +
-        '<path d="M32 4v10M32 50v10M4 32h10M50 32h10M11.5 11.5l7 7M45.5 45.5l7 7M11.5 52.5l7-7M45.5 18.5l7-7"/>' +
-      '</g>' +
-      '<circle cx="32" cy="32" r="12" fill="' + COLOR.sunFill + '" stroke="' + COLOR.sunStroke + '" stroke-width="2.5"/>'
-    ),
-    // Partly cloudy — small sun behind slate cloud.
-    partly: wrap(
-      '<g stroke="' + COLOR.sunStroke + '" stroke-width="2.5">' +
-        '<path d="M22 6v6M22 32v3M6 22h6M32 22h4M11 11l4 4M29.5 29.5l3 3M11 33l4-4M29.5 14.5l3-3"/>' +
-      '</g>' +
-      '<circle cx="22" cy="22" r="8" fill="' + COLOR.sunFill + '" stroke="' + COLOR.sunStroke + '" stroke-width="2.5"/>' +
-      '<path d="M50 54H22a11 11 0 0 1 0-22 13 13 0 0 1 25 3h2a9.5 9.5 0 0 1 0 19Z" fill="' + COLOR.cloudFill + '" stroke="' + COLOR.cloudStroke + '" stroke-width="2.5"/>'
-    ),
-    // Overcast / cloud — slate cloud with outline so it reads on white.
-    cloud: wrap(cloudBody()),
-    // Rain — slate cloud + 3 blue droplets.
-    rain: wrap(
-      cloudBody({yShift: -6}) +
-      '<g stroke="' + COLOR.rainStroke + '" stroke-width="3.5">' +
-        '<path d="M22 50l-3 8M32 50l-3 8M42 50l-3 8"/>' +
-      '</g>'
-    ),
-    // Snow — slate cloud + small star-flake dots.
-    snow: wrap(
-      cloudBody({yShift: -6}) +
-      '<g fill="' + COLOR.snowFill + '" stroke="' + COLOR.rainStroke + '" stroke-width="1.5">' +
-        '<circle cx="22" cy="54" r="2.5"/>' +
-        '<circle cx="32" cy="56" r="2.5"/>' +
-        '<circle cx="42" cy="54" r="2.5"/>' +
-      '</g>'
-    ),
-    // Thunderstorm — slate cloud + amber lightning bolt.
-    storm: wrap(
-      cloudBody({yShift: -6}) +
-      '<path d="M30 44l-6 10h6l-2 8 10-12h-6l3-6z" fill="' + COLOR.boltFill + '" stroke="' + COLOR.boltStroke + '" stroke-width="2"/>'
-    ),
-    // Fog/mist — three stacked slate horizontal lines.
-    fog: wrap(
-      '<g stroke="' + COLOR.fogStroke + '" stroke-width="3.5">' +
-        '<path d="M8 24h48M4 36h56M12 48h44"/>' +
-      '</g>'
-    ),
-    // Wind — slate flowing lines.
-    wind: wrap(
-      '<g stroke="' + COLOR.windStroke + '" stroke-width="3" fill="none">' +
-        '<path d="M6 22h38a8 8 0 1 0-8-8"/>' +
-        '<path d="M6 34h46"/>' +
-        '<path d="M6 46h28a8 8 0 1 1-8 8"/>' +
-      '</g>'
-    ),
-    // Clear night — deep slate moon (used when an explicit night code arrives
-    // from the source — Open-Meteo's WMO does not distinguish day/night
-    // directly, but the function below could be extended via is_day later).
-    nightClear: wrap(
-      '<path d="M44 36a18 18 0 1 1-22-22 14 14 0 0 0 22 22Z" fill="' + COLOR.nightFill + '" stroke="' + COLOR.nightStroke + '" stroke-width="2.5"/>'
-    ),
-  };
-
-  // Map every WMO weather code Open-Meteo can return (0..99) to an icon.
-  // Codes: https://open-meteo.com/en/docs#weathervariables
-  function iconFor(code) {
-    if (code == null) return ICONS.cloud;
-    if (code === 0) return ICONS.sun;                                            // clear sky
-    if (code === 1 || code === 2) return ICONS.partly;                           // mainly clear / partly cloudy
-    if (code === 3) return ICONS.cloud;                                          // overcast
-    if (code === 45 || code === 48) return ICONS.fog;                            // fog / depositing rime
-    if ([51, 53, 55, 56, 57].includes(code)) return ICONS.rain;                  // drizzle (incl. freezing)
-    if ([61, 63, 65, 66, 67].includes(code)) return ICONS.rain;                  // rain (incl. freezing)
-    if ([71, 73, 75, 77].includes(code)) return ICONS.snow;                      // snow fall / snow grains
-    if ([80, 81, 82].includes(code)) return ICONS.rain;                          // rain showers
-    if ([85, 86].includes(code)) return ICONS.snow;                              // snow showers
-    if ([95, 96, 99].includes(code)) return ICONS.storm;                         // thunderstorm (incl. hail)
-    return ICONS.cloud;                                                          // safe default — never fall through to red
+  function _wxSvg(code, cls) {
+    return '<svg' + (cls ? ' class="' + cls + '"' : '') + '><use href="#' + _wxSym(code) + '"/></svg>';
   }
 
   function fmtTemp(n) { return n == null ? '—°' : Math.round(n) + '°'; }
-  function fmtWind(n) { return n == null ? '— mph' : Math.round(n) + ' mph'; }
+  function fmtPct(n)  { return n == null ? '0%' : Math.round(n) + '%'; }
+
+  // Last-good snapshot — if a refresh fails (provider down / offline) we
+  // re-render the previous good data instead of blanking the widget. The
+  // server also serves a stale cached value on its side: defense-in-depth.
+  let _wxLastGood = null;
+  const $w = (id) => document.getElementById(id);
+
+  function renderWx(w) {
+    const icon = $w('wx-icon');
+    if (icon) icon.innerHTML = _wxSvg(w.condition_code);
+    if ($w('wx-temp')) $w('wx-temp').textContent = fmtTemp(w.temp_now);
+    if ($w('wx-cond')) $w('wx-cond').textContent = w.condition_label || '—';
+    const feels = 'Feels ' + fmtTemp(w.feels_like != null ? w.feels_like : w.temp_now);
+    const wind = (w.wind_mph != null ? Math.round(w.wind_mph) + ' mph' : '— mph') + (w.wind_dir ? ' ' + w.wind_dir : '');
+    if ($w('wx-sub')) $w('wx-sub').textContent = feels + ' · Wind ' + wind + ' · H ' + fmtTemp(w.temp_max) + '/L ' + fmtTemp(w.temp_min);
+    if ($w('wx-rain-today')) $w('wx-rain-today').textContent = fmtPct(w.precip_prob_today) + ' chance of rain today';
+    const days = $w('wx-days');
+    if (days) {
+      const fc = Array.isArray(w.forecast) ? w.forecast.slice(0, 5) : [];
+      days.innerHTML = fc.map(d =>
+        '<div class="wx-day">' +
+          '<div class="wx-dn">' + (d.weekday || '') + '</div>' +
+          _wxSvg(d.code, 'wx-di') +
+          '<div class="wx-hi">' + fmtTemp(d.temp_max) + '</div>' +
+          '<div class="wx-lo">' + fmtTemp(d.temp_min) + '</div>' +
+          '<div class="wx-rn"><svg class="wx-drop"><use href="#w-drop"/></svg>' + fmtPct(d.precip_prob) + '</div>' +
+        '</div>'
+      ).join('');
+    }
+  }
 
   async function loadWeather() {
     try {
       const resp = await fetch('/api/weather').then(r => r.json());
       const w = resp && resp.data;
-      if (!w) return;
-
-      const iconEl = document.getElementById('wx-icon');
-      if (iconEl) iconEl.innerHTML = iconFor(w.condition_code);
-
-      const tempEl = document.getElementById('wx-temp');
-      if (tempEl) tempEl.textContent = fmtTemp(w.temp_now);
-
-      const condEl = document.getElementById('wx-cond');
-      if (condEl) condEl.textContent = w.condition_label || '—';
-
-      const hiloEl = document.getElementById('wx-hilo');
-      if (hiloEl) hiloEl.textContent = `${fmtTemp(w.temp_max)}/${fmtTemp(w.temp_min)}`;
-
-      const windEl = document.getElementById('wx-wind');
-      if (windEl) windEl.textContent = fmtWind(w.wind_mph);
-
-      const dirEl = document.getElementById('wx-wind-dir');
-      if (dirEl) dirEl.textContent = w.wind_dir || '—';
+      if (!w) throw new Error('no weather data');
+      _wxLastGood = w;
+      renderWx(w);
     } catch (e) {
+      // Degrade gracefully: keep the last good render; if we never had one,
+      // show a quiet "unavailable" without blanking the page.
       console.warn('[Weather] load failed:', e);
+      if (_wxLastGood) {
+        renderWx(_wxLastGood);
+      } else if ($w('wx-cond')) {
+        $w('wx-cond').textContent = 'Weather unavailable';
+      }
     }
   }
 
   loadWeather();
-  setInterval(loadWeather, 10 * 60 * 1000); // refresh every 10 min
+  // Refresh every 30 min — the server caches each fetch ~30 min, so this stays
+  // light on Open-Meteo while keeping the widget current through the workday.
+  setInterval(loadWeather, 30 * 60 * 1000);
 })();
 
 
@@ -4977,9 +4946,9 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     {id:'active-drops',x:0,y:0,w:8,h:3},
     {id:'drops-status',x:8,y:0,w:4,h:4},
     {id:'progress-elevation',x:0,y:3,w:8,h:4},
-    {id:'weather',x:8,y:4,w:4,h:2},
+    {id:'weather',x:8,y:4,w:4,h:5},
     {id:'roster',x:0,y:7,w:8,h:3},
-    {id:'certs',x:8,y:6,w:4,h:2},
+    {id:'certs',x:8,y:9,w:4,h:2},
   ];
   let grid=null, saveTimer=null, suppressSave=false;
   function hint(t){ const h=$('ph-layout-hint'); if(h)h.textContent=t; }
