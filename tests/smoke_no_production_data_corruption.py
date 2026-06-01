@@ -124,6 +124,19 @@ TABLES_TO_SNAPSHOT: list[Tuple[str, list[str], list[str]]] = [
     # positions ONLY (no PII), so it is not serialized here. Surfaces immediately
     # if any FUTURE smoke writes a layout row for a real user during the CRUD run.
     ("dashboard_layouts", ["user_id", "page_key"], []),
+    # Expense / Spend module (#218 Batch A). Same backstop logic as the
+    # drop-plan tables: the CRUD smoke subprocess never writes any expense
+    # table, so within a meta-smoke run before==after and each reports
+    # "clean" — no false failure. They're snapshotted so that if a FUTURE
+    # smoke writes a NON-synthetic expense row during the CRUD run, it
+    # surfaces immediately. Identity leads with vendor/doc_number (which the
+    # expense smoke prefixes SMK-) so synthetic rows auto-filter as expected
+    # residue. value_cols are status/category/class ONLY — money (total,
+    # unit_price, extended_price) and receipt_image_path are NEVER serialized
+    # here (cost-data + path discipline, mirroring worker_rates).
+    ("expenses", ["vendor", "doc_number", "project_code"], ["status", "category"]),
+    ("expense_line_items", ["expense_id", "sort_order"], ["product_class"]),
+    ("expense_class_alias", ["vendor", "item_key"], ["product_class"]),
 ]
 
 

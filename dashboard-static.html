@@ -245,6 +245,99 @@
     .wx-day .wx-lo { color:#76777E; font-size:12px; }
     .wx-day .wx-rn { display:inline-flex; align-items:center; gap:3px; color:#2f86d6; font-weight:600; font-size:11.5px; margin-top:7px; }
     .wx-day .wx-rn .wx-drop { width:11px; height:11px; }
+
+    /* #218 Expense / Spend module — approved mockup (blue/white). Cost data:
+       admin/c_suite only; the whole nav group + views are revealed only for
+       those roles (server 403 is the real authority). */
+    .exp-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
+    .exp-head h1 { margin:0; font-size:22px; }
+    .exp-head .sub { color:#76777E; font-size:13px; margin-top:3px; }
+    .exp-hbtns { display:flex; gap:9px; flex-wrap:wrap; }
+    .exp-primary { background:#1E73E8; border:none; color:#fff; border-radius:10px; padding:9px 15px; font-size:13.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
+    .exp-primary:hover { filter:brightness(.96); }
+    .exp-ghost { background:#fff; border:1px solid #E8E4DD; color:#14161C; border-radius:10px; padding:9px 15px; font-size:13.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
+    .exp-ghost:hover { border-color:#1E73E8; color:#1E73E8; }
+    .exp-ic { width:16px; height:16px; }
+    .exp-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+    .exp-tile { background:#fff; border:1px solid rgba(30,115,232,.42); border-radius:13px; padding:11px 14px; box-shadow:inset 0 0 13px rgba(30,115,232,.14),0 1px 4px rgba(0,0,0,.04); }
+    .exp-tile .l { color:#76777E; font-size:12px; } .exp-tile .v { font-size:22px; font-weight:600; margin-top:2px; }
+    .exp-tile .v.amber { color:#BA7517; }
+    .exp-toolbar { display:flex; align-items:center; gap:10px; margin-bottom:14px; font-size:13px; flex-wrap:wrap; }
+    .exp-searchbox { display:flex; align-items:center; gap:8px; background:#f5f6f8; border:1px solid #E8E4DD; border-radius:9px; padding:8px 11px; color:#76777E; min-width:210px; }
+    .exp-searchbox input { border:none; background:transparent; outline:none; font-size:13px; color:#14161C; width:100%; }
+    .exp-sel { height:36px; border:1px solid #E8E4DD; border-radius:9px; padding:0 10px; font-size:13px; background:#fff; color:#14161C; font-family:inherit; }
+    .exp-count { margin-left:auto; color:#76777E; }
+    .exp-card { border:1px solid #E8E4DD; border-radius:13px; overflow:hidden; }
+    .exp-table { width:100%; border-collapse:collapse; font-size:13.5px; }
+    .exp-table thead th { background:#14161a; text-align:left; color:#EAECEF; font-weight:600; font-size:11px; letter-spacing:.04em; text-transform:uppercase; padding:11px 16px; }
+    .exp-table thead th.r, .exp-table td.r { text-align:right; }
+    .exp-table td { padding:11px 16px; border-bottom:1px solid #f3f3f5; }
+    .exp-table tr:last-child td { border-bottom:none; }
+    .exp-table tbody tr:hover td { background:#fafbfc; }
+    .exp-id { font-weight:600; }
+    .exp-muted { color:#76777E; }
+    .exp-amt { font-weight:600; }
+    .exp-cat { font-size:12px; font-weight:600; padding:2px 10px; border-radius:999px; color:#1E73E8; background:rgba(30,115,232,.1); white-space:nowrap; }
+    .exp-cat.del { color:#BA7517; background:rgba(186,117,23,.12); }
+    .exp-cat.equip { color:#7c3aed; background:rgba(124,58,237,.1); }
+    .exp-cat.labor { color:#0F6E56; background:rgba(15,110,86,.1); }
+    .exp-cat.other { color:#76777E; background:rgba(107,114,128,.12); }
+    .exp-pill { font-size:11.5px; font-weight:600; padding:2px 9px; border-radius:999px; white-space:nowrap; }
+    .exp-pill.ok { color:#0F6E56; background:rgba(15,110,86,.1); }
+    .exp-pill.rev { color:#BA7517; background:rgba(186,117,23,.12); }
+    .exp-pill.draft { color:#76777E; background:rgba(107,114,128,.12); }
+    .exp-acts { display:flex; gap:7px; justify-content:flex-end; }
+    .exp-iconbtn { width:30px; height:30px; border:1px solid #E8E4DD; background:#fff; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; color:#76777E; text-decoration:none; }
+    .exp-iconbtn:hover { color:#1E73E8; border-color:rgba(30,115,232,.4); }
+    .exp-iconbtn.del:hover { color:#C8102E; border-color:rgba(200,16,46,.4); }
+    .exp-iconbtn[disabled] { opacity:.4; cursor:default; }
+    .exp-empty { padding:30px; text-align:center; color:#76777E; }
+    /* class pills */
+    .exp-clz { font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; white-space:nowrap; display:inline-block; color:#76777E; background:rgba(107,114,128,.14); }
+    .exp-clz.mas { color:#1E73E8; background:rgba(30,115,232,.1); }
+    .exp-clz.cem { color:#8a6516; background:rgba(186,117,23,.13); }
+    .exp-clz.seal { color:#0F6E56; background:rgba(15,110,86,.1); }
+    .exp-clz.del { color:#BA7517; background:rgba(186,117,23,.12); }
+    .exp-clz.rent { color:#7c3aed; background:rgba(124,58,237,.1); }
+    .exp-clz.ppe { color:#C8102E; background:rgba(200,16,46,.09); }
+    /* capture panel */
+    .exp-drop { border:2px dashed rgba(30,115,232,.42); border-radius:14px; padding:26px; text-align:center; color:#76777E; background:rgba(30,115,232,.04); }
+    .exp-drop .big { width:34px; height:34px; color:#1E73E8; margin-bottom:8px; }
+    .exp-drop b { color:#14161C; }
+    .exp-capture-paths { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:14px; }
+    .exp-split { display:grid; grid-template-columns:300px 1fr; gap:18px; margin-top:16px; }
+    @media (max-width:860px){ .exp-split { grid-template-columns:1fr; } .exp-kpis { grid-template-columns:repeat(2,1fr); } }
+    .exp-receipt-pane { border:1px solid #E8E4DD; border-radius:12px; background:#fbfbfc; padding:12px; }
+    .exp-receipt-pane .imgtag { display:inline-flex; align-items:center; gap:5px; color:#1E73E8; font-weight:600; font-size:11px; margin-bottom:10px; }
+    .exp-receipt-pane img { width:100%; border-radius:8px; display:block; border:1px solid #E8E4DD; }
+    .exp-receipt-pane .none { color:#9AA3AE; font-size:12px; text-align:center; padding:24px 8px; }
+    .exp-aibanner { display:flex; align-items:center; gap:9px; background:rgba(30,115,232,.07); border:1px solid rgba(30,115,232,.42); border-radius:10px; padding:9px 13px; font-size:12.5px; color:#1E73E8; font-weight:600; margin-bottom:14px; }
+    .exp-aibanner .soon { margin-left:auto; font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:#76777E; background:#fff; border:1px solid #E8E4DD; border-radius:999px; padding:2px 8px; }
+    /* form */
+    .exp-frow { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+    @media (max-width:860px){ .exp-frow { grid-template-columns:1fr; } }
+    .exp-field label { display:block; color:#76777E; font-size:11px; font-weight:600; letter-spacing:.03em; text-transform:uppercase; margin-bottom:4px; }
+    .exp-field input, .exp-field select { width:100%; height:36px; border:1px solid #E8E4DD; border-radius:9px; padding:0 10px; font-size:13px; background:#fff; color:#14161C; font-family:inherit; }
+    .exp-litbl { border:1px solid #E8E4DD; border-radius:11px; overflow:auto; margin:6px 0 12px; }
+    .exp-litbl table { width:100%; border-collapse:collapse; font-size:12.5px; min-width:760px; }
+    .exp-litbl th { background:#f7f8fa; color:#76777E; padding:8px 10px; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; text-align:left; }
+    .exp-litbl th.r { text-align:right; }
+    .exp-litbl td { padding:6px 8px; border-top:1px solid #f3f3f5; vertical-align:middle; }
+    .exp-litbl td.r { text-align:right; }
+    .exp-litbl input, .exp-litbl select { width:100%; border:1px solid transparent; background:transparent; font-size:12.5px; padding:4px 6px; border-radius:6px; font-family:inherit; color:#14161C; }
+    .exp-litbl input:focus, .exp-litbl select:focus { border-color:rgba(30,115,232,.42); background:#fff; outline:none; }
+    .exp-litbl input.r { text-align:right; }
+    .exp-litbl select { border:1px solid #E8E4DD; background:#fff; }
+    .exp-li-refund { display:inline-flex; align-items:center; gap:4px; font-size:11px; color:#76777E; white-space:nowrap; cursor:pointer; }
+    .exp-li-del { width:24px; height:24px; border:1px solid #E8E4DD; background:#fff; border-radius:6px; color:#76777E; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+    .exp-li-del:hover { color:#C8102E; border-color:rgba(200,16,46,.4); }
+    .exp-addline { font-size:12.5px; color:#1E73E8; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; margin:2px 0 10px; background:none; border:none; padding:0; }
+    .exp-totrow { display:flex; justify-content:flex-end; gap:24px; font-size:14px; padding:6px 4px; align-items:baseline; }
+    .exp-totrow .tlab { color:#76777E; } .exp-totrow .tval { font-weight:700; font-size:17px; }
+    .exp-saverow { display:flex; justify-content:flex-end; gap:9px; margin-top:14px; flex-wrap:wrap; align-items:center; }
+    .exp-qb { display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:600; color:#76777E; border:1px dashed #E8E4DD; border-radius:8px; padding:5px 10px; }
+    .exp-legend { display:flex; gap:8px; flex-wrap:wrap; margin:2px 0 14px; }
+    .exp-refflag { color:#76777E; }
     .sidebar-header {
       display: flex;
       align-items: center;
@@ -723,6 +816,12 @@
   <symbol id="w-snow" viewBox="0 0 24 24"><path d="M7 14h10a4 4 0 000-8 5 5 0 00-9.6 1.3A3.5 3.5 0 007 14z" fill="#9AA3AE" stroke="#828B97" stroke-width="1"/><g fill="#7FB3E8"><circle cx="8" cy="18.6" r="1.3"/><circle cx="12" cy="19.6" r="1.3"/><circle cx="16" cy="18.6" r="1.3"/></g></symbol>
   <symbol id="w-storm" viewBox="0 0 24 24"><path d="M7 14h10a4 4 0 000-8 5 5 0 00-9.6 1.3A3.5 3.5 0 007 14z" fill="#9AA3AE" stroke="#828B97" stroke-width="1"/><path d="M13 14.5l-3 4.5h2.4l-1 4 4.6-5.6h-2.6l1.6-2.9z" fill="#FDB813" stroke="#F6A609" stroke-width="0.5"/></symbol>
   <symbol id="w-drop" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3s6 7 6 11a6 6 0 01-12 0c0-4 6-11 6-11z"/></symbol>
+  <!-- #218 expense module glyphs -->
+  <symbol id="i-scan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 012-2h3M16 3h3a2 2 0 012 2v3M21 16v3a2 2 0 01-2 2h-3M8 21H5a2 2 0 01-2-2v-3"/><rect x="7" y="9" width="10" height="6" rx="1"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7L18 9l-4.2 1.6L12 15l-1.8-4.4L6 9l4.2-1.3z"/><path d="M19 14l.8 2 .8-2 .8 2"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 012-2h2l1.5-2h7L19 6h2a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><circle cx="12" cy="13" r="3.5"/></symbol>
 </defs></svg>
 
 <div class="app-shell">
@@ -805,6 +904,18 @@
           </a>
           <a class="nav-link" data-view="compliance"><svg class="nav-ic"><use href="#i-alert"/></svg>Compliance & Permits</a>
           <a class="nav-link" data-view="closeout"><svg class="nav-ic"><use href="#i-clip"/></svg>Warranty & Closeout</a>
+        </div>
+      </div>
+      <!-- #218 Expenses — its own section. Cost data: hidden until the gate
+           script reveals it for admin/c_suite (server @requires_role is the
+           real authority — non-cost roles 403 + this stays omitted). -->
+      <div class="nav-group" data-group="expenses" id="exp-nav-group" style="display:none;">
+        <div class="nav-group-label"><span class="nav-group-name">Expenses</span><svg class="nav-chev"><use href="#i-chev"/></svg></div>
+        <div class="nav-items">
+          <a class="nav-link" data-view="expenses"><svg class="nav-ic"><use href="#i-receipt"/></svg>Expenses
+            <span style="font-size:9px;font-weight:700;color:#76777E;letter-spacing:0.5px;margin-left:6px;padding:1px 5px;border:1px solid #D5D2C9;border-radius:2px;text-transform:uppercase;">Admin</span>
+          </a>
+          <a class="nav-link" data-view="product-usage"><svg class="nav-ic"><use href="#i-layers"/></svg>Product Usage</a>
         </div>
       </div>
       <div class="nav-group" data-group="setup">
@@ -973,7 +1084,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #217 · 2026-06-01 · Weather 5-day forecast + daily rain %</div>
+          <div class="ph-build" id="ph-build-stamp">build #218 · 2026-06-01 · Expenses module (capture · manual entry · product usage · admin-gated)</div>
         </div>
       </section>
 
@@ -3274,6 +3385,128 @@
         </div>
       </section>
 
+      <!-- #218 EXPENSES (cost data — admin/c_suite only; server-gated) -->
+      <section class="view" data-view="expenses">
+        <div class="section">
+          <!-- State 1: LIST (Screen 1) -->
+          <div id="exp-list-view">
+            <div class="exp-head">
+              <div><h1>Expenses</h1><div class="sub">FR-BX-001 · 890 E 135th St · receipts on file + job costing</div></div>
+              <div class="exp-hbtns">
+                <button id="exp-scan-btn" class="exp-primary" type="button"><svg class="exp-ic"><use href="#i-scan"/></svg>Scan Receipt</button>
+                <button id="exp-addmanual-btn" class="exp-ghost" type="button"><svg class="exp-ic"><use href="#i-plus"/></svg>Add Manually</button>
+              </div>
+            </div>
+            <div class="exp-kpis">
+              <div class="exp-tile"><div class="l">Total spend</div><div class="v" id="exp-kpi-total">—</div></div>
+              <div class="exp-tile"><div class="l">This month</div><div class="v" id="exp-kpi-month">—</div></div>
+              <div class="exp-tile"><div class="l">Receipts on file</div><div class="v" id="exp-kpi-receipts">—</div></div>
+              <div class="exp-tile"><div class="l">Needs review</div><div class="v amber" id="exp-kpi-review">—</div></div>
+            </div>
+            <div class="exp-toolbar">
+              <div class="exp-searchbox"><svg class="exp-ic" style="width:15px;height:15px;"><use href="#i-search"/></svg><input id="exp-search" type="text" placeholder="Search by vendor, item, or doc #…" autocomplete="off"></div>
+              <select class="exp-sel" id="exp-filter-vendor"><option value="">All vendors</option></select>
+              <select class="exp-sel" id="exp-filter-category"><option value="">All categories</option><option>Materials</option><option>Delivery</option><option>Equipment</option><option>Labor</option><option>Other</option></select>
+              <select class="exp-sel" id="exp-filter-class"><option value="">All classes</option></select>
+              <select class="exp-sel" id="exp-filter-status"><option value="">All statuses</option><option value="draft">Draft</option><option value="needs_review">Needs review</option><option value="reviewed">Reviewed</option></select>
+              <span class="exp-count" id="exp-count">—</span>
+            </div>
+            <div class="exp-card">
+              <table class="exp-table">
+                <thead><tr><th>Date</th><th>Vendor</th><th>Doc #</th><th>Category</th><th>Cost code</th><th class="r">Amount</th><th>Status</th><th></th></tr></thead>
+                <tbody id="exp-tbody"><tr><td colspan="8" class="exp-empty">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- State 2: CAPTURE panel (Screen 2 — upload+manual now; AI auto-read is Batch B) -->
+          <div id="exp-capture-view" style="display:none;">
+            <div class="exp-head">
+              <div><h1>Scan Receipt</h1><div class="sub">Take a photo or upload — attach the image, then enter the fields</div></div>
+              <button id="exp-capture-back" class="exp-ghost" type="button">← Back to list</button>
+            </div>
+            <div class="exp-aibanner"><svg class="exp-ic"><use href="#i-spark"/></svg>AI auto-read — reads the receipt &amp; fills every field for you<span class="soon">Coming soon</span></div>
+            <div class="exp-drop">
+              <svg class="big"><use href="#i-upload"/></svg>
+              <div><b>Take a photo or upload a receipt</b></div>
+              <div>JPG, PNG, HEIC or PDF · the original image is always kept</div>
+              <div class="exp-capture-paths">
+                <button id="exp-path-camera" class="exp-primary" type="button"><svg class="exp-ic"><use href="#i-camera"/></svg>Take photo</button>
+                <button id="exp-path-upload" class="exp-ghost" type="button"><svg class="exp-ic"><use href="#i-upload"/></svg>Upload file</button>
+                <button id="exp-path-manual" class="exp-ghost" type="button"><svg class="exp-ic"><use href="#i-plus"/></svg>Add manually</button>
+              </div>
+            </div>
+            <input id="exp-capture-camera" type="file" accept="image/*" capture="environment" style="display:none;">
+            <input id="exp-capture-file" type="file" accept=".jpg,.jpeg,.png,.heic,.heif,.pdf,image/*,application/pdf" style="display:none;">
+          </div>
+
+          <!-- State 3: ADD/EDIT FORM (Screen 3; split w/ captured image when present) -->
+          <div id="exp-form-view" style="display:none;">
+            <div class="exp-head">
+              <div><h1 id="exp-form-title">Add Expense</h1><div class="sub" id="exp-form-sub">Enter it by hand — attach a photo any time</div></div>
+              <button id="exp-form-back" class="exp-ghost" type="button">← Back to list</button>
+            </div>
+            <div class="exp-split" id="exp-form-split">
+              <div class="exp-receipt-pane" id="exp-receipt-pane" style="display:none;">
+                <div class="imgtag"><svg class="exp-ic" style="width:14px;height:14px;"><use href="#i-eye"/></svg>Captured image</div>
+                <div id="exp-receipt-host"><div class="none">No image attached</div></div>
+              </div>
+              <div id="exp-form-fields">
+                <div class="exp-frow">
+                  <div class="exp-field"><label>Vendor</label><input id="exp-f-vendor" placeholder="e.g. Extech / LITSCO"></div>
+                  <div class="exp-field"><label>Date</label><input id="exp-f-date" type="text" placeholder="MM-DD-YYYY"></div>
+                </div>
+                <div class="exp-frow">
+                  <div class="exp-field"><label>Document type</label><input id="exp-f-doctype" placeholder="Invoice / Receipt / Pick Ticket / PO"></div>
+                  <div class="exp-field"><label>Document #</label><input id="exp-f-docnum" placeholder="e.g. 6073294"></div>
+                </div>
+                <div class="exp-frow">
+                  <div class="exp-field"><label>Order #</label><input id="exp-f-order" placeholder="optional"></div>
+                  <div class="exp-field"><label>Project / Job</label><select id="exp-f-project"><option value="FR-BX-001">FR-BX-001 · 890 E 135th St</option></select></div>
+                </div>
+                <div class="exp-frow">
+                  <div class="exp-field"><label>Category</label><select id="exp-f-category"><option>Materials</option><option>Delivery</option><option>Equipment</option><option>Labor</option><option>Other</option></select></div>
+                  <div class="exp-field"><label>Cost code (job costing)</label><input id="exp-f-costcode" placeholder="e.g. 03-200 Masonry"></div>
+                </div>
+                <div class="exp-litbl">
+                  <table>
+                    <thead><tr><th>Item ID</th><th>Description</th><th>Class</th><th class="r">Qty</th><th>Unit</th><th class="r">Unit $</th><th class="r">Extended</th><th>↩</th><th></th></tr></thead>
+                    <tbody id="exp-li-tbody"></tbody>
+                  </table>
+                </div>
+                <button class="exp-addline" id="exp-addline-btn" type="button"><svg class="exp-ic" style="width:14px;height:14px;"><use href="#i-plus"/></svg>Add line</button>
+                <div class="exp-totrow"><span class="tlab">Total <span class="exp-muted" style="font-size:11px;">(excl. refundable / out-of-cost)</span></span><span class="tval" id="exp-total">$0.00</span></div>
+                <div class="exp-saverow">
+                  <span class="exp-qb"><svg class="exp-ic" style="width:13px;height:13px;"><use href="#i-spark"/></svg>QuickBooks sync · coming soon</span>
+                  <span id="exp-form-statuswrap" style="display:none;"></span>
+                  <button id="exp-attach-btn" class="exp-ghost" type="button"><svg class="exp-ic"><use href="#i-upload"/></svg>Attach receipt photo</button>
+                  <button id="exp-approve-btn" class="exp-ghost" type="button" style="display:none;color:#0F6E56;border-color:rgba(15,110,86,.4);">Approve (PM)</button>
+                  <button id="exp-save-btn" class="exp-primary" type="button">Save expense</button>
+                </div>
+                <input id="exp-attach-file" type="file" accept=".jpg,.jpeg,.png,.heic,.heif,.pdf,image/*,application/pdf" style="display:none;">
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- #218 PRODUCT USAGE rollup (Screen 4) -->
+      <section class="view" data-view="product-usage">
+        <div class="section">
+          <div class="exp-head">
+            <div><h1>Product Usage</h1><div class="sub">FR-BX-001 · what we actually bought &amp; used — by product class · feeds estimating</div></div>
+            <div class="exp-hbtns"><select class="exp-sel" id="exp-pu-project"><option value="FR-BX-001">This project</option><option value="" disabled>All projects (company-wide soon)</option></select></div>
+          </div>
+          <div class="exp-card">
+            <table class="exp-table">
+              <thead><tr><th>Class</th><th>Product</th><th class="r">Qty</th><th>Unit</th><th class="r">Receipts</th><th class="r">Total spend</th></tr></thead>
+              <tbody id="exp-pu-tbody"><tr><td colspan="6" class="exp-empty">Loading…</td></tr></tbody>
+            </table>
+          </div>
+          <p class="exp-muted" style="font-size:12px;margin-top:10px;">Refundable deposits (↩) are tracked but flagged out of true job cost. Cost total (excl. refundable): <strong id="exp-pu-costtotal">—</strong>. "All projects" rolls this company-wide soon.</p>
+        </div>
+      </section>
+
       <!-- RFI LOG -->
       <section class="view" data-view="rfis">
         <div class="section">
@@ -3593,8 +3826,303 @@ document.querySelectorAll('.nav-link').forEach(link => {
     if (targetView === 'toolbox-talks') {
       if (typeof window.PROJ_loadToolboxTalks === 'function') window.PROJ_loadToolboxTalks();
     }
+    if (targetView === 'expenses') {
+      if (typeof window.PROJ_loadExpenses === 'function') window.PROJ_loadExpenses();
+    }
+    if (targetView === 'product-usage') {
+      if (typeof window.PROJ_loadProductUsage === 'function') window.PROJ_loadProductUsage();
+    }
   });
 });
+
+// ---- #218 Expense / Spend module (list · capture · form · product usage) ----
+// Cost data: the nav group is revealed only for admin/c_suite; the server
+// @requires_role is the real authority (non-cost roles 403). Money is rendered
+// from server-computed totals (Decimal, no drift). Dates LOCAL via SSCDatePicker.
+(function(){
+  const PROJECT = (location.pathname.match(/\/projects\/([^\/]+)/) || [])[1] || 'FR-BX-001';
+  const $ = (id) => document.getElementById(id);
+  if (!$('exp-tbody')) return;  // section not present
+  const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const jget = (u) => fetch(u, {credentials:'include'}).then(r => r.ok ? r.json() : Promise.reject(r));
+  function money(n){ if(n==null||isNaN(n)) return '$0.00'; return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function fmtMDY(iso){ if(!iso) return '—'; const p=String(iso).slice(0,10).split('-'); return p.length===3? p[1]+'/'+p[2]+'/'+p[0] : iso; }
+  function todayLocalISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+  let TAX = {classes:[], units:[], statuses:[]};
+  let EXP_ROWS = [];
+  let formLines = [];
+  let editingId = null;
+  let pendingReceipt = null;
+  let vendorPopulated = false;
+
+  function clzMod(c){ return ({MASONRY:'mas',CEMENT_MORTAR:'cem',CONCRETE_REPAIR:'cem',SEALANTS_CAULK:'seal',WATERPROOFING:'seal',DELIVERY_FREIGHT:'del',EQUIP_RENTAL:'rent',EQUIP_PURCHASE:'rent',PPE_SAFETY:'ppe',DEPOSIT_REFUNDABLE:'dep',CREDIT_RETURN:'dep'})[c] || ''; }
+  function catMod(cat){ const c=(cat||'').toLowerCase(); if(c.indexOf('deliv')>=0)return 'del'; if(c.indexOf('equip')>=0)return 'equip'; if(c.indexOf('labor')>=0)return 'labor'; if(c.indexOf('material')>=0)return ''; return 'other'; }
+
+  async function ensureTaxonomy(){
+    if(TAX.classes.length) return;
+    try{
+      const j = await jget('/api/expenses/taxonomy'); TAX = j.data;
+      const fc = $('exp-filter-class');
+      if(fc) fc.innerHTML = '<option value="">All classes</option>' + TAX.classes.map(c=>'<option value="'+c.code+'">'+esc(c.label)+'</option>').join('');
+    }catch(_){}
+  }
+
+  // ---------- LIST ----------
+  async function loadList(){
+    const tbody = $('exp-tbody'); if(!tbody) return;
+    const p = new URLSearchParams();
+    const q=$('exp-search').value.trim(); if(q) p.set('q',q);
+    const v=$('exp-filter-vendor').value; if(v) p.set('vendor',v);
+    const cat=$('exp-filter-category').value; if(cat) p.set('category',cat);
+    const cl=$('exp-filter-class').value; if(cl) p.set('product_class',cl);
+    const st=$('exp-filter-status').value; if(st) p.set('status',st);
+    tbody.innerHTML='<tr><td colspan="8" class="exp-empty">Loading…</td></tr>';
+    try{
+      const j = await jget('/api/projects/'+encodeURIComponent(PROJECT)+'/expenses?'+p.toString());
+      EXP_ROWS = j.data || [];
+      renderKpis(j.kpis||{});
+      renderRows(EXP_ROWS);
+      if(!vendorPopulated && !v){ populateVendors(EXP_ROWS); vendorPopulated=true; }
+      $('exp-count').textContent = EXP_ROWS.length + ' expense' + (EXP_ROWS.length===1?'':'s');
+    }catch(e){
+      tbody.innerHTML='<tr><td colspan="8" class="exp-empty" style="color:#C8102E;">Could not load expenses.</td></tr>';
+    }
+  }
+  function renderKpis(k){
+    $('exp-kpi-total').textContent = money(k.total_spend);
+    $('exp-kpi-month').textContent = money(k.this_month);
+    $('exp-kpi-receipts').textContent = (k.receipts_on_file!=null?k.receipts_on_file:0);
+    $('exp-kpi-review').textContent = (k.needs_review!=null?k.needs_review:0);
+  }
+  function renderRows(rows){
+    const tbody=$('exp-tbody');
+    if(!rows.length){ tbody.innerHTML='<tr><td colspan="8" class="exp-empty">No expenses yet. Click <strong>Scan Receipt</strong> or <strong>Add Manually</strong>.</td></tr>'; return; }
+    tbody.innerHTML = rows.map(e=>{
+      const pill = e.status==='reviewed' ? '<span class="exp-pill ok">Reviewed</span>' : e.status==='draft' ? '<span class="exp-pill draft">Draft</span>' : '<span class="exp-pill rev">Needs review</span>';
+      const view = e.has_receipt
+        ? '<a class="exp-iconbtn" href="/api/expenses/'+e.id+'/receipt" target="_blank" rel="noopener" title="View receipt"><svg class="exp-ic"><use href="#i-eye"/></svg></a>'
+        : '<span class="exp-iconbtn" title="No receipt on file" disabled><svg class="exp-ic"><use href="#i-eye"/></svg></span>';
+      const cat = e.category ? '<span class="exp-cat '+catMod(e.category)+'">'+esc(e.category)+'</span>' : '<span class="exp-muted">—</span>';
+      return '<tr>'
+        +'<td>'+esc(fmtMDY(e.expense_date))+'</td>'
+        +'<td class="exp-id">'+esc(e.vendor||'—')+'</td>'
+        +'<td class="exp-muted">'+esc(e.doc_number||'—')+'</td>'
+        +'<td>'+cat+'</td>'
+        +'<td class="exp-muted">'+esc(e.cost_code||'—')+'</td>'
+        +'<td class="r exp-amt">'+money(e.total)+'</td>'
+        +'<td>'+pill+'</td>'
+        +'<td><div class="exp-acts">'+view
+          +'<button class="exp-iconbtn" title="Edit" data-edit="'+e.id+'"><svg class="exp-ic"><use href="#i-pencil"/></svg></button>'
+          +'<button class="exp-iconbtn del" title="Delete" data-del="'+e.id+'"><svg class="exp-ic"><use href="#i-trash"/></svg></button>'
+        +'</div></td></tr>';
+    }).join('');
+  }
+  function populateVendors(rows){
+    const sel=$('exp-filter-vendor'); if(!sel) return;
+    const vendors=[...new Set(rows.map(r=>r.vendor).filter(Boolean))].sort();
+    sel.innerHTML='<option value="">All vendors</option>'+vendors.map(v=>'<option>'+esc(v)+'</option>').join('');
+  }
+  $('exp-tbody').addEventListener('click', (e)=>{
+    const del=e.target.closest('[data-del]'); if(del){ onDelete(del.getAttribute('data-del')); return; }
+    const ed=e.target.closest('[data-edit]'); if(ed){ pendingReceipt=null; openForm(ed.getAttribute('data-edit')); }
+  });
+  async function onDelete(id){
+    const row = EXP_ROWS.find(r=>String(r.id)===String(id));
+    if(!confirm('Delete this expense'+(row?(' — '+(row.vendor||'')+' · '+money(row.total)):'')+'? This removes its line items and receipt image. This cannot be undone.')) return;
+    try{ const r=await fetch('/api/expenses/'+id,{method:'DELETE',credentials:'include'}); if(r.ok) loadList(); else alert('Delete failed'); }catch(_){ alert('Network error'); }
+  }
+
+  // ---------- view states ----------
+  function showState(which){
+    $('exp-list-view').style.display = which==='list'?'':'none';
+    $('exp-capture-view').style.display = which==='capture'?'':'none';
+    $('exp-form-view').style.display = which==='form'?'':'none';
+  }
+
+  // ---------- CAPTURE ----------
+  function openCapture(){ pendingReceipt=null; showState('capture'); }
+  function onCaptureFile(file){ if(!file) return; pendingReceipt=file; openForm(null); }
+
+  // ---------- FORM ----------
+  function blankLine(){ return {item_id:'',description:'',product_class:'OTHER',normalized_product:'',qty:'',unit:'EA',unit_price:'',extended_price:'',is_refundable:false}; }
+  async function openForm(id){
+    await ensureTaxonomy();
+    editingId = id || null;
+    $('exp-form-title').textContent = editingId ? 'Edit Expense' : 'Add Expense';
+    $('exp-form-sub').textContent = editingId ? 'Edit fields & lines — total recomputes live' : 'Enter it by hand — attach a photo any time';
+    ['exp-f-vendor','exp-f-docnum','exp-f-order','exp-f-costcode','exp-f-doctype'].forEach(k=>{ if($(k)) $(k).value=''; });
+    $('exp-f-category').value='Materials';
+    if(window.SSCDatePicker){ SSCDatePicker.wire($('exp-f-date')); SSCDatePicker.setISO($('exp-f-date'), editingId?'':todayLocalISO()); }
+    else $('exp-f-date').value = editingId?'':todayLocalISO();
+    $('exp-approve-btn').style.display='none';
+    $('exp-form-statuswrap').style.display='none';
+    setReceiptPane(null);
+    if(!editingId && pendingReceipt) previewLocalReceipt(pendingReceipt);
+    if(editingId){ loadForEdit(editingId); }
+    else { formLines=[blankLine()]; renderLines(); recalcTotal(); }
+    showState('form');
+  }
+  async function loadForEdit(id){
+    try{
+      const j = await jget('/api/expenses/'+id); const e=j.data;
+      $('exp-f-vendor').value=e.vendor||''; $('exp-f-doctype').value=e.doc_type||''; $('exp-f-docnum').value=e.doc_number||'';
+      $('exp-f-order').value=e.order_number||''; $('exp-f-category').value=e.category||'Materials'; $('exp-f-costcode').value=e.cost_code||'';
+      if(window.SSCDatePicker) SSCDatePicker.setISO($('exp-f-date'), e.expense_date||'');
+      formLines = (e.line_items||[]).map(li=>({item_id:li.item_id||'',description:li.description||'',product_class:li.product_class||'OTHER',normalized_product:li.normalized_product||'',qty:li.qty,unit:li.unit||'EA',unit_price:li.unit_price,extended_price:li.extended_price,is_refundable:!!li.is_refundable}));
+      if(!formLines.length) formLines=[blankLine()];
+      renderLines(); recalcTotal();
+      setReceiptPane(e.has_receipt ? ('/api/expenses/'+id+'/receipt') : null);
+      const wrap=$('exp-form-statuswrap'); wrap.style.display='';
+      wrap.innerHTML = e.status==='reviewed'?'<span class="exp-pill ok">Reviewed</span>':e.status==='draft'?'<span class="exp-pill draft">Draft</span>':'<span class="exp-pill rev">Needs review</span>';
+      $('exp-approve-btn').style.display = e.status!=='reviewed' ? '' : 'none';
+    }catch(_){ alert('Could not load expense'); showState('list'); }
+  }
+  function classOptions(sel){ return TAX.classes.map(c=>'<option value="'+c.code+'"'+(c.code===sel?' selected':'')+'>'+esc(c.label)+'</option>').join(''); }
+  function unitOptions(sel){ let opts=TAX.units.slice(); if(sel && opts.indexOf(sel)<0) opts.unshift(sel); return opts.map(u=>'<option'+(u===sel?' selected':'')+'>'+esc(u)+'</option>').join(''); }
+  function renderLines(){
+    $('exp-li-tbody').innerHTML = formLines.map((ln,i)=>(
+      '<tr data-i="'+i+'">'
+      +'<td><input data-f="item_id" value="'+esc(ln.item_id)+'" placeholder="SKU"></td>'
+      +'<td><input data-f="description" value="'+esc(ln.description)+'" placeholder="Line item…"></td>'
+      +'<td><select data-f="product_class">'+classOptions(ln.product_class)+'</select></td>'
+      +'<td class="r"><input data-f="qty" class="r" value="'+esc(ln.qty)+'" placeholder="0"></td>'
+      +'<td><select data-f="unit">'+unitOptions(ln.unit)+'</select></td>'
+      +'<td class="r"><input data-f="unit_price" class="r" value="'+esc(ln.unit_price)+'" placeholder="0.0000"></td>'
+      +'<td class="r"><input data-f="extended_price" class="r" value="'+esc(ln.extended_price)+'" placeholder="0.00"></td>'
+      +'<td><label class="exp-li-refund"><input type="checkbox" data-f="is_refundable"'+(ln.is_refundable?' checked':'')+'>↩</label></td>'
+      +'<td><button class="exp-li-del" type="button" data-delline="'+i+'" title="Remove line">✕</button></td>'
+      +'</tr>'
+    )).join('');
+  }
+  function onLineEdit(ev){
+    const tr=ev.target.closest('tr[data-i]'); if(!tr) return;
+    const i=+tr.getAttribute('data-i'); const f=ev.target.getAttribute('data-f'); if(f==null) return;
+    const ln=formLines[i]; if(!ln) return;
+    if(f==='is_refundable'){ ln.is_refundable=ev.target.checked; }
+    else ln[f]=ev.target.value;
+    if(f==='product_class' && ln.product_class==='DEPOSIT_REFUNDABLE'){ ln.is_refundable=true; const cb=tr.querySelector('[data-f="is_refundable"]'); if(cb) cb.checked=true; }
+    if(f==='qty' || f==='unit_price'){
+      const q=parseFloat(ln.qty)||0, up=parseFloat(ln.unit_price)||0;
+      const ext=Math.round(q*up*100)/100;
+      ln.extended_price = ext ? ext.toFixed(2) : '';
+      const ei=tr.querySelector('[data-f="extended_price"]'); if(ei) ei.value=ln.extended_price;
+    }
+    recalcTotal();
+  }
+  $('exp-li-tbody').addEventListener('input', onLineEdit);
+  $('exp-li-tbody').addEventListener('change', onLineEdit);
+  $('exp-li-tbody').addEventListener('click',(ev)=>{ const d=ev.target.closest('[data-delline]'); if(!d) return; const i=+d.getAttribute('data-delline'); formLines.splice(i,1); if(!formLines.length) formLines=[blankLine()]; renderLines(); recalcTotal(); });
+  function lineOOC(ln){ return ln.is_refundable || ln.product_class==='DEPOSIT_REFUNDABLE' || ln.product_class==='CREDIT_RETURN'; }
+  function recalcTotal(){ let t=0; formLines.forEach(ln=>{ if(!lineOOC(ln)) t += parseFloat(ln.extended_price)||0; }); $('exp-total').textContent = money(Math.round(t*100)/100); }
+
+  function setReceiptPane(url){
+    const pane=$('exp-receipt-pane'), host=$('exp-receipt-host');
+    if(url){ pane.style.display=''; host.innerHTML='<img src="'+esc(url)+'" alt="receipt">'; $('exp-form-split').style.gridTemplateColumns='300px 1fr'; }
+    else { pane.style.display='none'; host.innerHTML='<div class="none">No image attached</div>'; $('exp-form-split').style.gridTemplateColumns='1fr'; }
+  }
+  function previewLocalReceipt(file){
+    const pane=$('exp-receipt-pane'), host=$('exp-receipt-host'); pane.style.display=''; $('exp-form-split').style.gridTemplateColumns='300px 1fr';
+    if(file.type==='application/pdf'){ host.innerHTML='<div class="none">PDF attached — '+esc(file.name)+'</div>'; return; }
+    try{ host.innerHTML='<img src="'+URL.createObjectURL(file)+'" alt="receipt">'; }catch(_){ host.innerHTML='<div class="none">'+esc(file.name||'image')+'</div>'; }
+  }
+
+  function collectLines(){
+    return formLines.filter(ln => (ln.description||'').toString().trim() || ln.extended_price || ln.qty).map((ln,idx)=>({
+      item_id: ln.item_id||null, description: ln.description||'', product_class: ln.product_class||'OTHER',
+      normalized_product: ln.normalized_product||null, qty: parseFloat(ln.qty)||0, unit: ln.unit||'EA',
+      unit_price: parseFloat(ln.unit_price)||0,
+      extended_price: (ln.extended_price!=='' && ln.extended_price!=null) ? parseFloat(ln.extended_price) : null,
+      is_refundable: ln.is_refundable?1:0, sort_order: idx,
+    }));
+  }
+  function collectHeader(){
+    const dateISO = window.SSCDatePicker ? SSCDatePicker.getISO($('exp-f-date')) : $('exp-f-date').value;
+    return { vendor:$('exp-f-vendor').value.trim(), doc_type:$('exp-f-doctype').value.trim(), doc_number:$('exp-f-docnum').value.trim(),
+             order_number:$('exp-f-order').value.trim(), expense_date:dateISO, category:$('exp-f-category').value, cost_code:$('exp-f-costcode').value.trim() };
+  }
+  async function uploadReceipt(id, file){ const fd=new FormData(); fd.append('receipt', file); const r=await fetch('/api/expenses/'+id+'/receipt',{method:'POST',credentials:'include',body:fd}); return r.ok; }
+  async function onSave(){
+    const header=collectHeader(), lines=collectLines();
+    const btn=$('exp-save-btn'); btn.disabled=true; btn.textContent='Saving…';
+    try{
+      if(editingId){
+        const r=await fetch('/api/expenses/'+editingId,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({},header,{lines:lines}))});
+        if(!r.ok) throw new Error('patch');
+        if(pendingReceipt){ await uploadReceipt(editingId, pendingReceipt); pendingReceipt=null; }
+      } else if(pendingReceipt){
+        const fd=new FormData();
+        Object.keys(header).forEach(k=>fd.append(k, header[k]==null?'':header[k]));
+        fd.append('lines', JSON.stringify(lines));
+        fd.append('receipt', pendingReceipt);
+        const r=await fetch('/api/projects/'+encodeURIComponent(PROJECT)+'/expenses',{method:'POST',credentials:'include',body:fd});
+        if(!r.ok) throw new Error('post'); pendingReceipt=null;
+      } else {
+        const r=await fetch('/api/projects/'+encodeURIComponent(PROJECT)+'/expenses',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({},header,{lines:lines}))});
+        if(!r.ok) throw new Error('post');
+      }
+      vendorPopulated=false; showState('list'); loadList();
+    }catch(e){ alert('Save failed — check the fields and try again.'); }
+    finally{ btn.disabled=false; btn.textContent='Save expense'; }
+  }
+  async function onApprove(){
+    if(!editingId) return;
+    try{ const r=await fetch('/api/expenses/'+editingId,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'reviewed'})});
+      if(r.ok){ loadForEdit(editingId); loadList(); } else alert('Approve failed'); }catch(_){ alert('Network error'); }
+  }
+
+  // ---------- PRODUCT USAGE ----------
+  async function loadProductUsage(){
+    const tb=$('exp-pu-tbody'); if(!tb) return;
+    tb.innerHTML='<tr><td colspan="6" class="exp-empty">Loading…</td></tr>';
+    try{
+      const j=await jget('/api/projects/'+encodeURIComponent(PROJECT)+'/expenses/product-usage');
+      const rows=j.data||[];
+      if(!rows.length){ tb.innerHTML='<tr><td colspan="6" class="exp-empty">No line items yet — add an expense to see usage.</td></tr>'; $('exp-pu-costtotal').textContent=money(0); return; }
+      tb.innerHTML=rows.map(r=>{
+        const ref=r.out_of_cost;
+        const spend = ref ? (money(r.refundable_total)+' <span class="exp-refflag" title="refundable — excluded from cost">&#8617;</span>') : money(r.total_spend);
+        return '<tr>'
+          +'<td><span class="exp-clz '+clzMod(r.product_class)+'">'+esc(r.product_class_label||r.product_class)+'</span></td>'
+          +'<td style="font-weight:600;">'+esc(r.product)+'</td>'
+          +'<td class="r">'+esc(Number(r.qty).toLocaleString('en-US'))+'</td>'
+          +'<td>'+esc(r.unit)+'</td>'
+          +'<td class="r">'+esc(r.receipts)+'</td>'
+          +'<td class="r '+(ref?'exp-muted':'exp-amt')+'">'+spend+'</td>'
+          +'</tr>';
+      }).join('');
+      $('exp-pu-costtotal').textContent = money((j.totals||{}).cost_total);
+    }catch(e){ tb.innerHTML='<tr><td colspan="6" class="exp-empty" style="color:#C8102E;">Could not load rollup.</td></tr>'; }
+  }
+
+  // ---------- wiring ----------
+  $('exp-scan-btn').addEventListener('click', openCapture);
+  $('exp-addmanual-btn').addEventListener('click', ()=>{ pendingReceipt=null; openForm(null); });
+  $('exp-capture-back').addEventListener('click', ()=>showState('list'));
+  $('exp-form-back').addEventListener('click', ()=>showState('list'));
+  $('exp-path-camera').addEventListener('click', ()=>$('exp-capture-camera').click());
+  $('exp-path-upload').addEventListener('click', ()=>$('exp-capture-file').click());
+  $('exp-path-manual').addEventListener('click', ()=>{ pendingReceipt=null; openForm(null); });
+  $('exp-capture-camera').addEventListener('change', (e)=>onCaptureFile(e.target.files[0]));
+  $('exp-capture-file').addEventListener('change', (e)=>onCaptureFile(e.target.files[0]));
+  $('exp-addline-btn').addEventListener('click', ()=>{ formLines.push(blankLine()); renderLines(); recalcTotal(); });
+  $('exp-attach-btn').addEventListener('click', ()=>$('exp-attach-file').click());
+  $('exp-attach-file').addEventListener('change', (e)=>{ const f=e.target.files[0]; if(!f) return; pendingReceipt=f; previewLocalReceipt(f); });
+  $('exp-save-btn').addEventListener('click', onSave);
+  $('exp-approve-btn').addEventListener('click', onApprove);
+  let searchT=null;
+  $('exp-search').addEventListener('input', ()=>{ clearTimeout(searchT); searchT=setTimeout(loadList, 250); });
+  ['exp-filter-vendor','exp-filter-category','exp-filter-class','exp-filter-status'].forEach(k=>$(k).addEventListener('change', loadList));
+  const puSel=$('exp-pu-project'); if(puSel) puSel.addEventListener('change', loadProductUsage);
+
+  // admin/c_suite reveal of the Expenses nav group (omitted otherwise)
+  function revealForAdmin(user){ if(user && (user.role==='admin'||user.role==='c_suite')){ const g=$('exp-nav-group'); if(g) g.style.display=''; } }
+  document.addEventListener('ssc:user-loaded', (e)=>revealForAdmin(e.detail));
+  if(window.__SSC_USER) revealForAdmin(window.__SSC_USER);
+
+  window.PROJ_loadExpenses = async function(){ await ensureTaxonomy(); showState('list'); loadList(); };
+  window.PROJ_loadProductUsage = function(){ loadProductUsage(); };
+})();
 
 // ---- Project Documents — Blank Forms subsection --------------------
 // Loads /api/blank-forms; renders each as a click-to-open card. PDFs

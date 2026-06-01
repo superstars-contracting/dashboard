@@ -7296,6 +7296,557 @@ def add_no_cache_headers(response):
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
     return response
+
+# ============= EXPENSE / SPEND MODULE (#218, Batch A) =============
+# Per-project expense capture: header + line items + receipt image + the
+# product-usage rollup that feeds estimating. COST DATA -> gated to the
+# established money roles (admin/c_suite); non-cost roles get 403 and the
+# nav/views are OMITTED client-side. Money is computed with Decimal (no float
+# drift); dates are LOCAL YYYY-MM-DD; receipt_image_path is NEVER serialized.
+from decimal import Decimal, ROUND_HALF_UP
+
+_EXPENSE_COST_ROLES = ('admin', 'c_suite')
+
+EXPENSE_PRODUCT_CLASSES = [
+    'MASONRY', 'CEMENT_MORTAR', 'CONCRETE_REPAIR', 'SEALANTS_CAULK', 'WATERPROOFING',
+    'GFRC_PRECAST', 'STUCCO_EIFS', 'COATINGS_PAINT', 'ROOFING', 'ELECTRICAL',
+    'EQUIP_RENTAL', 'EQUIP_PURCHASE', 'SCAFFOLD_ACCESS', 'TOOLS_CONSUMABLES',
+    'FASTENERS_HARDWARE', 'PPE_SAFETY', 'DUMPSTER_DISPOSAL', 'FUEL_VEHICLE',
+    'DELIVERY_FREIGHT', 'PERMITS_FEES', 'SUBCONTRACTOR', 'DEPOSIT_REFUNDABLE',
+    'CREDIT_RETURN', 'OTHER',
+]
+EXPENSE_CLASS_LABELS = {
+    'MASONRY': 'Masonry', 'CEMENT_MORTAR': 'Cement / Mortar',
+    'CONCRETE_REPAIR': 'Concrete Repair', 'SEALANTS_CAULK': 'Sealants / Caulk',
+    'WATERPROOFING': 'Waterproofing', 'GFRC_PRECAST': 'GFRC / Precast',
+    'STUCCO_EIFS': 'Stucco / EIFS', 'COATINGS_PAINT': 'Coatings / Paint',
+    'ROOFING': 'Roofing', 'ELECTRICAL': 'Electrical', 'EQUIP_RENTAL': 'Equip Rental',
+    'EQUIP_PURCHASE': 'Equip Purchase', 'SCAFFOLD_ACCESS': 'Scaffold / Access',
+    'TOOLS_CONSUMABLES': 'Tools / Consumables', 'FASTENERS_HARDWARE': 'Fasteners / Hardware',
+    'PPE_SAFETY': 'PPE / Safety', 'DUMPSTER_DISPOSAL': 'Dumpster / Disposal',
+    'FUEL_VEHICLE': 'Fuel / Vehicle', 'DELIVERY_FREIGHT': 'Delivery / Freight',
+    'PERMITS_FEES': 'Permits / Fees', 'SUBCONTRACTOR': 'Subcontractor',
+    'DEPOSIT_REFUNDABLE': 'Deposit (refundable)', 'CREDIT_RETURN': 'Credit / Return',
+    'OTHER': 'Other',
+}
+EXPENSE_UNITS = [
+    'PC', 'EA', 'bag', 'cube', 'pallet', 'tube', 'sausage', 'case', 'box', 'bucket',
+    'pail', 'gallon', 'roll', 'board', 'SF', 'LF', 'lb', 'ton', 'day', 'week', 'month',
+    'pull', 'LS',
+]
+EXPENSE_STATUSES = ('draft', 'needs_review', 'reviewed')
+_EXP_OUT_OF_COST_CLASSES = {'DEPOSIT_REFUNDABLE', 'CREDIT_RETURN'}
+_EXP_REFUNDABLE_CLASSES = {'DEPOSIT_REFUNDABLE'}
+_RECEIPT_EXT = {'.jpg', '.jpeg', '.png', '.heic', '.heif', '.pdf'}
+_RECEIPT_MIME = {
+    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+    '.heic': 'image/heic', '.heif': 'image/heif', '.pdf': 'application/pdf',
+}
+_RECEIPTS_BASE = (SCRIPT_DIR / "data_room" / "receipts")
+
+
+def _exp_dec(v):
+    try:
+        return Decimal(str(v if v is not None else 0))
+    except Exception:
+        return Decimal('0')
+
+
+def _exp_q2(d):
+    return d.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def _exp_money(v):
+    """Float rounded to 2dp for JSON (computed via Decimal — no float drift)."""
+    return float(_exp_q2(_exp_dec(v)))
+
+
+def _exp_actor_uid():
+    return (current_user() or {}).get('id')
+
+
+def _exp_normalize_line(ln, idx):
+    """Validate class/unit, derive refundable + out_of_cost from flags + class,
+    compute extended_price via Decimal (trust the receipt's line total if given,
+    else qty*unit_price)."""
+    pc = ln.get('product_class') or 'OTHER'
+    if pc not in EXPENSE_PRODUCT_CLASSES:
+        pc = 'OTHER'
+    qty = _exp_dec(ln.get('qty'))
+    unit_price = _exp_dec(ln.get('unit_price'))
+    ext_raw = ln.get('extended_price')
+    ext = _exp_q2(_exp_dec(ext_raw)) if ext_raw not in (None, '') else _exp_q2(qty * unit_price)
+    refundable = 1 if (ln.get('is_refundable') or pc in _EXP_REFUNDABLE_CLASSES) else 0
+    out_of_cost = 1 if (refundable or ln.get('out_of_cost') or pc in _EXP_OUT_OF_COST_CLASSES) else 0
+    try:
+        sort_order = int(ln.get('sort_order'))
+    except (TypeError, ValueError):
+        sort_order = idx
+    return {
+        'item_id': (ln.get('item_id') or None),
+        'description': (ln.get('description') or ''),
+        'product_class': pc,
+        'normalized_product': (ln.get('normalized_product') or None),
+        'qty': float(qty),
+        'unit': (ln.get('unit') or 'EA'),
+        'unit_price': float(unit_price),
+        'extended_price': float(ext),
+        'is_refundable': refundable,
+        'out_of_cost': out_of_cost,
+        'sort_order': sort_order,
+    }
+
+
+def _exp_compute_total(lines):
+    tot = Decimal('0')
+    for ln in lines:
+        if not ln.get('out_of_cost'):
+            tot += _exp_dec(ln.get('extended_price'))
+    return float(_exp_q2(tot))
+
+
+def _exp_public(row):
+    """Safe expense dict for JSON: drops receipt_image_path (PII/path rule),
+    exposes has_receipt boolean + money rounded via Decimal."""
+    d = dict(row)
+    rip = d.pop('receipt_image_path', None)
+    d['has_receipt'] = bool(rip)
+    if 'total' in d:
+        d['total'] = _exp_money(d.get('total'))
+    return d
+
+
+def _exp_line_public(row):
+    d = dict(row)
+    d['qty'] = float(d.get('qty') or 0)
+    d['unit_price'] = float(d.get('unit_price') or 0)
+    d['extended_price'] = _exp_money(d.get('extended_price'))
+    d['is_refundable'] = bool(d.get('is_refundable'))
+    d['out_of_cost'] = bool(d.get('out_of_cost'))
+    return d
+
+
+def _exp_store_receipt(project_code, file_storage):
+    """Store under data_room/receipts/<project>/<uuid>.<ext> (non-guessable).
+    Returns (abs_path_str, None) or (None, error)."""
+    ext = Path(file_storage.filename or '').suffix.lower()
+    if ext not in _RECEIPT_EXT:
+        return None, "Unsupported file type — use JPG, PNG, HEIC, or PDF"
+    base = _RECEIPTS_BASE.resolve()
+    rdir = _RECEIPTS_BASE / project_code
+    if not rdir.resolve().is_relative_to(base):
+        return None, "Invalid path"
+    rdir.mkdir(parents=True, exist_ok=True)
+    path = rdir / f"{uuid.uuid4().hex}{ext}"
+    file_storage.save(str(path))
+    return str(path), None
+
+
+def _exp_unlink_receipt(rip):
+    """Delete a receipt file IFF it's inside the receipts base (never escapes)."""
+    if not rip:
+        return
+    try:
+        p = Path(rip)
+        if p.resolve().is_relative_to(_RECEIPTS_BASE.resolve()) and p.exists():
+            p.unlink()
+    except Exception as fe:
+        logging.warning(f"receipt unlink failed ({rip}): {fe}")
+
+
+def _exp_read_payload():
+    """Return (header_dict, lines_list_or_None, receipt_filestorage_or_None) for
+    both multipart (capture w/ image) and JSON (manual) requests."""
+    HEADER_FIELDS = ('vendor', 'doc_type', 'doc_number', 'order_number',
+                     'expense_date', 'category', 'cost_code', 'payment_method',
+                     'status', 'notes')
+    ctype = request.content_type or ''
+    if ctype.startswith('multipart/form-data'):
+        form = request.form
+        header = {k: form.get(k) for k in HEADER_FIELDS}
+        lines = None
+        if form.get('lines'):
+            try:
+                parsed = json.loads(form.get('lines'))
+                lines = parsed if isinstance(parsed, list) else None
+            except Exception:
+                lines = None
+        return header, lines, request.files.get('receipt')
+    body = request.get_json(silent=True) or {}
+    header = {k: body.get(k) for k in HEADER_FIELDS}
+    lines = body.get('lines') if isinstance(body.get('lines'), list) else None
+    return header, lines, None
+
+
+def _exp_insert_lines(conn, expense_id, norm_lines):
+    for ln in norm_lines:
+        conn.execute(
+            "INSERT INTO expense_line_items (expense_id, item_id, description, "
+            "product_class, normalized_product, qty, unit, unit_price, extended_price, "
+            "is_refundable, out_of_cost, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (expense_id, ln['item_id'], ln['description'], ln['product_class'],
+             ln['normalized_product'], ln['qty'], ln['unit'], ln['unit_price'],
+             ln['extended_price'], ln['is_refundable'], ln['out_of_cost'], ln['sort_order']))
+
+
+def _exp_detail_dict(conn, expense_id):
+    row = conn.execute("SELECT * FROM expenses WHERE id=?", (expense_id,)).fetchone()
+    if not row:
+        return None
+    out = _exp_public(row)
+    lrows = conn.execute(
+        "SELECT * FROM expense_line_items WHERE expense_id=? ORDER BY sort_order, id",
+        (expense_id,)).fetchall()
+    out['line_items'] = [_exp_line_public(r) for r in lrows]
+    return out
+
+
+@app.route('/api/expenses/taxonomy', methods=['GET'])
+@requires_role(*_EXPENSE_COST_ROLES)
+def api_expense_taxonomy():
+    """The shared product-class + unit enums (single source for the picker)."""
+    return response_wrapper({
+        'classes': [{'code': c, 'label': EXPENSE_CLASS_LABELS.get(c, c)} for c in EXPENSE_PRODUCT_CLASSES],
+        'units': EXPENSE_UNITS,
+        'statuses': list(EXPENSE_STATUSES),
+        'out_of_cost_classes': sorted(_EXP_OUT_OF_COST_CLASSES),
+        'refundable_classes': sorted(_EXP_REFUNDABLE_CLASSES),
+    })
+
+
+@app.route('/api/projects/<project_code>/expenses', methods=['GET'])
+@requires_role(*_EXPENSE_COST_ROLES)
+def api_expenses_list(project_code):
+    """List + filters (q, vendor, category, product_class, cost_code, status,
+    from/to) + KPIs (total spend [excl out_of_cost — already baked into
+    expense.total], this month, receipts on file, needs-review). No *_path."""
+    conn = db()
+    try:
+        if not validate_project_exists(conn, project_code):
+            return jsonify({"error": "Project not found"}), 404
+        where = ["e.project_code = ?"]
+        params = [project_code]
+        for col, arg in (('vendor', 'vendor'), ('category', 'category'),
+                         ('cost_code', 'cost_code'), ('status', 'status')):
+            v = request.args.get(arg)
+            if v:
+                where.append(f"e.{col} = ?")
+                params.append(v)
+        fd = request.args.get('from')
+        if fd:
+            where.append("e.expense_date >= ?")
+            params.append(fd)
+        td = request.args.get('to')
+        if td:
+            where.append("e.expense_date <= ?")
+            params.append(td)
+        pclass = request.args.get('product_class')
+        if pclass:
+            where.append("EXISTS (SELECT 1 FROM expense_line_items li WHERE li.expense_id=e.id AND li.product_class=?)")
+            params.append(pclass)
+        q = (request.args.get('q') or '').strip()
+        if q:
+            like = f"%{q}%"
+            where.append("(e.vendor LIKE ? OR e.doc_number LIKE ? OR e.order_number LIKE ? OR "
+                         "e.notes LIKE ? OR e.cost_code LIKE ? OR EXISTS (SELECT 1 FROM "
+                         "expense_line_items lq WHERE lq.expense_id=e.id AND "
+                         "(lq.description LIKE ? OR lq.item_id LIKE ?)))")
+            params += [like] * 7
+        rows = conn.execute(
+            "SELECT e.* FROM expenses e WHERE " + " AND ".join(where) +
+            " ORDER BY e.expense_date DESC, e.id DESC", params).fetchall()
+        # line counts in one pass (avoid N+1 at scale)
+        ids = [r['id'] for r in rows]
+        lc_map = {}
+        if ids:
+            qmarks = ",".join("?" * len(ids))
+            for lr in conn.execute(
+                f"SELECT expense_id, COUNT(*) c, COUNT(DISTINCT product_class) dc "
+                f"FROM expense_line_items WHERE expense_id IN ({qmarks}) GROUP BY expense_id", ids):
+                lc_map[lr['expense_id']] = (lr['c'], lr['dc'])
+        out = []
+        total_spend = Decimal('0')
+        month_spend = Decimal('0')
+        receipts_on_file = 0
+        needs_review = 0
+        ym = date.today().strftime('%Y-%m')
+        for r in rows:
+            d = _exp_public(r)
+            c, dc = lc_map.get(r['id'], (0, 0))
+            d['line_count'] = c
+            d['product_class_count'] = dc
+            out.append(d)
+            total_spend += _exp_dec(r['total'])
+            if (r['expense_date'] or '').startswith(ym):
+                month_spend += _exp_dec(r['total'])
+            if r['receipt_image_path']:
+                receipts_on_file += 1
+            if r['status'] == 'needs_review':
+                needs_review += 1
+        return jsonify({
+            "data": out,
+            "meta": {"count": len(out), "generated_at": datetime.now().isoformat()},
+            "kpis": {
+                "total_spend": float(_exp_q2(total_spend)),
+                "this_month": float(_exp_q2(month_spend)),
+                "receipts_on_file": receipts_on_file,
+                "needs_review": needs_review,
+            },
+        })
+    finally:
+        conn.close()
+
+
+@app.route('/api/projects/<project_code>/expenses', methods=['POST'])
+@requires_role(*_EXPENSE_COST_ROLES)
+def api_expenses_create(project_code):
+    """Create header + lines (+ optional receipt image multipart). Admin manual
+    entry may pass status=reviewed; default needs_review."""
+    conn = db()
+    try:
+        if not validate_project_exists(conn, project_code):
+            return jsonify({"error": "Project not found"}), 404
+        header, lines, receipt = _exp_read_payload()
+        exp_date = (header.get('expense_date') or '').strip() or date.today().isoformat()
+        try:
+            datetime.strptime(exp_date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({"error": "expense_date must be YYYY-MM-DD"}), 400
+        status = header.get('status') or 'needs_review'
+        if status not in EXPENSE_STATUSES:
+            status = 'needs_review'
+        norm = [_exp_normalize_line(ln, i) for i, ln in enumerate(lines or [])]
+        total = _exp_compute_total(norm)
+        uid = _exp_actor_uid()
+        now = datetime.now().isoformat()
+        reviewed_by = uid if status == 'reviewed' else None
+        reviewed_at = now if status == 'reviewed' else None
+        cur = conn.execute(
+            "INSERT INTO expenses (project_code, vendor, doc_type, doc_number, order_number, "
+            "expense_date, category, cost_code, payment_method, total, status, notes, created_at, "
+            "created_by_uid, reviewed_by_uid, reviewed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (project_code, header.get('vendor'), header.get('doc_type'), header.get('doc_number'),
+             header.get('order_number'), exp_date, header.get('category'), header.get('cost_code'),
+             header.get('payment_method'), total, status, header.get('notes'), now, uid,
+             reviewed_by, reviewed_at))
+        expense_id = cur.lastrowid
+        _exp_insert_lines(conn, expense_id, norm)
+        if receipt and receipt.filename:
+            rip, err = _exp_store_receipt(project_code, receipt)
+            if err:
+                conn.rollback()
+                return jsonify({"error": err}), 400
+            conn.execute("UPDATE expenses SET receipt_image_path=? WHERE id=?", (rip, expense_id))
+        conn.commit()
+        return response_wrapper(_exp_detail_dict(conn, expense_id)), 201
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        logging.error(f"POST expenses: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/expenses/<int:expense_id>', methods=['GET'])
+@requires_role(*_EXPENSE_COST_ROLES)
+def api_expense_detail(expense_id):
+    conn = db()
+    try:
+        out = _exp_detail_dict(conn, expense_id)
+        if out is None:
+            return jsonify({"error": "Expense not found"}), 404
+        return response_wrapper(out)
+    finally:
+        conn.close()
+
+
+@app.route('/api/expenses/<int:expense_id>', methods=['PATCH'])
+@requires_role(*_EXPENSE_COST_ROLES)
+def api_expense_patch(expense_id):
+    """Edit header / replace lines (recompute total) / set status. Setting
+    status=reviewed stamps reviewed_by_uid + reviewed_at (PM approve)."""
+    conn = db()
+    try:
+        row = conn.execute("SELECT id FROM expenses WHERE id=?", (expense_id,)).fetchone()
+        if not row:
+            return jsonify({"error": "Expense not found"}), 404
+        body = request.get_json(silent=True) or {}
+        sets, params = [], []
+        for f in ('vendor', 'doc_type', 'doc_number', 'order_number', 'category',
+                  'cost_code', 'payment_method', 'notes'):
+            if f in body:
+                sets.append(f"{f}=?")
+                params.append(body.get(f))
+        if 'expense_date' in body:
+            ed = (body.get('expense_date') or '').strip()
+            if ed:
+                try:
+                    datetime.strptime(ed, '%Y-%m-%d')
+                except ValueError:
+                    return jsonify({"error": "expense_date must be YYYY-MM-DD"}), 400
+            sets.append("expense_date=?")
+            params.append(ed or None)
+        if 'status' in body:
+            st = body.get('status')
+            if st not in EXPENSE_STATUSES:
+                return jsonify({"error": "bad status"}), 400
+            sets.append("status=?")
+            params.append(st)
+            if st == 'reviewed':
+                sets += ["reviewed_by_uid=?", "reviewed_at=?"]
+                params += [_exp_actor_uid(), datetime.now().isoformat()]
+            else:
+                sets += ["reviewed_by_uid=?", "reviewed_at=?"]
+                params += [None, None]
+        if isinstance(body.get('lines'), list):
+            norm = [_exp_normalize_line(ln, i) for i, ln in enumerate(body['lines'])]
+            conn.execute("DELETE FROM expense_line_items WHERE expense_id=?", (expense_id,))
+            _exp_insert_lines(conn, expense_id, norm)
+            sets.append("total=?")
+            params.append(_exp_compute_total(norm))
+        if sets:
+            params.append(expense_id)
+            conn.execute(f"UPDATE expenses SET {', '.join(sets)} WHERE id=?", params)
+        conn.commit()
+        return response_wrapper(_exp_detail_dict(conn, expense_id))
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        logging.error(f"PATCH expense {expense_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/expenses/<int:expense_id>', methods=['DELETE'])
+@requires_role(*_EXPENSE_COST_ROLES)
+def api_expense_delete(expense_id):
+    """Cascade-delete lines + THIS expense's receipt file only. Others untouched."""
+    conn = db()
+    try:
+        row = conn.execute("SELECT receipt_image_path FROM expenses WHERE id=?", (expense_id,)).fetchone()
+        if not row:
+            return jsonify({"error": "Expense not found"}), 404
+        rip = row['receipt_image_path']
+        conn.execute("DELETE FROM expense_line_items WHERE expense_id=?", (expense_id,))
+        conn.execute("DELETE FROM expenses WHERE id=?", (expense_id,))
+        conn.commit()
+        _exp_unlink_receipt(rip)
+        return response_wrapper({"deleted": expense_id})
+    finally:
+        conn.close()
+
+
+@app.route('/api/expenses/<int:expense_id>/receipt', methods=['POST'])
+@requires_role(*_EXPENSE_COST_ROLES)
+def api_expense_receipt_upload(expense_id):
+    conn = db()
+    try:
+        row = conn.execute("SELECT project_code, receipt_image_path FROM expenses WHERE id=?", (expense_id,)).fetchone()
+        if not row:
+            return jsonify({"error": "Expense not found"}), 404
+        f = request.files.get('receipt') or request.files.get('file')
+        if not f or not f.filename:
+            return jsonify({"error": "No receipt file"}), 400
+        rip, err = _exp_store_receipt(row['project_code'], f)
+        if err:
+            return jsonify({"error": err}), 400
+        old = row['receipt_image_path']
+        conn.execute("UPDATE expenses SET receipt_image_path=? WHERE id=?", (rip, expense_id))
+        conn.commit()
+        if old and old != rip:
+            _exp_unlink_receipt(old)
+        return response_wrapper({
+            "has_receipt": True,
+            "content_type": _RECEIPT_MIME.get(Path(rip).suffix.lower(), 'application/octet-stream'),
+        }), 201
+    finally:
+        conn.close()
+
+
+@app.route('/api/expenses/<int:expense_id>/receipt', methods=['GET'])
+@requires_role(*_EXPENSE_COST_ROLES)
+def api_expense_receipt_get(expense_id):
+    """Serve the receipt image ONLY through this auth-gated route (never /files)."""
+    from flask import send_file
+    conn = db()
+    try:
+        row = conn.execute("SELECT receipt_image_path FROM expenses WHERE id=?", (expense_id,)).fetchone()
+        if not row:
+            return jsonify({"error": "Expense not found"}), 404
+        rip = row['receipt_image_path']
+        if not rip:
+            return jsonify({"error": "No receipt on file"}), 404
+        p = Path(rip)
+        if not (p.resolve().is_relative_to(_RECEIPTS_BASE.resolve()) and p.exists()):
+            return jsonify({"error": "Receipt file missing"}), 404
+        return send_file(str(p), mimetype=_RECEIPT_MIME.get(p.suffix.lower(), 'application/octet-stream'))
+    finally:
+        conn.close()
+
+
+@app.route('/api/projects/<project_code>/expenses/product-usage', methods=['GET'])
+@requires_role(*_EXPENSE_COST_ROLES)
+def api_expense_product_usage(project_code):
+    """Rollup grouped by product_class -> normalized_product (fallback to the
+    description) -> unit: sum qty, distinct receipts, sum extended_price (excl
+    out_of_cost). Refundable/out-of-cost amounts kept separate (shown with ↩)."""
+    conn = db()
+    try:
+        if not validate_project_exists(conn, project_code):
+            return jsonify({"error": "Project not found"}), 404
+        rows = conn.execute(
+            "SELECT li.product_class, "
+            "COALESCE(NULLIF(TRIM(li.normalized_product), ''), li.description) AS product, "
+            "li.unit, li.qty, li.extended_price, li.is_refundable, li.out_of_cost, li.expense_id "
+            "FROM expense_line_items li JOIN expenses e ON e.id=li.expense_id "
+            "WHERE e.project_code=?", (project_code,)).fetchall()
+        groups = {}
+        for r in rows:
+            key = (r['product_class'], (r['product'] or '—'), (r['unit'] or 'EA'))
+            g = groups.setdefault(key, {'qty': Decimal('0'), 'receipts': set(),
+                                        'cost': Decimal('0'), 'refundable': Decimal('0'),
+                                        'is_refundable': False, 'out_of_cost': False})
+            g['qty'] += _exp_dec(r['qty'])
+            g['receipts'].add(r['expense_id'])
+            if r['out_of_cost']:
+                g['refundable'] += _exp_dec(r['extended_price'])
+                g['out_of_cost'] = True
+                if r['is_refundable']:
+                    g['is_refundable'] = True
+            else:
+                g['cost'] += _exp_dec(r['extended_price'])
+        out = []
+        for (cls, prod, unit), g in groups.items():
+            out.append({
+                'product_class': cls,
+                'product_class_label': EXPENSE_CLASS_LABELS.get(cls, cls),
+                'product': prod, 'unit': unit,
+                'qty': float(g['qty']),
+                'receipts': len(g['receipts']),
+                'total_spend': float(_exp_q2(g['cost'])),
+                'refundable_total': float(_exp_q2(g['refundable'])),
+                'is_refundable': g['is_refundable'],
+                'out_of_cost': g['out_of_cost'],
+            })
+        out.sort(key=lambda x: (x['product_class'], x['product']))
+        cost_total = sum((_exp_dec(x['total_spend']) for x in out), Decimal('0'))
+        refund_total = sum((_exp_dec(x['refundable_total']) for x in out), Decimal('0'))
+        return jsonify({
+            "data": out,
+            "meta": {"count": len(out), "generated_at": datetime.now().isoformat()},
+            "totals": {"cost_total": float(_exp_q2(cost_total)),
+                       "refundable_total": float(_exp_q2(refund_total))},
+        })
+    finally:
+        conn.close()
+
+
 # ============= ERROR HANDLERS =============
 
 @app.errorhandler(404)
