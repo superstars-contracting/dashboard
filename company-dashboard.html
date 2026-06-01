@@ -9,7 +9,7 @@
      vendored GridStack (offline-safe, no CDN) + the shared widget design language
      + the shared per-user layout helper (DashLayout → /api/dashboard/layout). -->
 <link rel="stylesheet" href="/files/static/vendor/gridstack.min.css">
-<link rel="stylesheet" href="/files/static/css/widgets.css">
+<link rel="stylesheet" href="/files/static/css/widgets.css?v=211">
 <script src="/files/static/vendor/gridstack-all.js"></script>
 <script src="/files/static/js/dash_layout.js" defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -29,7 +29,7 @@
     --bad: #B11E2E;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { background: var(--cream); color: var(--ink); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  html, body { background: #fff; color: var(--ink); /* #211 — white page background */ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
   body { min-height: 100vh; }
 
   /* ==== HEADER ==== */
@@ -3547,7 +3547,7 @@ applyLanguage();
 })();
 </script>
 
-<div class="container"><div class="ph-build" id="cc-build-stamp">build #210 · 2026-05-30 · company console redesign + draggable widgets</div></div>
+<div class="container"><div class="ph-build" id="cc-build-stamp">build #211 · 2026-05-30 · calm-blue widget accent on white</div></div>
 
 <script>
 /* ===== Company console widgets (#210) — live data + reused #209 drag framework.

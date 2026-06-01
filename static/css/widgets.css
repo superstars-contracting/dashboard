@@ -5,16 +5,28 @@
    (Project Health still carries an inline copy from #208; a later batch can
    migrate it to this file.) Class prefix .ph-* = "panel/health" shared kit. */
 
+/* ===== Calm-blue widget accent (#211) — operator-approved (project_page_color_options.html,
+   the BLUE-on-white column): white card + a SOFT INWARD blue vignette (inset), NOT an
+   outward glow, plus a whisper of neutral depth. Applied here so both the project page
+   (#208) and the company console (#210) get it from one source. ===== */
+:root {
+  --accent:#1E73E8;
+  --accent-edge:rgba(30,115,232,.42);
+  --accent-in:rgba(30,115,232,.14);
+}
+
 /* KPI tiles */
 .ph-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin:16px 0 20px; }
-.ph-kpi { background:#fff; border:1px solid #E8E4DD; border-radius:12px; padding:16px 18px; display:flex; align-items:center; gap:14px; }
+.ph-kpi { background:#fff; border:1px solid var(--accent-edge); border-radius:14px; padding:16px 18px; display:flex; align-items:center; gap:14px;
+          box-shadow: inset 0 0 13px var(--accent-in), 0 1px 4px rgba(0,0,0,.04); }
 .ph-kpi-k { font-size:11px; color:#76777E; text-transform:uppercase; letter-spacing:.06em; }
 .ph-kpi-v { font-weight:800; font-size:26px; line-height:1; margin-top:4px; color:#14161C; }
 .ph-kpi-sub { font-size:11px; color:#76777E; margin-top:4px; }
 
 /* uniform DRAG-READY widget wrapper */
 .grid-stack { background:transparent; }
-.ph-widget { background:#fff; border:1px solid #E8E4DD; border-radius:12px; display:flex; flex-direction:column; overflow:hidden; }
+.ph-widget { background:#fff; border:1px solid var(--accent-edge); border-radius:14px; display:flex; flex-direction:column; overflow:hidden;
+             box-shadow: inset 0 0 13px var(--accent-in), 0 1px 4px rgba(0,0,0,.04); }
 .ph-widget-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 18px 0; }
 .ph-widget-head h3 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:#54505A; margin:0; }
 .ph-grip { color:#CDC9C0; font-size:15px; line-height:1; cursor:grab; user-select:none; }
@@ -35,6 +47,11 @@
 
 /* circular ring */
 .ph-ring text { font-family:inherit; }
+/* progress-arc = calm-blue accent (#211); the track circle (no round cap) stays
+   neutral. CSS `stroke` overrides the SVG stroke presentation attribute the ring
+   JS sets — so rings read blue on both pages with NO JS change. */
+.ph-widget circle[stroke-linecap="round"],
+.ph-kpi circle[stroke-linecap="round"] { stroke: var(--accent); }
 
 /* empty / loading — never blank */
 .ph-empty { text-align:center; padding:22px 12px; color:#76777E; }
