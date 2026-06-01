@@ -156,6 +156,48 @@
     .content-corner { display: flex; justify-content: flex-end; padding: 14px 28px 0; }
     .cc-live { display: inline-flex; align-items: center; gap: 6px; color: #9CA0AA; font-size: 12px; }
     .cc-dot { width: 7px; height: 7px; border-radius: 50%; background: #2F7C57; }
+
+    /* #214 Daily Construction Reports list — approved dcr_combined.html design (blue/white) */
+    .dcr-corner { display:flex; justify-content:flex-end; color:#76777E; font-size:12px; margin-bottom:4px; }
+    .dcr-corner .live { display:inline-flex; align-items:center; gap:6px; }
+    .dcr-gdot { width:8px; height:8px; border-radius:50%; background:#2F7C57; }
+    .dcr-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin:4px 0 16px; }
+    .dcr-head h1 { margin:0; font-size:24px; }
+    .dcr-head .sub { color:#76777E; font-size:13px; margin-top:2px; }
+    .dcr-primary { background:#1E73E8; border:none; color:#fff; border-radius:10px; padding:10px 16px; font-size:14px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+    .dcr-primary:hover { filter:brightness(.96); }
+    .dcr-primary .dcr-ic { width:16px; height:16px; }
+    .dcr-kpis { display:grid; grid-template-columns:repeat(2,170px); gap:12px; margin-bottom:16px; }
+    .dcr-tile { background:#fff; border:1px solid rgba(30,115,232,.42); border-radius:13px; padding:11px 14px; box-shadow:inset 0 0 12px rgba(30,115,232,.14),0 1px 4px rgba(0,0,0,.04); }
+    .dcr-tile .l { color:#76777E; font-size:12px; } .dcr-tile .v { font-size:22px; font-weight:600; margin-top:2px; }
+    .dcr-toolbar { display:flex; align-items:center; gap:10px; margin-bottom:14px; font-size:13px; flex-wrap:wrap; }
+    .dcr-searchbox { display:flex; align-items:center; gap:8px; background:#f5f6f8; border:1px solid #E8E4DD; border-radius:9px; padding:8px 11px; color:#76777E; min-width:240px; }
+    .dcr-searchbox input { border:none; background:transparent; outline:none; font-size:13px; color:#14161C; width:100%; }
+    .dcr-toolbar label { color:#76777E; font-size:11px; text-transform:uppercase; letter-spacing:.05em; font-weight:600; }
+    .dcr-inp { height:36px; border:1px solid #E8E4DD; border-radius:9px; padding:0 10px; font-size:13px; font-family:inherit; width:128px; background:#fff; }
+    .dcr-apply { height:36px; border:1px solid #E8E4DD; background:#fff; border-radius:9px; padding:0 16px; font-weight:600; cursor:pointer; color:#14161C; }
+    .dcr-apply:hover { border-color:#1E73E8; color:#1E73E8; }
+    .dcr-count { margin-left:auto; color:#76777E; }
+    .dcr-card { background:#fff; border:1px solid #E8E4DD; border-radius:14px; overflow:hidden; }
+    .dcr-table { width:100%; border-collapse:collapse; font-size:13.5px; }
+    .dcr-table thead th { background:#f7f8fa; text-align:left; color:#76777E; font-weight:600; font-size:11px; letter-spacing:.04em; text-transform:uppercase; padding:11px 16px; border-bottom:1px solid #E8E4DD; }
+    .dcr-table td { padding:12px 16px; border-bottom:1px solid #F3F3F5; }
+    .dcr-table tr:last-child td { border-bottom:none; }
+    .dcr-table tr:hover td { background:#FAFBFC; }
+    .dcr-id { font-weight:600; font-family:'Archivo',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Helvetica,Arial,sans-serif; }
+    .dcr-pill { font-size:12px; font-weight:600; padding:2px 10px; border-radius:999px; background:rgba(15,110,86,.1); color:#0F6E56; }
+    .dcr-pill.na { background:#F1F1F3; color:#76777E; }
+    .dcr-stale { margin-left:6px; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; background:#FFE8D6; color:#7A2E1B; border:1px solid #E8AC6A; }
+    .dcr-stale-row td { background:#FFF8F0; }
+    .dcr-muted { color:#76777E; }
+    .dcr-acts { display:flex; gap:7px; justify-content:flex-end; }
+    .dcr-iconbtn { width:31px; height:31px; border:1px solid #E8E4DD; background:#fff; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; color:#76777E; text-decoration:none; }
+    .dcr-iconbtn:hover { background:#F5F6F8; }
+    .dcr-iconbtn.dcr-view:hover { color:#1E73E8; border-color:rgba(30,115,232,.4); }
+    .dcr-iconbtn.dcr-del:hover { color:#C8102E; border-color:rgba(200,16,46,.4); }
+    .dcr-ic { width:16px; height:16px; }
+    .dcr-empty { padding:32px; text-align:center; color:#76777E; }
+    @media (max-width:640px){ .dcr-kpis{grid-template-columns:repeat(2,1fr)} }
     .sidebar-header {
       display: flex;
       align-items: center;
@@ -618,6 +660,10 @@
   <symbol id="i-dollar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M16 6H10a3 3 0 000 6h4a3 3 0 010 6H8"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></symbol>
   <symbol id="i-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></symbol>
 </defs></svg>
 
@@ -866,7 +912,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #213 · 2026-06-01 · top bar removed · account in sidebar</div>
+          <div class="ph-build" id="ph-build-stamp">build #214 · 2026-06-01 · DCR list restyled · KPI Total+Latest · icon actions</div>
         </div>
       </section>
 
@@ -1229,29 +1275,37 @@
       <section class="view" data-view="daily-report">
         <!-- State 1: Archive list (default) -->
         <div id="dcr-archive-view" class="section">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
-            <h2 style="margin-bottom:0;">Daily Construction Reports</h2>
-            <button id="dcr-new-btn" type="button" style="font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:10px 20px;border:none;border-radius:4px;background:#B11E2E;color:white;cursor:pointer;display:inline-flex;align-items:center;gap:8px;">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
-              Issue New DCR
-            </button>
+          <!-- #214 — restyled to the approved dcr_combined.html design: live-date corner,
+               KPI tiles (Total + Latest, no "Issued"), search + From/To (standard
+               SSCDatePicker) + Apply + live count, clean white table with green Issued
+               pill + icon actions (View · Edit · Delete). Reuses the existing endpoints. -->
+          <div class="dcr-corner"><span class="live"><span class="dcr-gdot"></span>Live · <span id="dcr-live-date">—</span></span></div>
+          <div class="dcr-head">
+            <div>
+              <h1>Daily Construction Reports</h1>
+              <div class="sub">FR-BX-001 · 890 E 135th St · <span id="dcr-head-count">—</span> reports</div>
+            </div>
+            <button id="dcr-new-btn" class="dcr-primary" type="button"><svg class="dcr-ic"><use href="#i-plus"/></svg>Issue New DCR</button>
           </div>
           <div id="dcr-issued-banner" style="display:none;background:#FAF7F1;border-left:3px solid #2F7C57;padding:10px 14px;border-radius:4px;margin-bottom:12px;font-size:12px;"></div>
-          <div style="background:white;border:1px solid #E8E4DD;border-radius:4px;padding:14px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-            <span style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">From</span>
-            <input type="date" id="dcr-filter-from" style="padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
-            <span style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">To</span>
-            <input type="date" id="dcr-filter-to" style="padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
-            <button id="dcr-filter-apply" type="button" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:6px 14px;border:none;border-radius:4px;background:#14161C;color:white;cursor:pointer;">Apply</button>
-            <div id="dcr-archive-status" style="margin-left:auto;font-size:11px;color:#76777E;">Loading…</div>
+          <div class="dcr-kpis">
+            <div class="dcr-tile"><div class="l">Total reports</div><div class="v" id="dcr-kpi-total">—</div></div>
+            <div class="dcr-tile"><div class="l">Latest</div><div class="v" id="dcr-kpi-latest" style="font-size:16px;">—</div></div>
           </div>
-          <div class="table-wrapper">
-            <table>
+          <div class="dcr-toolbar">
+            <div class="dcr-searchbox"><svg class="dcr-ic" style="width:15px;height:15px;"><use href="#i-search"/></svg><input id="dcr-search" type="text" placeholder="Search reports by ID or date…" autocomplete="off"></div>
+            <label for="dcr-filter-from">From</label><input class="dcr-inp" type="text" id="dcr-filter-from" placeholder="MM-DD-YYYY">
+            <label for="dcr-filter-to">To</label><input class="dcr-inp" type="text" id="dcr-filter-to" placeholder="MM-DD-YYYY">
+            <button id="dcr-filter-apply" class="dcr-apply" type="button">Apply</button>
+            <span class="dcr-count" id="dcr-archive-status">Loading…</span>
+          </div>
+          <div class="dcr-card">
+            <table class="dcr-table">
               <thead>
                 <tr><th>Report ID</th><th>Date</th><th>Status</th><th>Issued At</th><th></th></tr>
               </thead>
               <tbody id="dcr-archive-tbody">
-                <tr><td colspan="5" style="padding:24px;text-align:center;color:#76777E;">Loading…</td></tr>
+                <tr><td colspan="5" class="dcr-empty">Loading…</td></tr>
               </tbody>
             </table>
           </div>
@@ -2350,49 +2404,68 @@
 
           // ---- Archive list (state 1) ----
 
+          let DCR_ROWS = [];
+          // #214 — render the loaded rows with the approved icon actions, then update
+          // the KPIs (Total + Latest) + the live count. Search filters client-side by
+          // report id or date so it stays instant even at the 500-row stress scale.
+          function renderDcrList() {
+            const tbody = document.getElementById('dcr-archive-tbody');
+            const status = document.getElementById('dcr-archive-status');
+            const searchEl = document.getElementById('dcr-search');
+            const kpiTotal = document.getElementById('dcr-kpi-total');
+            const kpiLatest = document.getElementById('dcr-kpi-latest');
+            const headCount = document.getElementById('dcr-head-count');
+            if (!tbody) return;
+            const _fmt = (s) => (window.SSCDatePicker ? (SSCDatePicker.fmtMDY(s) || '—') : (String(s || '').slice(0, 10) || '—'));
+            const total = DCR_ROWS.length;
+            if (kpiTotal) kpiTotal.textContent = total;
+            const latestDate = total ? DCR_ROWS[0].report_date : null;   // rows arrive report_date DESC
+            if (kpiLatest) kpiLatest.textContent = latestDate ? _fmt(latestDate) : '—';
+            if (headCount) headCount.textContent = total;
+            const q = ((searchEl && searchEl.value) || '').trim().toLowerCase();
+            const filtered = q ? DCR_ROWS.filter(r => {
+              const id = String(r.display_id || r.report_id || '').toLowerCase();
+              return id.indexOf(q) !== -1
+                || String(r.report_date || '').toLowerCase().indexOf(q) !== -1
+                || _fmt(r.report_date).toLowerCase().indexOf(q) !== -1;
+            }) : DCR_ROWS;
+            if (!filtered.length) {
+              tbody.innerHTML = '<tr><td colspan="5" class="dcr-empty">' + (total ? 'No reports match this search.' : 'No DCRs in this range. Click <strong>Issue New DCR</strong> to create one.') + '</td></tr>';
+            } else {
+              tbody.innerHTML = filtered.map(renderArchiveRow).join('');
+            }
+            if (status) { status.textContent = filtered.length + ' report' + (filtered.length === 1 ? '' : 's'); status.style.color = '#76777E'; }
+          }
+
           function renderArchiveRow(r) {
-            const statusColor = r.status === 'issued' ? '#2F7C57' : '#76777E';
-            const viewLink = r.html_url
-              ? '<a href="' + esc(r.html_url) + '" target="_blank" style="color:#B11E2E;font-weight:600;text-decoration:none;">View →</a>'
-              : '<span style="color:#76777E;">—</span>';
+            const _fmt = (s) => (window.SSCDatePicker ? (SSCDatePicker.fmtMDY(s) || '—') : (String(s || '').slice(0, 10) || '—'));
             const displayId = r.display_id || r.report_id || '—';
             const reportDate = r.report_date || '';
             const seq = r.dcr_sequence;
-            // DCR-4: per-row Edit reopens the entry view scoped to this
-            // DCR's date. The operator can fix labor / add+remove photos /
-            // edit text rows, then click Issue DCR to re-issue. The
-            // re-issue path preserves report number + date via
-            // override_active=true (handled in issueDcr's 409 confirm
-            // flow, which the reissue banner short-circuits).
-            const editBtn = (seq !== undefined && seq !== null && reportDate)
-              ? '<button type="button" data-edit-seq="' + esc(seq) + '" data-edit-date="' + esc(reportDate) + '" data-edit-display-id="' + esc(displayId) + '" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 10px;border:1px solid #14161C;border-radius:4px;background:white;color:#14161C;cursor:pointer;margin-left:8px;">Edit</button>'
-              : '';
-            // Delete acts on the whole DCR (both audiences for this sequence),
-            // not just the visible internal row — see /by-sequence/<seq> route.
-            const deleteBtn = (seq !== undefined && seq !== null)
-              ? '<button type="button" data-delete-seq="' + esc(seq) + '" data-display-id="' + esc(displayId) + '" data-report-date="' + esc(reportDate) + '" style="font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 10px;border:1px solid #B11E2E;border-radius:4px;background:white;color:#B11E2E;cursor:pointer;margin-left:8px;">Delete</button>'
-              : '';
-            // Display dates as MM-DD-YYYY everywhere (the operator's preferred
-            // read form). The "Issued At" column drops the HH:MM:SS — the
-            // full datetime stays stored on the row for audit, only the
-            // rendered surface is date-only. fmtDate lives in a sibling
-            // IIFE so call the shared SSCDatePicker.fmtMDY directly.
-            const _fmt = (s) => (window.SSCDatePicker ? (SSCDatePicker.fmtMDY(s) || '—') : (String(s || '').slice(0, 10) || '—'));
-            const reportDateDisplay = reportDate ? _fmt(reportDate) : '—';
+            const dateDisp = reportDate ? _fmt(reportDate) : '—';
             const issuedAtRaw = r.updated_at || r.created_at;
-            const issuedAtDisplay = issuedAtRaw ? _fmt(issuedAtRaw) : '—';
-            // Stale badge — set when sign_in_log mutated after issuance.
-            // Renders next to the status pill so the operator sees it
-            // at-a-glance without scanning detail. Re-issue clears it.
-            const stalePill = r.stale
-              ? '<span title="sign_in_log changed after this DCR was issued — re-issue to refresh the rendered report" style="margin-left:6px;padding:3px 8px;border-radius:3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;background:#FFE8D6;color:#7A2E1B;border:1px solid #E8AC6A;">⚠ STALE</span>'
+            const issuedAtDisp = issuedAtRaw ? _fmt(issuedAtRaw) : '—';
+            const pillClass = (r.status === 'issued') ? 'dcr-pill' : 'dcr-pill na';
+            const statusPill = '<span class="' + pillClass + '">' + esc(r.status || '—') + '</span>';
+            const stalePill = r.stale ? '<span class="dcr-stale" title="sign_in_log changed after this DCR was issued — re-issue to refresh the rendered report">&#9888; stale</span>' : '';
+            // View (eye, blue) opens the rendered report; Edit (pencil) reopens the entry
+            // view scoped to this date (re-issue preserves number+date); Delete (trash,
+            // red) hits /by-sequence. Same data-* hooks the existing tbody delegation routes.
+            const viewBtn = r.html_url
+              ? '<a class="dcr-iconbtn dcr-view" href="' + esc(r.html_url) + '" target="_blank" rel="noopener" title="View report"><svg class="dcr-ic"><use href="#i-eye"/></svg></a>'
+              : '<span class="dcr-iconbtn" title="No rendered report yet" style="opacity:.4;cursor:default;"><svg class="dcr-ic"><use href="#i-eye"/></svg></span>';
+            const editBtn = (seq !== undefined && seq !== null && reportDate)
+              ? '<button type="button" class="dcr-iconbtn" title="Edit / re-issue" data-edit-seq="' + esc(seq) + '" data-edit-date="' + esc(reportDate) + '" data-edit-display-id="' + esc(displayId) + '"><svg class="dcr-ic"><use href="#i-pencil"/></svg></button>'
               : '';
-            return '<tr' + (r.stale ? ' style="background:#FFF8F0;"' : '') + '>' +
-              '<td style="font-family:\'Archivo\', -apple-system, BlinkMacSystemFont, \'Helvetica Neue\', Helvetica, Arial, sans-serif;font-size:13px;font-weight:600;">' + esc(displayId) + '</td>' +
-              '<td>' + esc(reportDateDisplay) + '</td>' +
-              '<td><span style="padding:3px 8px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;background:' + statusColor + ';color:white;">' + esc(r.status || '—') + '</span>' + stalePill + '</td>' +
-              '<td style="font-size:12px;color:#76777E;">' + esc(issuedAtDisplay) + '</td>' +
-              '<td style="white-space:nowrap;">' + viewLink + editBtn + deleteBtn + '</td>' +
+            const deleteBtn = (seq !== undefined && seq !== null)
+              ? '<button type="button" class="dcr-iconbtn dcr-del" title="Delete report" data-delete-seq="' + esc(seq) + '" data-display-id="' + esc(displayId) + '" data-report-date="' + esc(reportDate) + '"><svg class="dcr-ic"><use href="#i-trash"/></svg></button>'
+              : '';
+            return '<tr' + (r.stale ? ' class="dcr-stale-row"' : '') + '>' +
+              '<td class="dcr-id">' + esc(displayId) + '</td>' +
+              '<td>' + esc(dateDisp) + '</td>' +
+              '<td>' + statusPill + stalePill + '</td>' +
+              '<td class="dcr-muted">' + esc(issuedAtDisp) + '</td>' +
+              '<td><div class="dcr-acts">' + viewBtn + editBtn + deleteBtn + '</div></td>' +
             '</tr>';
           }
 
@@ -2459,14 +2532,11 @@
             try {
               const resp = await fetch('/api/projects/' + encodeURIComponent(PROJECT_CODE) + '/reports?' + params.toString(), {signal: ctrl.signal});
               const json = await resp.json();
-              const rows = (json && json.data) || [];
-              if (!rows.length) {
-                tbody.innerHTML = '<tr><td colspan="5" style="padding:32px;text-align:center;color:#76777E;">No DCRs in this range. Click <strong>Issue New DCR</strong> to create one.</td></tr>';
-                if (status) { status.textContent = 'No reports'; status.style.color = '#76777E'; }
-              } else {
-                tbody.innerHTML = rows.map(renderArchiveRow).join('');
-                if (status) { status.textContent = rows.length + ' report(s)'; status.style.color = '#2F7C57'; }
-              }
+              // Rows arrive report_date DESC (newest first) — renderDcrList relies on
+              // DCR_ROWS[0] being the latest for the KPI. Stash + render (KPIs, search
+              // filter, count, empty state all handled there).
+              DCR_ROWS = (json && json.data) || [];
+              renderDcrList();
             } catch (e) {
               console.warn('[DCR] archive load failed:', e);
               const label = (e && e.name === 'AbortError') ? 'Timed out — try Apply again' : 'Network error — try Apply again';
@@ -2482,6 +2552,14 @@
             const toInput = document.getElementById('dcr-filter-to');
             const newBtn = document.getElementById('dcr-new-btn');
             const applyBtn = document.getElementById('dcr-filter-apply');
+            const searchEl = document.getElementById('dcr-search');
+            // #214 — From/To use the app's standard date picker (#88): wire()
+            // swaps the text inputs for the brand popup + readonly display,
+            // so the range filter matches every other dated surface.
+            if (window.SSCDatePicker) {
+              if (fromInput) SSCDatePicker.wire(fromInput);
+              if (toInput) SSCDatePicker.wire(toInput);
+            }
             // Defaults: last 30 days. Seed via setISO so the visible value
             // is MM-DD-YYYY while dataset.iso carries the canonical
             // YYYY-MM-DD for getISO callers.
@@ -2491,6 +2569,20 @@
             };
             if (fromInput && !fromInput.value) _setSeed(fromInput, todayLocal(-30));
             if (toInput && !toInput.value) _setSeed(toInput, todayLocal());
+            // Search filters the already-loaded rows client-side (instant,
+            // no refetch) — renderDcrList re-reads #dcr-search.value each call.
+            if (searchEl && !searchEl.dataset.wired) {
+              searchEl.addEventListener('input', () => renderDcrList());
+              searchEl.dataset.wired = '1';
+            }
+            // Live-date corner — local MM/DD/YYYY (never toISOString, which is UTC).
+            const liveEl = document.getElementById('dcr-live-date');
+            if (liveEl) {
+              const d = new Date();
+              const mm = String(d.getMonth() + 1).padStart(2, '0');
+              const dd = String(d.getDate()).padStart(2, '0');
+              liveEl.textContent = mm + '/' + dd + '/' + d.getFullYear();
+            }
             if (applyBtn) applyBtn.addEventListener('click', () => loadArchive());
             if (newBtn) newBtn.addEventListener('click', () => showEntry());
           }
