@@ -197,6 +197,32 @@
     .dcr-ic { width:16px; height:16px; }
     .dcr-empty { padding:32px; text-align:center; color:#76777E; }
     @media (max-width:640px){ .dcr-kpis{grid-template-columns:repeat(2,1fr)} }
+
+    /* #216 Toolbox Talks — approved Option 1 color-coded cards (blue/white).
+       Category color rides on CSS custom props (--c stroke/fill, --cbg tag tint)
+       so each card + its EN/ES buttons inherit one color. tbx- prefixed to avoid
+       any global class collision (the #214 .view lesson). */
+    .tbx-filters { display:flex; gap:8px; flex-wrap:wrap; }
+    .tbx-chip { border:1px solid #E8E4DD; background:#fff; border-radius:999px; padding:6px 14px; font-size:13px; font-weight:600; cursor:pointer; color:#14161C; font-family:inherit; }
+    .tbx-chip:hover { border-color:rgba(30,115,232,.4); }
+    .tbx-chip.active { background:#1E73E8; border-color:#1E73E8; color:#fff; }
+    .tbx-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:14px; }
+    .tbx-talk { --c:#6b7280; --cbg:rgba(107,114,128,.12); background:#fff; border:1px solid #E8E4DD; border-left:3px solid var(--c); border-radius:12px; padding:14px 15px; display:flex; flex-direction:column; box-shadow:0 1px 4px rgba(0,0,0,.04); }
+    .tbx-trow { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+    .tbx-tag { font-size:11px; font-weight:700; letter-spacing:.03em; padding:2px 9px; border-radius:999px; color:var(--c); background:var(--cbg); white-space:nowrap; }
+    .tbx-min { color:#76777E; font-size:12px; white-space:nowrap; }
+    .tbx-title { font-weight:600; font-size:14.5px; line-height:1.35; color:#14161C; flex:1; margin-bottom:14px; }
+    .tbx-btns { display:flex; gap:8px; }
+    .tbx-en, .tbx-es { flex:1; justify-content:center; border-radius:8px; padding:7px 12px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; text-decoration:none; line-height:1; }
+    .tbx-en { background:var(--c); border:1px solid var(--c); color:#fff; }
+    .tbx-es { background:#fff; border:1px solid var(--c); color:var(--c); }
+    .tbx-ic { width:13px; height:13px; }
+    /* category palette — spec colors + 10–12% tint for the tag pill */
+    .tbx-cat-site     { --c:#0F6E56; --cbg:rgba(15,110,86,.10); }
+    .tbx-cat-fall     { --c:#BA7517; --cbg:rgba(186,117,23,.12); }
+    .tbx-cat-scaffold { --c:#C8102E; --cbg:rgba(200,16,46,.09); }
+    .tbx-cat-demo     { --c:#6b7280; --cbg:rgba(107,114,128,.12); }
+    .tbx-cat-general  { --c:#1E73E8; --cbg:rgba(30,115,232,.10); }
     .sidebar-header {
       display: flex;
       align-items: center;
@@ -664,6 +690,7 @@
   <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5H5V6h5"/></symbol>
 </defs></svg>
 
 <div class="app-shell">
@@ -911,7 +938,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #215 · 2026-06-01 · DCR dark table header · single live-date</div>
+          <div class="ph-build" id="ph-build-stamp">build #216 · 2026-06-01 · Toolbox Talks color-coded cards (Option 1)</div>
         </div>
       </section>
 
@@ -3197,17 +3224,17 @@
               <h2 style="margin-bottom:4px;">Toolbox Talks</h2>
               <div style="font-size:12px;color:#76777E;">DOB Ch 33-sourced safety talks · English + Spanish · ~15 min each · print, run pre-shift, collect signatures.</div>
             </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;" id="tbx-cat-filters">
-              <button type="button" class="tbx-cat-btn active" data-cat="" style="background:#14161C;color:white;border:1px solid #14161C;border-radius:4px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;">All</button>
-              <button type="button" class="tbx-cat-btn" data-cat="Site" style="background:white;color:#14161C;border:1px solid #E8E4DD;border-radius:4px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;">Site</button>
-              <button type="button" class="tbx-cat-btn" data-cat="Fall" style="background:white;color:#14161C;border:1px solid #E8E4DD;border-radius:4px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;">Fall</button>
-              <button type="button" class="tbx-cat-btn" data-cat="Scaffold" style="background:white;color:#14161C;border:1px solid #E8E4DD;border-radius:4px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;">Scaffold</button>
-              <button type="button" class="tbx-cat-btn" data-cat="Demo" style="background:white;color:#14161C;border:1px solid #E8E4DD;border-radius:4px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;">Demo</button>
-              <button type="button" class="tbx-cat-btn" data-cat="General" style="background:white;color:#14161C;border:1px solid #E8E4DD;border-radius:4px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;">General</button>
+            <div class="tbx-filters" id="tbx-cat-filters">
+              <button type="button" class="tbx-chip active" data-cat="">All</button>
+              <button type="button" class="tbx-chip" data-cat="Site">Site</button>
+              <button type="button" class="tbx-chip" data-cat="Fall">Fall</button>
+              <button type="button" class="tbx-chip" data-cat="Scaffold">Scaffold</button>
+              <button type="button" class="tbx-chip" data-cat="Demo">Demo</button>
+              <button type="button" class="tbx-chip" data-cat="General">General</button>
             </div>
           </div>
-          <div id="tbx-talks-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;">
-            <div style="padding:14px;text-align:center;color:#76777E;font-style:italic;background:white;border:1px solid #E8E4DD;border-radius:4px;grid-column:1/-1;">Loading…</div>
+          <div id="tbx-talks-grid" class="tbx-grid">
+            <div style="padding:14px;text-align:center;color:#76777E;font-style:italic;grid-column:1/-1;">Loading…</div>
           </div>
         </div>
       </section>
@@ -3690,13 +3717,12 @@ document.querySelectorAll('.nav-link').forEach(link => {
   let activeCategory = '';
   let cachedRows = null;
 
-  function _color(cat) {
-    if (cat === 'Scaffold') return '#B11E2E';
-    if (cat === 'Fall')     return '#B68838';
-    if (cat === 'Demo')     return '#76777E';
-    if (cat === 'Site')     return '#2F7C57';
-    if (cat === 'General')  return '#1b5cb3';
-    return '#76777E';
+  // #216 — map the talk category to its scoped palette class (Option 1 spec).
+  // The class carries --c (left bar + EN fill + ES text/border) and --cbg (tag
+  // tint). Unknown categories fall back to the gray default on .tbx-talk.
+  function _catClass(cat) {
+    const m = { Site:'tbx-cat-site', Fall:'tbx-cat-fall', Scaffold:'tbx-cat-scaffold', Demo:'tbx-cat-demo', General:'tbx-cat-general' };
+    return m[cat] || '';
   }
 
   function _render(rows) {
@@ -3706,28 +3732,25 @@ document.querySelectorAll('.nav-link').forEach(link => {
       ? rows.filter(r => (r.category || '') === activeCategory)
       : rows;
     if (!filtered.length) {
-      grid.innerHTML = '<div style="padding:14px;text-align:center;color:#76777E;font-style:italic;background:white;border:1px solid #E8E4DD;border-radius:4px;grid-column:1/-1;">No talks authored yet in this category. Library is built up over time.</div>';
+      grid.innerHTML = '<div style="padding:14px;text-align:center;color:#76777E;font-style:italic;grid-column:1/-1;">No talks authored yet in this category. Library is built up over time.</div>';
       return;
     }
+    // Option 1 (#216): calm white card, 3px left bar in the category color, a
+    // category tag pill (color text on a tint) + "· N" + "15 min", the title,
+    // and category-matched EN/ES buttons (EN filled, ES outlined). EN opens the
+    // English PDF, ES the Spanish PDF — the existing file_url_en/es links.
+    const ext = '<svg class="tbx-ic"><use href="#i-ext"/></svg>';
     grid.innerHTML = filtered.map(r => {
-      const c = _color(r.category);
-      // v2 (#166): big title is the dominant element; ES subtitle + §Ch33
-      // ref are removed (carried inside the PDF instead). Card uses flex
-      // column so the [EN] [ES] button bar sits flush at the bottom and
-      // every card in the grid takes the same height.
-      return `<div style="display:flex;flex-direction:column;padding:14px 16px 16px;background:white;border:1px solid #E8E4DD;border-left:4px solid ${c};border-radius:4px;min-height:180px;">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px;">
-          <div style="font-size:10px;font-weight:800;color:${c};text-transform:uppercase;letter-spacing:0.1em;">${_esc(r.category || 'Talk')} · Topic ${r.topic_number}</div>
-          <div style="font-size:10px;font-weight:700;color:#76777E;letter-spacing:0.05em;">${r.est_minutes || 15} min</div>
-        </div>
-        <div style="flex:1;font-family:Inter,Archivo,system-ui,sans-serif;font-weight:800;font-size:18px;color:#14161C;line-height:1.2;margin-bottom:12px;">${_esc(r.title_en)}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;align-items:stretch;border-radius:4px;overflow:hidden;">
-          <a href="${_esc(r.file_url_en)}" target="_blank" rel="noopener"
-             style="display:flex;align-items:center;justify-content:center;height:38px;padding:0 10px;box-sizing:border-box;background:${c};color:white;font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;text-decoration:none;line-height:1;">EN ↗</a>
-          <a href="${_esc(r.file_url_es)}" target="_blank" rel="noopener"
-             style="display:flex;align-items:center;justify-content:center;height:38px;padding:0 10px;box-sizing:border-box;background:#14161C;color:white;font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;text-decoration:none;line-height:1;">ES ↗</a>
-        </div>
-      </div>`;
+      const cls = _catClass(r.category);
+      const tag = _esc((r.category || 'Talk') + ' · ' + r.topic_number);
+      return '<div class="tbx-talk ' + cls + '">'
+        + '<div class="tbx-trow"><span class="tbx-tag">' + tag + '</span>'
+        + '<span class="tbx-min">' + (r.est_minutes || 15) + ' min</span></div>'
+        + '<div class="tbx-title">' + _esc(r.title_en) + '</div>'
+        + '<div class="tbx-btns">'
+        + '<a class="tbx-en" href="' + _esc(r.file_url_en) + '" target="_blank" rel="noopener">EN ' + ext + '</a>'
+        + '<a class="tbx-es" href="' + _esc(r.file_url_es) + '" target="_blank" rel="noopener">ES ' + ext + '</a>'
+        + '</div></div>';
     }).join('');
   }
 
@@ -3748,15 +3771,11 @@ document.querySelectorAll('.nav-link').forEach(link => {
   }
 
   document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.tbx-cat-btn');
+    const btn = e.target.closest('.tbx-chip');
     if (!btn) return;
     activeCategory = btn.getAttribute('data-cat') || '';
-    document.querySelectorAll('.tbx-cat-btn').forEach(b => {
-      const on = (b.getAttribute('data-cat') || '') === activeCategory;
-      b.style.background = on ? '#14161C' : 'white';
-      b.style.color = on ? 'white' : '#14161C';
-      b.style.borderColor = on ? '#14161C' : '#E8E4DD';
-      b.classList.toggle('active', on);
+    document.querySelectorAll('.tbx-chip').forEach(b => {
+      b.classList.toggle('active', (b.getAttribute('data-cat') || '') === activeCategory);
     });
     if (cachedRows) _render(cachedRows); else load();
   });
