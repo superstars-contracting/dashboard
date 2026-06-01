@@ -158,41 +158,82 @@
     /* Navigation */
     .nav { }
     .nav-group { margin-top: 14px; }
+    /* #212 — collapsible group header (clickable) + chevron */
     .nav-group-label {
       font-size: 9px;
       font-weight: 600;
       letter-spacing: 0.18em;
       text-transform: uppercase;
       color: #9CA0AA;
-      padding: 0 12px 6px;
+      padding: 7px 12px 5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
     }
+    .nav-group-label:hover { color: #5A5C66; }
+    .nav-chev { width: 12px; height: 12px; margin-left: auto; color: #C2C4CA; transition: transform .15s; flex: 0 0 auto; }
+    .nav-group.collapsed .nav-chev { transform: rotate(-90deg); }
+    .nav-group.collapsed .nav-items { display: none; }
     .nav-link {
-      display: block;
+      display: flex;
+      align-items: center;
+      gap: 11px;
       padding: 7px 12px;
       font-size: 13.5px;
       color: #5A5C66;
       cursor: pointer;
-      border-radius: 4px;
+      border-radius: 6px;
       text-decoration: none;
       position: relative;
       margin: 1px 0;
-      transition: all 150ms;
+      border-left: 3px solid transparent;
+      transition: background 150ms, color 150ms;
     }
-    .nav-link:hover { background: #FAF7F1; color: #14161C; }
+    .nav-ic { width: 18px; height: 18px; flex: 0 0 auto; color: #9CA0AA; }
+    .nav-link:hover { background: #F5F6F8; color: #14161C; }
+    /* Option 1 (#212) — soft blue highlight + blue left bar */
     .nav-link.active {
-      color: #14161C;
+      background: rgba(30,115,232,.10);
+      color: #1E73E8;
       font-weight: 600;
+      border-left-color: #1E73E8;
     }
-    .nav-link.active::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 6px;
-      bottom: 6px;
-      width: 2px;
-      background: #B11E2E;
-      border-radius: 2px;
-    }
+    .nav-link.active .nav-ic { color: #1E73E8; }
+    .nav-link.active::before { content: none; }
+
+    /* #212 Drop Report — matches drop_report_mockup.html (brand red+black header) */
+    .dr-edit { font-size:12px;font-weight:700;color:#1E73E8;text-decoration:none;white-space:nowrap; }
+    .dr-edit:hover { text-decoration:underline; }
+    .dr-sheet { max-width:880px;background:#fff;border:1px solid #E8E4DD;border-radius:10px;overflow:hidden;box-shadow:inset 0 0 13px rgba(30,115,232,.06),0 1px 4px rgba(0,0,0,.04); }
+    .dr-head { background:#14161C;color:#fff;padding:16px 22px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap; }
+    .dr-brand { display:flex;align-items:center;gap:10px; }
+    .dr-co { font-weight:700;font-size:15px;letter-spacing:.02em; } .dr-co .s { color:#aeb6c4;font-weight:500; }
+    .dr-title { font-size:12px;color:#9aa0aa;letter-spacing:.14em;margin-top:2px; }
+    .dr-meta { text-align:right;font-size:12px;color:#9aa0aa;line-height:1.6; } .dr-meta b { color:#fff;font-weight:600; }
+    .dr-band { display:grid;grid-template-columns:repeat(5,1fr);gap:18px;padding:16px 22px;border-bottom:1px solid #E8E4DD;font-size:13px;align-items:start; }
+    .dr-band .k { color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:.05em; }
+    .dr-band .v { font-weight:600;margin-top:3px; }
+    .dr-badge { display:inline-block;font-size:12px;padding:2px 10px;border-radius:999px;font-weight:600;background:rgba(30,115,232,.1);color:#1E73E8; }
+    .dr-badge.done { background:rgba(15,110,86,.1);color:#0F6E56; } .dr-badge.ns { background:#F1F1F3;color:#76777E; }
+    .dr-sec { padding:16px 22px;border-bottom:1px solid #E8E4DD; }
+    .dr-sec h3 { font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#76777E;margin:0 0 10px;font-weight:600; }
+    .dr-summary { display:grid;grid-template-columns:repeat(4,1fr);gap:14px; }
+    .dr-summary .v { font-size:20px;font-weight:700; } .dr-summary .l { color:#76777E;font-size:12px;margin-bottom:2px; }
+    .dr-ahead { color:#0F6E56;font-size:12px;font-weight:600; } .dr-behind { color:#B11E2E;font-size:12px;font-weight:600; } .dr-ontrack { color:#54505A;font-size:12px;font-weight:600; }
+    .dr-table { width:100%;border-collapse:collapse;font-size:13px; }
+    .dr-table th { text-align:left;color:#76777E;font-weight:600;font-size:12px;padding:6px 8px;border-bottom:1px solid #E8E4DD; }
+    .dr-table td { padding:7px 8px;border-bottom:1px solid #F2EFE7; }
+    .dr-pill { font-size:11px;padding:1px 8px;border-radius:999px;font-weight:600; }
+    .dr-pill.done { background:rgba(15,110,86,.1);color:#0F6E56; }
+    .dr-pill.prog { background:rgba(30,115,232,.1);color:#1E73E8; }
+    .dr-pill.na { background:#F1F1F3;color:#76777E; }
+    .dr-tot { font-weight:700; }
+    .dr-foot { padding:14px 22px;font-size:12px;color:#76777E;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap; }
+    .dr-sync { display:inline-flex;align-items:center;gap:6px;color:#1E73E8;font-weight:600; }
+    .dr-photos { display:flex;gap:8px;flex-wrap:wrap; } .dr-ph { width:74px;height:54px;border:1px dashed #E8E4DD;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#C2C4CA;font-size:11px; }
+    @media (max-width:760px){ .dr-band{grid-template-columns:repeat(2,1fr)} .dr-summary{grid-template-columns:repeat(2,1fr)} }
 
     /* Main Content */
     .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -534,6 +575,26 @@
 <link rel="stylesheet" href="/files/static/css/widgets.css?v=211">
 </head>
 <body>
+<!-- #212 nav icons — inline SVG <symbol> defs (defined ONCE, used via <use>).
+     No icon font / CDN, so they always render (offline-safe). -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-gauge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="7"/><path d="M12 13l3-3"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><path d="M16 8a3 3 0 010 6"/></symbol>
+  <symbol id="i-bldg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M4 9h16M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-mega" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l8 4V5L8 9z"/></symbol>
+  <symbol id="i-msg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-4 4z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="17" rx="1"/><path d="M9 4V3h6v1"/><path d="M9 10h6M9 14h6"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  <symbol id="i-dollar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M16 6H10a3 3 0 000 6h4a3 3 0 010 6H8"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></symbol>
+</defs></svg>
 
 <div class="app-shell">
   <!-- SIDEBAR -->
@@ -551,72 +612,79 @@
     <a href="/" style="display:flex;align-items:center;gap:8px;padding:10px 18px;color:#76777E;font-size:12px;text-decoration:none;border-bottom:1px solid #E8E4DD;letter-spacing:0.5px;text-transform:uppercase;font-weight:600;transition:color 0.15s;" onmouseover="this.style.color='#B11E2E'" onmouseout="this.style.color='#76777E'">
       ← Back to Company
     </a>
+    <!-- #212 — collapsible groups (click header to toggle, persisted per browser)
+         + inline-SVG icons (always render, no CDN). Active item = soft blue
+         highlight + blue left bar (Option 1). Legacy "Drop Plans" nav entry
+         removed; "Drop Plan" renamed to "Drop Report" (the report view); the
+         draggable board stays reachable from the report's "Edit / log" link. -->
     <nav class="nav">
-      <div class="nav-group">
-        <div class="nav-group-label">Overview</div>
-        <a class="nav-link active" data-view="dashboard">Project Health</a>
+      <div class="nav-group" data-group="overview">
+        <div class="nav-group-label"><span class="nav-group-name">Overview</span><svg class="nav-chev"><use href="#i-chev"/></svg></div>
+        <div class="nav-items">
+          <a class="nav-link active" data-view="dashboard"><svg class="nav-ic"><use href="#i-gauge"/></svg>Project Health</a>
+        </div>
       </div>
-      <div class="nav-group">
-        <div class="nav-group-label">People</div>
-        <a class="nav-link" data-view="employees">Employees & Certs</a>
-        <a class="nav-link" data-view="subs">Subcontractors & COIs</a>
+      <div class="nav-group" data-group="people">
+        <div class="nav-group-label"><span class="nav-group-name">People</span><svg class="nav-chev"><use href="#i-chev"/></svg></div>
+        <div class="nav-items">
+          <a class="nav-link" data-view="employees"><svg class="nav-ic"><use href="#i-users"/></svg>Employees & Certs</a>
+          <a class="nav-link" data-view="subs"><svg class="nav-ic"><use href="#i-bldg"/></svg>Subcontractors & COIs</a>
+        </div>
       </div>
-      <div class="nav-group">
-        <div class="nav-group-label">Field</div>
-        <a class="nav-link" data-view="drawings">Drawing Markup</a>
-        <a class="nav-link" data-view="documents">Project Documents</a>
-        <a class="nav-link" data-view="drop-plans">Drop Plans</a>
-        <!-- #201 — NEW authoritative Drop Plan (project-scoped: stages,
-             quantities, progress, role-gated cost). Real href to the
-             standalone /dropplan page — intentionally NO data-view so the
-             #195 nav interceptor lets the browser navigate (not swallow it).
-             The legacy data-view="drop-plans" sample above is superseded;
-             retire it in a future cleanup batch. -->
-        <a class="nav-link" href="/dropplan" title="Project Drop Plan — stages, quantities, progress (admin/c-suite also see cost)">Drop Plan</a>
-        <a class="nav-link" data-view="schedule">Schedule</a>
+      <div class="nav-group" data-group="field">
+        <div class="nav-group-label"><span class="nav-group-name">Field</span><svg class="nav-chev"><use href="#i-chev"/></svg></div>
+        <div class="nav-items">
+          <a class="nav-link" data-view="drawings"><svg class="nav-ic"><use href="#i-pencil"/></svg>Drawing Markup</a>
+          <a class="nav-link" data-view="documents"><svg class="nav-ic"><use href="#i-file"/></svg>Project Documents</a>
+          <a class="nav-link" data-view="drop-report" title="Drop Report — auto-pulled from the Drop Plan (one report per drop)"><svg class="nav-ic"><use href="#i-layers"/></svg>Drop Report</a>
+          <a class="nav-link" data-view="schedule"><svg class="nav-ic"><use href="#i-cal"/></svg>Schedule</a>
+        </div>
       </div>
-      <div class="nav-group">
-        <div class="nav-group-label">Daily Ops</div>
-        <a class="nav-link" data-view="daily-report">Daily Report</a>
-        <a class="nav-link" data-view="weekly-summary">Weekly Summary</a>
-        <a class="nav-link" data-view="site-closure">Site Closure</a>
-        <a class="nav-link" data-view="materials">Materials & Deliveries</a>
-        <a class="nav-link" data-view="meetings">Meeting Minutes</a>
-        <a class="nav-link" data-view="equipment">Equipment Log</a>
-        <a class="nav-link" data-view="toolbox-talks">Toolbox Talks</a>
+      <div class="nav-group" data-group="dailyops">
+        <div class="nav-group-label"><span class="nav-group-name">Daily Ops</span><svg class="nav-chev"><use href="#i-chev"/></svg></div>
+        <div class="nav-items">
+          <a class="nav-link" data-view="daily-report"><svg class="nav-ic"><use href="#i-file"/></svg>Daily Report</a>
+          <a class="nav-link" data-view="weekly-summary"><svg class="nav-ic"><use href="#i-cal"/></svg>Weekly Summary</a>
+          <a class="nav-link" data-view="site-closure"><svg class="nav-ic"><use href="#i-clip"/></svg>Site Closure</a>
+          <a class="nav-link" data-view="materials"><svg class="nav-ic"><use href="#i-box"/></svg>Materials & Deliveries</a>
+          <a class="nav-link" data-view="meetings"><svg class="nav-ic"><use href="#i-msg"/></svg>Meeting Minutes</a>
+          <a class="nav-link" data-view="equipment"><svg class="nav-ic"><use href="#i-box"/></svg>Equipment Log</a>
+          <a class="nav-link" data-view="toolbox-talks"><svg class="nav-ic"><use href="#i-mega"/></svg>Toolbox Talks</a>
+        </div>
       </div>
-      <div class="nav-group">
-        <div class="nav-group-label">Tracking</div>
-        <a class="nav-link" data-view="rfis">RFI Log</a>
-        <a class="nav-link" data-view="inspections">Inspection Log</a>
-        <a class="nav-link" data-view="violations">Violations</a>
-        <a class="nav-link" data-view="punch">Punch List</a>
+      <div class="nav-group" data-group="tracking">
+        <div class="nav-group-label"><span class="nav-group-name">Tracking</span><svg class="nav-chev"><use href="#i-chev"/></svg></div>
+        <div class="nav-items">
+          <a class="nav-link" data-view="rfis"><svg class="nav-ic"><use href="#i-msg"/></svg>RFI Log</a>
+          <a class="nav-link" data-view="inspections"><svg class="nav-ic"><use href="#i-clip"/></svg>Inspection Log</a>
+          <a class="nav-link" data-view="violations"><svg class="nav-ic"><use href="#i-alert"/></svg>Violations</a>
+          <a class="nav-link" data-view="punch"><svg class="nav-ic"><use href="#i-list"/></svg>Punch List</a>
+        </div>
       </div>
-      <div class="nav-group">
-        <div class="nav-group-label">Financial & Compliance</div>
-        <a class="nav-link" data-view="sov">Schedule of Values</a>
-        <!-- #193 — Labor Rate Tracker entry: routes to the existing LRT
-             view on the company console (kept there because the LRT JS
-             + grid live in company-dashboard.html). Hidden by default;
-             revealed only for admin/c_suite via lrt_nav_gate.js right
-             after auth_menu's ssc:user-loaded event fires. The server
-             still enforces /api/payroll/hours rate-column omission for
-             non-admin (#158); this is UX-only nav. -->
-        <a id="proj-lrt-nav-link" class="nav-link"
-           style="display:none;"
-           href="/company-dashboard.html#labor-rate"
-           title="Per-week hours worked × rate · check-cutting view (admin / c-suite only)">
-          Labor Rate Tracker
-          <span style="font-size:9px;font-weight:700;color:#76777E;letter-spacing:0.5px;margin-left:6px;padding:1px 5px;border:1px solid #D5D2C9;border-radius:2px;text-transform:uppercase;">Admin</span>
-        </a>
-        <a class="nav-link" data-view="compliance">Compliance & Permits</a>
-        <a class="nav-link" data-view="closeout">Warranty & Closeout</a>
+      <div class="nav-group" data-group="financial">
+        <div class="nav-group-label"><span class="nav-group-name">Financial & Compliance</span><svg class="nav-chev"><use href="#i-chev"/></svg></div>
+        <div class="nav-items">
+          <a class="nav-link" data-view="sov"><svg class="nav-ic"><use href="#i-dollar"/></svg>Schedule of Values</a>
+          <!-- Labor Rate Tracker — routes to the LRT view on the company console;
+               hidden until lrt_nav_gate.js reveals it for admin/c_suite. -->
+          <a id="proj-lrt-nav-link" class="nav-link"
+             style="display:none;"
+             href="/company-dashboard.html#labor-rate"
+             title="Per-week hours worked × rate · check-cutting view (admin / c-suite only)">
+            <svg class="nav-ic"><use href="#i-dollar"/></svg>Labor Rate Tracker
+            <span style="font-size:9px;font-weight:700;color:#76777E;letter-spacing:0.5px;margin-left:6px;padding:1px 5px;border:1px solid #D5D2C9;border-radius:2px;text-transform:uppercase;">Admin</span>
+          </a>
+          <a class="nav-link" data-view="compliance"><svg class="nav-ic"><use href="#i-alert"/></svg>Compliance & Permits</a>
+          <a class="nav-link" data-view="closeout"><svg class="nav-ic"><use href="#i-clip"/></svg>Warranty & Closeout</a>
+        </div>
       </div>
-      <div class="nav-group">
-        <div class="nav-group-label">Setup</div>
-        <a class="nav-link" data-view="portal">Client Portal</a>
-        <a class="nav-link" data-view="templates">Templates</a>
-        <a class="nav-link" data-view="settings">Settings</a>
+      <div class="nav-group" data-group="setup">
+        <div class="nav-group-label"><span class="nav-group-name">Setup</span><svg class="nav-chev"><use href="#i-chev"/></svg></div>
+        <div class="nav-items">
+          <a class="nav-link" data-view="portal"><svg class="nav-ic"><use href="#i-users"/></svg>Client Portal</a>
+          <a class="nav-link" data-view="templates"><svg class="nav-ic"><use href="#i-file"/></svg>Templates</a>
+          <a class="nav-link" data-view="settings"><svg class="nav-ic"><use href="#i-gear"/></svg>Settings</a>
+        </div>
       </div>
     </nav>
   </aside>
@@ -762,7 +830,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #211 · 2026-05-30 · calm-blue widget accent on white</div>
+          <div class="ph-build" id="ph-build-stamp">build #212 · 2026-06-01 · Drop Report + collapsible icon nav</div>
         </div>
       </section>
 
@@ -1046,6 +1114,24 @@
             </table>
           </div>
         </div>
+      </section>
+
+      <!-- DROP REPORT (#212) — one report per drop, auto-pulled LIVE from the Drop
+           Plan (existing drop-detail + quantity endpoints; NO new data model). -->
+      <section class="view" data-view="drop-report">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px;">
+          <div>
+            <div class="eyebrow">Field</div>
+            <h1 style="font-size:22px;margin:2px 0;">Drop Report</h1>
+            <div style="font-size:12px;color:#76777E;">One report per drop · auto-pulled from the Drop Plan (DCR cadence).</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <label for="dr-select" style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Drop</label>
+            <select id="dr-select" style="padding:8px 10px;border:1px solid #E8E4DD;border-radius:8px;font-family:inherit;font-size:14px;min-width:220px;background:#fff;"><option>Loading…</option></select>
+            <a class="dr-edit" href="/dropplan" title="Open the Drop Plan board to activate / log stages &amp; patches">Edit / log →</a>
+          </div>
+        </div>
+        <div id="dr-report"><div class="ph-loading">Pick a drop to view its report.</div></div>
       </section>
 
       <!-- SCHEDULE -->
@@ -4786,6 +4872,102 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
 
   function boot(){ initGrid(); load(); setInterval(load, 60000); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>
+
+<script>
+/* #212 — collapsible nav groups (persisted per browser) + Drop Report (auto-pulled
+   live from the Drop Plan via existing endpoints; no new data model). PII-safe. */
+(function(){
+  // ---- collapsible nav groups, persisted in localStorage ----
+  document.querySelectorAll('.nav .nav-group').forEach(function(g){
+    var k = g.getAttribute('data-group');
+    try { if (k && localStorage.getItem('ssc.navgrp.'+k) === 'collapsed') g.classList.add('collapsed'); } catch(e){}
+    var label = g.querySelector('.nav-group-label');
+    if (label) label.addEventListener('click', function(){
+      g.classList.toggle('collapsed');
+      try { if (k) localStorage.setItem('ssc.navgrp.'+k, g.classList.contains('collapsed') ? 'collapsed' : 'open'); } catch(e){}
+    });
+  });
+
+  // ---- Drop Report ----
+  var PROJECT='FR-BX-001', CLIENT='Compass Point, LLC', PROJ_NAME='890 E 135th St';
+  var SLABEL={not_started:['Not started','na'],in_progress:['In progress','prog'],complete:['Complete','done'],n_a:['N/A','na']};
+  function pad(n){return String(n).padStart(2,'0');}
+  function todayMDY(){var d=new Date();return pad(d.getMonth()+1)+'/'+pad(d.getDate())+'/'+d.getFullYear();}
+  function fmtMDY(iso){if(!iso)return '—';var p=String(iso).slice(0,10).split('-');return p.length===3?p[1]+'/'+p[2]+'/'+p[0]:iso;}
+  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function ceilTenth(v){if(v==null||isNaN(v))return null;return Math.ceil(Number((Number(v)*10).toFixed(6)))/10;}
+  var jget=function(u){return fetch(u,{credentials:'include'}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});};
+  function statusOf(d){var lc=(d.lifecycle||'');if(lc==='not_started')return 'not_started';var pct=(d.progress&&d.progress.pct)||0;if(pct>=100)return 'complete';return 'active';}
+  var loaded=false;
+
+  function loadDrops(){
+    var sel=document.getElementById('dr-select'); if(!sel)return;
+    jget('/api/dropplan/projects/'+PROJECT+'/drops').then(function(j){
+      var drops=(j&&j.data)||[];
+      if(!drops.length){ sel.innerHTML='<option value="">No drops</option>'; document.getElementById('dr-report').innerHTML='<div class="ph-loading">No drops yet.</div>'; return; }
+      drops.sort(function(a,b){ var sa=statusOf(a)==='active'?0:1, sb=statusOf(b)==='active'?0:1; if(sa!==sb)return sa-sb; return (a.sequence_no||0)-(b.sequence_no||0); });
+      sel.innerHTML=drops.map(function(d){ var st=statusOf(d); var tag=st==='active'?' · active':(st==='complete'?' · complete':''); return '<option value="'+esc(d.drop_id)+'">Drop '+esc(d.sequence_no)+' · '+esc(d.elevation||'')+tag+'</option>'; }).join('');
+      renderReport(drops[0].drop_id);
+    });
+  }
+
+  function renderReport(dropId){
+    var host=document.getElementById('dr-report'); if(!host||!dropId)return;
+    host.innerHTML='<div class="ph-loading">Loading report…</div>';
+    jget('/api/dropplan/drops/'+encodeURIComponent(dropId)).then(function(detResp){
+      var d=detResp&&detResp.data;
+      if(!d){ host.innerHTML='<div class="ph-empty"><div class="ph-empty-title">Could not load drop</div></div>'; return; }
+      jget('/api/dropplan/drops/'+encodeURIComponent(dropId)+'/quantity-entries').then(function(pResp){
+        var patches=((pResp&&pResp.data)||[]).filter(function(e){return e.volume_cf!=null;});
+        host.innerHTML=reportHtml(d, patches);
+      });
+    });
+  }
+
+  function reportHtml(d, patches){
+    var pr=d.progress||{}, wd=d.working_days||{};
+    var st=statusOf(d), pct=(pr.pct!=null?pr.pct:0);
+    var statusBadge = st==='active' ? '<span class="dr-badge">Active · '+pct+'%</span>'
+      : st==='complete' ? '<span class="dr-badge done">Complete</span>'
+      : '<span class="dr-badge ns">Not started</span>';
+    var dates=(d.stages||[]).map(function(s){return s.started_on||s.completed_on;}).filter(Boolean).sort();
+    var activated=dates.length?fmtMDY(dates[0]):'—';
+    var curStage=d.current_stage?esc(d.current_stage.name):'—';
+    var planned=(wd.planned_to_date_days!=null?wd.planned_to_date_days:0), actual=(wd.actual_to_date_days!=null?wd.actual_to_date_days:0);
+    var wdChip = wd.status==='ahead'?'<span class="dr-ahead">ahead</span>':wd.status==='behind'?'<span class="dr-behind">behind</span>':wd.status==='on_track'?'<span class="dr-ontrack">on track</span>':'';
+    var totVol=0; patches.forEach(function(p){totVol+=p.volume_cf;}); var totDisp=patches.length?ceilTenth(totVol).toFixed(1):'0.0';
+    var stageRows=(d.stages||[]).map(function(s){ var m=SLABEL[s.status]||[s.status,'na']; var date=s.completed_on||s.started_on; var days=(s.working_days_actual!=null?s.working_days_actual:(s.default_working_days!=null?s.default_working_days:'—')); return '<tr><td>'+esc(s.step_no)+'</td><td>'+esc(s.name)+'</td><td><span class="dr-pill '+m[1]+'">'+esc(m[0])+'</span></td><td>'+fmtMDY(date)+'</td><td style="text-align:right">'+esc(days)+'</td></tr>'; }).join('');
+    var patchRows=patches.length ? patches.map(function(p,i){ return '<tr><td>'+(i+1)+'</td><td>'+esc(p.length)+' '+esc(p.length_unit)+'</td><td>'+esc(p.width)+' '+esc(p.width_unit)+'</td><td>'+esc(p.depth)+' '+esc(p.depth_unit)+'</td><td style="text-align:right">'+ceilTenth(p.volume_cf).toFixed(1)+' CF</td></tr>'; }).join('') + '<tr><td class="dr-tot" colspan="4">Total · '+patches.length+' patch'+(patches.length===1?'':'es')+'</td><td class="dr-tot" style="text-align:right">'+totDisp+' CF</td></tr>'
+      : '<tr><td colspan="5" style="color:#76777E;padding:10px 8px;">No concrete patches logged yet.</td></tr>';
+    return '<div class="dr-sheet">'
+      +'<div class="dr-head"><div class="dr-brand"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><polygon points="12,1 15,9 23,9 16.5,14 19,22 12,17 5,22 7.5,14 1,9 9,9" fill="#B11E2E"/></svg>'
+        +'<div><div class="dr-co">SUPERSTARS <span class="s">CONTRACTING INC.</span></div><div class="dr-title">DROP REPORT</div></div></div>'
+        +'<div class="dr-meta">Report #'+esc(d.drop_id)+'<br>As of <b>'+todayMDY()+'</b><br>Auto-generated</div></div>'
+      +'<div class="dr-band">'
+        +'<div><div class="k">Project</div><div class="v">'+esc(PROJ_NAME)+' · '+esc(d.project_code)+'</div></div>'
+        +'<div><div class="k">Client</div><div class="v">'+esc(CLIENT)+'</div></div>'
+        +'<div><div class="k">Drop</div><div class="v">Drop '+esc(d.sequence_no)+' · '+esc(d.elevation||'')+'</div></div>'
+        +'<div><div class="k">Activated</div><div class="v">'+activated+'</div></div>'
+        +'<div><div class="k">Status</div><div class="v">'+statusBadge+'</div></div></div>'
+      +'<div class="dr-sec"><h3>Summary</h3><div class="dr-summary">'
+        +'<div><div class="l">Progress</div><div class="v">'+pct+'%</div></div>'
+        +'<div><div class="l">Current stage</div><div class="v" style="font-size:14px">'+curStage+'</div></div>'
+        +'<div><div class="l">Working days · plan/actual</div><div class="v" style="font-size:16px">'+planned+' / '+actual+' '+wdChip+'</div></div>'
+        +'<div><div class="l">Patch volume to date</div><div class="v">'+totDisp+' CF</div></div></div></div>'
+      +'<div class="dr-sec"><h3>Stage progress (auto-pulled)</h3><table class="dr-table"><thead><tr><th style="width:26px">#</th><th>Stage</th><th>Status</th><th>Date</th><th style="text-align:right">Days</th></tr></thead><tbody>'+stageRows+'</tbody></table></div>'
+      +'<div class="dr-sec"><h3>Concrete patches logged (auto-pulled)</h3><table class="dr-table"><thead><tr><th style="width:26px">#</th><th>Length</th><th>Width</th><th>Depth</th><th style="text-align:right">Volume</th></tr></thead><tbody>'+patchRows+'</tbody></table></div>'
+      +'<div class="dr-sec"><h3>Photos</h3><div class="dr-photos"><div class="dr-ph">stage</div><div class="dr-ph">stage</div><div class="dr-ph">+ add</div></div></div>'
+      +'<div class="dr-foot"><span class="dr-sync"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1E73E8" stroke-width="2"><path d="M20 11A8 8 0 105 6"/><path d="M4 4v4h4"/></svg>Live from the Drop Plan — updates as stages &amp; quantities are logged</span>'
+        +'<span>Engineer sign-off: ____________ · Generated '+todayMDY()+'</span></div>'
+      +'</div>';
+  }
+
+  document.addEventListener('change', function(e){ if(e.target && e.target.id==='dr-select'){ renderReport(e.target.value); } });
+  document.querySelectorAll('.nav-link[data-view="drop-report"]').forEach(function(l){
+    l.addEventListener('click', function(){ if(!loaded){ loaded=true; loadDrops(); } });
+  });
 })();
 </script>
 
