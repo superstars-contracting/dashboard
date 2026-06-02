@@ -49,6 +49,11 @@
   .acts{display:flex;gap:7px;justify-content:flex-end;align-items:center}
   .muted{color:var(--muted)}.empty{padding:26px;text-align:center;color:var(--muted)}
   .cellinput{width:84px;border:1.5px solid var(--blue);border-radius:7px;padding:5px 7px;font-size:13px;text-align:right;outline:none;box-shadow:0 0 0 3px var(--in);font-family:inherit}
+  /* #222 — saved rate shows as clean static text; click to edit (submits a pending change) */
+  .rateval{cursor:pointer;font-weight:600;color:var(--ink);padding:2px 7px;border-radius:7px;border:1px dashed transparent;transition:border-color .12s,background .12s}
+  .rateval:hover{border-color:var(--edge);background:rgba(30,115,232,.06)}
+  .rateval:active{background:rgba(30,115,232,.12)}
+  tr.pendingrate .rateval{color:var(--muted)}
   .inactbl tbody td{color:#9a9ea6}.inactbl .wid{color:var(--ink)}
   .appbtn{border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}
   .appbtn.ok{background:var(--green);color:#fff}.appbtn.no{background:#fff;border:1px solid var(--red);color:var(--red)}
@@ -148,7 +153,7 @@
       <tbody id="lr-pending-tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
     </table></div>
   </div>
-  <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:2px;" id="ph-build-stamp">build #221 · 2026-06-01 · Labor Rates — black worker IDs + PM-gated deactivate + name/photo hover</div>
+  <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:2px;" id="ph-build-stamp">build #222 · 2026-06-02 · Labor Rates — rates display as saved text · click-to-edit submits pending change</div>
 </div>
 
 <div class="overlay" id="lr-overlay">
@@ -230,11 +235,14 @@
     $('lr-inactive-tbody').innerHTML=I.length?I.map(inactiveRow).join(''):'<tr><td colspan="6" class="empty">No inactive workers.</td></tr>';
   }
   function activeRow(w){
-    const pendBadge=w.has_pending?('<span class="pend">→ pending PM'+(w.pending_type==='deactivate'?' (deactivate)':'')+'</span>'):'';
-    return '<tr><td class="wid" data-cardwid="'+esc(w.worker_id)+'">'+esc(w.worker_id)+'</td>'
+    const ratePend=w.has_pending&&w.pending_type!=='deactivate';
+    const deactPend=w.has_pending&&w.pending_type==='deactivate';
+    const rateBadge=ratePend?'<span class="pend">→ pending PM</span>':'';
+    const deactBadge=deactPend?'<span class="pend">→ pending PM (deactivate)</span>':'';
+    return '<tr'+(ratePend?' class="pendingrate"':'')+'><td class="wid" data-cardwid="'+esc(w.worker_id)+'">'+esc(w.worker_id)+'</td>'
       +'<td><span class="trade">'+esc(w.trade||'—')+'</span></td>'
-      +'<td class="r"><input class="cellinput" data-rate="'+esc(w.worker_id)+'" value="'+(w.current_rate!=null?Number(w.current_rate).toFixed(2):'')+'"></td>'
-      +'<td>'+esc(fmtMDY(w.effective_date))+pendBadge+'</td>'
+      +'<td class="r"><span class="rateval" data-rateedit="'+esc(w.worker_id)+'" title="Click to edit — submits for PM approval">'+money(w.current_rate)+'</span>'+rateBadge+'</td>'
+      +'<td>'+esc(fmtMDY(w.effective_date))+deactBadge+'</td>'
       +'<td><span class="st act">Active</span></td>'
       +'<td><div class="acts"><button class="iconbtn" title="History" data-hist="'+esc(w.worker_id)+'"><svg class="ic"><use href="#i-clock"/></svg></button>'
       +'<button class="iconbtn" title="Edit" data-edit="'+esc(w.worker_id)+'"><svg class="ic"><use href="#i-edit"/></svg></button>'
@@ -251,6 +259,7 @@
   }
   function byId(wid){ return ROSTER.active.concat(ROSTER.inactive).find(w=>w.worker_id===wid); }
   document.addEventListener('click',e=>{
+    const rv=e.target.closest('[data-rateedit]'); if(rv){ beginRateEdit(rv); return; }
     const h=e.target.closest('[data-hist]'); if(h){ openPanel(byId(h.getAttribute('data-hist')),false,true); return; }
     const ed=e.target.closest('[data-edit]'); if(ed){ openPanel(byId(ed.getAttribute('data-edit')),false); return; }
     const re=e.target.closest('[data-react]'); if(re){ reactivate(re.getAttribute('data-react')); return; }
@@ -258,12 +267,27 @@
     const ap=e.target.closest('[data-approve]'); if(ap){ decide(ap.getAttribute('data-approve'),'approve'); return; }
     const rj=e.target.closest('[data-reject]'); if(rj){ decide(rj.getAttribute('data-reject'),'reject'); return; }
   });
-  document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.classList&&e.target.classList.contains('cellinput')) submitInline(e.target); });
+  // #222 — click a saved rate to edit inline; Enter/blur submits a pending PM change, Esc cancels.
+  function beginRateEdit(span){
+    const wid=span.getAttribute('data-rateedit'); const w=byId(wid);
+    if(!w||w.status==='inactive') return;                       // inactive rows are read-only
+    const td=span.closest('td'); if(!td||td.querySelector('input.cellinput')) return;
+    const cur=w.current_rate!=null?Number(w.current_rate).toFixed(2):'';
+    td.innerHTML='<input class="cellinput" data-rate="'+esc(wid)+'" value="'+cur+'" inputmode="decimal" aria-label="New rate for '+esc(wid)+'">';
+    const inp=td.querySelector('input'); inp.focus(); inp.select();
+  }
+  document.addEventListener('keydown',e=>{
+    const t=e.target; if(!t.classList||!t.classList.contains('cellinput')) return;
+    if(e.key==='Enter'){ e.preventDefault(); submitInline(t); }
+    else if(e.key==='Escape'){ t.dataset.lrDone='1'; renderTables(); }   // cancel -> restore saved text
+  });
+  document.addEventListener('focusout',e=>{ const t=e.target; if(t.classList&&t.classList.contains('cellinput')) submitInline(t); });
   async function submitInline(inp){
+    if(inp.dataset.lrDone) return; inp.dataset.lrDone='1';       // guard: Enter + blur both fire
     const wid=inp.getAttribute('data-rate'); const v=parseFloat(inp.value); const cur=byId(wid);
-    if(!cur||isNaN(v)||v<=0||Math.abs(v-(cur.current_rate||0))<0.005){ return; }
+    if(!cur||isNaN(v)||v<=0||Math.abs(v-(cur.current_rate||0))<0.005){ renderTables(); return; }  // no-op -> restore saved text
     const r=await jpost('/api/labor-rates/changes',{worker_id:wid,new_rate:v,effective_date:cur.effective_date||todayISO()});
-    if(r.ok){ toast('Submitted for PM approval'); loadRoster(); loadPending(); } else { toast('Submit failed'); }
+    if(r.ok){ toast('Submitted for PM approval'); loadRoster(); loadPending(); } else { toast('Submit failed'); renderTables(); }
   }
 
   async function loadPending(){

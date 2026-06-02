@@ -109,13 +109,17 @@ def main():
     conn = db()
     state_n = conn.execute("SELECT COUNT(*) FROM labor_worker_state WHERE worker_id NOT LIKE 'W-9%'").fetchone()[0]
     active_n = conn.execute("SELECT COUNT(*) FROM labor_worker_state WHERE worker_id NOT LIKE 'W-9%' AND status='active'").fetchone()[0]
+    valid_status_n = conn.execute("SELECT COUNT(*) FROM labor_worker_state WHERE worker_id NOT LIKE 'W-9%' AND status IN ('active','inactive')").fetchone()[0]
     init_n = conn.execute("SELECT COUNT(*) FROM labor_rate_change WHERE is_initial=1 AND worker_id NOT LIKE 'W-9%'").fetchone()[0]
     mism = conn.execute("""SELECT COUNT(*) FROM labor_worker_state s JOIN employees e ON e.worker_id=s.worker_id
         JOIN worker_rates wr ON wr.employee_id=e.employee_id AND wr.effective_to IS NULL
         WHERE s.worker_id NOT LIKE 'W-9%' AND ABS(s.current_rate - wr.hourly_rate) > 0.005""").fetchone()[0]
     conn.close()
     ok("migration_14_state", state_n == 14, f"{state_n}")
-    ok("migration_all_active", active_n == 14)
+    # The active/inactive split is OPERATOR-controlled — real ops deactivate workers via the
+    # live dashboard (PM-gated deactivate, #221). Assert every real worker has a valid status
+    # (accounting sums to 14), NOT that all 14 are active, so the suite tolerates that drift.
+    ok("migration_status_accounted", valid_status_n == 14, f"{active_n} active / {14 - active_n} inactive (operator-controlled)")
     ok("migration_initial_history", init_n == 14)
     ok("migration_rates_match_worker_rates", mism == 0, "state.current_rate == worker_rates (no values shown)")
 
