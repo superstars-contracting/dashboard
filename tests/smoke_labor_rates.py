@@ -139,14 +139,47 @@ def main():
     w2 = find(roster(), "active", "W-9002")
     ok("reject_current_unchanged", w2 and w2["current_rate"] == 20.00 and not w2["has_pending"])
 
-    # ---- 5) ACTIVE/INACTIVE split + Reactivate (history kept) ----
-    requests.post(f"{BASE}/api/labor-rates/state/W-9001/status", json={"status": "inactive"}, timeout=15)
+    # ---- 5) Reactivate (instant admin) + direct set_status->inactive BLOCKED (#221) ----
+    dr0 = requests.post(f"{BASE}/api/labor-rates/deactivate", json={"worker_id": "W-9001"}, timeout=15)
+    pm.post(f"{BASE}/api/labor-rates/changes/{dr0.json()['data']['change_id']}/approve", timeout=15)
     rost3 = roster()
-    ok("inactive_moves_section", find(rost3, "inactive", "W-9001") is not None and find(rost3, "active", "W-9001") is None)
+    ok("deactivate_moves_to_inactive", find(rost3, "inactive", "W-9001") is not None and find(rost3, "active", "W-9001") is None)
+    ok("set_status_inactive_blocked",
+       requests.post(f"{BASE}/api/labor-rates/state/W-9001/status", json={"status": "inactive"}, timeout=10).status_code == 400)
     requests.post(f"{BASE}/api/labor-rates/state/W-9001/status", json={"status": "active"}, timeout=15)
     rost4 = roster()
     hist2 = requests.get(f"{BASE}/api/labor-rates/history/W-9001", timeout=15).json()["data"]
     ok("reactivate_same_id_history_kept", find(rost4, "active", "W-9001") is not None and len(hist2) >= 2)
+
+    # ---- 6) DEACTIVATE flow (#221) — PM-gated, same queue ----
+    add_worker("W-9003", "Rope Access", 30.00)
+    add_worker("W-9004", "Superintendent", 70.00)
+    dr = requests.post(f"{BASE}/api/labor-rates/deactivate", json={"worker_id": "W-9003"}, timeout=15)
+    ok("deactivate_submit_201", dr.status_code == 201 and dr.json()["data"]["change_type"] == "deactivate", f"HTTP {dr.status_code}")
+    dcid = dr.json()["data"]["change_id"]
+    rd = roster(); w3 = find(rd, "active", "W-9003")
+    ok("deactivate_stays_active_pending", w3 is not None and w3["has_pending"] and w3.get("pending_type") == "deactivate")
+    ok("deactivate_pending_kpi", rd["kpis"]["pending"] >= 1)
+    pq = pm.get(f"{BASE}/api/labor-rates/pending", timeout=10).json()["data"]
+    ok("queue_shows_deactivate_type", any(p["id"] == dcid and p["change_type"] == "deactivate" for p in pq))
+    # also have a rate pending in the queue (W-9002 from earlier was rejected; submit a fresh one)
+    requests.post(f"{BASE}/api/labor-rates/changes", json={"worker_id": "W-9004", "new_rate": 72.0, "effective_date": "2026-06-01"}, timeout=15)
+    pq2 = pm.get(f"{BASE}/api/labor-rates/pending", timeout=10).json()["data"]
+    ok("queue_mixed_types", any(p["change_type"] == "deactivate" for p in pq2) and any(p["change_type"] == "rate" for p in pq2))
+    ap = pm.post(f"{BASE}/api/labor-rates/changes/{dcid}/approve", timeout=15)
+    ok("deactivate_approve_200", ap.status_code == 200)
+    rd2 = roster()
+    ok("deactivate_approve_moves_inactive", find(rd2, "inactive", "W-9003") is not None and find(rd2, "active", "W-9003") is None)
+    hd = requests.get(f"{BASE}/api/labor-rates/history/W-9003", timeout=15).json()["data"]
+    dh = [h for h in hd if h["change_type"] == "deactivate" and h["status"] == "approved"]
+    ok("deactivate_history_entry", len(dh) >= 1 and dh[0]["decided_by_role"] == "pm")
+    # second deactivate -> PM reject -> stays active (W-9004 has a pending rate; submit deactivate supersedes it)
+    dr2 = requests.post(f"{BASE}/api/labor-rates/deactivate", json={"worker_id": "W-9004"}, timeout=15)
+    dcid2 = dr2.json()["data"]["change_id"]
+    pm.post(f"{BASE}/api/labor-rates/changes/{dcid2}/reject", json={"note": "keep"}, timeout=15)
+    ok("deactivate_reject_stays_active", find(roster(), "active", "W-9004") is not None)
+    # admin-only: PM cannot submit a deactivate (403)
+    ok("pm_deactivate_403", pm.post(f"{BASE}/api/labor-rates/deactivate", json={"worker_id": "W-9004"}, timeout=10).status_code == 403)
 
     # ---- 8) STRESS ~200 synthetic + changes ----
     _stress()
@@ -172,9 +205,11 @@ def _stress():
                         status=("inactive" if i % 7 == 0 else "active"))
         if rr.status_code == 201:
             n += 1
-            if i % 3 == 0:  # ~1/3 get a pending change
+            if i % 3 == 0:  # ~1/3 get a pending rate change
                 requests.post(f"{BASE}/api/labor-rates/changes", json={
                     "worker_id": wid, "new_rate": 15.0 + (i % 20), "effective_date": "2026-06-01"}, timeout=15)
+            elif i % 5 == 0 and i % 7 != 0:  # some active workers get a pending deactivate
+                requests.post(f"{BASE}/api/labor-rates/deactivate", json={"worker_id": wid}, timeout=15)
     seed_s = time.perf_counter() - t0
     ok("stress_seeded_200", n == 200, f"{n} in {seed_s:.1f}s")
     t = time.perf_counter()

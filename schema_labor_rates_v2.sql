@@ -39,3 +39,8 @@ CREATE TABLE IF NOT EXISTS labor_rate_change (
 CREATE INDEX IF NOT EXISTS idx_lws_status ON labor_worker_state(status);
 CREATE INDEX IF NOT EXISTS idx_lrc_worker ON labor_rate_change(worker_id);
 CREATE INDEX IF NOT EXISTS idx_lrc_status ON labor_rate_change(status);
+
+-- #221 — change_type so the SAME approval queue carries rate changes AND
+-- deactivation requests. ALTER is idempotent (migration skips duplicate column);
+-- existing rows default to 'rate' (back-compat).
+ALTER TABLE labor_rate_change ADD COLUMN change_type TEXT DEFAULT 'rate';

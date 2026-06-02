@@ -37,7 +37,7 @@
   thead th{background:#14161a;text-align:left;color:#EAECEF;font-weight:600;font-size:11px;letter-spacing:.04em;text-transform:uppercase;padding:11px 15px}
   th.r,td.r{text-align:right}
   td{padding:11px 15px;border-bottom:1px solid #f3f3f5}tr:last-child td{border-bottom:none}tbody tr:hover td{background:#fafbfc}
-  .wid{font-weight:700;color:var(--red)}
+  .wid{font-weight:700;color:var(--ink)}
   .trade{font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;color:var(--blue);background:rgba(30,115,232,.1)}
   .st{font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:999px}
   .st.act{color:var(--green);background:rgba(15,110,86,.1)}
@@ -49,7 +49,7 @@
   .acts{display:flex;gap:7px;justify-content:flex-end;align-items:center}
   .muted{color:var(--muted)}.empty{padding:26px;text-align:center;color:var(--muted)}
   .cellinput{width:84px;border:1.5px solid var(--blue);border-radius:7px;padding:5px 7px;font-size:13px;text-align:right;outline:none;box-shadow:0 0 0 3px var(--in);font-family:inherit}
-  .inactbl tbody td{color:#9a9ea6}.inactbl .wid{color:#a86}
+  .inactbl tbody td{color:#9a9ea6}.inactbl .wid{color:var(--ink)}
   .appbtn{border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}
   .appbtn.ok{background:var(--green);color:#fff}.appbtn.no{background:#fff;border:1px solid var(--red);color:var(--red)}
   .overlay{position:fixed;inset:0;background:rgba(20,22,26,.45);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:50}
@@ -90,6 +90,7 @@
 <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></symbol>
 <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></symbol>
 <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+<symbol id="i-ban" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></symbol>
 <symbol id="i-star" viewBox="0 0 24 24"><polygon points="12,1 15,9 23,9 16.5,14 19,22 12,17 5,22 7.5,14 1,9 9,9" fill="none" stroke="#C8102E" stroke-width="1.5"/></symbol>
 </defs></svg>
 
@@ -138,7 +139,7 @@
       <tbody id="lr-pending-tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
     </table></div>
   </div>
-  <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:2px;" id="ph-build-stamp">build #220 · 2026-06-01 · Labor Rates redesign (PM-approval gate · rate history · Active/Inactive split)</div>
+  <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:2px;" id="ph-build-stamp">build #221 · 2026-06-01 · Labor Rates — black worker IDs + PM-gated deactivate flow</div>
 </div>
 
 <div class="overlay" id="lr-overlay">
@@ -156,6 +157,7 @@
       <div class="field" id="lr-status-field"><label>Status</label><select id="lr-f-status"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
       <button class="submit" id="lr-submit"><svg class="ic" style="width:15px;height:15px"><use href="#i-send"/></svg><span id="lr-submit-label">Submit for PM approval</span></button>
       <div class="gatenote" id="lr-gatenote"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#i-lock"/></svg> Rate changes take effect only once a PM approves.</div>
+      <button class="ghost" id="lr-deact-btn" type="button" style="display:none;margin-top:12px;width:100%;color:var(--red);border-color:rgba(200,16,46,.4);align-items:center;justify-content:center;gap:6px;"><svg class="ic" style="width:14px;height:14px"><use href="#i-ban"/></svg>Request deactivation (PM approval)</button>
     </div>
     <div class="hist">
       <h4 id="lr-hist-title">Rate history</h4>
@@ -195,6 +197,7 @@
     $('lr-close').addEventListener('click',closePanel);
     $('lr-overlay').addEventListener('click',e=>{ if(e.target===$('lr-overlay')) closePanel(); });
     $('lr-submit').addEventListener('click',onSubmit);
+    $('lr-deact-btn').addEventListener('click',()=>{ if(editWid){ closePanel(); requestDeactivate(editWid); } });
     const s=$('lr-search'); if(s) s.addEventListener('input',renderTables);
   }
 
@@ -217,14 +220,15 @@
     $('lr-inactive-tbody').innerHTML=I.length?I.map(inactiveRow).join(''):'<tr><td colspan="6" class="empty">No inactive workers.</td></tr>';
   }
   function activeRow(w){
-    const pendBadge=w.has_pending?'<span class="pend">→ pending PM</span>':'';
+    const pendBadge=w.has_pending?('<span class="pend">→ pending PM'+(w.pending_type==='deactivate'?' (deactivate)':'')+'</span>'):'';
     return '<tr><td class="wid">'+esc(w.worker_id)+'</td>'
       +'<td><span class="trade">'+esc(w.trade||'—')+'</span></td>'
       +'<td class="r"><input class="cellinput" data-rate="'+esc(w.worker_id)+'" value="'+(w.current_rate!=null?Number(w.current_rate).toFixed(2):'')+'"></td>'
       +'<td>'+esc(fmtMDY(w.effective_date))+pendBadge+'</td>'
       +'<td><span class="st act">Active</span></td>'
       +'<td><div class="acts"><button class="iconbtn" title="History" data-hist="'+esc(w.worker_id)+'"><svg class="ic"><use href="#i-clock"/></svg></button>'
-      +'<button class="iconbtn" title="Edit" data-edit="'+esc(w.worker_id)+'"><svg class="ic"><use href="#i-edit"/></svg></button></div></td></tr>';
+      +'<button class="iconbtn" title="Edit" data-edit="'+esc(w.worker_id)+'"><svg class="ic"><use href="#i-edit"/></svg></button>'
+      +'<button class="iconbtn" title="Deactivate (PM approval)" data-deact="'+esc(w.worker_id)+'"><svg class="ic"><use href="#i-ban"/></svg></button></div></td></tr>';
   }
   function inactiveRow(w){
     return '<tr><td class="wid">'+esc(w.worker_id)+'</td>'
@@ -240,6 +244,7 @@
     const h=e.target.closest('[data-hist]'); if(h){ openPanel(byId(h.getAttribute('data-hist')),false,true); return; }
     const ed=e.target.closest('[data-edit]'); if(ed){ openPanel(byId(ed.getAttribute('data-edit')),false); return; }
     const re=e.target.closest('[data-react]'); if(re){ reactivate(re.getAttribute('data-react')); return; }
+    const dc=e.target.closest('[data-deact]'); if(dc){ requestDeactivate(dc.getAttribute('data-deact')); return; }
     const ap=e.target.closest('[data-approve]'); if(ap){ decide(ap.getAttribute('data-approve'),'approve'); return; }
     const rj=e.target.closest('[data-reject]'); if(rj){ decide(rj.getAttribute('data-reject'),'reject'); return; }
   });
@@ -255,14 +260,17 @@
     try{
       const j=await jget('/api/labor-rates/pending'); const rows=j.data||[];
       $('lr-pending-count').textContent=rows.length;
-      $('lr-pending-tbody').innerHTML=rows.length?rows.map(p=>(
-        '<tr><td class="wid">'+esc(p.worker_id)+'</td>'
+      $('lr-pending-tbody').innerHTML=rows.length?rows.map(p=>{
+        const isDeact=p.change_type==='deactivate';
+        const detail=isDeact?'<strong style="color:var(--amber)">Deactivate worker</strong>':(money(p.old_rate)+' → <strong>'+money(p.new_rate)+'</strong>');
+        const eff=isDeact?'—':esc(fmtMDY(p.effective_date));
+        return '<tr><td class="wid">'+esc(p.worker_id)+'</td>'
         +'<td><span class="trade">'+esc(p.trade||'—')+'</span></td>'
-        +'<td class="r">'+money(p.old_rate)+' → <strong>'+money(p.new_rate)+'</strong></td>'
-        +'<td>'+esc(fmtMDY(p.effective_date))+'</td>'
+        +'<td class="r">'+detail+'</td>'
+        +'<td>'+eff+'</td>'
         +'<td class="muted">'+esc((p.submitted_by_role||'—').toUpperCase())+'</td>'
-        +'<td><div class="acts"><button class="appbtn ok" data-approve="'+p.id+'">Approve</button><button class="appbtn no" data-reject="'+p.id+'">Reject</button></div></td></tr>'
-      )).join(''):'<tr><td colspan="6" class="empty">No pending rate changes.</td></tr>';
+        +'<td><div class="acts"><button class="appbtn ok" data-approve="'+p.id+'">Approve</button><button class="appbtn no" data-reject="'+p.id+'">Reject</button></div></td></tr>';
+      }).join(''):'<tr><td colspan="6" class="empty">No pending changes.</td></tr>';
     }catch(e){ $('lr-pending-tbody').innerHTML='<tr><td colspan="6" class="empty" style="color:#C8102E">Could not load queue.</td></tr>'; }
   }
   async function decide(cid,action){
@@ -279,6 +287,7 @@
     $('lr-gatenote').style.display=isAdd?'none':'';
     $('lr-status-field').style.display=isAdd?'':'none';
     $('lr-pendbar').style.display='none';
+    $('lr-deact-btn').style.display=(!isAdd && w && w.status==='active')?'':'none';
     if(window.SSCDatePicker) SSCDatePicker.wire($('lr-f-date'));
     if(isAdd){
       $('lr-f-wid').value=''; $('lr-f-trade').value='Mechanic'; $('lr-f-rate').value=''; $('lr-f-status').value='active';
@@ -289,7 +298,7 @@
       $('lr-f-trade').value=w.trade||'Mechanic';
       $('lr-f-rate').value=w.current_rate!=null?Number(w.current_rate).toFixed(2):'';
       if(window.SSCDatePicker) SSCDatePicker.setISO($('lr-f-date'),w.effective_date||todayISO());
-      $('lr-panel-id').textContent=w.worker_id+' · '+(w.trade||'—')+' · '+(w.status==='inactive'?'Inactive':'Active');
+      $('lr-panel-id').innerHTML='<strong style="color:var(--ink)">'+esc(w.worker_id)+'</strong> · '+esc(w.trade||'—')+' · '+(w.status==='inactive'?'Inactive':'Active');
       if(w.has_pending){ $('lr-pendbar').style.display=''; $('lr-pendbar').innerHTML='<svg class="ic" style="width:14px;height:14px"><use href="#i-clock"/></svg>Pending: '+money(w.current_rate)+' → '+money(w.pending_new_rate)+' · awaiting PM approval'; }
       loadHistory(w.worker_id);
     }
@@ -301,10 +310,14 @@
     try{
       const j=await jget('/api/labor-rates/history/'+encodeURIComponent(wid)); const rows=j.data||[];
       $('lr-hist-body').innerHTML=rows.length?rows.map(h=>{
+        const isDeact=h.change_type==='deactivate';
         const dot=h.status==='pending'?'pendd':h.is_initial?'init':h.status==='rejected'?'rej':'';
         const pill=h.status==='pending'?'<span class="hpill pp">Pending PM</span>':h.status==='rejected'?'<span class="hpill rj">Rejected</span>':(h.is_initial?'':'<span class="hpill ok">Approved</span>');
-        const who=h.is_initial?'initial rate':(h.status==='pending'?('submitted by '+(h.submitted_by_role||'—')):('approved by '+(h.decided_by_role||'—')));
-        return '<div class="hrow"><span class="hdot '+dot+'"></span><div><div class="hmain">'+money(h.new_rate)+' '+pill+'</div><div class="hsub">eff '+esc(fmtMDY(h.effective_date))+' · '+esc(who)+'</div></div></div>';
+        const main=isDeact?'Deactivate':money(h.new_rate);
+        const verb=isDeact?'deactivated':'approved';
+        const who=h.is_initial?'initial rate':(h.status==='pending'?('submitted by '+(h.submitted_by_role||'—')):(verb+' by '+(h.decided_by_role||'—')));
+        const eff=isDeact?'':('eff '+esc(fmtMDY(h.effective_date))+' · ');
+        return '<div class="hrow"><span class="hdot '+dot+'"></span><div><div class="hmain">'+main+' '+pill+'</div><div class="hsub">'+eff+esc(who)+'</div></div></div>';
       }).join(''):'<div class="muted" style="font-size:12px;">No history.</div>';
     }catch(e){ $('lr-hist-body').innerHTML='<div class="muted" style="font-size:12px;color:#C8102E">Could not load history.</div>'; }
   }
@@ -333,6 +346,11 @@
   async function reactivate(wid){
     const r=await jpost('/api/labor-rates/state/'+encodeURIComponent(wid)+'/status',{status:'active'});
     if(r.ok){ toast('Reactivated'); loadRoster(); } else { toast('Reactivate failed'); }
+  }
+  async function requestDeactivate(wid){
+    if(!confirm('Request deactivation of '+wid+'? It goes to PM approval — the worker stays Active until a PM approves.')) return;
+    const r=await jpost('/api/labor-rates/deactivate',{worker_id:wid});
+    if(r.ok){ toast('Deactivation submitted for PM approval'); loadRoster(); loadPending(); } else { const j=await r.json().catch(()=>({})); toast((j&&j.error)||'Submit failed'); }
   }
 
   boot();

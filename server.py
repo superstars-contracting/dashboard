@@ -4241,6 +4241,7 @@ def _lr_state_public(row, pending=None):
     if pending:
         d['pending_new_rate'] = _exp_money(pending['new_rate'])
         d['pending_change_id'] = pending['id']
+        d['pending_type'] = (pending['change_type'] or 'rate')  # 'rate' | 'deactivate'
     return d
 
 
@@ -4255,7 +4256,7 @@ def api_lr_roster():
             "ORDER BY CAST(SUBSTR(worker_id,3) AS INTEGER), worker_id").fetchall()
         pend = {}
         for p in conn.execute(
-                "SELECT worker_id, id, new_rate FROM labor_rate_change "
+                "SELECT worker_id, id, new_rate, change_type FROM labor_rate_change "
                 "WHERE status='pending' ORDER BY id"):
             pend[p['worker_id']] = p
         active, inactive = [], []
@@ -4279,12 +4280,14 @@ def api_lr_history(worker_id):
     conn = db()
     try:
         rows = conn.execute(
-            "SELECT id, old_rate, new_rate, effective_date, status, is_initial, "
+            "SELECT id, old_rate, new_rate, effective_date, status, is_initial, change_type, "
             "submitted_by_role, submitted_at, decided_by_role, decided_at, note "
             "FROM labor_rate_change WHERE worker_id=? "
-            "ORDER BY effective_date DESC, id DESC", (worker_id,)).fetchall()
+            "ORDER BY COALESCE(effective_date, substr(submitted_at,1,10)) DESC, id DESC",
+            (worker_id,)).fetchall()
         out = [{
             'id': r['id'],
+            'change_type': (r['change_type'] or 'rate'),
             'old_rate': _exp_money(r['old_rate']) if r['old_rate'] is not None else None,
             'new_rate': _exp_money(r['new_rate']),
             'effective_date': r['effective_date'],
@@ -4352,21 +4355,28 @@ def api_lr_approve(cid):
             return jsonify({"error": "change is not pending"}), 409
         uid, role = _lr_actor()
         now = datetime.now().isoformat()
+        ctype = (ch['change_type'] or 'rate')
         conn.execute("UPDATE labor_rate_change SET status='approved', decided_by_uid=?, "
                      "decided_by_role=?, decided_at=? WHERE id=?", (uid, role, now, cid))
-        conn.execute("UPDATE labor_worker_state SET current_rate=?, effective_date=?, "
-                     "updated_at=? WHERE worker_id=?",
-                     (_exp_money(ch['new_rate']), ch['effective_date'], now, ch['worker_id']))
-        conn.commit()
-        # bridge approved rate into worker_rates (check-cutting sheet) for real workers
-        if ch['employee_id']:
-            try:
-                from worker_rates import set_rate
-                set_rate(conn, employee_id=ch['employee_id'], hourly_rate=float(ch['new_rate']),
-                         effective_from=ch['effective_date'], notes='PM-approved rate change',
-                         actor_user_id=uid, actor_role=role)
-            except Exception as we:
-                logging.warning(f"labor-rate approve {cid}: worker_rates bridge skipped ({type(we).__name__})")
+        if ctype == 'deactivate':
+            # #221 — approved deactivation moves the worker to Inactive (no rate change)
+            conn.execute("UPDATE labor_worker_state SET status='inactive', updated_at=? WHERE worker_id=?",
+                         (now, ch['worker_id']))
+            conn.commit()
+        else:
+            conn.execute("UPDATE labor_worker_state SET current_rate=?, effective_date=?, "
+                         "updated_at=? WHERE worker_id=?",
+                         (_exp_money(ch['new_rate']), ch['effective_date'], now, ch['worker_id']))
+            conn.commit()
+            # bridge approved rate into worker_rates (check-cutting sheet) for real workers
+            if ch['employee_id']:
+                try:
+                    from worker_rates import set_rate
+                    set_rate(conn, employee_id=ch['employee_id'], hourly_rate=float(ch['new_rate']),
+                             effective_from=ch['effective_date'], notes='PM-approved rate change',
+                             actor_user_id=uid, actor_role=role)
+                except Exception as we:
+                    logging.warning(f"labor-rate approve {cid}: worker_rates bridge skipped ({type(we).__name__})")
         st = conn.execute("SELECT * FROM labor_worker_state WHERE worker_id=?", (ch['worker_id'],)).fetchone()
         return response_wrapper(_lr_state_public(st, None))
     finally:
@@ -4395,6 +4405,44 @@ def api_lr_reject(cid):
         conn.close()
 
 
+@app.route('/api/labor-rates/deactivate', methods=['POST'])
+@requires_role(*_LR_FULL_ROLES)
+def api_lr_request_deactivate():
+    """#221 — submit a DEACTIVATION request: routes through the SAME PM-approval
+    queue as rate changes. The worker STAYS active (with a pending badge) until a
+    PM approves; on approve they move to Inactive. Admin submits; PM decides."""
+    conn = db()
+    try:
+        body = request.get_json(silent=True) or {}
+        wid = (body.get('worker_id') or '').strip()
+        st = conn.execute("SELECT * FROM labor_worker_state WHERE worker_id=?", (wid,)).fetchone()
+        if not st:
+            return jsonify({"error": "unknown worker"}), 404
+        if st['status'] != 'active':
+            return jsonify({"error": "worker is not active"}), 409
+        uid, role = _lr_actor()
+        now = datetime.now().isoformat()
+        # one pending per worker: supersede any existing pending (rate or deactivate)
+        conn.execute(
+            "UPDATE labor_rate_change SET status='rejected', decided_by_uid=?, "
+            "decided_by_role=?, decided_at=?, note='superseded by a newer submission' "
+            "WHERE worker_id=? AND status='pending'", (uid, role, now, wid))
+        # new_rate is NOT NULL; for a deactivate it carries the current rate as a
+        # sentinel (the UI shows 'Deactivate', not a rate). effective_date NULL.
+        cur = conn.execute(
+            "INSERT INTO labor_rate_change (worker_id, employee_id, old_rate, new_rate, "
+            "effective_date, status, change_type, is_initial, submitted_by_uid, "
+            "submitted_by_role, submitted_at, note) "
+            "VALUES (?,?,?,?,?,'pending','deactivate',0,?,?,?,?)",
+            (wid, st['employee_id'], st['current_rate'], st['current_rate'], None,
+             uid, role, now, body.get('note')))
+        conn.commit()
+        return response_wrapper({"change_id": cur.lastrowid, "worker_id": wid,
+                                 "change_type": "deactivate", "status": "pending"}), 201
+    finally:
+        conn.close()
+
+
 @app.route('/api/labor-rates/pending', methods=['GET'])
 @requires_role(*_LR_APPROVE_ROLES)
 def api_lr_pending():
@@ -4403,11 +4451,12 @@ def api_lr_pending():
     try:
         rows = conn.execute(
             "SELECT c.id, c.worker_id, c.old_rate, c.new_rate, c.effective_date, "
-            "c.submitted_by_role, c.submitted_at, s.trade "
+            "c.submitted_by_role, c.submitted_at, c.change_type, s.trade "
             "FROM labor_rate_change c LEFT JOIN labor_worker_state s ON s.worker_id=c.worker_id "
             "WHERE c.status='pending' ORDER BY c.submitted_at, c.id").fetchall()
         out = [{
             'id': r['id'], 'worker_id': r['worker_id'], 'trade': r['trade'],
+            'change_type': (r['change_type'] or 'rate'),
             'old_rate': _exp_money(r['old_rate']) if r['old_rate'] is not None else None,
             'new_rate': _exp_money(r['new_rate']), 'effective_date': r['effective_date'],
             'submitted_by_role': r['submitted_by_role'], 'submitted_at': r['submitted_at'],
@@ -4420,18 +4469,21 @@ def api_lr_pending():
 @app.route('/api/labor-rates/state/<worker_id>/status', methods=['POST'])
 @requires_role(*_LR_FULL_ROLES)
 def api_lr_set_status(worker_id):
-    """Active/Inactive (Reactivate = active). Immediate admin action — not PM-gated."""
+    """#221 — ONLY Reactivate (->active) is an instant admin action here.
+    DEACTIVATION is PM-gated: it must go through /deactivate (pending approval),
+    so this endpoint refuses a direct ->inactive (no admin bypass of the gate)."""
     conn = db()
     try:
         if not conn.execute("SELECT 1 FROM labor_worker_state WHERE worker_id=?", (worker_id,)).fetchone():
             return jsonify({"error": "unknown worker"}), 404
         status = (request.get_json(silent=True) or {}).get('status')
-        if status not in ('active', 'inactive'):
-            return jsonify({"error": "status must be active|inactive"}), 400
-        conn.execute("UPDATE labor_worker_state SET status=?, updated_at=? WHERE worker_id=?",
-                     (status, datetime.now().isoformat(), worker_id))
+        if status != 'active':
+            return jsonify({"error": "Only reactivation is instant. Deactivation requires PM "
+                                     "approval — submit a deactivation request."}), 400
+        conn.execute("UPDATE labor_worker_state SET status='active', updated_at=? WHERE worker_id=?",
+                     (datetime.now().isoformat(), worker_id))
         conn.commit()
-        return response_wrapper({"worker_id": worker_id, "status": status})
+        return response_wrapper({"worker_id": worker_id, "status": "active"})
     finally:
         conn.close()
 
