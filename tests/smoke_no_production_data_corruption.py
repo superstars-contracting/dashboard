@@ -137,6 +137,13 @@ TABLES_TO_SNAPSHOT: list[Tuple[str, list[str], list[str]]] = [
     ("expenses", ["vendor", "doc_number", "project_code"], ["status", "category"]),
     ("expense_line_items", ["expense_id", "sort_order"], ["product_class"]),
     ("expense_class_alias", ["vendor", "item_key"], ["product_class"]),
+    # Labor Rates redesign (#220). COMP DATA — value_cols are status/trade ONLY;
+    # the rate values (current_rate / new_rate / old_rate) are NEVER serialized
+    # here, mirroring worker_rates above. Backstop logic: the CRUD smoke never
+    # writes these, so within a meta run before==after -> clean. Surfaces if a
+    # FUTURE smoke leaves a NON-synthetic labor-rate row during the CRUD run.
+    ("labor_worker_state", ["worker_id"], ["status", "trade"]),
+    ("labor_rate_change", ["id"], ["status", "worker_id"]),
 ]
 
 

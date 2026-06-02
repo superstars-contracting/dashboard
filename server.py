@@ -4212,14 +4212,318 @@ def api_signin_dcr_reconcile(project_code):
         return jsonify({"error": str(e)}), 500
 
 
+# ============= LABOR RATES v2 (#220) — approval-gated rate management =============
+# Layered on top of worker_rates (canonical, untouched). Keyed by worker_id so
+# real + synthetic workers share one model. COMP DATA: full roster/history/submit
+# = admin/c_suite; the pending-approval queue + approve/reject = admin/c_suite/pm
+# (PMs get ONLY the queue, never the roster). Money via _exp_money (Decimal, 2dp);
+# dates LOCAL; history is role-stamped (no names — PII-safe).
+LABOR_TRADES = ('Mechanic', 'Laborer', 'Rope Access', 'Superintendent')
+_LR_FULL_ROLES = ('admin', 'c_suite')
+_LR_APPROVE_ROLES = ('admin', 'c_suite', 'pm')
+
+
+def _lr_actor():
+    u = current_user() or {}
+    return u.get('id'), u.get('role')
+
+
+def _lr_state_public(row, pending=None):
+    d = {
+        'worker_id': row['worker_id'],
+        'trade': row['trade'],
+        'current_rate': _exp_money(row['current_rate']) if row['current_rate'] is not None else None,
+        'status': row['status'],
+        'effective_date': row['effective_date'],
+        'updated_at': row['updated_at'],
+        'has_pending': bool(pending),
+    }
+    if pending:
+        d['pending_new_rate'] = _exp_money(pending['new_rate'])
+        d['pending_change_id'] = pending['id']
+    return d
+
+
+@app.route('/api/labor-rates/roster', methods=['GET'])
+@requires_role(*_LR_FULL_ROLES)
+def api_lr_roster():
+    """Full roster split Active / Inactive + KPIs. Admin/c_suite only. No names."""
+    conn = db()
+    try:
+        states = conn.execute(
+            "SELECT * FROM labor_worker_state "
+            "ORDER BY CAST(SUBSTR(worker_id,3) AS INTEGER), worker_id").fetchall()
+        pend = {}
+        for p in conn.execute(
+                "SELECT worker_id, id, new_rate FROM labor_rate_change "
+                "WHERE status='pending' ORDER BY id"):
+            pend[p['worker_id']] = p
+        active, inactive = [], []
+        for s in states:
+            p = pend.get(s['worker_id'])
+            (active if s['status'] == 'active' else inactive).append(_lr_state_public(s, p))
+        return jsonify({
+            "data": {"active": active, "inactive": inactive},
+            "meta": {"generated_at": datetime.now().isoformat()},
+            "kpis": {"total": len(states), "active": len(active),
+                     "inactive": len(inactive), "pending": len(pend)},
+        })
+    finally:
+        conn.close()
+
+
+@app.route('/api/labor-rates/history/<worker_id>', methods=['GET'])
+@requires_role(*_LR_FULL_ROLES)
+def api_lr_history(worker_id):
+    """Per-worker rate-change timeline (role-stamped, no names)."""
+    conn = db()
+    try:
+        rows = conn.execute(
+            "SELECT id, old_rate, new_rate, effective_date, status, is_initial, "
+            "submitted_by_role, submitted_at, decided_by_role, decided_at, note "
+            "FROM labor_rate_change WHERE worker_id=? "
+            "ORDER BY effective_date DESC, id DESC", (worker_id,)).fetchall()
+        out = [{
+            'id': r['id'],
+            'old_rate': _exp_money(r['old_rate']) if r['old_rate'] is not None else None,
+            'new_rate': _exp_money(r['new_rate']),
+            'effective_date': r['effective_date'],
+            'status': r['status'], 'is_initial': bool(r['is_initial']),
+            'submitted_by_role': r['submitted_by_role'], 'submitted_at': r['submitted_at'],
+            'decided_by_role': r['decided_by_role'], 'decided_at': r['decided_at'],
+            'note': r['note'],
+        } for r in rows]
+        return response_wrapper(out, count=len(out))
+    finally:
+        conn.close()
+
+
+@app.route('/api/labor-rates/changes', methods=['POST'])
+@requires_role(*_LR_FULL_ROLES)
+def api_lr_submit_change():
+    """Submit a rate change -> pending PM approval. current_rate UNCHANGED."""
+    conn = db()
+    try:
+        body = request.get_json(silent=True) or {}
+        wid = (body.get('worker_id') or '').strip()
+        st = conn.execute("SELECT * FROM labor_worker_state WHERE worker_id=?", (wid,)).fetchone()
+        if not st:
+            return jsonify({"error": "unknown worker"}), 404
+        try:
+            new_rate = float(body.get('new_rate'))
+        except (TypeError, ValueError):
+            return jsonify({"error": "new_rate must be a number"}), 400
+        if new_rate <= 0:
+            return jsonify({"error": "new_rate must be positive"}), 400
+        eff = (body.get('effective_date') or '').strip()
+        try:
+            datetime.strptime(eff, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({"error": "effective_date must be YYYY-MM-DD"}), 400
+        uid, role = _lr_actor()
+        now = datetime.now().isoformat()
+        # one pending per worker: supersede any existing pending
+        conn.execute(
+            "UPDATE labor_rate_change SET status='rejected', decided_by_uid=?, "
+            "decided_by_role=?, decided_at=?, note='superseded by a newer submission' "
+            "WHERE worker_id=? AND status='pending'", (uid, role, now, wid))
+        cur = conn.execute(
+            "INSERT INTO labor_rate_change (worker_id, employee_id, old_rate, new_rate, "
+            "effective_date, status, is_initial, submitted_by_uid, submitted_by_role, "
+            "submitted_at, note) VALUES (?,?,?,?,?,'pending',0,?,?,?,?)",
+            (wid, st['employee_id'], st['current_rate'], _exp_money(new_rate), eff,
+             uid, role, now, body.get('note')))
+        conn.commit()
+        return response_wrapper({"change_id": cur.lastrowid, "worker_id": wid, "status": "pending"}), 201
+    finally:
+        conn.close()
+
+
+@app.route('/api/labor-rates/changes/<int:cid>/approve', methods=['POST'])
+@requires_role(*_LR_APPROVE_ROLES)
+def api_lr_approve(cid):
+    """PM (or admin) approves -> new_rate becomes current_rate + history entry."""
+    conn = db()
+    try:
+        ch = conn.execute("SELECT * FROM labor_rate_change WHERE id=?", (cid,)).fetchone()
+        if not ch:
+            return jsonify({"error": "change not found"}), 404
+        if ch['status'] != 'pending':
+            return jsonify({"error": "change is not pending"}), 409
+        uid, role = _lr_actor()
+        now = datetime.now().isoformat()
+        conn.execute("UPDATE labor_rate_change SET status='approved', decided_by_uid=?, "
+                     "decided_by_role=?, decided_at=? WHERE id=?", (uid, role, now, cid))
+        conn.execute("UPDATE labor_worker_state SET current_rate=?, effective_date=?, "
+                     "updated_at=? WHERE worker_id=?",
+                     (_exp_money(ch['new_rate']), ch['effective_date'], now, ch['worker_id']))
+        conn.commit()
+        # bridge approved rate into worker_rates (check-cutting sheet) for real workers
+        if ch['employee_id']:
+            try:
+                from worker_rates import set_rate
+                set_rate(conn, employee_id=ch['employee_id'], hourly_rate=float(ch['new_rate']),
+                         effective_from=ch['effective_date'], notes='PM-approved rate change',
+                         actor_user_id=uid, actor_role=role)
+            except Exception as we:
+                logging.warning(f"labor-rate approve {cid}: worker_rates bridge skipped ({type(we).__name__})")
+        st = conn.execute("SELECT * FROM labor_worker_state WHERE worker_id=?", (ch['worker_id'],)).fetchone()
+        return response_wrapper(_lr_state_public(st, None))
+    finally:
+        conn.close()
+
+
+@app.route('/api/labor-rates/changes/<int:cid>/reject', methods=['POST'])
+@requires_role(*_LR_APPROVE_ROLES)
+def api_lr_reject(cid):
+    """PM (or admin) rejects -> current_rate UNCHANGED, row flips rejected."""
+    conn = db()
+    try:
+        ch = conn.execute("SELECT status FROM labor_rate_change WHERE id=?", (cid,)).fetchone()
+        if not ch:
+            return jsonify({"error": "change not found"}), 404
+        if ch['status'] != 'pending':
+            return jsonify({"error": "change is not pending"}), 409
+        uid, role = _lr_actor()
+        body = request.get_json(silent=True) or {}
+        conn.execute("UPDATE labor_rate_change SET status='rejected', decided_by_uid=?, "
+                     "decided_by_role=?, decided_at=?, note=? WHERE id=?",
+                     (uid, role, datetime.now().isoformat(), body.get('note'), cid))
+        conn.commit()
+        return response_wrapper({"change_id": cid, "status": "rejected"})
+    finally:
+        conn.close()
+
+
+@app.route('/api/labor-rates/pending', methods=['GET'])
+@requires_role(*_LR_APPROVE_ROLES)
+def api_lr_pending():
+    """PM-scoped queue: ONLY the pending rate-change items (no full roster)."""
+    conn = db()
+    try:
+        rows = conn.execute(
+            "SELECT c.id, c.worker_id, c.old_rate, c.new_rate, c.effective_date, "
+            "c.submitted_by_role, c.submitted_at, s.trade "
+            "FROM labor_rate_change c LEFT JOIN labor_worker_state s ON s.worker_id=c.worker_id "
+            "WHERE c.status='pending' ORDER BY c.submitted_at, c.id").fetchall()
+        out = [{
+            'id': r['id'], 'worker_id': r['worker_id'], 'trade': r['trade'],
+            'old_rate': _exp_money(r['old_rate']) if r['old_rate'] is not None else None,
+            'new_rate': _exp_money(r['new_rate']), 'effective_date': r['effective_date'],
+            'submitted_by_role': r['submitted_by_role'], 'submitted_at': r['submitted_at'],
+        } for r in rows]
+        return response_wrapper(out, count=len(out))
+    finally:
+        conn.close()
+
+
+@app.route('/api/labor-rates/state/<worker_id>/status', methods=['POST'])
+@requires_role(*_LR_FULL_ROLES)
+def api_lr_set_status(worker_id):
+    """Active/Inactive (Reactivate = active). Immediate admin action — not PM-gated."""
+    conn = db()
+    try:
+        if not conn.execute("SELECT 1 FROM labor_worker_state WHERE worker_id=?", (worker_id,)).fetchone():
+            return jsonify({"error": "unknown worker"}), 404
+        status = (request.get_json(silent=True) or {}).get('status')
+        if status not in ('active', 'inactive'):
+            return jsonify({"error": "status must be active|inactive"}), 400
+        conn.execute("UPDATE labor_worker_state SET status=?, updated_at=? WHERE worker_id=?",
+                     (status, datetime.now().isoformat(), worker_id))
+        conn.commit()
+        return response_wrapper({"worker_id": worker_id, "status": status})
+    finally:
+        conn.close()
+
+
+@app.route('/api/labor-rates/state/<worker_id>/trade', methods=['POST'])
+@requires_role(*_LR_FULL_ROLES)
+def api_lr_set_trade(worker_id):
+    """Trade assignment. Immediate admin action — not PM-gated."""
+    conn = db()
+    try:
+        if not conn.execute("SELECT 1 FROM labor_worker_state WHERE worker_id=?", (worker_id,)).fetchone():
+            return jsonify({"error": "unknown worker"}), 404
+        trade = (request.get_json(silent=True) or {}).get('trade')
+        if trade not in LABOR_TRADES:
+            return jsonify({"error": "invalid trade"}), 400
+        conn.execute("UPDATE labor_worker_state SET trade=?, updated_at=? WHERE worker_id=?",
+                     (trade, datetime.now().isoformat(), worker_id))
+        conn.commit()
+        return response_wrapper({"worker_id": worker_id, "trade": trade})
+    finally:
+        conn.close()
+
+
+@app.route('/api/labor-rates/state', methods=['POST'])
+@requires_role(*_LR_FULL_ROLES)
+def api_lr_add_worker():
+    """Add a NEW worker's initial rate. Immediate admin action (approved initial
+    history) — not PM-gated; only subsequent CHANGES need PM sign-off."""
+    conn = db()
+    try:
+        body = request.get_json(silent=True) or {}
+        wid = (body.get('worker_id') or '').strip()
+        if not wid:
+            return jsonify({"error": "worker_id required"}), 400
+        if conn.execute("SELECT 1 FROM labor_worker_state WHERE worker_id=?", (wid,)).fetchone():
+            return jsonify({"error": "worker already has a rate"}), 409
+        trade = body.get('trade')
+        if trade not in LABOR_TRADES:
+            return jsonify({"error": "invalid trade"}), 400
+        try:
+            rate = float(body.get('rate'))
+        except (TypeError, ValueError):
+            return jsonify({"error": "rate must be a number"}), 400
+        if rate <= 0:
+            return jsonify({"error": "rate must be positive"}), 400
+        eff = (body.get('effective_date') or '').strip()
+        try:
+            datetime.strptime(eff, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({"error": "effective_date must be YYYY-MM-DD"}), 400
+        status = body.get('status') if body.get('status') in ('active', 'inactive') else 'active'
+        emp = conn.execute("SELECT employee_id FROM employees WHERE worker_id=?", (wid,)).fetchone()
+        eid = emp['employee_id'] if emp else None
+        uid, role = _lr_actor()
+        now = datetime.now().isoformat()
+        conn.execute("INSERT INTO labor_worker_state (worker_id, employee_id, trade, current_rate, "
+                     "status, effective_date, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+                     (wid, eid, trade, _exp_money(rate), status, eff, now, now))
+        conn.execute("INSERT INTO labor_rate_change (worker_id, employee_id, old_rate, new_rate, "
+                     "effective_date, status, is_initial, submitted_by_uid, submitted_by_role, "
+                     "submitted_at, decided_by_uid, decided_by_role, decided_at, note) "
+                     "VALUES (?,?,?,?,?,'approved',1,?,?,?,?,?,?,?)",
+                     (wid, eid, None, _exp_money(rate), eff, uid, role, now, uid, role, now,
+                      'initial rate (admin)'))
+        conn.commit()
+        if eid:
+            try:
+                from worker_rates import set_rate
+                set_rate(conn, employee_id=eid, hourly_rate=float(rate), effective_from=eff,
+                         notes='initial rate', actor_user_id=uid, actor_role=role)
+            except Exception:
+                pass
+        return response_wrapper({"worker_id": wid, "trade": trade, "status": status}), 201
+    finally:
+        conn.close()
+
+
 @app.route('/admin/labor-rates', methods=['GET'])
-@requires_role('admin', 'c_suite')
+@requires_role('admin', 'c_suite', 'pm')
 def admin_labor_rates_page():
-    """Serve the Labor Rates admin page (HTML). Static file gated by role."""
+    """Serve the Labor Rates admin page (HTML). Role-gated to admin/c_suite/pm —
+    the page + API scope what each sees (PM gets ONLY the pending queue; the
+    roster/history APIs 403 for PM). super/other get 403 here."""
     page = SCRIPT_DIR / 'admin_labor_rates.html'
     if not page.exists():
         return jsonify({"error": "admin page not found"}), 404
-    return send_file(str(page))
+    resp = send_file(str(page))
+    # comp-data page — never cache (no-store) anywhere
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 
 @app.route('/api/toolbox-talks/library', methods=['GET'])

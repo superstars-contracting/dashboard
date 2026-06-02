@@ -5,434 +5,337 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Labor Rates — Superstars Contracting</title>
 <style>
-  :root {
-    --ink: #14161C;
-    --ink-soft: #54505A;
-    --mute: #76777E;
-    --brand-red: #B11E2E;
-    --brand-red-dark: #8B1623;
-    --bg: #FAF7F1;
-    --card: #FFFFFF;
-    --border: #E8E4DD;
-    --ok: #2F7C57;
-    --warn: #B68838;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
-  body {
-    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-    background: var(--bg);
-    color: var(--ink);
-    font-size: 14px;
-    line-height: 1.4;
-  }
-  .header {
-    background: var(--ink);
-    color: white;
-    padding: 16px 28px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .brand { display: flex; align-items: center; gap: 12px; }
-  .brand-mark {
-    width: 30px; height: 30px;
-    color: var(--brand-red);
-  }
-  .brand-name {
-    font-weight: 800; letter-spacing: 0.04em;
-    text-transform: uppercase; font-size: 13px;
-  }
-  .brand-sub {
-    font-size: 10px; color: #9b9ca0;
-    letter-spacing: 0.08em; text-transform: uppercase;
-    margin-top: 2px;
-  }
-  .header-actions { display: flex; align-items: center; gap: 16px; }
-  .role-chip {
-    background: #2a2c34;
-    color: #fff; padding: 4px 10px;
-    border-radius: 3px; font-size: 10px;
-    text-transform: uppercase; letter-spacing: 0.08em;
-    font-weight: 700;
-  }
-  .back-link {
-    color: #9b9ca0; font-size: 12px;
-    text-decoration: none;
-    font-weight: 600;
-  }
-  .back-link:hover { color: white; }
-  main { padding: 28px; max-width: 1100px; margin: 0 auto; }
-  h1 { margin: 0 0 4px; font-size: 26px; }
-  .subhead {
-    font-size: 12px; color: var(--brand-red);
-    text-transform: uppercase; letter-spacing: 0.1em;
-    font-weight: 700; margin-bottom: 16px;
-  }
-  .audit-notice {
-    background: #fff7e0; border: 1px solid #e6c989;
-    border-left: 4px solid var(--warn);
-    padding: 10px 14px; border-radius: 3px;
-    font-size: 12px; color: #5b4a18;
-    margin-bottom: 22px;
-  }
-  .grid { display: grid; gap: 10px; }
-  .row {
-    background: var(--card); border: 1px solid var(--border);
-    border-left: 4px solid var(--brand-red);
-    border-radius: 4px;
-    padding: 14px 16px;
-    display: grid;
-    grid-template-columns: 1.4fr 0.8fr auto auto;
-    gap: 16px; align-items: center;
-  }
-  .who .wid {
-    font-weight: 700; color: var(--brand-red);
-    font-size: 12px; letter-spacing: 0.04em;
-  }
-  .who .name { font-weight: 700; font-size: 15px; margin-top: 2px; }
-  .who .trade { color: var(--mute); font-size: 11px; margin-top: 2px; }
-  .rate {
-    text-align: right;
-  }
-  .rate .val {
-    font-weight: 800; font-size: 22px;
-    color: var(--ink);
-  }
-  .rate .effective {
-    font-size: 11px; color: var(--mute); margin-top: 2px;
-  }
-  .rate-missing {
-    color: var(--warn); font-weight: 700; font-size: 13px;
-    letter-spacing: 0.04em;
-  }
-  .btn {
-    background: white; color: var(--ink);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 8px 14px; font-size: 12px;
-    font-weight: 700; letter-spacing: 0.05em;
-    text-transform: uppercase; cursor: pointer;
-  }
-  .btn:hover { background: var(--bg); border-color: var(--brand-red); }
-  .btn-primary {
-    background: var(--brand-red); color: white; border-color: var(--brand-red);
-  }
-  .btn-primary:hover { background: var(--brand-red-dark); border-color: var(--brand-red-dark); }
-  .history {
-    grid-column: 1 / -1;
-    border-top: 1px dashed var(--border);
-    margin-top: 12px; padding-top: 10px;
-    display: none;
-  }
-  .row.expanded .history { display: block; }
-  .history-row {
-    display: grid;
-    grid-template-columns: 110px 1fr 1.4fr;
-    gap: 12px; padding: 4px 0;
-    font-size: 12px;
-    border-bottom: 1px solid #f2efe7;
-  }
-  .history-row .from {
-    font-weight: 700; color: var(--ink-soft);
-  }
-  .history-row .val {
-    font-weight: 600;
-  }
-  .history-row .meta {
-    color: var(--mute); font-size: 11px;
-  }
-  .history-empty {
-    color: var(--mute); font-style: italic; font-size: 12px;
-  }
-
-  /* Modal */
-  .modal-bg {
-    position: fixed; inset: 0;
-    background: rgba(20,22,28,0.45);
-    display: none; align-items: center; justify-content: center;
-    z-index: 100;
-  }
-  .modal-bg.open { display: flex; }
-  .modal {
-    background: white; width: 460px;
-    border-radius: 6px;
-    padding: 22px 24px;
-    box-shadow: 0 12px 36px rgba(0,0,0,0.25);
-  }
-  .modal h2 {
-    margin: 0 0 4px; font-size: 18px;
-  }
-  .modal .worker-line {
-    font-size: 12px; color: var(--mute);
-    margin-bottom: 18px;
-  }
-  .field { margin-bottom: 14px; }
-  .field label {
-    display: block;
-    font-size: 11px; color: var(--ink-soft);
-    text-transform: uppercase; letter-spacing: 0.05em;
-    font-weight: 700;
-    margin-bottom: 4px;
-  }
-  .field input, .field textarea {
-    width: 100%; padding: 8px 10px;
-    border: 1px solid var(--border); border-radius: 3px;
-    font-family: inherit; font-size: 14px;
-    color: var(--ink);
-  }
-  .field input:focus, .field textarea:focus {
-    outline: none; border-color: var(--brand-red);
-  }
-  .modal-actions {
-    display: flex; justify-content: flex-end;
-    gap: 8px; margin-top: 18px;
-  }
-  .err {
-    color: var(--brand-red); font-size: 12px;
-    margin-top: 8px; min-height: 16px;
-  }
-  .err.ok { color: var(--ok); }
+  :root{--blue:#1E73E8;--ink:#1b1d22;--muted:#7a7f88;--line:#ededf0;--edge:rgba(30,115,232,.42);--in:rgba(30,115,232,.14);--green:#0F6E56;--amber:#BA7517;--red:#C8102E;--bg:#f3f4f6;}
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,"Segoe UI",Inter,Roboto,sans-serif}
+  .topbar{background:#14161a;color:#fff;padding:13px 26px;display:flex;align-items:center;justify-content:space-between}
+  .topbar .b{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:.04em;font-size:13px}
+  .topbar .b svg{width:20px;height:20px}
+  .topbar a{color:#cbd2dc;text-decoration:none;font-size:12.5px}
+  .topbar a:hover{color:#fff}
+  .topbar .who{font-size:12px;color:#9aa3ae}
+  .wrap{max-width:980px;margin:24px auto;padding:0 22px}
+  .frame{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:18px}
+  .head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap}
+  .head h1{margin:0;font-size:21px}.head .sub{color:var(--muted);font-size:13px;margin-top:3px}
+  .primary{background:var(--blue);border:none;color:#fff;border-radius:10px;padding:9px 15px;font-size:13.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+  .primary:hover{filter:brightness(.96)}
+  .ic{width:16px;height:16px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .tile{background:#fff;border:1px solid var(--edge);border-radius:13px;padding:10px 13px;box-shadow:inset 0 0 12px var(--in),0 1px 4px rgba(0,0,0,.04)}
+  .tile .l{color:var(--muted);font-size:11px}.tile .v{font-size:20px;font-weight:600;margin-top:2px}
+  .tile .v.amb{color:var(--amber)}
+  .toolbar{display:flex;align-items:center;margin-bottom:13px}
+  .searchbox{display:flex;align-items:center;gap:8px;background:#f5f6f8;border:1px solid var(--line);border-radius:9px;padding:7px 11px;color:var(--muted);min-width:220px;margin-left:auto}
+  .searchbox input{border:none;background:transparent;outline:none;font-size:13px;color:var(--ink);width:100%}
+  .sechead{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:6px 2px 9px}
+  .sechead .cnt{background:#eef0f3;color:var(--muted);border-radius:999px;padding:1px 9px;font-size:11px}
+  .secgap{height:20px}
+  .tbl{border:1px solid var(--line);border-radius:13px;overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  thead th{background:#14161a;text-align:left;color:#EAECEF;font-weight:600;font-size:11px;letter-spacing:.04em;text-transform:uppercase;padding:11px 15px}
+  th.r,td.r{text-align:right}
+  td{padding:11px 15px;border-bottom:1px solid #f3f3f5}tr:last-child td{border-bottom:none}tbody tr:hover td{background:#fafbfc}
+  .wid{font-weight:700;color:var(--red)}
+  .trade{font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;color:var(--blue);background:rgba(30,115,232,.1)}
+  .st{font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:999px}
+  .st.act{color:var(--green);background:rgba(15,110,86,.1)}
+  .st.inact{color:var(--muted);background:rgba(107,114,128,.14)}
+  .pend{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:999px;color:var(--amber);background:rgba(186,117,23,.13);margin-left:8px;vertical-align:middle}
+  .iconbtn{width:30px;height:30px;border:1px solid var(--line);background:#fff;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
+  .iconbtn:hover{color:var(--blue);border-color:var(--edge)}
+  .reactivate{border:1px solid var(--edge);background:#fff;color:var(--blue);border-radius:8px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+  .acts{display:flex;gap:7px;justify-content:flex-end;align-items:center}
+  .muted{color:var(--muted)}.empty{padding:26px;text-align:center;color:var(--muted)}
+  .cellinput{width:84px;border:1.5px solid var(--blue);border-radius:7px;padding:5px 7px;font-size:13px;text-align:right;outline:none;box-shadow:0 0 0 3px var(--in);font-family:inherit}
+  .inactbl tbody td{color:#9a9ea6}.inactbl .wid{color:#a86}
+  .appbtn{border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}
+  .appbtn.ok{background:var(--green);color:#fff}.appbtn.no{background:#fff;border:1px solid var(--red);color:var(--red)}
+  .overlay{position:fixed;inset:0;background:rgba(20,22,26,.45);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:50}
+  .overlay.show{display:flex}
+  .pwrap{display:grid;grid-template-columns:1fr 320px;gap:16px;max-width:760px;width:100%}
+  @media(max-width:720px){.pwrap{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:13px;padding:20px;display:flex;flex-direction:column}
+  .panel h3{margin:0 0 2px;font-size:16px;display:flex;justify-content:space-between;align-items:center}
+  .panel .pid{color:var(--muted);font-size:12px;margin-bottom:14px}
+  .closex{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1}
+  .pendbar{display:flex;gap:8px;align-items:center;background:rgba(186,117,23,.1);border:1px solid rgba(186,117,23,.3);border-radius:9px;padding:8px 11px;font-size:12px;color:#8a6516;font-weight:600;margin-bottom:14px}
+  .field{margin-bottom:13px}
+  .field label{display:block;color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;margin-bottom:4px}
+  .field input,.field select{width:100%;height:36px;border:1px solid var(--line);border-radius:9px;padding:0 10px;font-size:13px;background:#fff;color:var(--ink);font-family:inherit}
+  .prow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .submit{background:var(--blue);border:none;color:#fff;border-radius:9px;padding:10px;font-weight:600;cursor:pointer;width:100%;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+  .gatenote{font-size:11px;color:var(--muted);text-align:center;margin-top:7px}
+  .hist{border:1px solid var(--line);border-radius:13px;padding:18px 20px;background:#fff;max-height:560px;overflow:auto}
+  .hist h4{margin:0 0 12px;font-size:13px;letter-spacing:.03em;text-transform:uppercase;color:var(--muted)}
+  .hrow{display:flex;gap:12px;padding-bottom:14px;position:relative;margin-left:5px;padding-left:16px}
+  .hrow:not(:last-child){border-left:2px solid var(--line)}
+  .hdot{position:absolute;left:-6px;top:3px;width:10px;height:10px;border-radius:50%;background:var(--blue);border:2px solid #fff}
+  .hdot.pendd{background:var(--amber)}.hdot.init{background:var(--muted)}.hdot.rej{background:var(--red)}
+  .hmain{font-weight:600}.hsub{color:var(--muted);font-size:12px;margin-top:1px}
+  .hpill{font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:999px;margin-left:6px}
+  .hpill.ok{color:var(--green);background:rgba(15,110,86,.1)}
+  .hpill.pp{color:var(--amber);background:rgba(186,117,23,.13)}
+  .hpill.rj{color:var(--red);background:rgba(200,16,46,.1)}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#14161a;color:#fff;padding:10px 16px;border-radius:9px;font-size:13px;display:none;z-index:60}
 </style>
 </head>
 <body>
-  <div class="header">
-    <div class="brand">
-      <svg class="brand-mark" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <polygon points="12,2 14.6,8.6 21.5,9.3 16.2,13.9 18,20.5 12,17 6,20.5 7.8,13.9 2.5,9.3 9.4,8.6"/>
-      </svg>
-      <div>
-        <div class="brand-name">Superstars Contracting</div>
-        <div class="brand-sub">Labor Rates · Admin</div>
-      </div>
-    </div>
-    <div class="header-actions">
-      <span class="role-chip" id="hdr-role">…</span>
-      <span id="hdr-user" style="font-size:12px;color:#9b9ca0;"></span>
-      <a class="back-link" href="/">← Company Console</a>
-    </div>
+<svg style="display:none"><defs>
+<symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><polygon points="12,1 15,9 23,9 16.5,14 19,22 12,17 5,22 7.5,14 1,9 9,9" fill="none" stroke="#C8102E" stroke-width="1.5"/></symbol>
+</defs></svg>
+
+<div class="topbar">
+  <div class="b"><svg><use href="#i-star"/></svg>SUPERSTARS · LABOR RATES</div>
+  <div style="display:flex;align-items:center;gap:18px;"><span class="who" id="lr-who">—</span><a href="/company-dashboard.html">← Company Console</a></div>
+</div>
+
+<div class="wrap">
+  <div class="frame" id="lr-pm-note" style="display:none;border-left:3px solid var(--amber);">
+    <h1 style="font-size:18px;margin:0;">Rate approvals awaiting your review</h1>
+    <div class="sub" style="color:var(--muted);margin-top:3px;">You can approve or reject proposed rate changes. The full rate roster + history is admin-only.</div>
   </div>
 
-  <main>
-    <h1>Labor Rates</h1>
-    <div class="subhead">C-Suite / Admin only</div>
-    <div class="audit-notice">
-      Every change is logged with actor, date, and before/after values.
-      Audit trail is retained for compliance and pay-rate disputes.
+  <div class="frame" id="lr-admin-only">
+    <div class="head">
+      <div><h1>Labor Rates</h1><div class="sub">Per worker · straight hourly rate · edits require PM approval</div></div>
+      <button class="primary" id="lr-add-btn"><svg class="ic"><use href="#i-plus"/></svg>Add worker rate</button>
     </div>
-    <div id="rates-grid" class="grid">
-      <div style="padding:18px;text-align:center;color:var(--mute);background:white;border:1px solid var(--border);border-radius:4px;">Loading workers…</div>
+    <div class="kpis">
+      <div class="tile"><div class="l">Workers on file</div><div class="v" id="lr-kpi-total">—</div></div>
+      <div class="tile"><div class="l">Active</div><div class="v" id="lr-kpi-active">—</div></div>
+      <div class="tile"><div class="l">Inactive</div><div class="v" id="lr-kpi-inactive">—</div></div>
+      <div class="tile"><div class="l">Pending approval</div><div class="v amb" id="lr-kpi-pending">—</div></div>
     </div>
-  </main>
+    <div class="toolbar"><div class="searchbox"><svg class="ic" style="width:15px;height:15px"><use href="#i-search"/></svg><input id="lr-search" placeholder="Search worker or trade…"></div></div>
 
-  <!-- Edit Rate Modal -->
-  <div class="modal-bg" id="modal-bg">
-    <div class="modal" role="dialog" aria-modal="true">
-      <h2>Set Hourly Rate</h2>
-      <div class="worker-line" id="modal-worker">—</div>
-      <div class="field">
-        <label for="m-rate">New hourly rate (USD)</label>
-        <input type="number" id="m-rate" step="0.01" min="0.01" inputmode="decimal" placeholder="0.00">
-      </div>
-      <div class="field">
-        <label for="m-from">Effective from</label>
-        <input type="date" id="m-from">
-      </div>
-      <div class="field">
-        <label for="m-notes">Notes (optional)</label>
-        <textarea id="m-notes" rows="2" placeholder="Reason for the change…"></textarea>
-      </div>
-      <div class="err" id="m-err"></div>
-      <div class="modal-actions">
-        <button class="btn" type="button" id="m-cancel">Cancel</button>
-        <button class="btn btn-primary" type="button" id="m-save">Save rate</button>
-      </div>
-    </div>
+    <div class="sechead">Active <span class="cnt" id="lr-active-count">0</span></div>
+    <div class="tbl"><table>
+      <thead><tr><th>Worker</th><th>Trade</th><th class="r">Rate $/hr</th><th>Effective</th><th>Status</th><th></th></tr></thead>
+      <tbody id="lr-active-tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+    </table></div>
+
+    <div class="secgap"></div>
+    <div class="sechead">Inactive <span class="cnt" id="lr-inactive-count">0</span></div>
+    <div class="tbl inactbl"><table>
+      <thead><tr><th>Worker</th><th>Trade</th><th class="r">Last rate $/hr</th><th>Since</th><th>Status</th><th></th></tr></thead>
+      <tbody id="lr-inactive-tbody"><tr><td colspan="6" class="empty">—</td></tr></tbody>
+    </table></div>
   </div>
 
+  <div class="frame" id="lr-pending-frame" style="display:none;">
+    <div class="sechead" style="margin-top:0;">Pending approvals <span class="cnt" id="lr-pending-count">0</span></div>
+    <div class="tbl"><table>
+      <thead><tr><th>Worker</th><th>Trade</th><th class="r">Current → Proposed</th><th>Effective</th><th>Submitted</th><th></th></tr></thead>
+      <tbody id="lr-pending-tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+    </table></div>
+  </div>
+  <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:2px;" id="ph-build-stamp">build #220 · 2026-06-01 · Labor Rates redesign (PM-approval gate · rate history · Active/Inactive split)</div>
+</div>
+
+<div class="overlay" id="lr-overlay">
+  <div class="pwrap">
+    <div class="panel">
+      <h3><span id="lr-panel-title">Edit rate</span><button class="closex" id="lr-close">×</button></h3>
+      <div class="pid" id="lr-panel-id">—</div>
+      <div class="pendbar" id="lr-pendbar" style="display:none;"></div>
+      <div class="field" id="lr-wid-field"><label>Worker ID</label><input id="lr-f-wid" placeholder="W-####"></div>
+      <div class="field"><label>Trade</label><select id="lr-f-trade"><option>Mechanic</option><option>Laborer</option><option>Rope Access</option><option>Superintendent</option></select></div>
+      <div class="prow">
+        <div class="field"><label>Rate $/hr</label><input id="lr-f-rate" placeholder="0.00"></div>
+        <div class="field"><label>Effective date</label><input id="lr-f-date" type="text" placeholder="MM-DD-YYYY"></div>
+      </div>
+      <div class="field" id="lr-status-field"><label>Status</label><select id="lr-f-status"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+      <button class="submit" id="lr-submit"><svg class="ic" style="width:15px;height:15px"><use href="#i-send"/></svg><span id="lr-submit-label">Submit for PM approval</span></button>
+      <div class="gatenote" id="lr-gatenote"><svg class="ic" style="width:11px;height:11px;vertical-align:-1px"><use href="#i-lock"/></svg> Rate changes take effect only once a PM approves.</div>
+    </div>
+    <div class="hist">
+      <h4 id="lr-hist-title">Rate history</h4>
+      <div id="lr-hist-body"><div class="muted" style="font-size:12px;">—</div></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="lr-toast"></div>
+
+<script src="/files/static/js/datepicker.js"></script>
 <script>
-(function() {
-  const $ = (id) => document.getElementById(id);
-  const esc = (s) => (s == null ? '' : String(s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'));
+(function(){
+  const $=id=>document.getElementById(id);
+  const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const money=n=>n==null?'—':'$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmtMDY=iso=>{if(!iso)return '—';const p=String(iso).slice(0,10).split('-');return p.length===3?p[1]+'/'+p[2]+'/'+p[0]:iso;};
+  function todayISO(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function toast(m){const t=$('lr-toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2200);}
+  const jget=u=>fetch(u,{credentials:'include'}).then(r=>r.ok?r.json():Promise.reject(r));
+  const jpost=(u,b)=>fetch(u,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});
 
-  function fmtMoney(n) {
-    if (n == null || isNaN(n)) return '—';
-    return '$' + Number(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-  }
-  function todayLocal() {
-    const d = new Date();
-    return d.getFullYear() + '-'
-         + String(d.getMonth()+1).padStart(2,'0') + '-'
-         + String(d.getDate()).padStart(2,'0');
-  }
+  let ROLE='', ROSTER={active:[],inactive:[]}, editWid=null, addMode=false;
 
-  let editingEmpId = null;
-
-  async function loadMe() {
-    try {
-      const r = await fetch('/api/auth/me', {credentials: 'include'});
-      const j = await r.json();
-      if (j && j.user) {
-        $('hdr-role').textContent = j.user.role || '—';
-        $('hdr-user').textContent = j.user.full_name || j.user.email || '';
-      }
-    } catch (e) {}
-  }
-
-  async function loadGrid() {
-    const grid = $('rates-grid');
-    try {
-      const r = await fetch('/api/labor-rates/workers', {credentials: 'include'});
-      if (r.status === 403) {
-        grid.innerHTML = '<div style="padding:18px;text-align:center;color:var(--brand-red);background:white;border:1px solid var(--border);border-radius:4px;">Forbidden — your role cannot view labor rates.</div>';
-        return;
-      }
-      if (r.status === 401) {
-        window.location.href = '/login?next=/admin/labor-rates';
-        return;
-      }
-      const j = await r.json();
-      const workers = (j && j.data) || [];
-      if (!workers.length) {
-        grid.innerHTML = '<div style="padding:18px;text-align:center;color:var(--mute);background:white;border:1px solid var(--border);border-radius:4px;">No active workers.</div>';
-        return;
-      }
-      grid.innerHTML = workers.map(w => {
-        const hasRate = w.current_rate != null;
-        const rateBlock = hasRate
-          ? `<div class="val">${fmtMoney(w.current_rate)}/hr</div>
-             <div class="effective">Since ${esc(w.current_effective_from)}</div>`
-          : `<div class="rate-missing">Rate not set</div>
-             <div class="effective" style="color:var(--warn);">Add a rate to begin</div>`;
-        return `<div class="row" data-emp="${esc(w.employee_id)}">
-          <div class="who">
-            <div class="wid">${esc(w.worker_id || '—')}</div>
-            <div class="name">${esc(w.name || '—')}</div>
-            <div class="trade">${esc(w.trade || '')}</div>
-          </div>
-          <div class="rate">${rateBlock}</div>
-          <button class="btn" type="button" data-action="history" data-emp="${esc(w.employee_id)}">
-            View history${w.history_count ? ' (' + w.history_count + ')' : ''}
-          </button>
-          <button class="btn btn-primary" type="button" data-action="edit"
-                  data-emp="${esc(w.employee_id)}"
-                  data-name="${esc(w.name)}"
-                  data-wid="${esc(w.worker_id || '')}">
-            ${hasRate ? 'Edit rate' : 'Set rate'}
-          </button>
-          <div class="history" data-history-for="${esc(w.employee_id)}"></div>
-        </div>`;
-      }).join('');
-    } catch (e) {
-      grid.innerHTML = '<div style="padding:18px;text-align:center;color:var(--brand-red);background:white;border:1px solid var(--border);border-radius:4px;">Network error — retry.</div>';
+  async function boot(){
+    try{ const me=await jget('/api/auth/me'); ROLE=((me.user||me.data||me)||{}).role||''; $('lr-who').textContent=(ROLE||'').toUpperCase(); }catch(e){}
+    if(ROLE==='pm'){
+      $('lr-admin-only').style.display='none'; $('lr-pm-note').style.display='';
+      $('lr-pending-frame').style.display=''; loadPending();
+    } else {
+      $('lr-pending-frame').style.display=''; loadRoster(); loadPending();
     }
+    wire();
+  }
+  function wire(){
+    if(window.SSCDatePicker) SSCDatePicker.wire($('lr-f-date'));
+    const add=$('lr-add-btn'); if(add) add.addEventListener('click',()=>openPanel(null,true));
+    $('lr-close').addEventListener('click',closePanel);
+    $('lr-overlay').addEventListener('click',e=>{ if(e.target===$('lr-overlay')) closePanel(); });
+    $('lr-submit').addEventListener('click',onSubmit);
+    const s=$('lr-search'); if(s) s.addEventListener('input',renderTables);
   }
 
-  async function loadHistory(empId, container) {
-    try {
-      const r = await fetch('/api/labor-rates/workers/' + encodeURIComponent(empId) + '/history',
-                            {credentials: 'include'});
-      const j = await r.json();
-      const rows = (j && j.data) || [];
-      if (!rows.length) {
-        container.innerHTML = '<div class="history-empty">No history yet.</div>';
-        return;
-      }
-      container.innerHTML = '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;font-weight:700;color:var(--ink-soft);margin-bottom:4px;">History</div>'
-        + rows.map(r => {
-          const period = r.effective_to
-            ? `${esc(r.effective_from)} → ${esc(r.effective_to)}`
-            : `${esc(r.effective_from)} → current`;
-          const by = r.created_by_name ? esc(r.created_by_name) : '(unknown)';
-          return `<div class="history-row">
-            <div class="from">${period}</div>
-            <div class="val">${fmtMoney(r.hourly_rate)}/hr</div>
-            <div class="meta">Set by ${by} · ${esc((r.created_at || '').slice(0,10))}${r.notes ? ' · ' + esc(r.notes) : ''}</div>
-          </div>`;
-        }).join('');
-    } catch (e) {
-      container.innerHTML = '<div class="history-empty" style="color:var(--brand-red);">Failed to load history.</div>';
-    }
+  async function loadRoster(){
+    try{
+      const j=await jget('/api/labor-rates/roster'); ROSTER=j.data; const k=j.kpis||{};
+      $('lr-kpi-total').textContent=k.total; $('lr-kpi-active').textContent=k.active;
+      $('lr-kpi-inactive').textContent=k.inactive; $('lr-kpi-pending').textContent=k.pending;
+      renderTables();
+    }catch(e){ $('lr-active-tbody').innerHTML='<tr><td colspan="6" class="empty" style="color:#C8102E">Could not load roster.</td></tr>'; }
   }
-
-  function openModal(empId, name, wid) {
-    editingEmpId = empId;
-    $('modal-worker').textContent = (wid ? wid + ' · ' : '') + (name || '');
-    $('m-rate').value = '';
-    $('m-from').value = todayLocal();
-    $('m-notes').value = '';
-    $('m-err').textContent = '';
-    $('m-err').className = 'err';
-    $('modal-bg').classList.add('open');
-    setTimeout(() => $('m-rate').focus(), 50);
+  function filt(list){
+    const q=(($('lr-search')||{}).value||'').trim().toLowerCase();
+    return q?list.filter(w=>(w.worker_id||'').toLowerCase().includes(q)||(w.trade||'').toLowerCase().includes(q)):list;
   }
-  function closeModal() {
-    $('modal-bg').classList.remove('open');
-    editingEmpId = null;
+  function renderTables(){
+    const A=filt(ROSTER.active), I=filt(ROSTER.inactive);
+    $('lr-active-count').textContent=A.length; $('lr-inactive-count').textContent=I.length;
+    $('lr-active-tbody').innerHTML=A.length?A.map(activeRow).join(''):'<tr><td colspan="6" class="empty">No active workers.</td></tr>';
+    $('lr-inactive-tbody').innerHTML=I.length?I.map(inactiveRow).join(''):'<tr><td colspan="6" class="empty">No inactive workers.</td></tr>';
   }
-
-  async function saveRate() {
-    const errEl = $('m-err');
-    errEl.textContent = '';
-    errEl.className = 'err';
-    const rate = parseFloat($('m-rate').value);
-    const from = $('m-from').value;
-    const notes = $('m-notes').value.trim() || null;
-    if (!rate || rate <= 0) { errEl.textContent = 'Enter a positive rate.'; return; }
-    if (!from) { errEl.textContent = 'Effective-from date is required.'; return; }
-    try {
-      const r = await fetch('/api/labor-rates/workers/' + encodeURIComponent(editingEmpId), {
-        method: 'POST',
-        credentials: 'include',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({hourly_rate: rate, effective_from: from, notes: notes}),
-      });
-      const j = await r.json();
-      if (!r.ok) {
-        errEl.textContent = (j && j.error) || ('Save failed (' + r.status + ')');
-        return;
-      }
-      errEl.className = 'err ok';
-      errEl.textContent = 'Saved.';
-      setTimeout(() => { closeModal(); loadGrid(); }, 350);
-    } catch (e) {
-      errEl.textContent = 'Network error.';
-    }
+  function activeRow(w){
+    const pendBadge=w.has_pending?'<span class="pend">→ pending PM</span>':'';
+    return '<tr><td class="wid">'+esc(w.worker_id)+'</td>'
+      +'<td><span class="trade">'+esc(w.trade||'—')+'</span></td>'
+      +'<td class="r"><input class="cellinput" data-rate="'+esc(w.worker_id)+'" value="'+(w.current_rate!=null?Number(w.current_rate).toFixed(2):'')+'"></td>'
+      +'<td>'+esc(fmtMDY(w.effective_date))+pendBadge+'</td>'
+      +'<td><span class="st act">Active</span></td>'
+      +'<td><div class="acts"><button class="iconbtn" title="History" data-hist="'+esc(w.worker_id)+'"><svg class="ic"><use href="#i-clock"/></svg></button>'
+      +'<button class="iconbtn" title="Edit" data-edit="'+esc(w.worker_id)+'"><svg class="ic"><use href="#i-edit"/></svg></button></div></td></tr>';
   }
-
-  document.addEventListener('click', (e) => {
-    const editBtn = e.target.closest('[data-action="edit"]');
-    if (editBtn) {
-      openModal(
-        editBtn.getAttribute('data-emp'),
-        editBtn.getAttribute('data-name'),
-        editBtn.getAttribute('data-wid'),
-      );
-      return;
-    }
-    const histBtn = e.target.closest('[data-action="history"]');
-    if (histBtn) {
-      const empId = histBtn.getAttribute('data-emp');
-      const row = histBtn.closest('.row');
-      const container = row.querySelector('[data-history-for]');
-      const wasOpen = row.classList.contains('expanded');
-      row.classList.toggle('expanded');
-      if (!wasOpen) loadHistory(empId, container);
-      return;
-    }
+  function inactiveRow(w){
+    return '<tr><td class="wid">'+esc(w.worker_id)+'</td>'
+      +'<td><span class="trade">'+esc(w.trade||'—')+'</span></td>'
+      +'<td class="r">'+money(w.current_rate)+'</td>'
+      +'<td>'+esc(fmtMDY(w.effective_date))+'</td>'
+      +'<td><span class="st inact">Inactive</span></td>'
+      +'<td><div class="acts"><button class="iconbtn" title="History" data-hist="'+esc(w.worker_id)+'"><svg class="ic"><use href="#i-clock"/></svg></button>'
+      +'<button class="reactivate" data-react="'+esc(w.worker_id)+'"><svg class="ic" style="width:13px;height:13px"><use href="#i-refresh"/></svg> Reactivate</button></div></td></tr>';
+  }
+  function byId(wid){ return ROSTER.active.concat(ROSTER.inactive).find(w=>w.worker_id===wid); }
+  document.addEventListener('click',e=>{
+    const h=e.target.closest('[data-hist]'); if(h){ openPanel(byId(h.getAttribute('data-hist')),false,true); return; }
+    const ed=e.target.closest('[data-edit]'); if(ed){ openPanel(byId(ed.getAttribute('data-edit')),false); return; }
+    const re=e.target.closest('[data-react]'); if(re){ reactivate(re.getAttribute('data-react')); return; }
+    const ap=e.target.closest('[data-approve]'); if(ap){ decide(ap.getAttribute('data-approve'),'approve'); return; }
+    const rj=e.target.closest('[data-reject]'); if(rj){ decide(rj.getAttribute('data-reject'),'reject'); return; }
   });
-  $('m-cancel').addEventListener('click', closeModal);
-  $('m-save').addEventListener('click', saveRate);
-  $('modal-bg').addEventListener('click', (e) => {
-    if (e.target === $('modal-bg')) closeModal();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && $('modal-bg').classList.contains('open')) closeModal();
-  });
+  document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.classList&&e.target.classList.contains('cellinput')) submitInline(e.target); });
+  async function submitInline(inp){
+    const wid=inp.getAttribute('data-rate'); const v=parseFloat(inp.value); const cur=byId(wid);
+    if(!cur||isNaN(v)||v<=0||Math.abs(v-(cur.current_rate||0))<0.005){ return; }
+    const r=await jpost('/api/labor-rates/changes',{worker_id:wid,new_rate:v,effective_date:cur.effective_date||todayISO()});
+    if(r.ok){ toast('Submitted for PM approval'); loadRoster(); loadPending(); } else { toast('Submit failed'); }
+  }
 
-  loadMe();
-  loadGrid();
+  async function loadPending(){
+    try{
+      const j=await jget('/api/labor-rates/pending'); const rows=j.data||[];
+      $('lr-pending-count').textContent=rows.length;
+      $('lr-pending-tbody').innerHTML=rows.length?rows.map(p=>(
+        '<tr><td class="wid">'+esc(p.worker_id)+'</td>'
+        +'<td><span class="trade">'+esc(p.trade||'—')+'</span></td>'
+        +'<td class="r">'+money(p.old_rate)+' → <strong>'+money(p.new_rate)+'</strong></td>'
+        +'<td>'+esc(fmtMDY(p.effective_date))+'</td>'
+        +'<td class="muted">'+esc((p.submitted_by_role||'—').toUpperCase())+'</td>'
+        +'<td><div class="acts"><button class="appbtn ok" data-approve="'+p.id+'">Approve</button><button class="appbtn no" data-reject="'+p.id+'">Reject</button></div></td></tr>'
+      )).join(''):'<tr><td colspan="6" class="empty">No pending rate changes.</td></tr>';
+    }catch(e){ $('lr-pending-tbody').innerHTML='<tr><td colspan="6" class="empty" style="color:#C8102E">Could not load queue.</td></tr>'; }
+  }
+  async function decide(cid,action){
+    const r=await jpost('/api/labor-rates/changes/'+cid+'/'+action,{});
+    if(r.ok){ toast(action==='approve'?'Approved — rate updated':'Rejected'); loadPending(); if(ROLE!=='pm') loadRoster(); }
+    else { toast(action+' failed'); }
+  }
+
+  function openPanel(w,isAdd){
+    addMode=!!isAdd; editWid=(w&&w.worker_id)||null;
+    $('lr-panel-title').textContent=isAdd?'Add worker rate':'Edit rate';
+    $('lr-wid-field').style.display=isAdd?'':'none';
+    $('lr-submit-label').textContent=isAdd?'Add rate (admin)':'Submit for PM approval';
+    $('lr-gatenote').style.display=isAdd?'none':'';
+    $('lr-status-field').style.display=isAdd?'':'none';
+    $('lr-pendbar').style.display='none';
+    if(window.SSCDatePicker) SSCDatePicker.wire($('lr-f-date'));
+    if(isAdd){
+      $('lr-f-wid').value=''; $('lr-f-trade').value='Mechanic'; $('lr-f-rate').value=''; $('lr-f-status').value='active';
+      if(window.SSCDatePicker) SSCDatePicker.setISO($('lr-f-date'),todayISO());
+      $('lr-panel-id').textContent='New worker';
+      $('lr-hist-title').textContent='Rate history'; $('lr-hist-body').innerHTML='<div class="muted" style="font-size:12px;">No history yet.</div>';
+    } else if(w){
+      $('lr-f-trade').value=w.trade||'Mechanic';
+      $('lr-f-rate').value=w.current_rate!=null?Number(w.current_rate).toFixed(2):'';
+      if(window.SSCDatePicker) SSCDatePicker.setISO($('lr-f-date'),w.effective_date||todayISO());
+      $('lr-panel-id').textContent=w.worker_id+' · '+(w.trade||'—')+' · '+(w.status==='inactive'?'Inactive':'Active');
+      if(w.has_pending){ $('lr-pendbar').style.display=''; $('lr-pendbar').innerHTML='<svg class="ic" style="width:14px;height:14px"><use href="#i-clock"/></svg>Pending: '+money(w.current_rate)+' → '+money(w.pending_new_rate)+' · awaiting PM approval'; }
+      loadHistory(w.worker_id);
+    }
+    $('lr-overlay').classList.add('show');
+  }
+  function closePanel(){ $('lr-overlay').classList.remove('show'); }
+  async function loadHistory(wid){
+    $('lr-hist-title').textContent='Rate history · '+wid;
+    try{
+      const j=await jget('/api/labor-rates/history/'+encodeURIComponent(wid)); const rows=j.data||[];
+      $('lr-hist-body').innerHTML=rows.length?rows.map(h=>{
+        const dot=h.status==='pending'?'pendd':h.is_initial?'init':h.status==='rejected'?'rej':'';
+        const pill=h.status==='pending'?'<span class="hpill pp">Pending PM</span>':h.status==='rejected'?'<span class="hpill rj">Rejected</span>':(h.is_initial?'':'<span class="hpill ok">Approved</span>');
+        const who=h.is_initial?'initial rate':(h.status==='pending'?('submitted by '+(h.submitted_by_role||'—')):('approved by '+(h.decided_by_role||'—')));
+        return '<div class="hrow"><span class="hdot '+dot+'"></span><div><div class="hmain">'+money(h.new_rate)+' '+pill+'</div><div class="hsub">eff '+esc(fmtMDY(h.effective_date))+' · '+esc(who)+'</div></div></div>';
+      }).join(''):'<div class="muted" style="font-size:12px;">No history.</div>';
+    }catch(e){ $('lr-hist-body').innerHTML='<div class="muted" style="font-size:12px;color:#C8102E">Could not load history.</div>'; }
+  }
+  async function onSubmit(){
+    const dateISO=window.SSCDatePicker?SSCDatePicker.getISO($('lr-f-date')):$('lr-f-date').value;
+    const rate=parseFloat($('lr-f-rate').value);
+    if(isNaN(rate)||rate<=0){ toast('Enter a valid rate'); return; }
+    const btn=$('lr-submit'); btn.disabled=true;
+    try{
+      if(addMode){
+        const wid=($('lr-f-wid').value||'').trim();
+        if(!wid){ toast('Worker ID required'); return; }
+        const r=await jpost('/api/labor-rates/state',{worker_id:wid,trade:$('lr-f-trade').value,rate:rate,effective_date:dateISO,status:$('lr-f-status').value});
+        if(r.ok){ toast('Worker rate added'); closePanel(); loadRoster(); } else { const j=await r.json().catch(()=>({})); toast(j.error||'Add failed'); }
+      } else {
+        const cur=byId(editWid);
+        if(cur && $('lr-f-trade').value!==cur.trade){ await jpost('/api/labor-rates/state/'+encodeURIComponent(editWid)+'/trade',{trade:$('lr-f-trade').value}); }
+        if(cur && Math.abs(rate-(cur.current_rate||0))>=0.005){
+          const r=await jpost('/api/labor-rates/changes',{worker_id:editWid,new_rate:rate,effective_date:dateISO});
+          if(!r.ok){ toast('Submit failed'); return; }
+        }
+        toast('Submitted for PM approval'); closePanel(); loadRoster(); loadPending();
+      }
+    } finally { btn.disabled=false; }
+  }
+  async function reactivate(wid){
+    const r=await jpost('/api/labor-rates/state/'+encodeURIComponent(wid)+'/status',{status:'active'});
+    if(r.ok){ toast('Reactivated'); loadRoster(); } else { toast('Reactivate failed'); }
+  }
+
+  boot();
 })();
 </script>
 </body>
