@@ -4466,6 +4466,75 @@ def api_lr_pending():
         conn.close()
 
 
+def _lr_card_authorized(conn, worker_id, role):
+    """Who may see a worker's name/photo: admin/c_suite -> anyone; pm -> ONLY
+    workers that currently have a PENDING item in their queue (so a PM cannot
+    enumerate every worker's identity); everyone else -> no. (#221)"""
+    if role in ('admin', 'c_suite'):
+        return True
+    if role == 'pm':
+        return conn.execute(
+            "SELECT 1 FROM labor_rate_change WHERE worker_id=? AND status='pending' LIMIT 1",
+            (worker_id,)).fetchone() is not None
+    return False
+
+
+@app.route('/api/labor-rates/worker-card/<worker_id>', methods=['GET'])
+@requires_role(*_LR_APPROVE_ROLES)
+def api_lr_worker_card(worker_id):
+    """Identity card for the hover popup: {display_name, trade, has_photo}.
+    NEVER returns any *_path. Gated: admin/c_suite any worker; pm only the workers
+    in its pending queue; super/other 403 (the decorator)."""
+    conn = db()
+    try:
+        _, role = _lr_actor()
+        if not _lr_card_authorized(conn, worker_id, role):
+            return jsonify({"error": "forbidden"}), 403
+        emp = conn.execute("SELECT name, trade, face_image_path FROM employees WHERE worker_id=?",
+                           (worker_id,)).fetchone()
+        st = conn.execute("SELECT trade FROM labor_worker_state WHERE worker_id=?", (worker_id,)).fetchone()
+        display_name = (emp['name'] if emp and emp['name'] else None)
+        trade = (emp['trade'] if emp and emp['trade'] else (st['trade'] if st else None))
+        has_photo = False
+        if emp and emp['face_image_path']:
+            try:
+                p = Path(emp['face_image_path'])
+                base = (SCRIPT_DIR / "worker_records").resolve()
+                has_photo = p.resolve().is_relative_to(base) and p.exists()
+            except Exception:
+                has_photo = False
+        return response_wrapper({"worker_id": worker_id, "display_name": display_name,
+                                 "trade": trade, "has_photo": bool(has_photo)})
+    finally:
+        conn.close()
+
+
+@app.route('/api/labor-rates/worker-photo/<worker_id>', methods=['GET'])
+@requires_role(*_LR_APPROVE_ROLES)
+def api_lr_worker_photo(worker_id):
+    """Serve a worker's headshot through THIS auth-gated route only (same gating
+    as the card; never exposes the path). Path is confined to worker_records/."""
+    from flask import send_file
+    conn = db()
+    try:
+        _, role = _lr_actor()
+        if not _lr_card_authorized(conn, worker_id, role):
+            return jsonify({"error": "forbidden"}), 403
+        emp = conn.execute("SELECT face_image_path FROM employees WHERE worker_id=?", (worker_id,)).fetchone()
+        if not emp or not emp['face_image_path']:
+            return jsonify({"error": "no photo"}), 404
+        p = Path(emp['face_image_path'])
+        base = (SCRIPT_DIR / "worker_records").resolve()
+        if not (p.resolve().is_relative_to(base) and p.exists()):
+            return jsonify({"error": "photo missing"}), 404
+        mt = 'image/png' if p.suffix.lower() == '.png' else 'image/jpeg'
+        resp = send_file(str(p), mimetype=mt)
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return resp
+    finally:
+        conn.close()
+
+
 @app.route('/api/labor-rates/state/<worker_id>/status', methods=['POST'])
 @requires_role(*_LR_FULL_ROLES)
 def api_lr_set_status(worker_id):

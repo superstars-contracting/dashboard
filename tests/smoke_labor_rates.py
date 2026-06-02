@@ -10,10 +10,14 @@ are verified intact by a MATCH query (never printing a real value).
 Covers: migration intact (14 real, all active, initial history, == worker_rates);
 submit -> pending (current unchanged, pending KPI++); PM approve -> applies +
 history; PM reject -> holds; Active/Inactive split + Reactivate (history kept);
-role-stamped history (no names); gating (admin submit; PM only the queue, roster
-403; super 403); stress 200 + scoped cleanup (zero residue, 14 real untouched).
+PM-gated deactivate (#221, same queue, both types); role-stamped history (no
+names); worker-card + photo hover (#221, gated: admin any, PM only its queue
+items, super 403, no *_path leak — FAKE 'SMK ' names only); gating (admin submit;
+PM only the queue, roster 403; super 403); stress 200 + scoped cleanup (zero
+residue incl. synthetic employees + test photo dirs; 14 real untouched).
 """
 import os
+import shutil
 import sqlite3
 import sys
 import time
@@ -66,6 +70,28 @@ def make_user(email, role):
 def add_worker(wid, trade, rate, eff="2026-01-05", status="active"):
     return requests.post(f"{BASE}/api/labor-rates/state", json={
         "worker_id": wid, "trade": trade, "rate": rate, "effective_date": eff, "status": status}, timeout=15)
+
+
+def mk_emp(wid, eid, name, trade, photo=False):
+    """Synthetic employees row (FAKE 'SMK ...' name) so the worker-card endpoint
+    has an identity to return. If photo, drop a tiny synthetic face.jpg under a
+    SYNTHETIC worker_records dir (no real name). Returns nothing PII."""
+    fip = None
+    if photo:
+        d = SCRIPT_DIR / "worker_records" / f"{eid}_SMK-TEST"
+        d.mkdir(parents=True, exist_ok=True)
+        fp = d / "face.jpg"
+        try:
+            from PIL import Image
+            Image.new("RGB", (6, 6), (90, 110, 140)).save(str(fp), "JPEG")
+        except Exception:
+            fp.write_bytes(b"\xff\xd8\xff\xe0\x00\x10JFIF synthetic-test\xff\xd9")
+        fip = str(fp.resolve())
+    conn = db()
+    conn.execute("DELETE FROM employees WHERE worker_id=?", (wid,))
+    conn.execute("INSERT INTO employees (employee_id, worker_id, name, trade, face_image_path) "
+                 "VALUES (?,?,?,?,?)", (eid, wid, name, trade, fip))
+    conn.commit(); conn.close()
 
 
 def roster():
@@ -181,6 +207,35 @@ def main():
     # admin-only: PM cannot submit a deactivate (403)
     ok("pm_deactivate_403", pm.post(f"{BASE}/api/labor-rates/deactivate", json={"worker_id": "W-9004"}, timeout=10).status_code == 403)
 
+    # ---- 7b) WORKER-CARD + PHOTO hover (#221) — gated identity, FAKE names only ----
+    # W-9501: has a synthetic photo + a PENDING change (so a PM may see it).
+    # W-9502: no photo + NO pending (so a PM must NOT see it).
+    mk_emp("W-9501", "E-99501", "SMK Test Alpha", "Rope Access", photo=True)
+    mk_emp("W-9502", "E-99502", "SMK Test Bravo", "Mechanic", photo=False)
+    add_worker("W-9501", "Rope Access", 40.00)
+    add_worker("W-9502", "Mechanic", 41.00)
+    requests.post(f"{BASE}/api/labor-rates/changes", json={"worker_id": "W-9501", "new_rate": 42.0, "effective_date": "2026-06-01"}, timeout=15)
+    # admin: card for ANY worker; name+trade present; NO *_path leak
+    ca = requests.get(f"{BASE}/api/labor-rates/worker-card/W-9501", timeout=10)
+    cj = ca.json().get("data", {}) if ca.status_code == 200 else {}
+    ok("card_admin_200", ca.status_code == 200 and cj.get("display_name") == "SMK Test Alpha" and cj.get("trade") == "Rope Access", f"HTTP {ca.status_code}")
+    ok("card_has_photo_true", cj.get("has_photo") is True)
+    ok("card_no_path_leak", not any("path" in k.lower() for k in cj.keys()) and "worker_records" not in ca.text.lower())
+    cb = requests.get(f"{BASE}/api/labor-rates/worker-card/W-9502", timeout=10).json().get("data", {})
+    ok("card_no_photo_initials", cb.get("display_name") == "SMK Test Bravo" and cb.get("has_photo") is False)
+    # admin photo route serves the synthetic image (no-store); a worker with no photo -> 404
+    pa = requests.get(f"{BASE}/api/labor-rates/worker-photo/W-9501", timeout=10)
+    ok("photo_admin_serves", pa.status_code == 200 and pa.headers.get("Content-Type", "").startswith("image/") and "no-store" in pa.headers.get("Cache-Control", ""), f"HTTP {pa.status_code}")
+    ok("photo_no_file_404", requests.get(f"{BASE}/api/labor-rates/worker-photo/W-9502", timeout=10).status_code == 404)
+    # PM: card/photo ONLY for a worker with a pending queue item; 403 otherwise
+    ok("card_pm_with_pending_200", pm.get(f"{BASE}/api/labor-rates/worker-card/W-9501", timeout=10).status_code == 200)
+    ok("card_pm_no_pending_403", pm.get(f"{BASE}/api/labor-rates/worker-card/W-9502", timeout=10).status_code == 403)
+    ok("photo_pm_with_pending_200", pm.get(f"{BASE}/api/labor-rates/worker-photo/W-9501", timeout=10).status_code == 200)
+    ok("photo_pm_no_pending_403", pm.get(f"{BASE}/api/labor-rates/worker-photo/W-9502", timeout=10).status_code == 403)
+    # super/other: 403 on both card + photo
+    ok("card_super_403", sup.get(f"{BASE}/api/labor-rates/worker-card/W-9501", timeout=10).status_code == 403)
+    ok("photo_super_403", sup.get(f"{BASE}/api/labor-rates/worker-photo/W-9501", timeout=10).status_code == 403)
+
     # ---- 8) STRESS ~200 synthetic + changes ----
     _stress()
 
@@ -231,15 +286,26 @@ def _cleanup():
     chg = conn.execute("SELECT COUNT(*) FROM labor_rate_change WHERE worker_id LIKE 'W-9%'").fetchone()[0]
     conn.execute("DELETE FROM labor_rate_change WHERE worker_id LIKE 'W-9%'")
     conn.execute("DELETE FROM labor_worker_state WHERE worker_id LIKE 'W-9%'")
+    # synthetic employees created for the worker-card test (FAKE 'SMK ' names, E-99% eids) only
+    conn.execute("DELETE FROM employees WHERE worker_id LIKE 'W-9%' AND (name LIKE 'SMK %' OR employee_id LIKE 'E-99%')")
+    # those synthetic employees bridged a rate into worker_rates + an audit_log row — purge both (E-99% only)
+    conn.execute("DELETE FROM worker_rates WHERE employee_id LIKE 'E-99%'")
+    conn.execute("DELETE FROM audit_log WHERE target_id LIKE 'E-99%'")
     conn.execute("DELETE FROM users WHERE email IN (?,?)", (PM_EMAIL, SUPER_EMAIL))
     conn.commit()
     res_state = conn.execute("SELECT COUNT(*) FROM labor_worker_state WHERE worker_id LIKE 'W-9%'").fetchone()[0]
     res_chg = conn.execute("SELECT COUNT(*) FROM labor_rate_change WHERE worker_id LIKE 'W-9%'").fetchone()[0]
+    res_emp = conn.execute("SELECT COUNT(*) FROM employees WHERE worker_id LIKE 'W-9%'").fetchone()[0]
+    res_wr9 = conn.execute("SELECT COUNT(*) FROM worker_rates WHERE employee_id LIKE 'E-99%'").fetchone()[0]
     real_state = conn.execute("SELECT COUNT(*) FROM labor_worker_state").fetchone()[0]
     real_wr = conn.execute("SELECT COUNT(*) FROM worker_rates WHERE effective_to IS NULL").fetchone()[0]
     conn.close()
-    print(f"    purged {chg} change rows; residue state={res_state} change={res_chg}")
-    ok("cleanup_zero_residue", res_state == 0 and res_chg == 0)
+    # synthetic worker_records dirs (E-99..._SMK-TEST) — never touch real worker folders
+    dirs = 0
+    for d in (SCRIPT_DIR / "worker_records").glob("E-99*_SMK-TEST"):
+        shutil.rmtree(d, ignore_errors=True); dirs += 1
+    print(f"    purged {chg} change rows + synthetic emps; removed {dirs} test photo dir(s); residue state={res_state} change={res_chg} emp={res_emp} wr={res_wr9}")
+    ok("cleanup_zero_residue", res_state == 0 and res_chg == 0 and res_emp == 0 and res_wr9 == 0)
     ok("cleanup_14_real_untouched", real_state == 14 and real_wr == 14, f"state={real_state} worker_rates={real_wr}")
 
 

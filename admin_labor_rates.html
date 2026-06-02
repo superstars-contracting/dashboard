@@ -79,6 +79,15 @@
   .hpill.pp{color:var(--amber);background:rgba(186,117,23,.13)}
   .hpill.rj{color:var(--red);background:rgba(200,16,46,.1)}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#14161a;color:#fff;padding:10px 16px;border-radius:9px;font-size:13px;display:none;z-index:60}
+  /* #221 — worker identity hover card (name + photo / initials) */
+  [data-cardwid]{cursor:help}
+  .lr-card{position:absolute;z-index:80;background:#fff;border:1px solid var(--line);border-radius:11px;box-shadow:0 8px 24px rgba(0,0,0,.16);padding:11px 13px;min-width:200px;max-width:280px;display:none}
+  .lr-card-row{display:flex;align-items:center;gap:11px}
+  .lr-card-photo{width:44px;height:44px;border-radius:50%;object-fit:cover;border:1px solid var(--line);flex-shrink:0;background:#f1f1f3}
+  .lr-card-initials{width:44px;height:44px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0}
+  .lr-card-name{font-weight:700;font-size:14px;color:var(--ink);line-height:1.25}
+  .lr-card-sub{color:var(--muted);font-size:12px;margin-top:2px}
+  .lr-card-loading{color:var(--muted);font-size:12px}
 </style>
 </head>
 <body>
@@ -139,7 +148,7 @@
       <tbody id="lr-pending-tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
     </table></div>
   </div>
-  <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:2px;" id="ph-build-stamp">build #221 · 2026-06-01 · Labor Rates — black worker IDs + PM-gated deactivate flow</div>
+  <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:2px;" id="ph-build-stamp">build #221 · 2026-06-01 · Labor Rates — black worker IDs + PM-gated deactivate + name/photo hover</div>
 </div>
 
 <div class="overlay" id="lr-overlay">
@@ -166,6 +175,7 @@
   </div>
 </div>
 <div class="toast" id="lr-toast"></div>
+<div class="lr-card" id="lr-card"></div>
 
 <script src="/files/static/js/datepicker.js"></script>
 <script>
@@ -221,7 +231,7 @@
   }
   function activeRow(w){
     const pendBadge=w.has_pending?('<span class="pend">→ pending PM'+(w.pending_type==='deactivate'?' (deactivate)':'')+'</span>'):'';
-    return '<tr><td class="wid">'+esc(w.worker_id)+'</td>'
+    return '<tr><td class="wid" data-cardwid="'+esc(w.worker_id)+'">'+esc(w.worker_id)+'</td>'
       +'<td><span class="trade">'+esc(w.trade||'—')+'</span></td>'
       +'<td class="r"><input class="cellinput" data-rate="'+esc(w.worker_id)+'" value="'+(w.current_rate!=null?Number(w.current_rate).toFixed(2):'')+'"></td>'
       +'<td>'+esc(fmtMDY(w.effective_date))+pendBadge+'</td>'
@@ -231,7 +241,7 @@
       +'<button class="iconbtn" title="Deactivate (PM approval)" data-deact="'+esc(w.worker_id)+'"><svg class="ic"><use href="#i-ban"/></svg></button></div></td></tr>';
   }
   function inactiveRow(w){
-    return '<tr><td class="wid">'+esc(w.worker_id)+'</td>'
+    return '<tr><td class="wid" data-cardwid="'+esc(w.worker_id)+'">'+esc(w.worker_id)+'</td>'
       +'<td><span class="trade">'+esc(w.trade||'—')+'</span></td>'
       +'<td class="r">'+money(w.current_rate)+'</td>'
       +'<td>'+esc(fmtMDY(w.effective_date))+'</td>'
@@ -264,7 +274,7 @@
         const isDeact=p.change_type==='deactivate';
         const detail=isDeact?'<strong style="color:var(--amber)">Deactivate worker</strong>':(money(p.old_rate)+' → <strong>'+money(p.new_rate)+'</strong>');
         const eff=isDeact?'—':esc(fmtMDY(p.effective_date));
-        return '<tr><td class="wid">'+esc(p.worker_id)+'</td>'
+        return '<tr><td class="wid" data-cardwid="'+esc(p.worker_id)+'">'+esc(p.worker_id)+'</td>'
         +'<td><span class="trade">'+esc(p.trade||'—')+'</span></td>'
         +'<td class="r">'+detail+'</td>'
         +'<td>'+eff+'</td>'
@@ -352,6 +362,32 @@
     const r=await jpost('/api/labor-rates/deactivate',{worker_id:wid});
     if(r.ok){ toast('Deactivation submitted for PM approval'); loadRoster(); loadPending(); } else { const j=await r.json().catch(()=>({})); toast((j&&j.error)||'Submit failed'); }
   }
+
+  // ---------- identity hover/tap card (#221): name + photo / initials ----------
+  let cardTimer=null; const cardCache={};
+  function initials(name){ const p=String(name||'').trim().split(/\s+/).filter(Boolean); return (((p[0]||'')[0]||'')+(p.length>1?((p[p.length-1]||'')[0]||''):'')).toUpperCase()||'·'; }
+  async function showCard(wid, anchor){
+    const card=$('lr-card'); const r=anchor.getBoundingClientRect();
+    card.style.left=(window.scrollX+r.left)+'px'; card.style.top=(window.scrollY+r.bottom+6)+'px'; card.style.display='block';
+    card.innerHTML='<div class="lr-card-loading">Loading…</div>';
+    let data=cardCache[wid];
+    if(data===undefined){
+      try{ const j=await jget('/api/labor-rates/worker-card/'+encodeURIComponent(wid)); data=j.data; cardCache[wid]=data; }
+      catch(e){ data=null; }  // 403/error -> not cached, shows "unavailable", retries later
+    }
+    if(window.innerWidth - r.left < 290) card.style.left=(window.scrollX+Math.max(8,r.right-280))+'px';
+    if(!data){ card.innerHTML='<div class="lr-card-name">'+esc(wid)+'</div><div class="lr-card-sub">identity unavailable</div>'; return; }
+    const name=data.display_name||wid;
+    const avatar=data.has_photo
+      ? '<img class="lr-card-photo" src="/api/labor-rates/worker-photo/'+encodeURIComponent(wid)+'" alt="" onerror="this.style.display=\'none\'">'
+      : '<div class="lr-card-initials">'+esc(initials(name))+'</div>';
+    card.innerHTML='<div class="lr-card-row">'+avatar+'<div><div class="lr-card-name">'+esc(name)+'</div><div class="lr-card-sub">'+esc(wid)+' · '+esc(data.trade||'—')+'</div></div></div>';
+  }
+  function hideCard(){ $('lr-card').style.display='none'; }
+  document.addEventListener('mouseover',e=>{ const el=e.target.closest('[data-cardwid]'); if(el){ clearTimeout(cardTimer); showCard(el.getAttribute('data-cardwid'), el); } });
+  document.addEventListener('mouseout',e=>{ if(e.target.closest('[data-cardwid]')){ cardTimer=setTimeout(hideCard,220); } });
+  document.addEventListener('click',e=>{ const el=e.target.closest('[data-cardwid]'); if(el){ clearTimeout(cardTimer); showCard(el.getAttribute('data-cardwid'), el); } else if(!e.target.closest('#lr-card')){ hideCard(); } });
+  (function(){ const c=$('lr-card'); c.addEventListener('mouseover',()=>clearTimeout(cardTimer)); c.addEventListener('mouseout',()=>{ cardTimer=setTimeout(hideCard,220); }); })();
 
   boot();
 })();
