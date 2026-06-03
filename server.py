@@ -3700,6 +3700,93 @@ def api_project_workers(project_code):
         return jsonify({"error": str(e)}), 400
 
 
+@app.route('/api/projects/<project_code>/crew-compliance', methods=['GET'])
+def api_project_crew_compliance(project_code):
+    """#223 — crew credential readiness for the project's on-site roster; powers
+    the Employees & Certifications card view. Reuses employees + certifications
+    (no cert-data changes); compliance is COMPUTED from cert expiry using the
+    LOCAL date. PII posture: returns the worker's name/trade/worker_id (same
+    audience as the existing per-project roster) plus a has_photo BOOLEAN —
+    NEVER any *_path. Headshots come ONLY from the gated face-photo route.
+    no-store (the payload carries names)."""
+    conn = db()
+    try:
+        include_archived = (request.args.get('include_archived', '').lower()
+                            in ('1', 'true', 'yes'))
+        archive_clause = '' if include_archived else ' AND e.archived_at IS NULL'
+        rows = conn.execute(
+            f"""SELECT e.employee_id, e.worker_id, e.name, e.trade, e.face_image_path, e.intake_status
+                FROM employees e
+                JOIN project_assignments pa ON pa.employee_id = e.employee_id
+                WHERE pa.project_code = ? AND pa.status = 'active'{archive_clause}
+                ORDER BY e.name""",
+            (project_code,)).fetchall()
+        today = date.today()
+        today_iso = today.isoformat()
+        d30_iso = (today + timedelta(days=30)).isoformat()
+        base = (SCRIPT_DIR / "worker_records").resolve()
+        renderable = ('.jpg', '.jpeg', '.png')   # browser-renderable headshots only
+        workers = []
+        agg = {"total": 0, "ready": 0, "expiring": 0, "expired": 0}
+        for e in rows:
+            certs = conn.execute(
+                """SELECT ct.name AS cert_name, c.date_obtained, c.expiration_date, c.status
+                   FROM certifications c LEFT JOIN cert_types ct ON ct.cert_type_id = c.cert_type_id
+                   WHERE c.employee_id = ?
+                   ORDER BY CASE WHEN c.expiration_date IS NULL THEN 1 ELSE 0 END,
+                            c.expiration_date ASC, c.id DESC""",
+                (e["employee_id"],)).fetchall()
+            clist = []
+            n_expiring = n_expired = 0
+            for c in certs:
+                exp = c["expiration_date"]
+                if not exp and not c["date_obtained"]:
+                    sd = "unknown"
+                elif not exp:
+                    sd = "valid"
+                elif exp < today_iso:
+                    sd = "expired"; n_expired += 1
+                elif exp <= d30_iso:
+                    sd = "expiring"; n_expiring += 1
+                else:
+                    sd = "valid"
+                days = None
+                if exp:
+                    try:
+                        days = (date.fromisoformat(exp) - today).days
+                    except (ValueError, TypeError):
+                        days = None
+                clist.append({"cert_name": c["cert_name"] or "Certification",
+                              "date_obtained": c["date_obtained"], "expiration_date": exp,
+                              "status_derived": sd, "days_to_expiry": days})
+            compliance = "expired" if n_expired else ("expiring" if n_expiring else "ready")
+            has_photo = False
+            fp = e["face_image_path"]
+            if fp:
+                try:
+                    p = Path(fp)
+                    has_photo = (p.suffix.lower() in renderable
+                                 and p.resolve().is_relative_to(base) and p.exists())
+                except (OSError, ValueError):
+                    has_photo = False
+            agg["total"] += 1
+            agg[compliance] += 1
+            workers.append({
+                "employee_id": e["employee_id"], "worker_id": e["worker_id"],
+                "name": e["name"], "trade": e["trade"], "has_photo": bool(has_photo),
+                "intake_status": e["intake_status"], "cert_total": len(clist),
+                "cert_expiring": n_expiring, "cert_expired": n_expired,
+                "compliance": compliance, "certs": clist,
+            })
+        total = agg["total"]
+        pct_ready = round(100 * agg["ready"] / total) if total else 0
+        resp = response_wrapper({"workers": workers, "hero": {**agg, "pct_ready": pct_ready}})
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return resp
+    finally:
+        conn.close()
+
+
 # ---------------------------------------------------------------------------
 # Reports Phase 1 — shared spine endpoints (read-only)
 # ---------------------------------------------------------------------------
@@ -6132,6 +6219,35 @@ def api_employee_face_photo_delete(employee_id):
         if conn is not None:
             try: conn.close()
             except Exception: pass
+
+
+@app.route('/api/employees/<employee_id>/face-photo', methods=['GET'])
+def api_employee_face_photo_get(employee_id):
+    """#223 — serve a worker's headshot for the Employees & Certifications card
+    view through THIS auth-gated route only (behind the global auth gate, same
+    audience as the per-project roster page). NEVER exposes the path; confined to
+    worker_records/; no-store. 404 when there's no browser-renderable photo so the
+    card falls back to a non-semantic initials avatar."""
+    from flask import send_file
+    conn = db()
+    try:
+        emp = conn.execute("SELECT face_image_path FROM employees WHERE employee_id = ?",
+                           (employee_id,)).fetchone()
+        if not emp or not emp["face_image_path"]:
+            return jsonify({"error": "no photo"}), 404
+        p = Path(emp["face_image_path"])
+        ext = p.suffix.lower()
+        if ext not in ('.jpg', '.jpeg', '.png'):
+            return jsonify({"error": "unsupported"}), 404
+        base = WORKER_RECORDS_DIR.resolve()
+        if not (p.resolve().is_relative_to(base) and p.exists()):
+            return jsonify({"error": "photo missing"}), 404
+        mt = 'image/png' if ext == '.png' else 'image/jpeg'
+        resp = send_file(str(p), mimetype=mt)
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return resp
+    finally:
+        conn.close()
 
 
 @app.route('/api/cert-types', methods=['GET'])
