@@ -881,6 +881,9 @@
           <a class="nav-link" data-view="drawings"><svg class="nav-ic"><use href="#i-pencil"/></svg>Drawing Markup</a>
           <a class="nav-link" data-view="documents"><svg class="nav-ic"><use href="#i-file"/></svg>Project Documents</a>
           <a class="nav-link" data-view="drop-report" title="Drop Report — auto-pulled from the Drop Plan (one report per drop)"><svg class="nav-ic"><use href="#i-layers"/></svg>Drop Report</a>
+          <div class="nav-subitems" style="margin-left:13px;padding-left:9px;border-left:2px solid #E8E4DD;display:flex;flex-direction:column;">
+            <a class="nav-link" data-view="drop-plans" title="Drop Plan — by elevation / by stage; expand a drop in place" style="font-size:12.5px;"><svg class="nav-ic"><use href="#i-layers"/></svg>Drop Plan</a>
+          </div>
           <a class="nav-link" data-view="schedule"><svg class="nav-ic"><use href="#i-cal"/></svg>Schedule</a>
         </div>
       </div>
@@ -1100,7 +1103,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #223 · 2026-06-02 · Employees & Certifications — crafted card view (faces · compliance rings · readiness hero)</div>
+          <div class="ph-build" id="ph-build-stamp">build #224 · 2026-06-04 · Drop Plan — By Elevation + By Stage · progress hero · behind-target · lean quantity entry · nested under Drop Report</div>
         </div>
       </section>
 
@@ -1319,107 +1322,109 @@
       </section>
 
       <!-- DROP PLANS -->
+      <!-- DROP PLAN (#224) — crafted board: By Elevation + By Stage toggle, progress hero,
+           behind-target flag, expand-in-place, lean quantity entry. Reuses /api/dropplan/* . -->
       <section class="view" data-view="drop-plans">
-        <div class="section">
-          <h2>Drop Plans</h2>
-          <div class="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>Drop ID</th>
-                  <th>Elevation</th>
-                  <th>Bay</th>
-                  <th>Floors</th>
-                  <th>Status</th>
-                  <th>Crew</th>
-                  <th>Planned Start</th>
-                  <th>Planned End</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr data-link="/drop_plans/DP-001.html">
-                  <td>DP-001</td>
-                  <td>South</td>
-                  <td>A</td>
-                  <td>1-5</td>
-                  <td><span class="badge badge-ok">Complete</span></td>
-                  <td>Team A</td>
-                  <td>May 1</td>
-                  <td>May 3</td>
-                </tr>
-                <tr data-link="/drop_plans/DP-002.html">
-                  <td>DP-002</td>
-                  <td>North</td>
-                  <td>B</td>
-                  <td>1-5</td>
-                  <td><span class="badge badge-ok">Complete</span></td>
-                  <td>Team B</td>
-                  <td>May 4</td>
-                  <td>May 6</td>
-                </tr>
-                <tr data-link="/drop_plans/DP-003.html">
-                  <td>DP-003</td>
-                  <td>East</td>
-                  <td>C</td>
-                  <td>2-6</td>
-                  <td><span class="badge badge-warn">In Progress</span></td>
-                  <td>Team C</td>
-                  <td>May 6</td>
-                  <td>May 10</td>
-                </tr>
-                <tr data-link="/drop_plans/DP-004.html">
-                  <td>DP-004</td>
-                  <td>West</td>
-                  <td>D</td>
-                  <td>1-4</td>
-                  <td><span class="badge badge-warn">Scheduled</span></td>
-                  <td>Team A</td>
-                  <td>May 11</td>
-                  <td>May 14</td>
-                </tr>
-                <tr data-link="/drop_plans/DP-005.html">
-                  <td>DP-005</td>
-                  <td>South</td>
-                  <td>E</td>
-                  <td>3-7</td>
-                  <td><span class="badge badge-warn">Scheduled</span></td>
-                  <td>Team D</td>
-                  <td>May 15</td>
-                  <td>May 18</td>
-                </tr>
-                <tr data-link="/drop_plans/DP-006.html">
-                  <td>DP-006</td>
-                  <td>North</td>
-                  <td>F</td>
-                  <td>1-5</td>
-                  <td><span class="badge badge-warn">Pending</span></td>
-                  <td>TBD</td>
-                  <td>May 19</td>
-                  <td>May 22</td>
-                </tr>
-                <tr data-link="/drop_plans/DP-007.html">
-                  <td>DP-007</td>
-                  <td>East</td>
-                  <td>G</td>
-                  <td>2-4</td>
-                  <td><span class="badge badge-warn">Pending</span></td>
-                  <td>TBD</td>
-                  <td>May 23</td>
-                  <td>May 25</td>
-                </tr>
-                <tr data-link="/drop_plans/DP-008.html">
-                  <td>DP-008</td>
-                  <td>West</td>
-                  <td>H</td>
-                  <td>1-3</td>
-                  <td><span class="badge badge-bad">On Hold</span></td>
-                  <td>TBD</td>
-                  <td>Jun 1</td>
-                  <td>Jun 3</td>
-                </tr>
-              </tbody>
-            </table>
+        <style>
+          /* #224 — all classes dp- prefixed (no collision with the shared dashboard CSS).
+             COLOR RULE: green/amber/red/blue = drop STATUS only. Elevation accents use a
+             NON-SEMANTIC palette (blue/teal/violet/indigo). */
+          .dp-wrap{--dp-blue:#1E73E8;--dp-ink:#1b1d22;--dp-muted:#7a7f88;--dp-line:#ededf0;--dp-edge:rgba(30,115,232,.42);--dp-in:rgba(30,115,232,.14);--dp-green:#0F6E56;--dp-amber:#BA7517;--dp-gray:#cfd4da;--elN:#1E73E8;--elW:#0E8C8C;--elS:#7c3aed;--elE:#4f56c4;color:var(--dp-ink);font:14px/1.5 -apple-system,"Segoe UI",Inter,Roboto,sans-serif}
+          .dp-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap}
+          .dp-h1{margin:0;font-size:22px;letter-spacing:-.01em}
+          .dp-sub{color:var(--dp-muted);font-size:13px;margin-top:3px}
+          .dp-ic{width:14px;height:14px;flex:none}
+          .dp-hero{display:flex;align-items:center;gap:24px;background:#fff;border:1px solid var(--dp-edge);border-radius:18px;padding:18px 22px;margin-bottom:18px;box-shadow:inset 0 0 18px var(--dp-in),0 1px 6px rgba(0,0,0,.04);flex-wrap:wrap}
+          .dp-ring{position:relative;width:92px;height:92px;flex:none}.dp-ring svg{transform:rotate(-90deg)}
+          .dp-ring .dp-pct{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+          .dp-ring .dp-pct b{font-size:22px;font-weight:700;line-height:1}.dp-ring .dp-pct s{font-size:9.5px;color:var(--dp-muted);text-decoration:none;letter-spacing:.04em;text-transform:uppercase;margin-top:2px}
+          .dp-herobody{flex:1;min-width:240px}.dp-ht{font-size:14px;font-weight:700;margin-bottom:9px}
+          .dp-bar{display:flex;height:11px;border-radius:7px;overflow:hidden;margin-bottom:10px;background:#eef0f3}.dp-bar i{display:block;height:100%}
+          .dp-legend{display:flex;gap:16px;font-size:12px;color:var(--dp-muted);flex-wrap:wrap}.dp-legend span{display:inline-flex;align-items:center;gap:6px}
+          .dp-dot{width:9px;height:9px;border-radius:50%;flex:none}
+          .dp-herostat{flex:none;text-align:right;padding-left:22px;border-left:1px solid var(--dp-line)}
+          .dp-herostat b{font-size:21px;font-weight:700}.dp-herostat s{display:block;font-size:11px;color:var(--dp-muted);text-decoration:none;margin-top:2px}
+          .dp-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+          .dp-seg{display:flex;background:#fff;border:1px solid var(--dp-line);border-radius:10px;overflow:hidden}
+          .dp-seg button{border:none;background:#fff;padding:8px 15px;font-size:12.5px;font-weight:600;color:var(--dp-muted);cursor:pointer}
+          .dp-seg button.dp-on{background:var(--dp-blue);color:#fff}
+          .dp-sec{margin-bottom:16px}
+          .dp-sechead{display:flex;align-items:center;gap:9px;margin:0 2px 10px;font-size:13px;font-weight:700;cursor:pointer}
+          .dp-elbadge{width:10px;height:10px;border-radius:3px;flex:none}
+          .dp-sechead .dp-cnt{color:var(--dp-muted);font-weight:600;font-size:12px}
+          .dp-sechead .dp-mini{margin-left:auto;font-size:11px;color:var(--dp-muted);display:flex;align-items:center;gap:8px}
+          .dp-chev{width:14px;height:14px;color:var(--dp-muted);transition:transform .15s}
+          .dp-sec.dp-collapsed-sec .dp-chev{transform:rotate(-90deg)}
+          .dp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(192px,1fr));gap:12px}
+          .dp-sec.dp-collapsed-sec .dp-grid{display:none}
+          .dp-card{background:#fff;border:1px solid var(--dp-line);border-radius:14px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.05);cursor:pointer;transition:border-color .15s,box-shadow .15s}
+          .dp-card:hover{border-color:var(--dp-edge);box-shadow:0 4px 14px rgba(30,115,232,.1)}
+          .dp-card.dp-sel{border-color:var(--dp-edge);box-shadow:0 4px 14px rgba(30,115,232,.14)}
+          .dp-droptop{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+          .dp-dpid{font-weight:700;font-size:15px}
+          .dp-stat{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+          .dp-stat.active{color:var(--dp-blue);background:rgba(30,115,232,.1)}
+          .dp-stat.done{color:var(--dp-green);background:rgba(15,110,86,.1)}
+          .dp-stat.todo{color:var(--dp-muted);background:#eef0f3}
+          .dp-stat.behind{color:var(--dp-amber);background:rgba(186,117,23,.13)}
+          .dp-prog{height:7px;border-radius:5px;background:#eef0f3;overflow:hidden;margin-bottom:8px}.dp-prog i{display:block;height:100%;border-radius:5px}
+          .dp-meta{display:flex;justify-content:space-between;font-size:11.5px;color:var(--dp-muted)}
+          .dp-collapsed{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--dp-line);border-radius:13px;padding:11px 15px;margin-bottom:9px;cursor:pointer}
+          .dp-collapsed:hover{border-color:var(--dp-edge)}
+          .dp-exp{grid-column:1/-1;background:#fff;border:1px solid var(--dp-edge);border-radius:16px;padding:18px 20px;box-shadow:inset 0 0 16px var(--dp-in),0 1px 6px rgba(0,0,0,.04);margin-top:4px}
+          .dp-exphead{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+          .dp-exphead .dp-dpid{font-size:16px}
+          .dp-twocol{display:grid;grid-template-columns:1fr 300px;gap:24px}
+          @media(max-width:680px){.dp-twocol{grid-template-columns:1fr}}
+          .dp-steps{display:flex;flex-direction:column}
+          .dp-step{display:flex;align-items:center;gap:11px;padding:6px 0;position:relative;padding-left:20px;margin-left:6px}
+          .dp-step:not(:last-child){border-left:2px solid var(--dp-line)}
+          .dp-sdot{position:absolute;left:-6px;width:12px;height:12px;border-radius:50%;border:2px solid #fff;flex:none}
+          .dp-sdot.done{background:var(--dp-green)}.dp-sdot.cur{background:var(--dp-blue)}.dp-sdot.todo{background:#cfd4da}.dp-sdot.na{background:#e6e8ec}
+          .dp-sname{flex:1;font-size:13px}.dp-sname.na{color:#b7bcc4;text-decoration:line-through}.dp-sname.cur{font-weight:700}
+          .dp-gate{font-size:9px;color:var(--dp-amber);font-weight:700;text-transform:uppercase;margin-left:6px}
+          .dp-sdate{color:var(--dp-muted);font-size:12px;white-space:nowrap}
+          .dp-natoggle{font-size:10px;font-weight:700;color:var(--dp-muted);border:1px solid var(--dp-line);border-radius:6px;padding:1px 7px;cursor:pointer;background:#fff}
+          .dp-natoggle.on{color:var(--dp-blue);border-color:var(--dp-edge);background:var(--dp-in)}
+          .dp-qty{background:#f7f8fa;border:1px solid var(--dp-line);border-radius:13px;padding:15px;align-self:start}
+          .dp-qty h4{margin:0 0 3px;font-size:13px}.dp-qsub{color:var(--dp-muted);font-size:11.5px;margin-bottom:12px}
+          .dp-qrow{display:flex;gap:7px;margin-bottom:9px;align-items:stretch}
+          .dp-qcell{flex:1;display:flex;flex-direction:column;gap:4px}
+          .dp-qcell input{width:100%;height:32px;border:1px solid var(--dp-line);border-radius:8px;padding:0 8px;font-size:13px;text-align:center;font-family:inherit}
+          .dp-unit-tog{display:flex;border:1px solid var(--dp-line);border-radius:6px;overflow:hidden}
+          .dp-unit-tog button{flex:1;border:none;background:#fff;font-size:10px;font-weight:700;color:var(--dp-muted);cursor:pointer;padding:2px 0}
+          .dp-unit-tog button.on{background:var(--dp-blue);color:#fff}
+          .dp-qx{display:flex;align-items:center;color:var(--dp-muted);font-weight:700;padding-top:6px}
+          .dp-qvol{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid var(--dp-edge);border-radius:9px;padding:8px 11px;margin-bottom:10px;box-shadow:inset 0 0 10px var(--dp-in)}
+          .dp-qvol b{font-size:16px;font-weight:700;color:var(--dp-blue)}
+          .dp-qadd{width:100%;background:var(--dp-blue);border:none;color:#fff;border-radius:9px;padding:9px;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+          .dp-qrun{font-size:11.5px;color:var(--dp-muted);text-align:center;margin-top:9px}
+          .dp-qerr{color:var(--dp-amber);font-size:11.5px;text-align:center;margin-top:6px;min-height:14px}
+          .dp-pipe{display:flex;gap:11px;overflow-x:auto;padding-bottom:8px}
+          .dp-pcol{flex:1;min-width:140px;background:#fff;border:1px solid var(--dp-line);border-radius:12px;padding:11px}
+          .dp-pchead{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;margin-bottom:10px;gap:8px}
+          .dp-pchead .dp-pn{background:#eef0f3;color:var(--dp-muted);border-radius:999px;font-size:11px;padding:1px 8px;font-weight:700;flex:none}
+          .dp-chip{display:flex;align-items:center;gap:7px;background:#fafbfc;border:1px solid var(--dp-line);border-radius:9px;padding:7px 9px;margin-bottom:6px;font-size:12.5px;font-weight:600;cursor:pointer}
+          .dp-chip:hover{border-color:var(--dp-edge)}
+          .dp-chip.dp-sel{border-color:var(--dp-edge);background:var(--dp-in)}
+          .dp-chip .dp-cdot{width:8px;height:8px;border-radius:50%;flex:none}
+          .dp-chip .dp-el{margin-left:auto;font-size:10px;color:var(--dp-muted);font-weight:700}
+          .dp-more{font-size:11px;color:var(--dp-muted);text-align:center;padding:3px}
+          .dp-stage-exp{margin-top:14px}
+          .dp-empty{padding:28px;text-align:center;color:var(--dp-muted)}
+          .dp-hide{display:none!important}
+        </style>
+        <div class="dp-wrap">
+          <div class="dp-head">
+            <div><h1 class="dp-h1">Drop Plan</h1><div class="dp-sub" id="dp-sub">Loading…</div></div>
           </div>
+          <div class="dp-hero" id="dp-hero"><div class="dp-empty" style="margin:0">Loading drop plan…</div></div>
+          <div class="dp-toolbar">
+            <div class="dp-seg"><button id="dp-view-elev" class="dp-on">By Elevation</button><button id="dp-view-stage">By Stage</button></div>
+          </div>
+          <div id="dp-elev"></div>
+          <div id="dp-stage" class="dp-hide"></div>
+          <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:18px;" id="dp-build-stamp">build #224 · 2026-06-04 · Drop Plan — By Elevation + By Stage · progress hero · behind-target · lean quantity entry</div>
         </div>
       </section>
 
@@ -1435,7 +1440,7 @@
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <label for="dr-select" style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Drop</label>
             <select id="dr-select" style="padding:8px 10px;border:1px solid #E8E4DD;border-radius:8px;font-family:inherit;font-size:14px;min-width:220px;background:#fff;"><option>Loading…</option></select>
-            <a class="dr-edit" href="/dropplan" title="Open the Drop Plan board to activate / log stages &amp; patches">Edit / log →</a>
+            <!-- #224 — "Edit / log →" jump removed: Drop Plan is now its own nav item (nested under Drop Report); no surprise-jump. -->
           </div>
         </div>
         <div id="dr-report"><div class="ph-loading">Pick a drop to view its report.</div></div>
@@ -5850,6 +5855,267 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   document.querySelectorAll('.nav-link[data-view="drop-report"]').forEach(function(l){
     l.addEventListener('click', function(){ if(!loaded){ loaded=true; loadDrops(); } });
   });
+})();
+</script>
+
+<script>
+/* #224 — Drop Plan board (By Elevation + By Stage toggle). Reuses /api/dropplan/* — no
+   new data model. Expand-in-place (NO navigation/URL change, the #205 lesson). COLOR RULE:
+   green/amber/red/blue mean drop STATUS only; elevation accents are non-semantic. LOCAL
+   dates (MM/DD/YYYY display). */
+(function(){
+  var pc=(location.pathname.match(/\/projects\/([^\/]+)/)||[])[1];
+  var PROJECT_CODE = pc ? decodeURIComponent(pc) : 'FR-BX-001';
+  var STC={green:'#0F6E56',active:'#1E73E8',behind:'#BA7517',todo:'#cfd4da'};
+  var ELORDER=['North','West','South','East'];
+  var ELCOLOR={North:'#1E73E8',West:'#0E8C8C',South:'#7c3aed',East:'#4f56c4'};
+  var ELTAG={North:'N',West:'W',South:'S',East:'E'};
+  var ICPLUS='<svg class="dp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+  var ICCHEVD='<svg class="dp-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+  var DP={drops:[],sov:[],patchSov:null,template:null,view:'elevation',expanded:null,detail:{},collapsed:{},units:{length:'in',width:'in',depth:'in'},wired:false};
+
+  function $(id){return document.getElementById(id);}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
+  function jget(u){return fetch(u,{credentials:'include'}).then(function(r){return r.json();});}
+  function ceilTenth(v){if(v==null||isNaN(v))return null;return Math.ceil(Math.round(v*10*1e6)/1e6)/10;}
+  function mdy(iso){if(!iso)return '—';var m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?(m[2]+'/'+m[3]+'/'+m[1]):iso;}
+  function todayLocal(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+
+  function dropStatus(d){
+    var pct=(d.progress&&d.progress.pct)||0;
+    if(pct>=100)return 'complete';
+    var lc=d.lifecycle||'';
+    if(!(pct>0||(lc&&lc!=='not_started')))return 'not_started';
+    if(d.working_days&&d.working_days.status==='behind')return 'behind';
+    return 'active';
+  }
+  function statMeta(s){
+    return s==='complete'?{cls:'done',label:'Complete',color:STC.green}
+      :s==='behind'?{cls:'behind',label:'Behind',color:STC.behind}
+      :s==='not_started'?{cls:'todo',label:'Not started',color:STC.todo}
+      :{cls:'active',label:'Active',color:STC.active};
+  }
+
+  async function loadDropPlan(){
+    dpWire();
+    try{
+      var dj=await jget('/api/dropplan/projects/'+encodeURIComponent(PROJECT_CODE)+'/drops');
+      DP.drops=(dj&&dj.data)||[];
+      if(!DP.sov.length){
+        var sj=await jget('/api/dropplan/projects/'+encodeURIComponent(PROJECT_CODE)+'/sov-lines');
+        DP.sov=(sj&&sj.data)||[];
+        DP.patchSov=DP.sov.filter(function(s){return s.unit==='CF';})[0]||DP.sov[0]||null;
+      }
+      renderHero(); renderView();
+    }catch(e){ console.warn('[dropplan] load failed',e); var h=$('dp-elev'); if(h)h.innerHTML='<div class="dp-empty">Could not load the drop plan.</div>'; }
+  }
+
+  function aggregate(){
+    var a={complete:0,active:0,not_started:0,behind:0,total:DP.drops.length,cf:0,cs:0,ap:0};
+    DP.drops.forEach(function(d){
+      var s=dropStatus(d);
+      if(s==='complete')a.complete++;
+      else if(s==='not_started')a.not_started++;
+      else { a.active++; if(s==='behind')a.behind++; }
+      a.cf+=(d.volume_to_date||0);
+      a.cs+=(d.progress&&d.progress.complete_steps)||0;
+      a.ap+=(d.progress&&d.progress.applicable_steps)||0;
+    });
+    a.pct=a.ap?Math.round(a.cs/a.ap*100):0;
+    return a;
+  }
+
+  function renderHero(){
+    var a=aggregate(),el=$('dp-hero'); if(!el)return;
+    var C=263.9,off=C*(1-a.pct/100),seg=function(n){return a.total?(100*n/a.total):0;};
+    el.innerHTML=
+      '<div class="dp-ring"><svg width="92" height="92"><circle cx="46" cy="46" r="42" fill="none" stroke="#eef0f3" stroke-width="9"></circle>'
+      +'<circle cx="46" cy="46" r="42" fill="none" stroke="'+STC.active+'" stroke-width="9" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+off.toFixed(1)+'"></circle></svg>'
+      +'<div class="dp-pct"><b>'+a.pct+'%</b><s>complete</s></div></div>'
+      +'<div class="dp-herobody"><div class="dp-ht">Restoration progress · all drops</div>'
+      +'<div class="dp-bar"><i style="width:'+seg(a.complete)+'%;background:'+STC.green+'"></i><i style="width:'+seg(a.active)+'%;background:'+STC.active+'"></i><i style="width:'+seg(a.not_started)+'%;background:'+STC.todo+'"></i></div>'
+      +'<div class="dp-legend"><span><span class="dp-dot" style="background:'+STC.green+'"></span>'+a.complete+' complete</span>'
+      +'<span><span class="dp-dot" style="background:'+STC.active+'"></span>'+a.active+' active</span>'
+      +'<span><span class="dp-dot" style="background:'+STC.todo+'"></span>'+a.not_started+' not started</span>'
+      +'<span><span class="dp-dot" style="background:'+STC.behind+'"></span>'+a.behind+' behind target</span></div></div>'
+      +'<div class="dp-herostat"><b>'+(ceilTenth(a.cf)||0).toFixed(1)+'</b><s>patch CF to date</s></div>';
+    var sub=$('dp-sub'); if(sub)sub.textContent=PROJECT_CODE+' · '+a.total+' drops · '+ELORDER.filter(function(e){return DP.drops.some(function(d){return d.elevation===e;});}).length+' elevations';
+  }
+
+  function renderView(){
+    var ec=$('dp-elev'),sc=$('dp-stage'); if(!ec||!sc)return;
+    var byElev=DP.view==='elevation';
+    ec.classList.toggle('dp-hide',!byElev);
+    sc.classList.toggle('dp-hide',byElev);
+    if(byElev)renderByElevation(); else renderByStage();
+  }
+
+  function cardHtml(d){
+    var s=dropStatus(d),m=statMeta(s),pct=(d.progress&&d.progress.pct)||0,cs=d.current_stage;
+    var stageLabel=s==='complete'?'Complete':(cs?esc(cs.name):'—');
+    var cf=(d.volume_to_date_display!=null?d.volume_to_date_display:0);
+    var barColor=s==='complete'?STC.green:(s==='behind'?STC.behind:(s==='not_started'?'transparent':STC.active));
+    var barW=s==='not_started'?0:(s==='complete'?100:Math.max(pct,3));
+    var card='<div class="dp-card'+(d.drop_id===DP.expanded?' dp-sel':'')+'" data-drop="'+esc(d.drop_id)+'">'
+      +'<div class="dp-droptop"><span class="dp-dpid">DP-'+esc(d.sequence_no)+'</span><span class="dp-stat '+m.cls+'">'+m.label+'</span></div>'
+      +'<div class="dp-prog"><i style="width:'+barW+'%;background:'+barColor+'"></i></div>'
+      +'<div class="dp-meta"><span>'+stageLabel+'</span><span>'+(cf||0).toFixed(1)+' CF</span></div></div>';
+    if(d.drop_id===DP.expanded)card+=expandHtml(d);
+    return card;
+  }
+
+  function renderByElevation(){
+    var host=$('dp-elev'); if(!host)return;
+    var byEl={}; DP.drops.forEach(function(d){(byEl[d.elevation]||(byEl[d.elevation]=[])).push(d);});
+    var elevs=Object.keys(byEl); elevs.sort(function(a,b){var ia=ELORDER.indexOf(a),ib=ELORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib);});
+    host.innerHTML=elevs.map(function(e){
+      var ds=byEl[e].slice().sort(function(a,b){return (a.sequence_no||0)-(b.sequence_no||0);});
+      var collapsed=!!DP.collapsed[e];
+      var done=ds.filter(function(d){return dropStatus(d)==='complete';}).length;
+      var act=ds.filter(function(d){var s=dropStatus(d);return s==='active'||s==='behind';}).length;
+      return '<div class="dp-sec'+(collapsed?' dp-collapsed-sec':'')+'" data-elev="'+esc(e)+'">'
+        +'<div class="dp-sechead" data-elevtoggle="'+esc(e)+'"><span class="dp-elbadge" style="background:'+(ELCOLOR[e]||'#888')+'"></span>'+esc(e)+' <span class="dp-cnt">'+ds.length+' drops</span>'
+        +'<span class="dp-mini">'+act+' active · '+done+' complete '+ICCHEVD+'</span></div>'
+        +'<div class="dp-grid">'+ds.map(cardHtml).join('')+'</div></div>';
+    }).join('')||'<div class="dp-empty">No drops in this project.</div>';
+  }
+
+  function renderByStage(){
+    var host=$('dp-stage'); if(!host)return;
+    if(!DP.template){
+      host.innerHTML='<div class="dp-empty">Loading stages…</div>';
+      var first=DP.drops[0];
+      if(!first){host.innerHTML='<div class="dp-empty">No drops.</div>';return;}
+      jget('/api/dropplan/drops/'+encodeURIComponent(first.drop_id)).then(function(j){
+        DP.template=(((j&&j.data&&j.data.stages)||[]).map(function(s){return {step_no:s.step_no,name:s.name};}));
+        renderByStage();
+      });
+      return;
+    }
+    var cols=[{key:'not_started',name:'Not started'}].concat(DP.template.map(function(s){return {key:'step-'+s.step_no,name:s.name};})).concat([{key:'complete',name:'Complete'}]);
+    var bucket={}; cols.forEach(function(c){bucket[c.key]=[];});
+    DP.drops.forEach(function(d){
+      var s=dropStatus(d);
+      var key=s==='complete'?'complete':(s==='not_started'?'not_started':(d.current_stage?('step-'+d.current_stage.step_no):'not_started'));
+      (bucket[key]||(bucket[key]=[])).push(d);
+    });
+    var pipe=cols.map(function(c){
+      var ds=bucket[c.key]||[];
+      var chips=ds.slice(0,8).map(function(d){
+        var m=statMeta(dropStatus(d));
+        return '<div class="dp-chip'+(d.drop_id===DP.expanded?' dp-sel':'')+'" data-drop="'+esc(d.drop_id)+'"><span class="dp-cdot" style="background:'+m.color+'"></span>DP-'+esc(d.sequence_no)+'<span class="dp-el">'+(ELTAG[d.elevation]||'')+'</span></div>';
+      }).join('');
+      var more=ds.length>8?('<div class="dp-more">+'+(ds.length-8)+' more</div>'):'';
+      return '<div class="dp-pcol"><div class="dp-pchead"><span>'+esc(c.name)+'</span><span class="dp-pn">'+ds.length+'</span></div>'+(chips||'<div class="dp-more">—</div>')+more+'</div>';
+    }).join('');
+    var exp='';
+    if(DP.expanded){var d=DP.drops.filter(function(x){return x.drop_id===DP.expanded;})[0]; if(d)exp='<div class="dp-stage-exp">'+expandHtml(d)+'</div>';}
+    host.innerHTML='<div class="dp-pipe">'+pipe+'</div>'+exp;
+  }
+
+  function expandHtml(d){
+    var det=DP.detail[d.drop_id];
+    if(!det)return '<div class="dp-exp"><div class="dp-empty" style="padding:14px">Loading drop…</div></div>';
+    var s=dropStatus(d),m=statMeta(s),wd=d.working_days||{};
+    var tnote=(wd.planned_total_days?('Target '+wd.planned_total_days+' days'):'')+(wd.actual_to_date_days?(' · '+wd.actual_to_date_days+'d actual'):'');
+    var steps=((det.detail.stages)||[]).map(function(st){
+      var cls=st.status==='complete'?'done':st.status==='in_progress'?'cur':st.status==='n_a'?'na':'todo';
+      var ncls=st.status==='n_a'?'na':st.status==='in_progress'?'cur':'';
+      var date=st.status==='in_progress'?'in progress':(st.completed_on?mdy(st.completed_on):(st.started_on?mdy(st.started_on):'—'));
+      var gate=st.is_cure_gate?'<span class="dp-gate">cure gate</span>':(st.is_signoff_gate?'<span class="dp-gate">sign-off</span>':'');
+      return '<div class="dp-step"><span class="dp-sdot '+cls+'"></span><span class="dp-sname '+ncls+'">'+esc(st.name)+gate+'</span>'
+        +'<span class="dp-sdate">'+esc(date)+'</span>'
+        +'<button class="dp-natoggle'+(st.status==='n_a'?' on':'')+'" data-na="'+st.step_no+'" data-drop="'+esc(d.drop_id)+'">N/A</button></div>';
+    }).join('');
+    var patches=(det.patches||[]),sum=0; patches.forEach(function(p){sum+=(p.volume_cf||0);});
+    var u=DP.units;
+    var qcell=function(k,ph){return '<div class="dp-qcell"><input data-dim="'+k+'" type="number" step="0.01" min="0" inputmode="decimal" placeholder="'+ph+'">'
+      +'<span class="dp-unit-tog" data-unitfor="'+k+'"><button data-u="in" class="'+(u[k]==='in'?'on':'')+'">in</button><button data-u="ft" class="'+(u[k]==='ft'?'on':'')+'">ft</button></span></div>';};
+    var qty='<div class="dp-qty"><h4>Add a patch</h4><div class="dp-qsub">L × W × depth → volume, auto-rounded</div>'
+      +'<div class="dp-qrow">'+qcell('length','L')+'<span class="dp-qx">×</span>'+qcell('width','W')+'<span class="dp-qx">×</span>'+qcell('depth','D')+'</div>'
+      +'<div class="dp-qvol"><span style="color:var(--dp-muted);font-size:12px">Volume</span><b id="dp-livevol">0.0 CF</b></div>'
+      +'<button class="dp-qadd" data-addpatch="'+esc(d.drop_id)+'">'+ICPLUS+'Add patch</button>'
+      +'<div class="dp-qerr" id="dp-qerr"></div>'
+      +'<div class="dp-qrun">Drop total · <b>'+(ceilTenth(sum)||0).toFixed(1)+' CF</b> · '+patches.length+' patch'+(patches.length===1?'':'es')+'</div></div>';
+    return '<div class="dp-exp">'
+      +'<div class="dp-exphead"><span class="dp-dpid">DP-'+esc(d.sequence_no)+' · '+esc(d.elevation||'')+'</span><span class="dp-stat '+m.cls+'">'+m.label+'</span>'+(tnote?'<span style="color:var(--dp-muted);font-size:12px;margin-left:auto">'+esc(tnote)+'</span>':'')+'</div>'
+      +'<div class="dp-twocol"><div class="dp-steps">'+steps+'</div>'+qty+'</div></div>';
+  }
+
+  async function toggleExpand(dropId){
+    if(DP.expanded===dropId){DP.expanded=null;renderView();return;}
+    DP.expanded=dropId;
+    if(!DP.detail[dropId]){
+      renderView();
+      try{
+        var dj=await jget('/api/dropplan/drops/'+encodeURIComponent(dropId));
+        var pj=await jget('/api/dropplan/drops/'+encodeURIComponent(dropId)+'/quantity-entries');
+        DP.detail[dropId]={detail:(dj&&dj.data)||{},patches:((pj&&pj.data)||[]).filter(function(e){return e.volume_cf!=null;})};
+      }catch(e){DP.detail[dropId]={detail:{},patches:[]};}
+    }
+    renderView();
+    setTimeout(function(){var ex=document.querySelector('.dp-exp');if(ex)ex.scrollIntoView({behavior:'smooth',block:'nearest'});},40);
+  }
+
+  function refreshDetail(dropId){
+    return Promise.all([jget('/api/dropplan/drops/'+encodeURIComponent(dropId)),jget('/api/dropplan/drops/'+encodeURIComponent(dropId)+'/quantity-entries')])
+      .then(function(r){
+        DP.detail[dropId]={detail:(r[0]&&r[0].data)||{},patches:((r[1]&&r[1].data)||[]).filter(function(e){return e.volume_cf!=null;})};
+        return jget('/api/dropplan/projects/'+encodeURIComponent(PROJECT_CODE)+'/drops').then(function(dj){DP.drops=(dj&&dj.data)||DP.drops;renderHero();renderView();});
+      });
+  }
+
+  function liveVol(){
+    var g=function(k){var el=document.querySelector('.dp-exp [data-dim="'+k+'"]');return el&&el.value!==''?parseFloat(el.value):null;};
+    var f=function(v,un){return v==null?null:(un==='in'?v/12:v);};
+    var l=f(g('length'),DP.units.length),w=f(g('width'),DP.units.width),d=f(g('depth'),DP.units.depth);
+    var lv=$('dp-livevol'); if(!lv)return;
+    lv.textContent=(l!=null&&w!=null&&d!=null)?(ceilTenth(l*w*d).toFixed(1)+' CF'):'0.0 CF';
+  }
+  async function addPatch(dropId){
+    var err=$('dp-qerr'); if(err)err.textContent='';
+    var g=function(k){var el=document.querySelector('.dp-exp [data-dim="'+k+'"]');return el&&el.value!==''?parseFloat(el.value):null;};
+    var l=g('length'),w=g('width'),d=g('depth');
+    if(l==null||w==null||d==null||l<=0||w<=0||d<=0){if(err)err.textContent='Enter length, width, and depth.';return;}
+    if(!DP.patchSov){if(err)err.textContent='No patch SOV line for this project.';return;}
+    var body={sov_line_item:DP.patchSov.sov_id,length:l,width:w,depth:d,length_unit:DP.units.length,width_unit:DP.units.width,depth_unit:DP.units.depth,logged_on:todayLocal()};
+    try{
+      var r=await fetch('/api/dropplan/drops/'+encodeURIComponent(dropId)+'/quantity-entries',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      if(!r.ok){var j=await r.json().catch(function(){return {};});if(err)err.textContent=(j&&j.error)||'Add failed';return;}
+      await refreshDetail(dropId);
+    }catch(e){if(err)err.textContent='Network error';}
+  }
+  async function toggleNA(dropId,stepNo){
+    var det=DP.detail[dropId]; if(!det)return;
+    var st=((det.detail.stages)||[]).filter(function(s){return String(s.step_no)===String(stepNo);})[0]; if(!st)return;
+    var ns=st.status==='n_a'?'not_started':'n_a';
+    try{await fetch('/api/dropplan/drops/'+encodeURIComponent(dropId)+'/stages/'+stepNo,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:ns})});await refreshDetail(dropId);}catch(e){}
+  }
+
+  function dpWire(){
+    if(DP.wired)return; DP.wired=true;
+    var ve=$('dp-view-elev'),vs=$('dp-view-stage');
+    if(ve&&vs){
+      ve.addEventListener('click',function(){DP.view='elevation';ve.classList.add('dp-on');vs.classList.remove('dp-on');renderView();});
+      vs.addEventListener('click',function(){DP.view='stage';vs.classList.add('dp-on');ve.classList.remove('dp-on');renderView();});
+    }
+    var wrap=document.querySelector('.view[data-view="drop-plans"]'); if(!wrap)return;
+    wrap.addEventListener('click',function(e){
+      var na=e.target.closest('[data-na]'); if(na){toggleNA(na.getAttribute('data-drop'),na.getAttribute('data-na'));return;}
+      var add=e.target.closest('[data-addpatch]'); if(add){addPatch(add.getAttribute('data-addpatch'));return;}
+      var ub=e.target.closest('[data-unitfor] button[data-u]'); if(ub){var tog=ub.parentNode,k=tog.getAttribute('data-unitfor');DP.units[k]=ub.getAttribute('data-u');Array.prototype.forEach.call(tog.querySelectorAll('button'),function(b){b.classList.remove('on');});ub.classList.add('on');liveVol();return;}
+      var et=e.target.closest('[data-elevtoggle]'); if(et){var el=et.getAttribute('data-elevtoggle');DP.collapsed[el]=!DP.collapsed[el];renderByElevation();return;}
+      if(e.target.closest('.dp-exp'))return;
+      var chip=e.target.closest('.dp-chip[data-drop]'); if(chip){toggleExpand(chip.getAttribute('data-drop'));return;}
+      var card=e.target.closest('.dp-card[data-drop]'); if(card){toggleExpand(card.getAttribute('data-drop'));return;}
+    });
+    wrap.addEventListener('input',function(e){if(e.target.closest('.dp-exp')&&e.target.getAttribute('data-dim'))liveVol();});
+  }
+
+  document.querySelectorAll('.nav-link[data-view="drop-plans"]').forEach(function(l){
+    l.addEventListener('click',function(){loadDropPlan();});
+  });
+  if(document.querySelector('section[data-view="drop-plans"].active'))loadDropPlan();
 })();
 </script>
 

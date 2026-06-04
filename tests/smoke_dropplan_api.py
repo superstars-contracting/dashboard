@@ -200,6 +200,18 @@ def main() -> int:
         check("volume_total = 6.6667 (full precision)", abs(qt2["volume_total"] - 6.6667) < 0.001, f"{qt2['volume_total']}")
         check("volume_total_display = ceil-to-tenth = 6.7", qt2["volume_total_display"] == 6.7, f"{qt2['volume_total_display']}")
 
+        # ---- #224: volume_to_date surfaces on the DROPS-LIST row (powers the By-Elevation
+        #      cards + progress hero without one detail call per drop) ----
+        lst_drops = admin.get(f"{BASE}/api/dropplan/projects/{PROJECT}/drops", timeout=10).json()["data"]
+        smk_row = next((d for d in lst_drops if d["drop_id"] == SMK_DROP), None)
+        check("#224 drops-list row carries volume_to_date + display",
+              bool(smk_row) and "volume_to_date" in smk_row and "volume_to_date_display" in smk_row, f"row={bool(smk_row)}")
+        check("#224 volume_to_date == summed patch volume (6.6667 full / 6.7 display)",
+              bool(smk_row) and abs(smk_row["volume_to_date"] - 6.6667) < 0.001 and smk_row["volume_to_date_display"] == 6.7,
+              f"{smk_row.get('volume_to_date') if smk_row else None}/{smk_row.get('volume_to_date_display') if smk_row else None}")
+        check("#224 drops-list rows carry working_days (the By-Stage 'behind' source)",
+              bool(smk_row) and isinstance(smk_row.get("working_days"), dict) and "status" in smk_row["working_days"])
+
         # ---- edge cases: API rejects bad dimensions (does not crash) ----
         def bad(json_body, label):
             r = admin.post(f"{BASE}/api/dropplan/drops/{SMK_DROP}/quantity-entries", json=json_body, timeout=10)

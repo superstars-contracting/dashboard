@@ -198,6 +198,13 @@ def drop_summary(conn: sqlite3.Connection, drop_id: str, include_cost: bool) -> 
     out["progress"] = drop_progress(conn, drop_id)
     out["current_stage"] = current_stage(conn, drop_id)
     out["working_days"] = drop_working_days(conn, drop_id)
+    # #224 — patch volume to date so the By-Elevation cards + progress hero can show
+    # CF without one detail call per drop. No schema change: summed straight from the
+    # quantity_entries ledger (the single source of truth). full precision + ceil-tenth.
+    vt = conn.execute(
+        "SELECT SUM(volume_cf) FROM quantity_entries WHERE drop_id=?", (drop_id,)).fetchone()[0]
+    out["volume_to_date"] = round(vt, 6) if vt is not None else 0.0
+    out["volume_to_date_display"] = ceil_tenth(vt) if vt is not None else 0.0
     return out
 
 
