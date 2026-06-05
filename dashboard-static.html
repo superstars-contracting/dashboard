@@ -1232,7 +1232,14 @@
         <style>
           /* #229 Project Documents — Lumen+Oat compliance checklist + readiness hero + upload modal/bulk.
              All classes pd- prefixed (no collision with the shared dashboard CSS). */
-          .pd-wrap{--pd-ink:#222633;--pd-muted:#8c92a0;--pd-line:#eceef3;--pd-accent:#4364dc;--pd-accent-ink:#3a5fd0;--pd-accent-soft:#ebf0fe;--pd-accent-edge:rgba(67,100,220,.30);--on-ink:#178a6c;--on-soft:#e7f6f0;--miss-ink:#8f8675;--miss-soft:#f3f0e9;--miss:#cabfad;--warn-ink:#d75a4c;--warn-soft:#fceeec;color:var(--pd-ink);font:14px/1.55 -apple-system,"Segoe UI",Inter,Roboto,sans-serif}
+          /* pd- custom props defined on BOTH the page wrap AND the modal overlay.
+             The .pd-overlay modal is a DOM sibling of .pd-wrap (not a child), so
+             without this it can't see --pd-accent et al. — var() fails, the primary
+             button's background falls back to transparent and its white text lands on
+             the white modal = an invisible "empty white box". (#230) color/font stay
+             on .pd-wrap only so the overlay's own text rendering is unchanged. */
+          .pd-wrap,.pd-overlay{--pd-ink:#222633;--pd-muted:#8c92a0;--pd-line:#eceef3;--pd-accent:#4364dc;--pd-accent-ink:#3a5fd0;--pd-accent-soft:#ebf0fe;--pd-accent-edge:rgba(67,100,220,.30);--on-ink:#178a6c;--on-soft:#e7f6f0;--miss-ink:#8f8675;--miss-soft:#f3f0e9;--miss:#cabfad;--warn-ink:#d75a4c;--warn-soft:#fceeec}
+          .pd-wrap{color:var(--pd-ink);font:14px/1.55 -apple-system,"Segoe UI",Inter,Roboto,sans-serif}
           .pd-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;flex-wrap:wrap}
           .pd-h1{margin:0;font-size:21px;font-weight:700}.pd-sub{color:var(--pd-muted);font-size:12.5px;margin-top:3px}
           .pd-ic{width:15px;height:15px;flex:none}
@@ -1304,7 +1311,7 @@
           </div>
           <div class="pd-hero" id="pd-hero"><div class="pd-empty" style="margin:0">Loading documents…</div></div>
           <div id="pd-checklist"></div>
-          <div id="pd-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #229 · 2026-06-05 · Project Documents — compliance checklist · readiness hero · upload (single + bulk)</div>
+          <div id="pd-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #230 · 2026-06-05 · Project Documents — upload modal primary button renders blue + labeled (Single + Bulk)</div>
         </div>
         <div class="pd-overlay" id="pd-modal">
           <div class="pd-modal">
@@ -1328,8 +1335,8 @@
             </div>
             <div id="pd-bulk" class="pd-hide"><div id="pd-bulk-rows"></div></div>
             <div class="pd-err" id="pd-modal-err"></div>
-            <div class="pd-mbtns" id="pd-single-btns"><button class="pd-cancel" id="pd-cancel" type="button">Cancel</button><button class="pd-save" id="pd-save-single" type="button">Save</button></div>
-            <div class="pd-bfoot pd-hide" id="pd-bulk-foot"><span class="pd-bcount" id="pd-bulk-count">0 files</span><button class="pd-save" id="pd-save-bulk" type="button">Upload all (0)</button></div>
+            <div class="pd-mbtns" id="pd-single-btns"><button class="pd-cancel" id="pd-cancel" type="button">Cancel</button><button class="pd-save" id="pd-save-single" type="button" disabled><svg class="pd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg>Save document</button></div>
+            <div class="pd-bfoot pd-hide" id="pd-bulk-foot"><span class="pd-bcount" id="pd-bulk-count">0 files</span><button class="pd-save" id="pd-save-bulk" type="button" disabled><svg class="pd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg><span id="pd-bulk-label">Upload all (0)</span></button></div>
           </div>
         </div>
         <div class="section" style="margin-top:26px;border-top:1px solid #eceef3;padding-top:20px;">
@@ -6463,6 +6470,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     $('pd-bulk').classList.toggle('pd-hide',m!=='bulk');
     $('pd-single-btns').classList.toggle('pd-hide',m!=='single');
     $('pd-bulk-foot').classList.toggle('pd-hide',m!=='bulk');
+    $('pd-save-single').disabled=!PD.files.length;  // visible blue + labeled, enabled once a file is attached
     if(m==='bulk')renderBulk();
   }
   function setFiles(fileList){
@@ -6481,7 +6489,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
         +'<button class="pd-bx" data-brm="'+i+'" type="button">&times;</button></div>';
     }).join('');
     $('pd-bulk-count').textContent=PD.files.length+(PD.files.length===1?' file':' files');
-    $('pd-save-bulk').textContent='Upload all ('+PD.files.length+')';
+    $('pd-bulk-label').textContent='Upload all ('+PD.files.length+')';
     $('pd-save-bulk').disabled=!PD.files.length;
     if(window.SSCDatePicker)host.querySelectorAll('.pd-bexp').forEach(function(el){try{SSCDatePicker.wire(el);}catch(e){}});
   }
