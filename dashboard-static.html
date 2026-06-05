@@ -1103,7 +1103,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #226 · 2026-06-05 · Drop Plan — compact expanded drop (small date chips · tight rows · width cap · slim activate) · drop data reset</div>
+          <div class="ph-build" id="ph-build-stamp">build #227 · 2026-06-05 · Drop Plan — By-Stage columns scroll internally when overflowing (all chips render, no +N truncation)</div>
         </div>
       </section>
 
@@ -1424,7 +1424,7 @@
           .dp-qadd{width:100%;background:var(--dp-blue);border:none;color:#fff;border-radius:9px;padding:9px;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
           .dp-qrun{font-size:11.5px;color:var(--dp-muted);text-align:center;margin-top:9px}
           .dp-qerr{color:var(--dp-amber);font-size:11.5px;text-align:center;margin-top:6px;min-height:14px}
-          .dp-pipe{display:flex;gap:11px;overflow-x:auto;padding-bottom:8px}
+          .dp-pipe{display:flex;gap:11px;overflow-x:auto;padding-bottom:8px;align-items:flex-start}
           .dp-pcol{flex:1;min-width:140px;background:#fff;border:1px solid var(--dp-line);border-radius:12px;padding:11px}
           .dp-pchead{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;margin-bottom:10px;gap:8px}
           .dp-pchead .dp-pn{background:#eef0f3;color:var(--dp-muted);border-radius:999px;font-size:11px;padding:1px 8px;font-weight:700;flex:none}
@@ -1434,6 +1434,12 @@
           .dp-chip .dp-cdot{width:8px;height:8px;border-radius:50%;flex:none}
           .dp-chip .dp-el{margin-left:auto;font-size:10px;color:var(--dp-muted);font-weight:700}
           .dp-more{font-size:11px;color:var(--dp-muted);text-align:center;padding:3px}
+          /* #227 — a column's chip list scrolls INTERNALLY when it overflows; auto = scrollbar only when needed.
+             The header (dp-pchead) sits ABOVE this and stays fixed. Horizontal pipe scroll is unchanged. */
+          .dp-pchips{max-height:62vh;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#d7dae1 transparent}
+          .dp-pchips::-webkit-scrollbar{width:7px}
+          .dp-pchips::-webkit-scrollbar-thumb{background:#d7dae1;border-radius:7px}
+          .dp-pchips::-webkit-scrollbar-track{background:transparent}
           .dp-stage-exp{margin-top:14px}
           .dp-empty{padding:28px;text-align:center;color:var(--dp-muted)}
           .dp-hide{display:none!important}
@@ -1448,7 +1454,7 @@
           </div>
           <div id="dp-elev"></div>
           <div id="dp-stage" class="dp-hide"></div>
-          <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:18px;" id="dp-build-stamp">build #226 · 2026-06-05 · Drop Plan — compact expanded drop · small date chips · tight rows · slim activate</div>
+          <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:18px;" id="dp-build-stamp">build #227 · 2026-06-05 · Drop Plan — By-Stage columns scroll internally (all chips render)</div>
         </div>
       </section>
 
@@ -6036,12 +6042,11 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     });
     var pipe=cols.map(function(c){
       var ds=bucket[c.key]||[];
-      var chips=ds.slice(0,8).map(function(d){
+      var chips=ds.map(function(d){   // #227 — render ALL chips; the list scrolls internally
         var m=statMeta(dropStatus(d));
         return '<div class="dp-chip'+(d.drop_id===DP.expanded?' dp-sel':'')+'" data-drop="'+esc(d.drop_id)+'"><span class="dp-cdot" style="background:'+m.dot+'"></span>DP-'+esc(d.sequence_no)+'<span class="dp-el">'+(ELTAG[d.elevation]||'')+'</span></div>';
       }).join('');
-      var more=ds.length>8?('<div class="dp-more">+'+(ds.length-8)+' more</div>'):'';
-      return '<div class="dp-pcol"><div class="dp-pchead"><span>'+esc(c.name)+'</span><span class="dp-pn">'+ds.length+'</span></div>'+(chips||'<div class="dp-more">—</div>')+more+'</div>';
+      return '<div class="dp-pcol"><div class="dp-pchead"><span>'+esc(c.name)+'</span><span class="dp-pn">'+ds.length+'</span></div><div class="dp-pchips">'+(chips||'<div class="dp-more">—</div>')+'</div></div>';
     }).join('');
     var exp='';
     if(DP.expanded){var d=DP.drops.filter(function(x){return x.drop_id===DP.expanded;})[0]; if(d)exp='<div class="dp-stage-exp">'+expandHtml(d)+'</div>';}
