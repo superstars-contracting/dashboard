@@ -687,23 +687,6 @@
     .card-title { font-size: 14px; font-weight: 600; color: #14161C; margin-bottom: 8px; }
     .card-status { font-size: 11px; color: #76777E; }
 
-    /* Document Grid */
-    .doc-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-    .doc-card {
-      background: white;
-      border: 1px solid #E8E4DD;
-      border-radius: 4px;
-      padding: 16px;
-      text-align: center;
-    }
-    .doc-icon { font-size: 32px; margin-bottom: 12px; }
-    .doc-name { font-size: 12px; font-weight: 600; color: #14161C; margin-bottom: 4px; }
-
     /* Category Breakdown */
     .category-list {
       display: grid;
@@ -1103,7 +1086,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #229 · 2026-06-05 · Project Documents — compliance checklist + readiness hero + upload (single modal + bulk tray) + expiry tracking</div>
+          <div class="ph-build" id="ph-build-stamp">build #231 · 2026-06-05 · Project Documents — Blank Forms moved to Templates · #148 placeholder removed</div>
         </div>
       </section>
 
@@ -1311,7 +1294,7 @@
           </div>
           <div class="pd-hero" id="pd-hero"><div class="pd-empty" style="margin:0">Loading documents…</div></div>
           <div id="pd-checklist"></div>
-          <div id="pd-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #230 · 2026-06-05 · Project Documents — upload modal primary button renders blue + labeled (Single + Bulk)</div>
+          <div id="pd-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #231 · 2026-06-05 · Project Documents — Blank Forms moved to Templates · #148 placeholder removed</div>
         </div>
         <div class="pd-overlay" id="pd-modal">
           <div class="pd-modal">
@@ -1340,25 +1323,12 @@
           </div>
         </div>
         <div class="section" style="margin-top:26px;border-top:1px solid #eceef3;padding-top:20px;">
-          <!-- BLANK FORMS subsection — reusable safety / compliance
-               templates (scaffold inspection, future safety plan,
-               orientation, waste-management, rigging C-hook letters).
-               Sourced from the cross-project blank_forms catalog and
-               served from data_room/forms/. -->
-          <div style="margin-bottom:18px;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;">
-              <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin:0;">Blank Forms</h3>
-              <span style="font-size:11px;color:#76777E;">Reusable templates · Print fresh each shift</span>
-            </div>
-            <div id="proj-blank-forms" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));gap:10px;">
-              <div style="padding:14px;text-align:center;color:#76777E;font-style:italic;background:white;border:1px solid #E8E4DD;border-radius:4px;">Loading…</div>
-            </div>
-          </div>
-
-          <!-- SPECIFICATIONS subsection — first real-data section in
-               Project Documents (the others below remain visual
-               placeholders until the rest of #148 lands). The Specs
-               Library on the company console attaches into this list. -->
+          <!-- SPECIFICATIONS subsection — real-data section in Project
+               Documents. The Specs Library on the company console attaches
+               into this list. (#231 — Blank Forms moved to the Templates
+               page; the old #148 "Other Documents" placeholder cards that
+               sat below here removed, superseded by the #229 checklist
+               above.) -->
           <div style="margin-bottom:18px;">
             <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;">
               <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin:0;">Specifications</h3>
@@ -1378,54 +1348,6 @@
                 <tr><td colspan="5" style="padding:14px;text-align:center;color:#76777E;font-style:italic;">Loading…</td></tr>
               </tbody>
             </table>
-          </div>
-          <h3 style="font-size:13px;font-weight:700;color:#76777E;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;">Other Documents (placeholder — #148)</h3>
-          <div class="doc-grid">
-            <div class="doc-card">
-              <div class="doc-icon">📋</div>
-              <div class="doc-name">Drawing Set A1</div>
-              <div style="font-size: 11px; color: #76777E;">Foundations</div>
-            </div>
-            <div class="doc-card">
-              <div class="doc-icon">📋</div>
-              <div class="doc-name">Drawing Set A2</div>
-              <div style="font-size: 11px; color: #76777E;">Elevations</div>
-            </div>
-            <div class="doc-card">
-              <div class="doc-icon">📋</div>
-              <div class="doc-name">Specifications</div>
-              <div style="font-size: 11px; color: #76777E;">Division 7-9</div>
-            </div>
-            <div class="doc-card">
-              <div class="doc-icon">✅</div>
-              <div class="doc-name">CD-5 Approval</div>
-              <div style="font-size: 11px; color: #76777E;">Signed May 1</div>
-            </div>
-            <div class="doc-card">
-              <div class="doc-icon">✅</div>
-              <div class="doc-name">CD-8 Approval</div>
-              <div style="font-size: 11px; color: #76777E;">Signed May 3</div>
-            </div>
-            <div class="doc-card">
-              <div class="doc-icon">📄</div>
-              <div class="doc-name">Safety Plan</div>
-              <div style="font-size: 11px; color: #76777E;">Site-Specific</div>
-            </div>
-            <div class="doc-card">
-              <div class="doc-icon">📄</div>
-              <div class="doc-name">Waste Management</div>
-              <div style="font-size: 11px; color: #76777E;">Plan & Reports</div>
-            </div>
-            <div class="doc-card">
-              <div class="doc-icon">📄</div>
-              <div class="doc-name">Community Board</div>
-              <div style="font-size: 11px; color: #76777E;">Notices</div>
-            </div>
-            <div class="doc-card">
-              <div class="doc-icon">📦</div>
-              <div class="doc-name">Schedule of Values</div>
-              <div style="font-size: 11px; color: #76777E;">Updated May 5</div>
-            </div>
           </div>
         </div>
       </section>
@@ -3966,6 +3888,21 @@
               <div style="padding:14px;text-align:center;color:#76777E;font-style:italic;background:white;border:1px solid #E8E4DD;border-radius:4px;">Loading…</div>
             </div>
           </div>
+          <!-- BLANK FORMS — moved here from Project Documents (#231).
+               Reusable safety / compliance form templates (scaffold
+               inspection, safety plan, orientation, waste-management,
+               rigging C-hook letters). Same cross-project blank_forms
+               catalog (/api/blank-forms), served from data_room/forms/ —
+               relocated to the Templates page; data unchanged. -->
+          <div style="border-top:1px solid #E8E4DD;margin-top:8px;padding-top:18px;">
+            <div style="margin-bottom:10px;">
+              <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 4px;">Blank Forms</h3>
+              <div style="font-size:11px;color:#76777E;">Reusable safety / compliance form templates — print fresh each shift.</div>
+            </div>
+            <div id="proj-blank-forms" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));gap:10px;">
+              <div style="padding:14px;text-align:center;color:#76777E;font-style:italic;background:white;border:1px solid #E8E4DD;border-radius:4px;">Loading…</div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -4026,10 +3963,10 @@ document.querySelectorAll('.nav-link').forEach(link => {
     // Per-view lazy loads
     if (targetView === 'documents') {
       if (typeof window.PROJ_loadAttachedSpecs === 'function') window.PROJ_loadAttachedSpecs();
-      if (typeof window.PROJ_loadBlankForms === 'function') window.PROJ_loadBlankForms();
     }
     if (targetView === 'templates') {
       if (typeof window.PROJ_loadSignageTemplates === 'function') window.PROJ_loadSignageTemplates();
+      if (typeof window.PROJ_loadBlankForms === 'function') window.PROJ_loadBlankForms();  // #231 — Blank Forms moved here from Project Documents
     }
     if (targetView === 'toolbox-talks') {
       if (typeof window.PROJ_loadToolboxTalks === 'function') window.PROJ_loadToolboxTalks();
@@ -4406,7 +4343,8 @@ document.querySelectorAll('.nav-link').forEach(link => {
   window.PROJ_loadProductUsage = function(){ loadProductUsage(); };
 })();
 
-// ---- Project Documents — Blank Forms subsection --------------------
+// ---- Templates page — Blank Forms subsection (#231: moved here from
+// Project Documents) ------------------------------------------------
 // Loads /api/blank-forms; renders each as a click-to-open card. PDFs
 // open in a new tab via the /files/ static route.
 (function() {
