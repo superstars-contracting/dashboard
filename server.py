@@ -7731,6 +7731,48 @@ def api_dropplan_patch_stage(drop_id, step_no):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/dropplan/drops/<drop_id>/activate', methods=['POST'])
+@requires_role(*_DROPPLAN_ROLES)
+def api_dropplan_activate(drop_id):
+    """#225 — Activate a (not-started) drop: lifecycle -> scaffold_active and stage 1
+    (the scaffold / rope set-up) becomes in_progress with the provided start date, so
+    the stepper unlocks for dating. start_date is the LOCAL day the scaffold/rope line
+    went up (YYYY-MM-DD; optional — re-activating without it just updates the status)."""
+    try:
+        body = request.get_json(silent=True) or {}
+        start = (body.get('start_date') or '').strip()
+        if start:
+            try:
+                datetime.strptime(start, '%Y-%m-%d')
+            except ValueError:
+                return jsonify({"error": "start_date must be YYYY-MM-DD"}), 400
+        conn = db()
+        try:
+            d = conn.execute("SELECT drop_id, lifecycle FROM drops WHERE drop_id=?", (drop_id,)).fetchone()
+            if d is None:
+                return jsonify({"error": "drop not found"}), 404
+            conn.execute("UPDATE drops SET lifecycle='scaffold_active', updated_at=CURRENT_TIMESTAMP "
+                         "WHERE drop_id=?", (drop_id,))
+            if start:
+                conn.execute("UPDATE drop_stage_status SET status='in_progress', started_on=? "
+                             "WHERE drop_id=? AND step_no=1", (start, drop_id))
+            else:
+                conn.execute("UPDATE drop_stage_status SET status='in_progress' "
+                             "WHERE drop_id=? AND step_no=1", (drop_id,))
+            _dropplan_audit(conn, 'dropplan_activate', 'drops', drop_id,
+                            before={'lifecycle': d['lifecycle']},
+                            after={'lifecycle': 'scaffold_active', 'stage1_start': start or None},
+                            note='activate drop')
+            conn.commit()
+        finally:
+            conn.close()
+        return response_wrapper({"drop_id": drop_id, "lifecycle": "scaffold_active",
+                                 "stage1_started_on": start or None})
+    except Exception as e:
+        logging.error(f"POST /api/dropplan/drops/{drop_id}/activate: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/dropplan/paint-phases/<int:phase_id>', methods=['PATCH'])
 @requires_role(*_DROPPLAN_ROLES)
 def api_dropplan_patch_paint(phase_id):

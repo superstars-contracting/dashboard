@@ -212,6 +212,42 @@ def main() -> int:
         check("#224 drops-list rows carry working_days (the By-Stage 'behind' source)",
               bool(smk_row) and isinstance(smk_row.get("working_days"), dict) and "status" in smk_row["working_days"])
 
+        # ---- #225: rigorous L×W×D math — no false math; ceil-tenth NEVER rounds down ----
+        import math as _math
+        def _ceil_tenth(v):
+            return _math.ceil(round(v * 10, 6)) / 10
+        MATH = [
+            ((12, 'in'), (8, 'in'), (6, 'in'), (12 / 12) * (8 / 12) * (6 / 12), 0.4),   # 0.33333 -> 0.4
+            ((24, 'in'), (12, 'in'), (3, 'in'), (24 / 12) * (12 / 12) * (3 / 12), 0.5),  # 0.5     -> 0.5
+            ((1, 'ft'), (1, 'ft'), (1, 'ft'), 1.0, 1.0),                                  # 1.0     -> 1.0
+            ((18, 'in'), (1, 'ft'), (6, 'in'), (18 / 12) * 1 * (6 / 12), 0.8),            # 0.75    -> 0.8
+        ]
+        math_ok = True
+        for (L, lu), (W, wu), (D, du), hand, exp_disp in MATH:
+            r = admin.post(f"{BASE}/api/dropplan/drops/{SMK_DROP}/quantity-entries",
+                           json={"sov_line_item": sid, "length": L, "length_unit": lu, "width": W,
+                                 "width_unit": wu, "depth": D, "depth_unit": du}, timeout=10).json()["data"]
+            case_ok = (abs(r["volume_cf"] - hand) < 1e-9 and r["volume_cf_display"] == exp_disp
+                       and r["volume_cf_display"] >= r["volume_cf"] - 1e-9 and _ceil_tenth(hand) == exp_disp)
+            math_ok = math_ok and case_ok
+            if not case_ok:
+                check(f"#225 math {L}{lu}x{W}{wu}x{D}{du}", False,
+                      f"stored={r['volume_cf']} disp={r['volume_cf_display']} hand={hand} exp={exp_disp}")
+        check("#225 L×W×D math: 4 cases stored full-precision + ceil-to-tenth display, ceil never rounds down", math_ok)
+
+        # ---- #225: activate-drop endpoint (lifecycle -> scaffold_active + stage 1 start date) ----
+        av = admin.post(f"{BASE}/api/dropplan/drops/{SMK_DROP}/activate", json={"start_date": "2026-05-20"}, timeout=10)
+        avj = av.json().get("data", {})
+        check("#225 activate -> 200 + scaffold_active + stage1 start",
+              av.status_code == 200 and avj.get("lifecycle") == "scaffold_active" and avj.get("stage1_started_on") == "2026-05-20",
+              f"{av.status_code} {avj}")
+        det_av = admin.get(f"{BASE}/api/dropplan/drops/{SMK_DROP}", timeout=10).json()["data"]
+        st1 = next((s for s in det_av["stages"] if s["step_no"] == 1), {})
+        check("#225 activate set stage 1 in_progress + started_on (LOCAL date, exact)",
+              st1.get("status") == "in_progress" and st1.get("started_on") == "2026-05-20", f"{st1}")
+        check("#225 activate on a missing drop -> 404",
+              admin.post(f"{BASE}/api/dropplan/drops/SMK-NOPE-DROP/activate", json={"start_date": "2026-05-20"}, timeout=10).status_code == 404)
+
         # ---- edge cases: API rejects bad dimensions (does not crash) ----
         def bad(json_body, label):
             r = admin.post(f"{BASE}/api/dropplan/drops/{SMK_DROP}/quantity-entries", json=json_body, timeout=10)

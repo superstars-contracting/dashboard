@@ -1103,7 +1103,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #224 · 2026-06-04 · Drop Plan — By Elevation + By Stage · progress hero · behind-target · lean quantity entry · nested under Drop Report</div>
+          <div class="ph-build" id="ph-build-stamp">build #225 · 2026-06-04 · Drop Plan — Lumen+Oat palette · stage start-dates · activate-drop flow · 35-drop reset</div>
         </div>
       </section>
 
@@ -1329,7 +1329,17 @@
           /* #224 — all classes dp- prefixed (no collision with the shared dashboard CSS).
              COLOR RULE: green/amber/red/blue = drop STATUS only. Elevation accents use a
              NON-SEMANTIC palette (blue/teal/violet/indigo). */
-          .dp-wrap{--dp-blue:#1E73E8;--dp-ink:#1b1d22;--dp-muted:#7a7f88;--dp-line:#ededf0;--dp-edge:rgba(30,115,232,.42);--dp-in:rgba(30,115,232,.14);--dp-green:#0F6E56;--dp-amber:#BA7517;--dp-gray:#cfd4da;--elN:#1E73E8;--elW:#0E8C8C;--elS:#7c3aed;--elE:#4f56c4;color:var(--dp-ink);font:14px/1.5 -apple-system,"Segoe UI",Inter,Roboto,sans-serif}
+          /* #225 Lumen + Oat (locked tokens). Gradients on bars + ring; soft pills; azure
+             glow on Active; oat for not-started. Elevation accents are MUTED/neutral so
+             they never clash with the azure. COLOR = STATUS ONLY. */
+          .dp-wrap{--dp-canvas:#fafbfd;--dp-ink:#222633;--dp-muted:#8c92a0;--dp-line:#eceef3;
+            --dp-blue:#4364dc;--dp-edge:rgba(67,100,220,.38);--dp-in:rgba(67,100,220,.10);--dp-glow:rgba(67,100,220,.22);
+            --done-ink:#178a6c;--done-soft:#e7f6f0;--done-dot:#15a07e;
+            --active-ink:#3a5fd0;--active-soft:#ebf0fe;--active-dot:#4364dc;
+            --behind-ink:#d75a4c;--behind-soft:#fceeec;--behind-dot:#e9685a;
+            --oat-ink:#8f8675;--oat-soft:#f3f0e9;--oat-dot:#cabfad;
+            --elN:#6f93c9;--elW:#5fa6a0;--elS:#9a8fc9;--elE:#7f9bb8;
+            color:var(--dp-ink);font:14px/1.5 -apple-system,"Segoe UI",Inter,Roboto,sans-serif}
           .dp-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap}
           .dp-h1{margin:0;font-size:22px;letter-spacing:-.01em}
           .dp-sub{color:var(--dp-muted);font-size:13px;margin-top:3px}
@@ -1339,7 +1349,9 @@
           .dp-ring .dp-pct{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
           .dp-ring .dp-pct b{font-size:22px;font-weight:700;line-height:1}.dp-ring .dp-pct s{font-size:9.5px;color:var(--dp-muted);text-decoration:none;letter-spacing:.04em;text-transform:uppercase;margin-top:2px}
           .dp-herobody{flex:1;min-width:240px}.dp-ht{font-size:14px;font-weight:700;margin-bottom:9px}
-          .dp-bar{display:flex;height:11px;border-radius:7px;overflow:hidden;margin-bottom:10px;background:#eef0f3}.dp-bar i{display:block;height:100%}
+          .dp-bar{display:flex;height:11px;border-radius:7px;overflow:hidden;margin-bottom:10px;background:var(--oat-soft);box-shadow:inset 0 1px 2px rgba(0,0,0,.05)}.dp-bar i{display:block;height:100%}
+          .dp-dot{box-shadow:0 1px 2px rgba(0,0,0,.16)}
+          .dp-herostat b{color:var(--dp-blue)}
           .dp-legend{display:flex;gap:16px;font-size:12px;color:var(--dp-muted);flex-wrap:wrap}.dp-legend span{display:inline-flex;align-items:center;gap:6px}
           .dp-dot{width:9px;height:9px;border-radius:50%;flex:none}
           .dp-herostat{flex:none;text-align:right;padding-left:22px;border-left:1px solid var(--dp-line)}
@@ -1357,17 +1369,17 @@
           .dp-sec.dp-collapsed-sec .dp-chev{transform:rotate(-90deg)}
           .dp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(192px,1fr));gap:12px}
           .dp-sec.dp-collapsed-sec .dp-grid{display:none}
-          .dp-card{background:#fff;border:1px solid var(--dp-line);border-radius:14px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.05);cursor:pointer;transition:border-color .15s,box-shadow .15s}
-          .dp-card:hover{border-color:var(--dp-edge);box-shadow:0 4px 14px rgba(30,115,232,.1)}
-          .dp-card.dp-sel{border-color:var(--dp-edge);box-shadow:0 4px 14px rgba(30,115,232,.14)}
+          .dp-card{background:#fff;border:1px solid var(--dp-line);border-radius:14px;padding:14px;box-shadow:0 4px 16px rgba(30,35,45,.06);cursor:pointer;transition:border-color .15s,box-shadow .15s}
+          .dp-card:hover{border-color:var(--dp-edge);box-shadow:0 6px 20px var(--dp-glow)}
+          .dp-card.dp-sel,.dp-card.dp-glow{border-color:var(--dp-edge);box-shadow:0 6px 20px var(--dp-glow)}
           .dp-droptop{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
           .dp-dpid{font-weight:700;font-size:15px}
-          .dp-stat{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
-          .dp-stat.active{color:var(--dp-blue);background:rgba(30,115,232,.1)}
-          .dp-stat.done{color:var(--dp-green);background:rgba(15,110,86,.1)}
-          .dp-stat.todo{color:var(--dp-muted);background:#eef0f3}
-          .dp-stat.behind{color:var(--dp-amber);background:rgba(186,117,23,.13)}
-          .dp-prog{height:7px;border-radius:5px;background:#eef0f3;overflow:hidden;margin-bottom:8px}.dp-prog i{display:block;height:100%;border-radius:5px}
+          .dp-stat{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;border:1px solid rgba(0,0,0,.04)}
+          .dp-stat.active{color:var(--active-ink);background:var(--active-soft);box-shadow:0 2px 8px var(--dp-glow)}
+          .dp-stat.done{color:var(--done-ink);background:var(--done-soft)}
+          .dp-stat.todo{color:var(--oat-ink);background:var(--oat-soft)}
+          .dp-stat.behind{color:var(--behind-ink);background:var(--behind-soft)}
+          .dp-prog{height:7px;border-radius:6px;background:var(--oat-soft);overflow:hidden;margin-bottom:8px;box-shadow:inset 0 1px 2px rgba(0,0,0,.05)}.dp-prog i{display:block;height:100%;border-radius:6px}
           .dp-meta{display:flex;justify-content:space-between;font-size:11.5px;color:var(--dp-muted)}
           .dp-collapsed{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--dp-line);border-radius:13px;padding:11px 15px;margin-bottom:9px;cursor:pointer}
           .dp-collapsed:hover{border-color:var(--dp-edge)}
@@ -1380,12 +1392,23 @@
           .dp-step{display:flex;align-items:center;gap:11px;padding:6px 0;position:relative;padding-left:20px;margin-left:6px}
           .dp-step:not(:last-child){border-left:2px solid var(--dp-line)}
           .dp-sdot{position:absolute;left:-6px;width:12px;height:12px;border-radius:50%;border:2px solid #fff;flex:none}
-          .dp-sdot.done{background:var(--dp-green)}.dp-sdot.cur{background:var(--dp-blue)}.dp-sdot.todo{background:#cfd4da}.dp-sdot.na{background:#e6e8ec}
+          .dp-sdot.done{background:var(--done-dot)}.dp-sdot.cur{background:var(--active-dot)}.dp-sdot.todo{background:var(--oat-dot)}.dp-sdot.na{background:#eceef1}
           .dp-sname{flex:1;font-size:13px}.dp-sname.na{color:#b7bcc4;text-decoration:line-through}.dp-sname.cur{font-weight:700}
-          .dp-gate{font-size:9px;color:var(--dp-amber);font-weight:700;text-transform:uppercase;margin-left:6px}
+          .dp-gate{font-size:9px;color:var(--behind-ink);font-weight:700;text-transform:uppercase;margin-left:6px}
           .dp-sdate{color:var(--dp-muted);font-size:12px;white-space:nowrap}
           .dp-natoggle{font-size:10px;font-weight:700;color:var(--dp-muted);border:1px solid var(--dp-line);border-radius:6px;padding:1px 7px;cursor:pointer;background:#fff}
-          .dp-natoggle.on{color:var(--dp-blue);border-color:var(--dp-edge);background:var(--dp-in)}
+          .dp-natoggle.on{color:var(--active-ink);border-color:var(--dp-edge);background:var(--active-soft)}
+          /* #225 — stage start-date chips + activate-drop banner */
+          .dp-sdate{display:inline-flex;align-items:center}
+          .dp-datechip{font-size:11.5px;color:var(--dp-ink);background:#fff;border:1px solid var(--dp-line);border-radius:7px;padding:4px 9px;cursor:pointer;font-family:inherit;height:auto;width:auto;min-width:118px;text-align:left}
+          .dp-datechip::placeholder{color:var(--active-ink);font-weight:600}
+          .dp-datechip.dp-empty{border-color:var(--dp-edge);background:var(--active-soft)}
+          .dp-actbanner{display:flex;align-items:center;gap:14px;background:var(--active-soft);border:1px solid var(--dp-edge);border-radius:12px;padding:14px 16px;margin-bottom:14px;flex-wrap:wrap}
+          .dp-at{font-weight:700;font-size:13.5px}.dp-as{color:var(--dp-muted);font-size:12px}
+          .dp-actdate{height:34px;border:1px solid var(--dp-line);border-radius:8px;padding:0 9px;font-size:12.5px;font-family:inherit;margin-left:auto}
+          .dp-actgo{background:var(--dp-blue);border:none;color:#fff;border-radius:9px;padding:9px 15px;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+          .dp-exphint{color:var(--dp-muted);font-size:12px;margin-bottom:14px}
+          .dp-activate{margin-top:9px;width:100%;border:1px solid var(--dp-edge);background:var(--active-soft);color:var(--active-ink);border-radius:9px;padding:7px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
           .dp-qty{background:#f7f8fa;border:1px solid var(--dp-line);border-radius:13px;padding:15px;align-self:start}
           .dp-qty h4{margin:0 0 3px;font-size:13px}.dp-qsub{color:var(--dp-muted);font-size:11.5px;margin-bottom:12px}
           .dp-qrow{display:flex;gap:7px;margin-bottom:9px;align-items:stretch}
@@ -1424,7 +1447,7 @@
           </div>
           <div id="dp-elev"></div>
           <div id="dp-stage" class="dp-hide"></div>
-          <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:18px;" id="dp-build-stamp">build #224 · 2026-06-04 · Drop Plan — By Elevation + By Stage · progress hero · behind-target · lean quantity entry</div>
+          <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:18px;" id="dp-build-stamp">build #225 · 2026-06-04 · Drop Plan — Lumen+Oat palette · stage start-dates · activate-drop flow</div>
         </div>
       </section>
 
@@ -5866,12 +5889,16 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
 (function(){
   var pc=(location.pathname.match(/\/projects\/([^\/]+)/)||[])[1];
   var PROJECT_CODE = pc ? decodeURIComponent(pc) : 'FR-BX-001';
-  var STC={green:'#0F6E56',active:'#1E73E8',behind:'#BA7517',todo:'#cfd4da'};
+  // #225 Lumen+Oat: gradient fills on bars/ring + solid dots; oat for not-started.
+  var GRAD={complete:'linear-gradient(90deg,#34c29a,#15a07e)',active:'linear-gradient(90deg,#6a8df5,#4364dc)',behind:'linear-gradient(90deg,#f69483,#e9685a)',not_started:'linear-gradient(90deg,#ded6c8,#cabfad)'};
+  var DOT={complete:'#15a07e',active:'#4364dc',behind:'#e9685a',not_started:'#cabfad'};
   var ELORDER=['North','West','South','East'];
-  var ELCOLOR={North:'#1E73E8',West:'#0E8C8C',South:'#7c3aed',East:'#4f56c4'};
+  var ELCOLOR={North:'#6f93c9',West:'#5fa6a0',South:'#9a8fc9',East:'#7f9bb8'};  // muted — never clash with azure
   var ELTAG={North:'N',West:'W',South:'S',East:'E'};
   var ICPLUS='<svg class="dp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
   var ICCHEVD='<svg class="dp-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+  var ICBOLT='<svg class="dp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>';
+  var ICCAL='<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:5px;color:#8c92a0"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>';
   var DP={drops:[],sov:[],patchSov:null,template:null,view:'elevation',expanded:null,detail:{},collapsed:{},units:{length:'in',width:'in',depth:'in'},wired:false};
 
   function $(id){return document.getElementById(id);}
@@ -5890,10 +5917,10 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     return 'active';
   }
   function statMeta(s){
-    return s==='complete'?{cls:'done',label:'Complete',color:STC.green}
-      :s==='behind'?{cls:'behind',label:'Behind',color:STC.behind}
-      :s==='not_started'?{cls:'todo',label:'Not started',color:STC.todo}
-      :{cls:'active',label:'Active',color:STC.active};
+    return s==='complete'?{cls:'done',label:'Complete',dot:DOT.complete,grad:GRAD.complete}
+      :s==='behind'?{cls:'behind',label:'Behind',dot:DOT.behind,grad:GRAD.behind}
+      :s==='not_started'?{cls:'todo',label:'Not started',dot:DOT.not_started,grad:GRAD.not_started}
+      :{cls:'active',label:'Active',dot:DOT.active,grad:GRAD.active};
   }
 
   async function loadDropPlan(){
@@ -5916,7 +5943,8 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
       var s=dropStatus(d);
       if(s==='complete')a.complete++;
       else if(s==='not_started')a.not_started++;
-      else { a.active++; if(s==='behind')a.behind++; }
+      else if(s==='behind')a.behind++;       // #225 behind is its own bucket (mutually exclusive)
+      else a.active++;
       a.cf+=(d.volume_to_date||0);
       a.cs+=(d.progress&&d.progress.complete_steps)||0;
       a.ap+=(d.progress&&d.progress.applicable_steps)||0;
@@ -5929,15 +5957,16 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     var a=aggregate(),el=$('dp-hero'); if(!el)return;
     var C=263.9,off=C*(1-a.pct/100),seg=function(n){return a.total?(100*n/a.total):0;};
     el.innerHTML=
-      '<div class="dp-ring"><svg width="92" height="92"><circle cx="46" cy="46" r="42" fill="none" stroke="#eef0f3" stroke-width="9"></circle>'
-      +'<circle cx="46" cy="46" r="42" fill="none" stroke="'+STC.active+'" stroke-width="9" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+off.toFixed(1)+'"></circle></svg>'
+      '<div class="dp-ring"><svg width="92" height="92"><defs><linearGradient id="dp-lo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a8df5"></stop><stop offset="1" stop-color="#4364dc"></stop></linearGradient></defs>'
+      +'<circle cx="46" cy="46" r="42" fill="none" stroke="#f3f0e9" stroke-width="9"></circle>'
+      +'<circle cx="46" cy="46" r="42" fill="none" stroke="url(#dp-lo)" stroke-width="9" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+off.toFixed(1)+'"></circle></svg>'
       +'<div class="dp-pct"><b>'+a.pct+'%</b><s>complete</s></div></div>'
       +'<div class="dp-herobody"><div class="dp-ht">Restoration progress · all drops</div>'
-      +'<div class="dp-bar"><i style="width:'+seg(a.complete)+'%;background:'+STC.green+'"></i><i style="width:'+seg(a.active)+'%;background:'+STC.active+'"></i><i style="width:'+seg(a.not_started)+'%;background:'+STC.todo+'"></i></div>'
-      +'<div class="dp-legend"><span><span class="dp-dot" style="background:'+STC.green+'"></span>'+a.complete+' complete</span>'
-      +'<span><span class="dp-dot" style="background:'+STC.active+'"></span>'+a.active+' active</span>'
-      +'<span><span class="dp-dot" style="background:'+STC.todo+'"></span>'+a.not_started+' not started</span>'
-      +'<span><span class="dp-dot" style="background:'+STC.behind+'"></span>'+a.behind+' behind target</span></div></div>'
+      +'<div class="dp-bar"><i style="width:'+seg(a.complete)+'%;background:'+GRAD.complete+'"></i><i style="width:'+seg(a.active)+'%;background:'+GRAD.active+'"></i><i style="width:'+seg(a.behind)+'%;background:'+GRAD.behind+'"></i></div>'
+      +'<div class="dp-legend"><span><span class="dp-dot" style="background:'+DOT.complete+'"></span>'+a.complete+' complete</span>'
+      +'<span><span class="dp-dot" style="background:'+DOT.active+'"></span>'+a.active+' active</span>'
+      +'<span><span class="dp-dot" style="background:'+DOT.behind+'"></span>'+a.behind+' behind target</span>'
+      +'<span><span class="dp-dot" style="background:'+DOT.not_started+'"></span>'+a.not_started+' not started</span></div></div>'
       +'<div class="dp-herostat"><b>'+(ceilTenth(a.cf)||0).toFixed(1)+'</b><s>patch CF to date</s></div>';
     var sub=$('dp-sub'); if(sub)sub.textContent=PROJECT_CODE+' · '+a.total+' drops · '+ELORDER.filter(function(e){return DP.drops.some(function(d){return d.elevation===e;});}).length+' elevations';
   }
@@ -5954,12 +5983,16 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     var s=dropStatus(d),m=statMeta(s),pct=(d.progress&&d.progress.pct)||0,cs=d.current_stage;
     var stageLabel=s==='complete'?'Complete':(cs?esc(cs.name):'—');
     var cf=(d.volume_to_date_display!=null?d.volume_to_date_display:0);
-    var barColor=s==='complete'?STC.green:(s==='behind'?STC.behind:(s==='not_started'?'transparent':STC.active));
-    var barW=s==='not_started'?0:(s==='complete'?100:Math.max(pct,3));
-    var card='<div class="dp-card'+(d.drop_id===DP.expanded?' dp-sel':'')+'" data-drop="'+esc(d.drop_id)+'">'
+    var barW=s==='not_started'?0:(s==='complete'?100:Math.max(pct,4));
+    var barFill=s==='not_started'?'':('background:'+m.grad);
+    var sel=(d.drop_id===DP.expanded?' dp-sel':'');
+    var glow=(s==='active'||s==='behind')?' dp-glow':'';
+    var activateBtn=s==='not_started'?'<button class="dp-activate" data-activate="'+esc(d.drop_id)+'">'+ICBOLT+'Activate drop</button>':'';
+    var card='<div class="dp-card'+sel+glow+'" data-drop="'+esc(d.drop_id)+'">'
       +'<div class="dp-droptop"><span class="dp-dpid">DP-'+esc(d.sequence_no)+'</span><span class="dp-stat '+m.cls+'">'+m.label+'</span></div>'
-      +'<div class="dp-prog"><i style="width:'+barW+'%;background:'+barColor+'"></i></div>'
-      +'<div class="dp-meta"><span>'+stageLabel+'</span><span>'+(cf||0).toFixed(1)+' CF</span></div></div>';
+      +'<div class="dp-prog"><i style="width:'+barW+'%;'+barFill+'"></i></div>'
+      +'<div class="dp-meta"><span>'+stageLabel+'</span><span>'+(cf||0).toFixed(1)+' CF</span></div>'
+      +activateBtn+'</div>';
     if(d.drop_id===DP.expanded)card+=expandHtml(d);
     return card;
   }
@@ -5978,6 +6011,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
         +'<span class="dp-mini">'+act+' active · '+done+' complete '+ICCHEVD+'</span></div>'
         +'<div class="dp-grid">'+ds.map(cardHtml).join('')+'</div></div>';
     }).join('')||'<div class="dp-empty">No drops in this project.</div>';
+    wireDates();
   }
 
   function renderByStage(){
@@ -6003,7 +6037,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
       var ds=bucket[c.key]||[];
       var chips=ds.slice(0,8).map(function(d){
         var m=statMeta(dropStatus(d));
-        return '<div class="dp-chip'+(d.drop_id===DP.expanded?' dp-sel':'')+'" data-drop="'+esc(d.drop_id)+'"><span class="dp-cdot" style="background:'+m.color+'"></span>DP-'+esc(d.sequence_no)+'<span class="dp-el">'+(ELTAG[d.elevation]||'')+'</span></div>';
+        return '<div class="dp-chip'+(d.drop_id===DP.expanded?' dp-sel':'')+'" data-drop="'+esc(d.drop_id)+'"><span class="dp-cdot" style="background:'+m.dot+'"></span>DP-'+esc(d.sequence_no)+'<span class="dp-el">'+(ELTAG[d.elevation]||'')+'</span></div>';
       }).join('');
       var more=ds.length>8?('<div class="dp-more">+'+(ds.length-8)+' more</div>'):'';
       return '<div class="dp-pcol"><div class="dp-pchead"><span>'+esc(c.name)+'</span><span class="dp-pn">'+ds.length+'</span></div>'+(chips||'<div class="dp-more">—</div>')+more+'</div>';
@@ -6011,21 +6045,37 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     var exp='';
     if(DP.expanded){var d=DP.drops.filter(function(x){return x.drop_id===DP.expanded;})[0]; if(d)exp='<div class="dp-stage-exp">'+expandHtml(d)+'</div>';}
     host.innerHTML='<div class="dp-pipe">'+pipe+'</div>'+exp;
+    wireDates();
   }
 
   function expandHtml(d){
     var det=DP.detail[d.drop_id];
     if(!det)return '<div class="dp-exp"><div class="dp-empty" style="padding:14px">Loading drop…</div></div>';
-    var s=dropStatus(d),m=statMeta(s),wd=d.working_days||{};
+    var s=dropStatus(d),m=statMeta(s);
+    var headPill='<span class="dp-dpid">DP-'+esc(d.sequence_no)+' · '+esc(d.elevation||'')+'</span><span class="dp-stat '+m.cls+'">'+m.label+'</span>';
+    // #225 — a not-started drop expands to the ACTIVATE banner (date -> POST /activate)
+    if(s==='not_started'){
+      return '<div class="dp-exp"><div class="dp-exphead">'+headPill+'</div>'
+        +'<div class="dp-actbanner"><div><div class="dp-at">Activate this drop</div><div class="dp-as">Drops the scaffold / rope line and starts the clock on stage 1</div></div>'
+        +'<input type="date" class="dp-actdate" data-actdate="'+esc(d.drop_id)+'">'
+        +'<button class="dp-actgo" data-activatego="'+esc(d.drop_id)+'">'+ICBOLT+'Activate &amp; start</button></div>'
+        +'<div class="dp-exphint">Pick the day the scaffold went up — the drop turns Active, stage 1 gets that start date, and the rest of the stepper unlocks for dating.</div></div>';
+    }
+    var wd=d.working_days||{};
     var tnote=(wd.planned_total_days?('Target '+wd.planned_total_days+' days'):'')+(wd.actual_to_date_days?(' · '+wd.actual_to_date_days+'d actual'):'');
     var steps=((det.detail.stages)||[]).map(function(st){
       var cls=st.status==='complete'?'done':st.status==='in_progress'?'cur':st.status==='n_a'?'na':'todo';
       var ncls=st.status==='n_a'?'na':st.status==='in_progress'?'cur':'';
-      var date=st.status==='in_progress'?'in progress':(st.completed_on?mdy(st.completed_on):(st.started_on?mdy(st.started_on):'—'));
       var gate=st.is_cure_gate?'<span class="dp-gate">cure gate</span>':(st.is_signoff_gate?'<span class="dp-gate">sign-off</span>':'');
-      return '<div class="dp-step"><span class="dp-sdot '+cls+'"></span><span class="dp-sname '+ncls+'">'+esc(st.name)+gate+'</span>'
-        +'<span class="dp-sdate">'+esc(date)+'</span>'
-        +'<button class="dp-natoggle'+(st.status==='n_a'?' on':'')+'" data-na="'+st.step_no+'" data-drop="'+esc(d.drop_id)+'">N/A</button></div>';
+      var right;
+      if(st.status==='n_a'){
+        right='<button class="dp-natoggle on" data-na="'+st.step_no+'" data-drop="'+esc(d.drop_id)+'">N/A</button>';
+      }else{
+        var iso=st.started_on||'';   // #225 editable START date chip per stage (SSCDatePicker)
+        right='<span class="dp-sdate"><input type="date" class="dp-datechip'+(iso?'':' dp-empty')+'" placeholder="Set start date" data-datestep="'+st.step_no+'" data-drop="'+esc(d.drop_id)+'"'+(iso?(' data-iso="'+esc(iso)+'"'):'')+'></span>'
+          +'<button class="dp-natoggle" data-na="'+st.step_no+'" data-drop="'+esc(d.drop_id)+'">N/A</button>';
+      }
+      return '<div class="dp-step"><span class="dp-sdot '+cls+'"></span><span class="dp-sname '+ncls+'">'+esc(st.name)+gate+'</span>'+right+'</div>';
     }).join('');
     var patches=(det.patches||[]),sum=0; patches.forEach(function(p){sum+=(p.volume_cf||0);});
     var u=DP.units;
@@ -6038,7 +6088,8 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
       +'<div class="dp-qerr" id="dp-qerr"></div>'
       +'<div class="dp-qrun">Drop total · <b>'+(ceilTenth(sum)||0).toFixed(1)+' CF</b> · '+patches.length+' patch'+(patches.length===1?'':'es')+'</div></div>';
     return '<div class="dp-exp">'
-      +'<div class="dp-exphead"><span class="dp-dpid">DP-'+esc(d.sequence_no)+' · '+esc(d.elevation||'')+'</span><span class="dp-stat '+m.cls+'">'+m.label+'</span>'+(tnote?'<span style="color:var(--dp-muted);font-size:12px;margin-left:auto">'+esc(tnote)+'</span>':'')+'</div>'
+      +'<div class="dp-exphead">'+headPill+(tnote?'<span style="color:var(--dp-muted);font-size:12px;margin-left:auto">'+esc(tnote)+'</span>':'')+'</div>'
+      +'<div class="dp-exphint">Click a stage date to set when it started · toggle N/A · log patches at right</div>'
       +'<div class="dp-twocol"><div class="dp-steps">'+steps+'</div>'+qty+'</div></div>';
   }
 
@@ -6092,6 +6143,28 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     try{await fetch('/api/dropplan/drops/'+encodeURIComponent(dropId)+'/stages/'+stepNo,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:ns})});await refreshDetail(dropId);}catch(e){}
   }
 
+  function wireDates(){
+    if(!window.SSCDatePicker)return;
+    var wrap=document.querySelector('.view[data-view="drop-plans"]'); if(!wrap)return;
+    Array.prototype.forEach.call(wrap.querySelectorAll('.dp-datechip'),function(el){
+      if(el.dataset.dpwired)return; el.dataset.dpwired='1';
+      try{ SSCDatePicker.wire(el); var iso=el.getAttribute('data-iso'); if(iso)SSCDatePicker.setISO(el,iso); }catch(e){}
+    });
+    Array.prototype.forEach.call(wrap.querySelectorAll('.dp-actdate'),function(el){
+      if(el.dataset.dpwired)return; el.dataset.dpwired='1';
+      try{ SSCDatePicker.wire(el); SSCDatePicker.setISO(el,todayLocal()); }catch(e){}
+    });
+  }
+  async function setStageDate(dropId,stepNo,iso){
+    if(!iso)return;
+    try{ await fetch('/api/dropplan/drops/'+encodeURIComponent(dropId)+'/stages/'+stepNo,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({started_on:iso})}); await refreshDetail(dropId); }catch(e){}
+  }
+  async function activateDrop(dropId){
+    var el=document.querySelector('.dp-actdate[data-actdate="'+dropId+'"]');
+    var iso=(el&&window.SSCDatePicker)?(SSCDatePicker.getISO(el)||todayLocal()):((el&&el.value)||todayLocal());
+    try{ await fetch('/api/dropplan/drops/'+encodeURIComponent(dropId)+'/activate',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({start_date:iso})}); await refreshDetail(dropId); }catch(e){}
+  }
+
   function dpWire(){
     if(DP.wired)return; DP.wired=true;
     var ve=$('dp-view-elev'),vs=$('dp-view-stage');
@@ -6103,6 +6176,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     wrap.addEventListener('click',function(e){
       var na=e.target.closest('[data-na]'); if(na){toggleNA(na.getAttribute('data-drop'),na.getAttribute('data-na'));return;}
       var add=e.target.closest('[data-addpatch]'); if(add){addPatch(add.getAttribute('data-addpatch'));return;}
+      var ag=e.target.closest('[data-activatego]'); if(ag){activateDrop(ag.getAttribute('data-activatego'));return;}
       var ub=e.target.closest('[data-unitfor] button[data-u]'); if(ub){var tog=ub.parentNode,k=tog.getAttribute('data-unitfor');DP.units[k]=ub.getAttribute('data-u');Array.prototype.forEach.call(tog.querySelectorAll('button'),function(b){b.classList.remove('on');});ub.classList.add('on');liveVol();return;}
       var et=e.target.closest('[data-elevtoggle]'); if(et){var el=et.getAttribute('data-elevtoggle');DP.collapsed[el]=!DP.collapsed[el];renderByElevation();return;}
       if(e.target.closest('.dp-exp'))return;
@@ -6110,6 +6184,8 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
       var card=e.target.closest('.dp-card[data-drop]'); if(card){toggleExpand(card.getAttribute('data-drop'));return;}
     });
     wrap.addEventListener('input',function(e){if(e.target.closest('.dp-exp')&&e.target.getAttribute('data-dim'))liveVol();});
+    // #225 — a stage date chip changed -> persist started_on (LOCAL date via SSCDatePicker)
+    wrap.addEventListener('change',function(e){var dc=e.target.closest('.dp-datechip'); if(dc){var iso=window.SSCDatePicker?SSCDatePicker.getISO(dc):dc.value; setStageDate(dc.getAttribute('data-drop'),dc.getAttribute('data-datestep'),iso);}});
   }
 
   document.querySelectorAll('.nav-link[data-view="drop-plans"]').forEach(function(l){
