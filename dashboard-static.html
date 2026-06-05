@@ -1103,7 +1103,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #225 · 2026-06-04 · Drop Plan — Lumen+Oat palette · stage start-dates · activate-drop flow · 35-drop reset</div>
+          <div class="ph-build" id="ph-build-stamp">build #226 · 2026-06-05 · Drop Plan — compact expanded drop (small date chips · tight rows · width cap · slim activate) · drop data reset</div>
         </div>
       </section>
 
@@ -1386,27 +1386,28 @@
           .dp-exp{grid-column:1/-1;background:#fff;border:1px solid var(--dp-edge);border-radius:16px;padding:18px 20px;box-shadow:inset 0 0 16px var(--dp-in),0 1px 6px rgba(0,0,0,.04);margin-top:4px}
           .dp-exphead{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
           .dp-exphead .dp-dpid{font-size:16px}
-          .dp-twocol{display:grid;grid-template-columns:1fr 300px;gap:24px}
+          .dp-twocol{display:grid;grid-template-columns:minmax(0,1fr) 252px;gap:24px;align-items:start}
           @media(max-width:680px){.dp-twocol{grid-template-columns:1fr}}
-          .dp-steps{display:flex;flex-direction:column}
-          .dp-step{display:flex;align-items:center;gap:11px;padding:6px 0;position:relative;padding-left:20px;margin-left:6px}
+          .dp-steps{display:flex;flex-direction:column;max-width:540px}
+          .dp-step{display:flex;align-items:center;gap:10px;height:34px;position:relative;padding-left:18px;margin-left:5px}
           .dp-step:not(:last-child){border-left:2px solid var(--dp-line)}
-          .dp-sdot{position:absolute;left:-6px;width:12px;height:12px;border-radius:50%;border:2px solid #fff;flex:none}
+          .dp-sdot{position:absolute;left:-5px;width:10px;height:10px;border-radius:50%;border:2px solid #fff;flex:none}
           .dp-sdot.done{background:var(--done-dot)}.dp-sdot.cur{background:var(--active-dot)}.dp-sdot.todo{background:var(--oat-dot)}.dp-sdot.na{background:#eceef1}
-          .dp-sname{flex:1;font-size:13px}.dp-sname.na{color:#b7bcc4;text-decoration:line-through}.dp-sname.cur{font-weight:700}
+          .dp-sname{flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dp-sname.na{color:#b7bcc4;text-decoration:line-through}.dp-sname.cur{font-weight:700}
           .dp-gate{font-size:9px;color:var(--behind-ink);font-weight:700;text-transform:uppercase;margin-left:6px}
           .dp-sdate{color:var(--dp-muted);font-size:12px;white-space:nowrap}
-          .dp-natoggle{font-size:10px;font-weight:700;color:var(--dp-muted);border:1px solid var(--dp-line);border-radius:6px;padding:1px 7px;cursor:pointer;background:#fff}
+          .dp-natoggle{font-size:10px;font-weight:700;color:var(--dp-muted);border:1px solid var(--dp-line);border-radius:6px;padding:3px 7px;cursor:pointer;background:#fff;flex:none}
           .dp-natoggle.on{color:var(--active-ink);border-color:var(--dp-edge);background:var(--active-soft)}
           /* #225 — stage start-date chips + activate-drop banner */
           .dp-sdate{display:inline-flex;align-items:center}
-          .dp-datechip{font-size:11.5px;color:var(--dp-ink);background:#fff;border:1px solid var(--dp-line);border-radius:7px;padding:4px 9px;cursor:pointer;font-family:inherit;height:auto;width:auto;min-width:118px;text-align:left}
+          /* #226 — small inline date-chip pill (the picker input is CONSTRAINED so it never blows up) */
+          .dp-datechip{font-size:11.5px;line-height:1;color:var(--dp-ink);border:1px solid var(--dp-line);border-radius:7px;padding:5px 9px 5px 24px;cursor:pointer;font-family:inherit;height:auto;width:106px;min-width:0;text-align:left;white-space:nowrap;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%238c92a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M3 9h18M8 2v4M16 2v4'/%3E%3C/svg%3E") no-repeat 8px center}
           .dp-datechip::placeholder{color:var(--active-ink);font-weight:600}
-          .dp-datechip.dp-empty{border-color:var(--dp-edge);background:var(--active-soft)}
-          .dp-actbanner{display:flex;align-items:center;gap:14px;background:var(--active-soft);border:1px solid var(--dp-edge);border-radius:12px;padding:14px 16px;margin-bottom:14px;flex-wrap:wrap}
-          .dp-at{font-weight:700;font-size:13.5px}.dp-as{color:var(--dp-muted);font-size:12px}
-          .dp-actdate{height:34px;border:1px solid var(--dp-line);border-radius:8px;padding:0 9px;font-size:12.5px;font-family:inherit;margin-left:auto}
-          .dp-actgo{background:var(--dp-blue);border:none;color:#fff;border-radius:9px;padding:9px 15px;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+          .dp-datechip.dp-empty{color:var(--active-ink);border-color:var(--dp-edge);background-color:var(--active-soft);font-weight:600}
+          .dp-actbanner{display:flex;align-items:center;gap:12px;background:var(--active-soft);border:1px solid var(--dp-edge);border-radius:11px;padding:10px 13px;margin-bottom:14px}
+          .dp-at{font-weight:700;font-size:13px}.dp-as{color:var(--dp-muted);font-size:11.5px}
+          .dp-actdate{height:32px;width:120px;border:1px solid var(--dp-line);border-radius:7px;padding:0 9px;font-size:12.5px;font-family:inherit;margin-left:auto;flex:none}
+          .dp-actgo{background:var(--dp-blue);border:none;color:#fff;border-radius:8px;padding:8px 13px;font-weight:600;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex:none}
           .dp-exphint{color:var(--dp-muted);font-size:12px;margin-bottom:14px}
           .dp-activate{margin-top:9px;width:100%;border:1px solid var(--dp-edge);background:var(--active-soft);color:var(--active-ink);border-radius:9px;padding:7px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
           .dp-qty{background:#f7f8fa;border:1px solid var(--dp-line);border-radius:13px;padding:15px;align-self:start}
@@ -1447,7 +1448,7 @@
           </div>
           <div id="dp-elev"></div>
           <div id="dp-stage" class="dp-hide"></div>
-          <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:18px;" id="dp-build-stamp">build #225 · 2026-06-04 · Drop Plan — Lumen+Oat palette · stage start-dates · activate-drop flow</div>
+          <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:18px;" id="dp-build-stamp">build #226 · 2026-06-05 · Drop Plan — compact expanded drop · small date chips · tight rows · slim activate</div>
         </div>
       </section>
 
@@ -6072,7 +6073,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
         right='<button class="dp-natoggle on" data-na="'+st.step_no+'" data-drop="'+esc(d.drop_id)+'">N/A</button>';
       }else{
         var iso=st.started_on||'';   // #225 editable START date chip per stage (SSCDatePicker)
-        right='<span class="dp-sdate"><input type="date" class="dp-datechip'+(iso?'':' dp-empty')+'" placeholder="Set start date" data-datestep="'+st.step_no+'" data-drop="'+esc(d.drop_id)+'"'+(iso?(' data-iso="'+esc(iso)+'"'):'')+'></span>'
+        right='<span class="dp-sdate"><input type="date" class="dp-datechip'+(iso?'':' dp-empty')+'" placeholder="Set date" data-datestep="'+st.step_no+'" data-drop="'+esc(d.drop_id)+'"'+(iso?(' data-iso="'+esc(iso)+'"'):'')+'></span>'
           +'<button class="dp-natoggle" data-na="'+st.step_no+'" data-drop="'+esc(d.drop_id)+'">N/A</button>';
       }
       return '<div class="dp-step"><span class="dp-sdot '+cls+'"></span><span class="dp-sname '+ncls+'">'+esc(st.name)+gate+'</span>'+right+'</div>';
