@@ -1103,7 +1103,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #228 · 2026-06-05 · Drop Plan — By-Stage columns fixed contained height · long column scrolls inside its box (no board growth)</div>
+          <div class="ph-build" id="ph-build-stamp">build #229 · 2026-06-05 · Project Documents — compliance checklist + readiness hero + upload (single modal + bulk tray) + expiry tracking</div>
         </div>
       </section>
 
@@ -1229,8 +1229,110 @@
 
       <!-- DOCUMENTS -->
       <section class="view" data-view="documents">
-        <div class="section">
-          <h2>Project Documents</h2>
+        <style>
+          /* #229 Project Documents — Lumen+Oat compliance checklist + readiness hero + upload modal/bulk.
+             All classes pd- prefixed (no collision with the shared dashboard CSS). */
+          .pd-wrap{--pd-ink:#222633;--pd-muted:#8c92a0;--pd-line:#eceef3;--pd-accent:#4364dc;--pd-accent-ink:#3a5fd0;--pd-accent-soft:#ebf0fe;--pd-accent-edge:rgba(67,100,220,.30);--on-ink:#178a6c;--on-soft:#e7f6f0;--miss-ink:#8f8675;--miss-soft:#f3f0e9;--miss:#cabfad;--warn-ink:#d75a4c;--warn-soft:#fceeec;color:var(--pd-ink);font:14px/1.55 -apple-system,"Segoe UI",Inter,Roboto,sans-serif}
+          .pd-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+          .pd-h1{margin:0;font-size:21px;font-weight:700}.pd-sub{color:var(--pd-muted);font-size:12.5px;margin-top:3px}
+          .pd-ic{width:15px;height:15px;flex:none}
+          .pd-upload{background:var(--pd-accent);border:none;color:#fff;border-radius:10px;padding:9px 15px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;box-shadow:0 2px 8px rgba(67,100,220,.25)}
+          .pd-hero{display:flex;align-items:center;gap:22px;background:#fff;border:1px solid var(--pd-accent-edge);border-radius:16px;padding:16px 20px;margin-bottom:18px;box-shadow:0 6px 20px rgba(30,35,45,.06);flex-wrap:wrap}
+          .pd-ring{position:relative;width:80px;height:80px;flex:none}.pd-ring svg{transform:rotate(-90deg)}
+          .pd-ring .pd-pct{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+          .pd-ring .pd-pct b{font-size:19px;font-weight:700;line-height:1}.pd-ring .pd-pct s{font-size:9px;color:var(--pd-muted);text-decoration:none;letter-spacing:.04em;text-transform:uppercase;margin-top:2px}
+          .pd-herobody{flex:1;min-width:240px}.pd-ht{font-size:14px;font-weight:700;margin-bottom:9px}
+          .pd-bar{display:flex;height:10px;border-radius:6px;overflow:hidden;margin-bottom:9px;background:var(--miss-soft);box-shadow:inset 0 1px 2px rgba(0,0,0,.05)}.pd-bar i{display:block;height:100%}
+          .pd-legend{display:flex;gap:15px;font-size:11.5px;color:var(--pd-muted);flex-wrap:wrap}.pd-legend span{display:inline-flex;align-items:center;gap:5px}
+          .pd-dot{width:8px;height:8px;border-radius:50%;flex:none}
+          .pd-grp{margin-bottom:14px}
+          .pd-ghead{display:flex;align-items:center;gap:9px;margin:0 2px 8px;font-size:12.5px;font-weight:700}
+          .pd-gbar{width:10px;height:10px;border-radius:3px;flex:none}
+          .pd-gcount{margin-left:auto;font-size:11px;color:var(--pd-muted);font-weight:600}
+          .pd-clist{background:#fff;border:1px solid var(--pd-line);border-radius:13px;overflow:hidden;box-shadow:0 2px 10px rgba(30,35,45,.04)}
+          .pd-crow{display:flex;align-items:center;gap:12px;padding:10px 15px;border-bottom:1px solid #f3f3f5}.pd-crow:last-child{border-bottom:none}
+          .pd-ck{width:20px;height:20px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff}
+          .pd-ck.on{background:linear-gradient(135deg,#34c29a,#15a07e)}
+          .pd-ck.miss{background:#fff;border:2px dashed var(--miss)}
+          .pd-ck.warn{background:linear-gradient(135deg,#f69483,#e9685a)}
+          .pd-cdoc{flex:1;font-weight:600;font-size:13.5px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pd-cdoc.misstxt{color:var(--pd-muted);font-weight:500}
+          .pd-cdoc.link{cursor:pointer}.pd-cdoc.link:hover{color:var(--pd-accent-ink)}
+          .pd-cmeta{font-size:11.5px;color:var(--pd-muted);white-space:nowrap}
+          .pd-flag{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+          .pd-flag.on{color:var(--on-ink);background:var(--on-soft)}.pd-flag.miss{color:var(--miss-ink);background:var(--miss-soft)}.pd-flag.warn{color:var(--warn-ink);background:var(--warn-soft)}
+          .pd-upmini{font-size:11px;font-weight:600;color:var(--pd-accent-ink);border:1px solid var(--pd-accent-edge);background:var(--pd-accent-soft);border-radius:7px;padding:4px 9px;cursor:pointer;white-space:nowrap}
+          .pd-rowacts{display:flex;gap:6px;align-items:center;flex:none}
+          .pd-mini2{font-size:10.5px;color:var(--pd-muted);border:1px solid var(--pd-line);background:#fff;border-radius:6px;padding:3px 7px;cursor:pointer;white-space:nowrap}
+          .pd-extra{font-size:11.5px;color:var(--pd-muted);padding:7px 15px;background:#fafbfe;border-bottom:1px solid #f3f3f5;display:flex;align-items:center;gap:8px}.pd-extra:last-child{border-bottom:none}
+          .pd-overlay{position:fixed;inset:0;background:rgba(20,22,30,.30);display:none;align-items:flex-start;justify-content:center;padding:48px 16px;overflow:auto;z-index:1200}
+          .pd-overlay.show{display:flex}
+          .pd-modal{position:relative;width:460px;max-width:100%;background:#fff;border-radius:18px;box-shadow:0 24px 60px rgba(20,25,40,.28);padding:22px;color:var(--pd-ink)}
+          .pd-mhead{display:flex;align-items:center;margin-bottom:3px}.pd-mhead h3{margin:0;font-size:17px}.pd-mx{margin-left:auto;color:var(--pd-muted);cursor:pointer;font-size:22px;line-height:1;background:none;border:none}
+          .pd-msub{color:var(--pd-muted);font-size:12px;margin-bottom:14px}
+          .pd-modetog{display:flex;background:#f4f6f9;border-radius:9px;padding:3px;margin-bottom:14px;gap:3px}
+          .pd-modetog button{flex:1;border:none;background:none;font-size:12px;font-weight:600;color:var(--pd-muted);cursor:pointer;padding:6px;border-radius:7px}
+          .pd-modetog button.on{background:#fff;color:var(--pd-accent-ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+          .pd-drop{border:2px dashed var(--pd-accent-edge);border-radius:13px;background:var(--pd-accent-soft);padding:20px;text-align:center;color:var(--pd-muted);margin-bottom:14px;cursor:pointer}
+          .pd-drop.drag{background:#dde7fd;border-color:var(--pd-accent)}
+          .pd-drop .bi{width:28px;height:28px;color:var(--pd-accent);margin-bottom:6px}.pd-drop b{color:var(--pd-ink);font-size:13.5px}.pd-drop .sub{font-size:11px;margin-top:3px}
+          .pd-field{margin-bottom:12px}
+          .pd-field label{display:block;color:var(--pd-muted);font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:5px}
+          .pd-field input,.pd-field select,.pd-field textarea{width:100%;height:38px;border:1px solid var(--pd-line);border-radius:9px;padding:0 11px;font-size:13px;background:#fff;color:var(--pd-ink);font-family:inherit}
+          .pd-field textarea{height:auto;padding:8px 11px;resize:vertical}
+          .pd-two{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+          .pd-aistub{display:flex;align-items:center;gap:8px;background:#f4f6f9;border:1px dashed var(--pd-line);border-radius:9px;padding:9px 11px;margin-bottom:13px;font-size:11.5px;color:var(--pd-muted)}.pd-aistub b{color:var(--pd-accent-ink);font-weight:700}
+          .pd-mbtns{display:flex;gap:9px;justify-content:flex-end;margin-top:4px}
+          .pd-cancel{background:#fff;border:1px solid var(--pd-line);border-radius:9px;padding:10px 16px;font-weight:600;cursor:pointer;color:var(--pd-ink);font-size:13px}
+          .pd-save{background:var(--pd-accent);border:none;color:#fff;border-radius:9px;padding:10px 16px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(67,100,220,.25);display:inline-flex;align-items:center;gap:7px;font-size:13px}
+          .pd-save:disabled{opacity:.5;cursor:not-allowed}
+          .pd-brow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f3f3f5}.pd-brow:last-of-type{border-bottom:none}
+          .pd-bthumb{width:26px;height:32px;border-radius:6px;background:linear-gradient(160deg,#f4f6f9,#e9edf2);display:flex;align-items:center;justify-content:center;color:var(--pd-accent);flex:none}
+          .pd-bname{font-weight:600;font-size:12.5px;min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+          .pd-bsz{color:var(--pd-muted);font-size:10.5px;flex:none}
+          .pd-bsel{height:32px;border:1px solid var(--pd-line);border-radius:8px;padding:0 8px;font-size:12px;background:#fff;flex:none}
+          .pd-bx{color:var(--pd-muted);cursor:pointer;font-size:16px;background:none;border:none;flex:none}
+          .pd-bfoot{display:flex;align-items:center;margin-top:14px;gap:10px}
+          .pd-bcount{color:var(--pd-muted);font-size:12px}.pd-bfoot .pd-save{margin-left:auto}
+          .pd-err{color:var(--warn-ink);font-size:12px;margin-top:8px;min-height:14px}
+          .pd-empty{padding:24px;text-align:center;color:var(--pd-muted)}
+          .pd-hide{display:none!important}
+        </style>
+        <div class="pd-wrap">
+          <div class="pd-head">
+            <div><h1 class="pd-h1">Project Documents</h1><div class="pd-sub">The required-docs checklist · what's filed, what's missing</div></div>
+            <button class="pd-upload" id="pd-upload-btn"><svg class="pd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg>Upload</button>
+          </div>
+          <div class="pd-hero" id="pd-hero"><div class="pd-empty" style="margin:0">Loading documents…</div></div>
+          <div id="pd-checklist"></div>
+          <div id="pd-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #229 · 2026-06-05 · Project Documents — compliance checklist · readiness hero · upload (single + bulk)</div>
+        </div>
+        <div class="pd-overlay" id="pd-modal">
+          <div class="pd-modal">
+            <div class="pd-mhead"><h3 id="pd-modal-title">Upload document</h3><button class="pd-mx" id="pd-modal-close">&times;</button></div>
+            <div class="pd-msub" id="pd-modal-sub">Add a project document</div>
+            <input type="file" id="pd-file-input" multiple accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,.xlsx" style="display:none">
+            <div class="pd-modetog" id="pd-modetog"><button data-mode="single" class="on" type="button">Single</button><button data-mode="bulk" type="button">Bulk</button></div>
+            <div class="pd-drop" id="pd-drop"><svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg><div><b id="pd-drop-label">Drag a file here or browse</b></div><div class="sub">PDF, JPG, PNG, HEIC, XLSX · drop several for bulk</div></div>
+            <div id="pd-single">
+              <div class="pd-aistub"><svg class="pd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span><b>AI auto-read</b> type &amp; expiry — coming soon (Batch B)</span></div>
+              <div class="pd-two">
+                <div class="pd-field"><label>Category</label><select id="pd-f-cat"></select></div>
+                <div class="pd-field"><label>Fulfills</label><select id="pd-f-req"></select></div>
+              </div>
+              <div class="pd-field"><label>Title</label><input id="pd-f-title" placeholder="Document title"></div>
+              <div class="pd-two">
+                <div class="pd-field"><label>Effective</label><input type="date" id="pd-f-eff"></div>
+                <div class="pd-field"><label>Expiry <span style="text-transform:none;font-weight:600;letter-spacing:0">(if any)</span></label><input type="date" id="pd-f-exp"></div>
+              </div>
+              <div class="pd-field"><label>Notes <span style="text-transform:none;font-weight:600;letter-spacing:0">(optional)</span></label><textarea id="pd-f-notes" rows="2" placeholder="—"></textarea></div>
+            </div>
+            <div id="pd-bulk" class="pd-hide"><div id="pd-bulk-rows"></div></div>
+            <div class="pd-err" id="pd-modal-err"></div>
+            <div class="pd-mbtns" id="pd-single-btns"><button class="pd-cancel" id="pd-cancel" type="button">Cancel</button><button class="pd-save" id="pd-save-single" type="button">Save</button></div>
+            <div class="pd-bfoot pd-hide" id="pd-bulk-foot"><span class="pd-bcount" id="pd-bulk-count">0 files</span><button class="pd-save" id="pd-save-bulk" type="button">Upload all (0)</button></div>
+          </div>
+        </div>
+        <div class="section" style="margin-top:26px;border-top:1px solid #eceef3;padding-top:20px;">
           <!-- BLANK FORMS subsection — reusable safety / compliance
                templates (scaffold inspection, future safety plan,
                orientation, waste-management, rigging C-hook letters).
@@ -6245,6 +6347,218 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
       .then(function(){ window.location.href='/login'; })
       .catch(function(){ window.location.href='/login'; });
   });
+})();
+</script>
+
+<script>
+/* #229 — Project Documents (Batch A): compliance checklist + readiness hero + upload
+   (single modal flipping to a bulk tray on multi-file). Reuses /api/projects/<code>/documents.
+   NO *_path is ever read from the API (file_url is the gated route). LOCAL dates (MM/DD/YYYY). */
+(function(){
+  var pc=(location.pathname.match(/\/projects\/([^\/]+)/)||[])[1];
+  var PROJECT_CODE = pc ? decodeURIComponent(pc) : 'FR-BX-001';
+  var CATS=[['PERMITS','Permits & Approvals','#6f8bb5'],['DRAWINGS','Drawings & Engineering','#4f9a92'],['CONTRACTS','Contracts & Financial','#8a7fb8'],['INSPECTIONS','Inspections & Reports','#6b78b0'],['SAFETY','Safety & Compliance','#9a8f7a'],['CLOSEOUT','Closeout','#9aa0a8']];
+  var CATCOLOR={}; CATS.forEach(function(c){CATCOLOR[c[0]]=c[2];});
+  var GRAD={on:'linear-gradient(90deg,#34c29a,#15a07e)',miss:'linear-gradient(90deg,#ded6c8,#cabfad)',warn:'linear-gradient(90deg,#f69483,#e9685a)'};
+  var ICCHECK='<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg>';
+  var ICWARN='<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 8v5M12 16.5v.5"/></svg>';
+  var ICDOC='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 2h8l4 4v16H6z"/><path d="M14 2v4h4"/></svg>';
+  var PD={data:null,files:[],mode:'single',wired:false,prefill:null};
+
+  function $(id){return document.getElementById(id);}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
+  function jget(u){return fetch(u,{credentials:'include'}).then(function(r){return r.json();});}
+  function mdy(iso){if(!iso)return '—';var m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?(m[2]+'/'+m[3]+'/'+m[1]):iso;}
+  function todayLocal(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function fsize(n){if(n==null)return '';if(n<1024)return n+' B';if(n<1048576)return Math.round(n/1024)+' KB';return (n/1048576).toFixed(1)+' MB';}
+  function suggestCat(fn){var f=(fn||'').toLowerCase();
+    if(/(coi|insurance|contract|aia|sov|bond)/.test(f))return 'CONTRACTS';
+    if(/(rope|sds|safety|sst|toolbox)/.test(f))return 'SAFETY';
+    if(/(arch|drawing|draw|rev|struct|shop)/.test(f))return 'DRAWINGS';
+    if(/(fisp|inspect|probe|tr1|qewi|signoff|sign-off)/.test(f))return 'INSPECTIONS';
+    if(/(completion|warrant|lien|closeout)/.test(f))return 'CLOSEOUT';
+    if(/(permit|pw2|best|variance|shed)/.test(f))return 'PERMITS';
+    return 'PERMITS';}
+
+  async function loadDocs(){
+    pdWire();
+    try{
+      var j=await jget('/api/projects/'+encodeURIComponent(PROJECT_CODE)+'/documents');
+      PD.data=(j&&j.data)||{categories:[],readiness:{}};
+      renderHero(); renderChecklist();
+    }catch(e){console.warn('[projdocs] load failed',e);var h=$('pd-checklist');if(h)h.innerHTML='<div class="pd-empty">Could not load documents.</div>';}
+  }
+
+  function renderHero(){
+    var r=(PD.data&&PD.data.readiness)||{},el=$('pd-hero');if(!el)return;
+    var rt=r.required_total||0,on=r.on_file||0,miss=r.missing||0,att=r.attention||0,pct=r.pct||0;
+    var C=201,off=C*(1-pct/100),seg=function(n){return rt?(100*n/rt):0;};
+    el.innerHTML=
+      '<div class="pd-ring"><svg width="80" height="80"><defs><linearGradient id="pd-r1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a8df5"></stop><stop offset="1" stop-color="#4364dc"></stop></linearGradient></defs>'
+      +'<circle cx="40" cy="40" r="32" fill="none" stroke="#edeef3" stroke-width="9"></circle>'
+      +'<circle cx="40" cy="40" r="32" fill="none" stroke="url(#pd-r1)" stroke-width="9" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+off.toFixed(1)+'"></circle></svg>'
+      +'<div class="pd-pct"><b>'+pct+'%</b><s>ready</s></div></div>'
+      +'<div class="pd-herobody"><div class="pd-ht">'+on+' of '+rt+' required documents on file</div>'
+      +'<div class="pd-bar"><i style="width:'+seg(on)+'%;background:'+GRAD.on+'"></i><i style="width:'+seg(miss)+'%;background:'+GRAD.miss+'"></i><i style="width:'+seg(att)+'%;background:'+GRAD.warn+'"></i></div>'
+      +'<div class="pd-legend"><span><span class="pd-dot" style="background:#15a07e"></span>'+on+' on file</span><span><span class="pd-dot" style="background:#cabfad"></span>'+miss+' missing</span><span><span class="pd-dot" style="background:#e9685a"></span>'+att+' expiring / expired</span></div></div>';
+  }
+
+  function renderChecklist(){
+    var host=$('pd-checklist');if(!host)return;
+    var cats=(PD.data&&PD.data.categories)||[];
+    host.innerHTML=cats.map(function(c){
+      var rows=(c.items||[]).map(function(it){
+        var warn=(it.status==='expiring'||it.status==='expired');
+        var ckcls=it.status==='missing'?'miss':(warn?'warn':'on');
+        var ckinner=it.status==='missing'?'':(warn?ICWARN:ICCHECK);
+        var nm='<span class="pd-cdoc'+(it.status==='missing'?' misstxt':'')+(it.doc?' link" data-open="'+it.doc.id+'"':'"')+'>'+esc(it.label)+'</span>';
+        var right;
+        if(it.status==='missing'){
+          right='<button class="pd-upmini" data-upcat="'+esc(c.category)+'" data-upreq="'+esc(it.requirement_key)+'">Upload</button>';
+        }else if(warn){
+          var lbl=(it.status==='expired'?'Expired ':'Expiring ')+mdy(it.doc.expiry_date);
+          right='<span class="pd-flag warn">'+lbl+'</span><button class="pd-upmini" data-upcat="'+esc(c.category)+'" data-upreq="'+esc(it.requirement_key)+'">Replace</button>';
+        }else{
+          right='<span class="pd-cmeta">filed '+mdy(it.doc.effective_date)+'</span><button class="pd-mini2" data-del="'+it.doc.id+'">Remove</button>';
+        }
+        return '<div class="pd-crow"><span class="pd-ck '+ckcls+'">'+ckinner+'</span>'+nm+'<span class="pd-rowacts">'+right+'</span></div>';
+      }).join('');
+      var extras=(c.extras||[]).map(function(d){
+        var fl=d.status==='expired'?'<span class="pd-flag warn">Expired</span>':(d.status==='expiring'?'<span class="pd-flag warn">Expiring</span>':(d.superseded?'<span class="pd-flag miss">Superseded</span>':'<span class="pd-flag on">Extra</span>'));
+        return '<div class="pd-extra"><span class="pd-cdoc link" data-open="'+d.id+'" style="font-size:12.5px;font-weight:600">'+esc(d.title)+'</span>'+fl+'<span style="margin-left:auto;font-size:10.5px">'+esc(d.doc_type||'')+'</span><button class="pd-mini2" data-del="'+d.id+'">Remove</button></div>';
+      }).join('');
+      return '<div class="pd-grp"><div class="pd-ghead"><span class="pd-gbar" style="background:'+(CATCOLOR[c.category]||'#888')+'"></span>'+esc(c.name)+'<span class="pd-gcount">'+(c.filed||0)+' / '+(c.total||0)+'</span></div>'
+        +'<div class="pd-clist">'+(rows||'<div class="pd-extra">No required items.</div>')+extras+'</div></div>';
+    }).join('')||'<div class="pd-empty">No categories.</div>';
+  }
+
+  // ---------- upload modal ----------
+  function catOptions(sel){return CATS.map(function(c){return '<option value="'+c[0]+'"'+(c[0]===sel?' selected':'')+'>'+c[1]+'</option>';}).join('');}
+  function reqOptions(cat,sel){
+    var c=((PD.data&&PD.data.categories)||[]).filter(function(x){return x.category===cat;})[0];
+    var opts='<option value="">— Other / extra —</option>';
+    if(c)opts+=(c.items||[]).map(function(it){return '<option value="'+esc(it.requirement_key)+'"'+(it.requirement_key===sel?' selected':'')+'>'+esc(it.label)+'</option>';}).join('');
+    return opts;
+  }
+  function openModal(prefill){
+    PD.prefill=prefill||null; PD.files=[]; setMode('single');
+    $('pd-modal-title').textContent=prefill&&prefill.req?'Upload — '+(prefill.reqLabel||'required doc'):'Upload document';
+    $('pd-modal-sub').textContent=prefill&&prefill.cat?(catName(prefill.cat)+(prefill.reqLabel?' · '+prefill.reqLabel:'')):'Add a project document';
+    var cat=prefill&&prefill.cat?prefill.cat:'PERMITS';
+    $('pd-f-cat').innerHTML=catOptions(cat);
+    $('pd-f-req').innerHTML=reqOptions(cat,prefill&&prefill.req?prefill.req:'');
+    $('pd-f-title').value=prefill&&prefill.reqLabel?prefill.reqLabel:'';
+    $('pd-f-notes').value=''; $('pd-modal-err').textContent='';
+    $('pd-drop-label').textContent='Drag a file here or browse';
+    $('pd-file-input').value='';
+    if(window.SSCDatePicker){ try{SSCDatePicker.wire($('pd-f-eff'));SSCDatePicker.wire($('pd-f-exp'));SSCDatePicker.setISO($('pd-f-eff'),todayLocal());SSCDatePicker.setISO($('pd-f-exp'),'');}catch(e){} }
+    $('pd-modal').classList.add('show');
+  }
+  function closeModal(){$('pd-modal').classList.remove('show');PD.files=[];}
+  function catName(code){var c=CATS.filter(function(x){return x[0]===code;})[0];return c?c[1]:code;}
+  function setMode(m){
+    PD.mode=m;
+    $('pd-modetog').querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-mode')===m);});
+    $('pd-single').classList.toggle('pd-hide',m!=='single');
+    $('pd-bulk').classList.toggle('pd-hide',m!=='bulk');
+    $('pd-single-btns').classList.toggle('pd-hide',m!=='single');
+    $('pd-bulk-foot').classList.toggle('pd-hide',m!=='bulk');
+    if(m==='bulk')renderBulk();
+  }
+  function setFiles(fileList){
+    PD.files=Array.prototype.slice.call(fileList||[]);
+    if(PD.files.length>1){ setMode('bulk'); }
+    else { setMode('single'); $('pd-drop-label').textContent=PD.files.length?PD.files[0].name:'Drag a file here or browse'; if(PD.files.length&&!$('pd-f-title').value)$('pd-f-title').value=PD.files[0].name.replace(/\.[^.]+$/,''); }
+  }
+  function renderBulk(){
+    var host=$('pd-bulk-rows');if(!host)return;
+    if(!PD.files.length){host.innerHTML='<div class="pd-empty" style="padding:14px">Drop files above to bulk-upload.</div>';}
+    else host.innerHTML=PD.files.map(function(f,i){
+      var sug=suggestCat(f.name);
+      return '<div class="pd-brow" data-bi="'+i+'"><span class="pd-bthumb">'+ICDOC+'</span><span class="pd-bname" title="'+esc(f.name)+'">'+esc(f.name)+'</span><span class="pd-bsz">'+fsize(f.size)+'</span>'
+        +'<select class="pd-bsel" data-bcat="'+i+'">'+catOptions(sug)+'</select>'
+        +'<input type="date" class="pd-bsel pd-bexp" data-bexp="'+i+'" title="expiry (optional)" style="width:128px">'
+        +'<button class="pd-bx" data-brm="'+i+'" type="button">&times;</button></div>';
+    }).join('');
+    $('pd-bulk-count').textContent=PD.files.length+(PD.files.length===1?' file':' files');
+    $('pd-save-bulk').textContent='Upload all ('+PD.files.length+')';
+    $('pd-save-bulk').disabled=!PD.files.length;
+    if(window.SSCDatePicker)host.querySelectorAll('.pd-bexp').forEach(function(el){try{SSCDatePicker.wire(el);}catch(e){}});
+  }
+
+  async function saveSingle(){
+    var err=$('pd-modal-err');err.textContent='';
+    if(!PD.files.length){err.textContent='Choose a file first.';return;}
+    var fd=new FormData();
+    fd.append('file',PD.files[0]);
+    fd.append('category',$('pd-f-cat').value);
+    fd.append('requirement_key',$('pd-f-req').value||'');
+    fd.append('title',$('pd-f-title').value||PD.files[0].name);
+    fd.append('effective_date',(window.SSCDatePicker?SSCDatePicker.getISO($('pd-f-eff')):$('pd-f-eff').value)||'');
+    fd.append('expiry_date',(window.SSCDatePicker?SSCDatePicker.getISO($('pd-f-exp')):$('pd-f-exp').value)||'');
+    fd.append('notes',$('pd-f-notes').value||'');
+    $('pd-save-single').disabled=true;
+    try{
+      var r=await fetch('/api/projects/'+encodeURIComponent(PROJECT_CODE)+'/documents',{method:'POST',credentials:'include',body:fd});
+      if(!r.ok){var j=await r.json().catch(function(){return {};});err.textContent=(j&&j.error)||'Upload failed';return;}
+      closeModal(); await loadDocs();
+    }catch(e){err.textContent='Network error';}
+    finally{$('pd-save-single').disabled=false;}
+  }
+  async function saveBulk(){
+    var err=$('pd-modal-err');err.textContent='';
+    if(!PD.files.length){err.textContent='No files.';return;}
+    var fd=new FormData();
+    PD.files.forEach(function(f,i){
+      fd.append('file_'+i,f);
+      var sel=$('pd-bulk-rows').querySelector('[data-bcat="'+i+'"]');
+      fd.append('category_'+i,sel?sel.value:suggestCat(f.name));
+      var exp=$('pd-bulk-rows').querySelector('[data-bexp="'+i+'"]');
+      var expv=exp&&window.SSCDatePicker?SSCDatePicker.getISO(exp):(exp?exp.value:'');
+      if(expv)fd.append('expiry_'+i,expv);
+    });
+    $('pd-save-bulk').disabled=true;
+    try{
+      var r=await fetch('/api/projects/'+encodeURIComponent(PROJECT_CODE)+'/documents/bulk',{method:'POST',credentials:'include',body:fd});
+      if(!r.ok){var j=await r.json().catch(function(){return {};});err.textContent=(j&&j.error)||'Bulk upload failed';return;}
+      closeModal(); await loadDocs();
+    }catch(e){err.textContent='Network error';}
+    finally{$('pd-save-bulk').disabled=false;}
+  }
+  async function delDoc(id){
+    if(!confirm('Remove this document and its file?'))return;
+    try{await fetch('/api/documents/'+id,{method:'DELETE',credentials:'include'});await loadDocs();}catch(e){}
+  }
+
+  function pdWire(){
+    if(PD.wired)return;PD.wired=true;
+    var u=$('pd-upload-btn');if(u)u.addEventListener('click',function(){openModal(null);});
+    var x=$('pd-modal-close');if(x)x.addEventListener('click',closeModal);
+    var cn=$('pd-cancel');if(cn)cn.addEventListener('click',closeModal);
+    var ov=$('pd-modal');if(ov)ov.addEventListener('click',function(e){if(e.target===ov)closeModal();});
+    $('pd-modetog').addEventListener('click',function(e){var b=e.target.closest('button[data-mode]');if(b)setMode(b.getAttribute('data-mode'));});
+    var drop=$('pd-drop'),fi=$('pd-file-input');
+    if(drop&&fi){
+      drop.addEventListener('click',function(){fi.click();});
+      fi.addEventListener('change',function(){setFiles(fi.files);});
+      drop.addEventListener('dragover',function(e){e.preventDefault();drop.classList.add('drag');});
+      drop.addEventListener('dragleave',function(){drop.classList.remove('drag');});
+      drop.addEventListener('drop',function(e){e.preventDefault();drop.classList.remove('drag');if(e.dataTransfer&&e.dataTransfer.files)setFiles(e.dataTransfer.files);});
+    }
+    $('pd-f-cat').addEventListener('change',function(){$('pd-f-req').innerHTML=reqOptions($('pd-f-cat').value,'');});
+    $('pd-save-single').addEventListener('click',saveSingle);
+    $('pd-save-bulk').addEventListener('click',saveBulk);
+    $('pd-bulk-rows').addEventListener('click',function(e){var rm=e.target.closest('[data-brm]');if(rm){var i=+rm.getAttribute('data-brm');PD.files.splice(i,1);renderBulk();}});
+    var cl=$('pd-checklist');
+    if(cl)cl.addEventListener('click',function(e){
+      var up=e.target.closest('[data-upcat]');if(up){var cat=up.getAttribute('data-upcat'),req=up.getAttribute('data-upreq');var c=((PD.data&&PD.data.categories)||[]).filter(function(x){return x.category===cat;})[0];var it=c?(c.items||[]).filter(function(x){return x.requirement_key===req;})[0]:null;openModal({cat:cat,req:req,reqLabel:it?it.label:''});return;}
+      var del=e.target.closest('[data-del]');if(del){delDoc(+del.getAttribute('data-del'));return;}
+      var op=e.target.closest('[data-open]');if(op){window.open('/api/documents/'+op.getAttribute('data-open')+'/file','_blank');return;}
+    });
+  }
+
+  document.querySelectorAll('.nav-link[data-view="documents"]').forEach(function(l){l.addEventListener('click',loadDocs);});
+  if(document.querySelector('section[data-view="documents"].active'))loadDocs();
 })();
 </script>
 

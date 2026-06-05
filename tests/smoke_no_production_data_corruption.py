@@ -144,6 +144,17 @@ TABLES_TO_SNAPSHOT: list[Tuple[str, list[str], list[str]]] = [
     # FUTURE smoke leaves a NON-synthetic labor-rate row during the CRUD run.
     ("labor_worker_state", ["worker_id"], ["status", "trade"]),
     ("labor_rate_change", ["id"], ["status", "worker_id"]),
+    # Project Documents (#229 Batch A). Same backstop logic as the drop-plan tables:
+    # the CRUD smoke subprocess never writes these, so within a meta run before==after
+    # -> each reports "clean". Snapshotted so a FUTURE smoke leaving a NON-synthetic row
+    # surfaces. Identity leads with project_code (the doc smoke prefixes SMK-) so
+    # synthetic rows auto-filter as expected residue. value_cols are category ONLY —
+    # file_path / title / file_name are NEVER serialized here (path + PII discipline,
+    # mirroring receipt_image_path / worker_rates above).
+    ("project_documents", ["project_code", "id"], ["category"]),
+    # document_requirements: a STATIC seeded reference table (like cert_types) — the CRUD
+    # smoke never touches it, so before==after -> clean. Identity = the natural key.
+    ("document_requirements", ["category", "requirement_key"], ["sort_order"]),
 ]
 
 

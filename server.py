@@ -3787,6 +3787,330 @@ def api_project_crew_compliance(project_code):
         conn.close()
 
 
+# ===========================================================================
+# Project Documents — Batch A (#229): per-project compliance doc checklist +
+# single/bulk upload + gated file serving. file_path is on-disk ONLY (NEVER in
+# any JSON); readiness/status is COMPUTED from expiry (LOCAL date). NO AI yet.
+# ===========================================================================
+_PROJDOC_ROLES = ('admin', 'c_suite', 'pm', 'super')   # site-management; Contracts may tighten to admin/c_suite later
+_PROJDOC_CATEGORIES = ('PERMITS', 'DRAWINGS', 'CONTRACTS', 'INSPECTIONS', 'SAFETY', 'CLOSEOUT')
+_PROJDOC_CATNAMES = {
+    'PERMITS': 'Permits & Approvals', 'DRAWINGS': 'Drawings & Engineering',
+    'CONTRACTS': 'Contracts & Financial', 'INSPECTIONS': 'Inspections & Reports',
+    'SAFETY': 'Safety & Compliance', 'CLOSEOUT': 'Closeout',
+}
+_PROJDOC_EXT_TYPE = {
+    '.pdf': ('PDF', 'application/pdf'),
+    '.jpg': ('JPG', 'image/jpeg'), '.jpeg': ('JPG', 'image/jpeg'),
+    '.png': ('PNG', 'image/png'),
+    '.heic': ('HEIC', 'image/heic'), '.heif': ('HEIC', 'image/heif'),
+    '.xlsx': ('XLSX', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+}
+
+
+def _projdoc_suggest_category(filename):
+    """Filename heuristic for the bulk tray's category auto-suggest (overridable)."""
+    f = (filename or '').lower()
+    if any(k in f for k in ('coi', 'insurance', 'contract', 'aia', 'sov', 'bond')):
+        return 'CONTRACTS'
+    if any(k in f for k in ('rope', 'sds', 'safety', 'sst', 'toolbox')):
+        return 'SAFETY'
+    if any(k in f for k in ('arch', 'drawing', 'draw', 'rev', 'struct', 'shop')):
+        return 'DRAWINGS'
+    if any(k in f for k in ('fisp', 'inspect', 'probe', 'tr1', 'qewi', 'signoff', 'sign-off')):
+        return 'INSPECTIONS'
+    if any(k in f for k in ('completion', 'warrant', 'lien', 'closeout')):
+        return 'CLOSEOUT'
+    if any(k in f for k in ('permit', 'pw2', 'best', 'variance', 'shed')):
+        return 'PERMITS'
+    return 'PERMITS'
+
+
+def _projdoc_status(d, today_iso, d30_iso):
+    if d.get('superseded'):
+        return 'superseded'
+    exp = d.get('expiry_date')
+    if exp:
+        if exp < today_iso:
+            return 'expired'
+        if exp <= d30_iso:
+            return 'expiring'
+    return 'on_file'
+
+
+def _projdoc_public(d, today_iso, d30_iso):
+    """PII/path-safe shape — NO file_path. file_url is the GATED route, not a path."""
+    return {
+        'id': d['id'], 'project_code': d['project_code'], 'category': d['category'],
+        'requirement_key': d['requirement_key'], 'title': d['title'], 'doc_type': d['doc_type'],
+        'file_name': d['file_name'], 'file_size': d['file_size'], 'mime': d['mime'],
+        'effective_date': d['effective_date'], 'expiry_date': d['expiry_date'],
+        'version': d['version'], 'notes': d['notes'], 'superseded': d['superseded'],
+        'uploaded_at': d['uploaded_at'], 'status': _projdoc_status(d, today_iso, d30_iso),
+        'file_url': f"/api/documents/{d['id']}/file",
+    }
+
+
+def _projdoc_save_file(project_code, fs):
+    """Save an upload under data_room/project_docs/<project>/<uuid>.<ext>.
+    Returns (path, doc_type, mime, file_size); raises ValueError on a bad type/path.
+    The stored name is a uuid — the original filename never touches the path."""
+    ext = Path(fs.filename or 'document').suffix.lower()
+    if ext not in _PROJDOC_EXT_TYPE:
+        raise ValueError(f"unsupported file type: {ext or '(none)'}")
+    base = (SCRIPT_DIR / 'data_room' / 'project_docs').resolve()
+    pdir = SCRIPT_DIR / 'data_room' / 'project_docs' / project_code
+    if not pdir.resolve().is_relative_to(base):
+        raise ValueError("invalid project path")
+    pdir.mkdir(parents=True, exist_ok=True)
+    fpath = pdir / (uuid.uuid4().hex + ext)
+    fs.save(str(fpath))
+    doc_type, mime = _PROJDOC_EXT_TYPE[ext]
+    return fpath, doc_type, mime, fpath.stat().st_size
+
+
+def _projdoc_insert(conn, project_code, fs, form):
+    """Single-row insert from a FileStorage + form-like dict. Rolls the on-disk file
+    back on DB failure so disk/DB never diverge. Returns the new id."""
+    category = (form.get('category') or '').strip().upper()
+    if category not in _PROJDOC_CATEGORIES:
+        raise ValueError("invalid category")
+    fpath, doc_type, mime, size = _projdoc_save_file(project_code, fs)
+    try:
+        rk = (form.get('requirement_key') or '').strip() or None
+        file_name = Path(fs.filename or 'document').name
+        title = (form.get('title') or '').strip() or file_name
+        eff = (form.get('effective_date') or '').strip() or None
+        exp = (form.get('expiry_date') or '').strip() or None
+        for dval in (eff, exp):
+            if dval:
+                datetime.strptime(dval, '%Y-%m-%d')   # LOCAL YYYY-MM-DD validation
+        version = (form.get('version') or '').strip() or None
+        notes = (form.get('notes') or '').strip() or None
+        uid = (current_user() or {}).get('id')
+        cur = conn.execute(
+            "INSERT INTO project_documents (project_code, category, requirement_key, title, doc_type, "
+            "file_path, file_name, file_size, mime, effective_date, expiry_date, version, notes, "
+            "superseded, uploaded_by_uid, uploaded_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?)",
+            (project_code, category, rk, title, doc_type, str(fpath), file_name, size, mime,
+             eff, exp, version, notes, uid, datetime.now().isoformat()))
+        return cur.lastrowid
+    except Exception:
+        try:
+            fpath.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise
+
+
+@app.route('/api/projects/<project_code>/documents', methods=['GET'])
+@requires_role(*_PROJDOC_ROLES)
+def api_project_documents(project_code):
+    """#229 — the compliance checklist payload: per category, each REQUIRED item with
+    its computed status (on_file/missing/expiring/expired) + extra docs + the readiness
+    rollup (on_file/missing/attention + % of required on file). NO *_path. no-store."""
+    conn = db()
+    try:
+        today = date.today()
+        today_iso = today.isoformat()
+        d30_iso = (today + timedelta(days=30)).isoformat()
+        reqs = [dict(r) for r in conn.execute(
+            "SELECT category, requirement_key, label, sort_order FROM document_requirements "
+            "ORDER BY category, sort_order").fetchall()]
+        docs = [dict(d) for d in conn.execute(
+            "SELECT * FROM project_documents WHERE project_code=? ORDER BY uploaded_at DESC, id DESC",
+            (project_code,)).fetchall()]
+        by_req = {}   # most-recent non-superseded doc fulfilling each requirement
+        for d in docs:
+            rk = d['requirement_key']
+            if rk and not d['superseded'] and rk not in by_req:
+                by_req[rk] = d
+        cat_reqs = {}
+        for r in reqs:
+            cat_reqs.setdefault(r['category'], []).append(r)
+        agg = {'required_total': 0, 'on_file': 0, 'missing': 0, 'attention': 0}
+        out_cats = []
+        for code in _PROJDOC_CATEGORIES:
+            items = []
+            for r in cat_reqs.get(code, []):
+                d = by_req.get(r['requirement_key'])
+                agg['required_total'] += 1
+                if d:
+                    st = _projdoc_status(d, today_iso, d30_iso)
+                    agg['attention' if st in ('expiring', 'expired') else 'on_file'] += 1
+                    items.append({'requirement_key': r['requirement_key'], 'label': r['label'],
+                                  'status': st, 'doc': _projdoc_public(d, today_iso, d30_iso)})
+                else:
+                    agg['missing'] += 1
+                    items.append({'requirement_key': r['requirement_key'], 'label': r['label'],
+                                  'status': 'missing', 'doc': None})
+            req_keys = {r['requirement_key'] for r in cat_reqs.get(code, [])}
+            extras = [_projdoc_public(d, today_iso, d30_iso) for d in docs
+                      if d['category'] == code and (not d['requirement_key']
+                                                    or d['requirement_key'] not in req_keys or d['superseded'])]
+            filed = sum(1 for it in items if it['status'] != 'missing')
+            out_cats.append({'category': code, 'name': _PROJDOC_CATNAMES[code], 'items': items,
+                             'extras': extras, 'filed': filed, 'total': len(items)})
+        rt = agg['required_total']
+        pct = round(100 * agg['on_file'] / rt) if rt else 0
+        resp = response_wrapper({'categories': out_cats, 'readiness': {**agg, 'pct': pct}})
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return resp
+    finally:
+        conn.close()
+
+
+@app.route('/api/projects/<project_code>/documents', methods=['POST'])
+@requires_role(*_PROJDOC_ROLES)
+def api_project_documents_upload(project_code):
+    """#229 — upload ONE document (multipart: file + category, requirement_key, title,
+    effective_date, expiry_date, version, notes). LOCAL dates."""
+    conn = db()
+    try:
+        if not validate_project_exists(conn, project_code):
+            return jsonify({"error": "project not found"}), 404
+        if 'file' not in request.files:
+            return jsonify({"error": "no file"}), 400
+        try:
+            new_id = _projdoc_insert(conn, project_code, request.files['file'], request.form)
+        except ValueError as ve:
+            return jsonify({"error": str(ve)}), 400
+        conn.commit()
+        today = date.today()
+        row = dict(conn.execute("SELECT * FROM project_documents WHERE id=?", (new_id,)).fetchone())
+        return response_wrapper(_projdoc_public(row, today.isoformat(), (today + timedelta(days=30)).isoformat())), 201
+    except Exception as e:
+        logging.error(f"POST /api/projects/{project_code}/documents: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/projects/<project_code>/documents/bulk', methods=['POST'])
+@requires_role(*_PROJDOC_ROLES)
+def api_project_documents_bulk(project_code):
+    """#229 — upload MANY in one request. Client sends file_<i> + category_<i> (chosen
+    category per file, seeded by the filename heuristic + operator override) + expiry_<i>."""
+    conn = db()
+    try:
+        if not validate_project_exists(conn, project_code):
+            return jsonify({"error": "project not found"}), 404
+        pairs = []
+        i = 0
+        while f'file_{i}' in request.files:
+            pairs.append((i, request.files[f'file_{i}']))
+            i += 1
+        if not pairs:   # fallback: any file values, category from heuristic
+            pairs = list(enumerate(request.files.values()))
+        if not pairs:
+            return jsonify({"error": "no files"}), 400
+        saved, errors = [], []
+        for idx, fs in pairs:
+            cat = (request.form.get(f'category_{idx}') or request.form.get('category') or '').strip().upper()
+            if cat not in _PROJDOC_CATEGORIES:
+                cat = _projdoc_suggest_category(fs.filename)
+            form = {'category': cat, 'title': fs.filename,
+                    'expiry_date': request.form.get(f'expiry_{idx}', '')}
+            try:
+                saved.append(_projdoc_insert(conn, project_code, fs, form))
+            except ValueError as ve:
+                errors.append({'file': Path(fs.filename or '?').name, 'error': str(ve)})
+        conn.commit()
+        return response_wrapper({'saved': len(saved), 'ids': saved, 'errors': errors}), 201
+    except Exception as e:
+        logging.error(f"POST /api/projects/{project_code}/documents/bulk: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/documents/suggest-category', methods=['GET'])
+@requires_role(*_PROJDOC_ROLES)
+def api_projdoc_suggest():
+    """Filename -> suggested category (one home for the bulk-tray heuristic). ?filename=..."""
+    return response_wrapper({'category': _projdoc_suggest_category(request.args.get('filename', ''))})
+
+
+@app.route('/api/documents/<int:doc_id>/file', methods=['GET'])
+@requires_role(*_PROJDOC_ROLES)
+def api_projdoc_file(doc_id):
+    """Serve a document's bytes through THIS auth-gated route ONLY. Never exposes the
+    path; confined to data_room/project_docs/. no-store (docs may be sensitive)."""
+    from flask import send_file
+    conn = db()
+    try:
+        row = conn.execute("SELECT file_path, mime FROM project_documents WHERE id=?", (doc_id,)).fetchone()
+        if not row or not row['file_path']:
+            return jsonify({"error": "not found"}), 404
+        p = Path(row['file_path'])
+        base = (SCRIPT_DIR / 'data_room' / 'project_docs').resolve()
+        if not (p.resolve().is_relative_to(base) and p.exists()):
+            return jsonify({"error": "file missing"}), 404
+        resp = send_file(str(p), mimetype=row['mime'] or 'application/octet-stream')
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return resp
+    finally:
+        conn.close()
+
+
+@app.route('/api/documents/<int:doc_id>', methods=['PATCH'])
+@requires_role(*_PROJDOC_ROLES)
+def api_projdoc_patch(doc_id):
+    """#229 — edit metadata / mark superseded. Whitelisted fields only; never the path."""
+    conn = db()
+    try:
+        if not conn.execute("SELECT 1 FROM project_documents WHERE id=?", (doc_id,)).fetchone():
+            return jsonify({"error": "not found"}), 404
+        body = request.get_json(silent=True) or {}
+        fields = {}
+        for k in ('category', 'requirement_key', 'title', 'effective_date', 'expiry_date', 'version', 'notes', 'superseded'):
+            if k in body:
+                fields[k] = body[k]
+        if 'category' in fields and fields['category'] not in _PROJDOC_CATEGORIES:
+            return jsonify({"error": "invalid category"}), 400
+        for dk in ('effective_date', 'expiry_date'):
+            if fields.get(dk):
+                try:
+                    datetime.strptime(fields[dk], '%Y-%m-%d')
+                except ValueError:
+                    return jsonify({"error": f"{dk} must be YYYY-MM-DD"}), 400
+        if 'superseded' in fields:
+            fields['superseded'] = 1 if fields['superseded'] else 0
+        if not fields:
+            return jsonify({"error": "no fields"}), 400
+        sets = ", ".join(f"{k}=?" for k in fields)
+        conn.execute(f"UPDATE project_documents SET {sets} WHERE id=?", (*fields.values(), doc_id))
+        conn.commit()
+        today = date.today()
+        row = dict(conn.execute("SELECT * FROM project_documents WHERE id=?", (doc_id,)).fetchone())
+        return response_wrapper(_projdoc_public(row, today.isoformat(), (today + timedelta(days=30)).isoformat()))
+    finally:
+        conn.close()
+
+
+@app.route('/api/documents/<int:doc_id>', methods=['DELETE'])
+@requires_role(*_PROJDOC_ROLES)
+def api_projdoc_delete(doc_id):
+    """#229 — remove the row + its on-disk file (confined to data_room/project_docs/)."""
+    conn = db()
+    try:
+        row = conn.execute("SELECT file_path FROM project_documents WHERE id=?", (doc_id,)).fetchone()
+        if not row:
+            return jsonify({"error": "not found"}), 404
+        conn.execute("DELETE FROM project_documents WHERE id=?", (doc_id,))
+        conn.commit()
+        try:
+            p = Path(row['file_path'])
+            base = (SCRIPT_DIR / 'data_room' / 'project_docs').resolve()
+            if p.resolve().is_relative_to(base):
+                p.unlink(missing_ok=True)
+        except Exception as e:
+            logging.warning(f"projdoc delete file unlink failed for {doc_id}: {e}")
+        return response_wrapper({"deleted": doc_id})
+    finally:
+        conn.close()
+
+
 # ---------------------------------------------------------------------------
 # Reports Phase 1 — shared spine endpoints (read-only)
 # ---------------------------------------------------------------------------
