@@ -1103,7 +1103,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #227 · 2026-06-05 · Drop Plan — By-Stage columns scroll internally when overflowing (all chips render, no +N truncation)</div>
+          <div class="ph-build" id="ph-build-stamp">build #228 · 2026-06-05 · Drop Plan — By-Stage columns fixed contained height · long column scrolls inside its box (no board growth)</div>
         </div>
       </section>
 
@@ -1425,18 +1425,19 @@
           .dp-qrun{font-size:11.5px;color:var(--dp-muted);text-align:center;margin-top:9px}
           .dp-qerr{color:var(--dp-amber);font-size:11.5px;text-align:center;margin-top:6px;min-height:14px}
           .dp-pipe{display:flex;gap:11px;overflow-x:auto;padding-bottom:8px;align-items:flex-start}
-          .dp-pcol{flex:1;min-width:140px;background:#fff;border:1px solid var(--dp-line);border-radius:12px;padding:11px}
-          .dp-pchead{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;margin-bottom:10px;gap:8px}
+          .dp-pcol{--dp-colh:360px;flex:1;min-width:140px;background:#fff;border:1px solid var(--dp-line);border-radius:12px;padding:11px;height:var(--dp-colh);display:flex;flex-direction:column}
+          .dp-pchead{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;margin-bottom:10px;gap:8px;flex:none}
           .dp-pchead .dp-pn{background:#eef0f3;color:var(--dp-muted);border-radius:999px;font-size:11px;padding:1px 8px;font-weight:700;flex:none}
-          .dp-chip{display:flex;align-items:center;gap:7px;background:#fafbfc;border:1px solid var(--dp-line);border-radius:9px;padding:7px 9px;margin-bottom:6px;font-size:12.5px;font-weight:600;cursor:pointer}
+          .dp-chip{display:flex;align-items:center;gap:7px;background:#fafbfc;border:1px solid var(--dp-line);border-radius:9px;padding:7px 9px;margin-bottom:6px;font-size:12.5px;font-weight:600;cursor:pointer;flex:none}
           .dp-chip:hover{border-color:var(--dp-edge)}
           .dp-chip.dp-sel{border-color:var(--dp-edge);background:var(--dp-in)}
           .dp-chip .dp-cdot{width:8px;height:8px;border-radius:50%;flex:none}
           .dp-chip .dp-el{margin-left:auto;font-size:10px;color:var(--dp-muted);font-weight:700}
-          .dp-more{font-size:11px;color:var(--dp-muted);text-align:center;padding:3px}
-          /* #227 — a column's chip list scrolls INTERNALLY when it overflows; auto = scrollbar only when needed.
-             The header (dp-pchead) sits ABOVE this and stays fixed. Horizontal pipe scroll is unchanged. */
-          .dp-pchips{max-height:62vh;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#d7dae1 transparent}
+          .dp-more{font-size:11px;color:var(--dp-muted);text-align:center;padding:3px;margin:auto}
+          /* #228 — the COLUMN is a fixed-height (--dp-colh) flex box; the header is flex:none and the chip
+             list (flex:1) scrolls INSIDE it, so a long column never grows the board. auto = scrollbar only
+             when needed; slim/neutral. Horizontal pipe scroll is unchanged. */
+          .dp-pchips{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;scrollbar-width:thin;scrollbar-color:#d7dae1 transparent}
           .dp-pchips::-webkit-scrollbar{width:7px}
           .dp-pchips::-webkit-scrollbar-thumb{background:#d7dae1;border-radius:7px}
           .dp-pchips::-webkit-scrollbar-track{background:transparent}
@@ -1454,7 +1455,7 @@
           </div>
           <div id="dp-elev"></div>
           <div id="dp-stage" class="dp-hide"></div>
-          <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:18px;" id="dp-build-stamp">build #227 · 2026-06-05 · Drop Plan — By-Stage columns scroll internally (all chips render)</div>
+          <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:18px;" id="dp-build-stamp">build #228 · 2026-06-05 · Drop Plan — By-Stage columns fixed height · scroll inside the box</div>
         </div>
       </section>
 
