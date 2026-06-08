@@ -1086,7 +1086,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #231 · 2026-06-05 · Project Documents — Blank Forms moved to Templates · #148 placeholder removed</div>
+          <div class="ph-build" id="ph-build-stamp">build #232 · 2026-06-08 · Templates — Blank Forms reuses the Signage Templates card layout</div>
         </div>
       </section>
 
@@ -4343,13 +4343,27 @@ document.querySelectorAll('.nav-link').forEach(link => {
   window.PROJ_loadProductUsage = function(){ loadProductUsage(); };
 })();
 
-// ---- Templates page — Blank Forms subsection (#231: moved here from
-// Project Documents) ------------------------------------------------
-// Loads /api/blank-forms; renders each as a click-to-open card. PDFs
-// open in a new tab via the /files/ static route.
+// ---- Templates page — Blank Forms subsection -----------------------
+// #231: moved here from Project Documents.
+// #232: renders with the IDENTICAL card component as the Signage
+// Templates grid below — colored left border by category (same _color
+// map), "CATEGORY · PDF" tag, bold title, "Open ↗" link, same grid — so
+// the two Templates sections match exactly. Loads /api/blank-forms; PDFs
+// open in a new tab via the /files/ static route (open/print intact).
 (function() {
   const _esc = (s) => (s == null ? '' : String(s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'));
+
+  // Category -> left-border color. SAME mapping as PROJ_loadSignageTemplates'
+  // _color (#160/#169) so a Safety form gets the same red as a Safety sign.
+  // Keep in sync with the signage card (#232).
+  function _color(cat) {
+    if (cat === 'Safety') return '#B11E2E';
+    if (cat === 'PPE')    return '#1b5cb3';
+    if (cat === 'DOB')    return '#B68838';
+    if (cat === 'Site')   return '#2F7C57';
+    return '#76777E';
+  }
 
   async function load() {
     const grid = document.getElementById('proj-blank-forms');
@@ -4359,24 +4373,27 @@ document.querySelectorAll('.nav-link').forEach(link => {
       const j = await resp.json();
       const rows = (j && j.data) || [];
       if (!rows.length) {
-        grid.innerHTML = '<div style="padding:14px;text-align:center;color:#76777E;font-style:italic;background:white;border:1px solid #E8E4DD;border-radius:4px;">No blank forms yet.</div>';
+        grid.innerHTML = '<div style="padding:14px;text-align:center;color:#76777E;font-style:italic;background:white;border:1px solid #E8E4DD;border-radius:4px;grid-column:1/-1;">No blank forms yet.</div>';
         return;
       }
+      // #232: card markup identical to PROJ_loadSignageTemplates' _render
+      // (flex-column, category-colored left border, 10px tag, 18px title,
+      // "Open ↗"; no description line — matches the signage card).
       grid.innerHTML = rows.map(r => {
+        const c = _color(r.category);
         const ext = (r.filename || '').split('.').pop().toUpperCase();
         return `<a href="${_esc(r.file_url)}" target="_blank" rel="noopener"
-                    style="display:block;padding:14px;background:white;border:1px solid #E8E4DD;border-left:4px solid #B11E2E;border-radius:4px;text-decoration:none;color:inherit;transition:all 0.15s;"
-                    onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.08)';this.style.borderLeftColor='#8B1623';"
-                    onmouseout="this.style.boxShadow='';this.style.borderLeftColor='#B11E2E';">
-          <div style="font-size:9px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">${_esc(r.category || 'Form')} · ${_esc(ext)}</div>
-          <div style="font-weight:700;font-size:13px;color:#14161C;margin-bottom:4px;">${_esc(r.title)}</div>
-          ${r.description ? '<div style="font-size:11px;color:#76777E;line-height:1.4;">' + _esc(r.description) + '</div>' : ''}
-          <div style="font-size:10px;color:#B11E2E;font-weight:600;margin-top:6px;letter-spacing:0.04em;text-transform:uppercase;">Open ↗</div>
+                    style="display:flex;flex-direction:column;padding:14px 16px 14px;background:white;border:1px solid #E8E4DD;border-left:4px solid ${c};border-radius:4px;text-decoration:none;color:inherit;transition:all 0.15s;min-height:170px;"
+                    onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.08)';"
+                    onmouseout="this.style.boxShadow='';">
+          <div style="font-size:10px;font-weight:800;color:${c};text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">${_esc(r.category || 'Form')} · ${_esc(ext)}</div>
+          <div style="flex:1;font-family:Inter,Archivo,system-ui,sans-serif;font-weight:800;font-size:18px;color:#14161C;line-height:1.22;">${_esc(r.title)}</div>
+          <div style="font-size:11px;color:${c};font-weight:800;letter-spacing:0.08em;text-transform:uppercase;margin-top:12px;">Open ↗</div>
         </a>`;
       }).join('');
     } catch (e) {
       console.warn('[blank-forms] load failed:', e);
-      grid.innerHTML = '<div style="padding:14px;text-align:center;color:#B11E2E;background:white;border:1px solid #E8E4DD;border-radius:4px;">Network error — retry</div>';
+      grid.innerHTML = '<div style="padding:14px;text-align:center;color:#B11E2E;background:white;border:1px solid #E8E4DD;border-radius:4px;grid-column:1/-1;">Network error — retry</div>';
     }
   }
   window.PROJ_loadBlankForms = load;
