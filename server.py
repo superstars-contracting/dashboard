@@ -34,8 +34,11 @@ app.register_blueprint(preview_bp)
 from auth import apply_auth_gate, requires_role, current_user  # noqa: F401 (requires_role re-exported for future use)
 apply_auth_gate(app)
 
-# Security: max upload size (20 MB per file). Anything larger is rejected at the WSGI layer.
-app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
+# Security: cap upload size. Raised to 256 MB (#235) so a field-photo BATCH POST
+# (many images, several 8-12 MB) isn't rejected at the WSGI layer; the Field
+# Photos UI also uploads in chunks. A request over the cap returns a clean 413
+# JSON (see the 413 handler in the Field Photos section), never a 500.
+app.config['MAX_CONTENT_LENGTH'] = 256 * 1024 * 1024
 
 # Whitelist of allowed file types for worker document uploads
 ALLOWED_DOC_MIME_TYPES = {
@@ -8257,6 +8260,444 @@ def dropplan_page():
     resp.headers['Pragma'] = 'no-cache'
     resp.headers['Expires'] = '0'
     return resp
+
+
+# ===========================================================================
+# Field Photos — Phase 1 (#235): per-project work-in-progress photo gallery +
+# Unassigned sort/assign tray + bulk upload. file_path/thumb_path are on-disk
+# ONLY (NEVER in JSON); the gated /api/field-photos/<id>/(thumb|file) routes serve the
+# bytes. GPS/EXIF is stripped on processing; dates are LOCAL. All four project
+# roles can view + upload.
+# ===========================================================================
+_FP_ROLES = ('admin', 'c_suite', 'pm', 'super')
+_FP_BASE = SCRIPT_DIR / 'data_room' / 'field_photos'
+_FP_EXT = {'.jpg', '.jpeg', '.png', '.heic', '.heif', '.webp'}
+_FP_MAX_FILES = 60            # per single POST (the UI chunks bigger batches)
+_FP_CLUSTER_GAP_MIN = 90      # a > 90-min gap (or a date change) starts a new time cluster
+
+
+@app.errorhandler(413)
+def _fp_request_too_large(e):
+    return jsonify({"error": "That upload is too large for one request — the app uploads photos in "
+                             "smaller groups; try again or select fewer at once.", "too_large": True}), 413
+
+
+def _fp_drop_labels(conn, project_code):
+    out = {}
+    for r in conn.execute("SELECT drop_id, sequence_no, elevation FROM drops WHERE project_code=?", (project_code,)):
+        out[r["drop_id"]] = f"DP-{r['sequence_no']} · {r['elevation'] or '—'}"
+    return out
+
+
+def _fp_drops_list(conn, project_code):
+    rows = conn.execute("SELECT drop_id, sequence_no, elevation FROM drops WHERE project_code=? ORDER BY sequence_no",
+                        (project_code,)).fetchall()
+    return [{"drop_id": r["drop_id"], "label": f"DP-{r['sequence_no']} · {r['elevation'] or '—'}",
+             "sequence_no": r["sequence_no"], "elevation": r["elevation"]} for r in rows]
+
+
+def _fieldphoto_public(r, label_map):
+    """PII/path-safe shape — NO file_path / thumb_path. URLs are the gated routes."""
+    return {
+        "id": r["id"], "project_code": r["project_code"],
+        "drop_id": r["drop_id"], "drop_label": label_map.get(r["drop_id"]) if r["drop_id"] else None,
+        "worker_id": r["worker_id"], "stage": r["stage"], "caption": r["caption"],
+        "taken_at": r["taken_at"], "taken_at_estimated": bool(r["taken_at_estimated"]),
+        "uploaded_at": r["uploaded_at"], "file_name": r["file_name"], "file_size": r["file_size"],
+        "mime": r["mime"], "width": r["width"], "height": r["height"],
+        "orientation_applied": bool(r["orientation_applied"]),
+        "thumb_url": f"/api/field-photos/{r['id']}/thumb", "file_url": f"/api/field-photos/{r['id']}/file",
+    }
+
+
+def _fp_write(project_code, res):
+    """Write the display + thumb bytes under data_room/field_photos/<project>/<uuid>/.
+    Returns (file_path, thumb_path). Raises on a bad path."""
+    base = _FP_BASE.resolve()
+    pdir = _FP_BASE / project_code / uuid.uuid4().hex
+    if not pdir.resolve().is_relative_to(base):
+        raise ValueError("invalid project path")
+    pdir.mkdir(parents=True, exist_ok=True)
+    fpath = pdir / ("full" + res["ext"])
+    tpath = pdir / ("thumb" + res["ext"])
+    fpath.write_bytes(res["display_bytes"])
+    tpath.write_bytes(res["thumb_bytes"])
+    return str(fpath), str(tpath)
+
+
+def _fp_parse_batch_date(s):
+    """MM/DD/YYYY or YYYY-MM-DD -> 'YYYY-MM-DD 12:00:00' (LOCAL noon) for the
+    no-EXIF fallback, or None."""
+    s = (s or "").strip()
+    if not s:
+        return None
+    for fmt in ("%m/%d/%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(s, fmt).strftime("%Y-%m-%d 12:00:00")
+        except ValueError:
+            continue
+    return None
+
+
+def _fp_dt(s):
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            return datetime.strptime(str(s)[:19], fmt)
+        except (ValueError, TypeError):
+            continue
+    return None
+
+
+def _fp_cluster_label(first_dt, last_dt):
+    if not first_dt:
+        return "Undated"
+    day = f"{first_dt:%a} {first_dt:%b} {first_dt.day}"
+    def t(d):
+        h = d.hour % 12 or 12
+        return f"{h}:{d.minute:02d} {'AM' if d.hour < 12 else 'PM'}"
+    if last_dt and (last_dt - first_dt).total_seconds() > 60:
+        return f"{day} · {t(first_dt)}–{t(last_dt)}"
+    return f"{day} · {t(first_dt)}"
+
+
+def _fp_time_clusters(rows, label_map, tcol):
+    """Group consecutive photos (already ordered ASC by tcol) into clusters,
+    starting a new cluster on a > _FP_CLUSTER_GAP_MIN gap or a date change."""
+    clusters, cur = [], []
+
+    def flush():
+        if not cur:
+            return
+        dts = [_fp_dt(p[tcol]) for p in cur]
+        dts = [d for d in dts if d]
+        clusters.append({
+            "label": _fp_cluster_label(dts[0] if dts else None, dts[-1] if dts else None),
+            "count": len(cur), "likely_one_drop": len(cur) > 1,
+            "photos": [_fieldphoto_public(p, label_map) for p in cur],
+        })
+
+    prev = None
+    for r in rows:
+        dt = _fp_dt(r[tcol])
+        if cur and (dt is None or prev is None or
+                    (dt - prev).total_seconds() > _FP_CLUSTER_GAP_MIN * 60 or dt.date() != prev.date()):
+            flush()
+            cur = []
+        cur.append(r)
+        prev = dt
+    flush()
+    return clusters
+
+
+def _fp_stats(conn, project_code):
+    g = lambda q, p=(): conn.execute(q, (project_code,) + p).fetchone()[0]
+    week_ago = (date.today() - timedelta(days=7)).isoformat()
+    latest = g("SELECT MAX(taken_at) FROM field_photos WHERE project_code=?")
+    return {
+        "total": g("SELECT COUNT(*) FROM field_photos WHERE project_code=?"),
+        "this_week": g("SELECT COUNT(*) FROM field_photos WHERE project_code=? AND substr(taken_at,1,10) >= ?", (week_ago,)),
+        "drops_covered": g("SELECT COUNT(DISTINCT drop_id) FROM field_photos WHERE project_code=? AND drop_id IS NOT NULL"),
+        "total_drops": g("SELECT COUNT(*) FROM drops WHERE project_code=?"),
+        "unassigned": g("SELECT COUNT(*) FROM field_photos WHERE project_code=? AND drop_id IS NULL"),
+        "latest": (str(latest)[:10] if latest else None),
+    }
+
+
+def _fp_no_store(resp):
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    return resp
+
+
+@app.route('/api/projects/<project_code>/photos/upload', methods=['POST'])
+@requires_role(*_FP_ROLES)
+def api_field_photos_upload(project_code):
+    """Upload 1..N images (multipart). Optional batch tags drop_id/date/worker/
+    stage. Each image is processed independently (downscale + thumb + EXIF date +
+    orientation baked in + GPS stripped); a file that can't be decoded is SKIPPED
+    with a reason and the rest still succeed. Lands Unassigned unless a drop was
+    given. Returns a per-file result list. No *_path."""
+    import field_photos as fp
+    files = (request.files.getlist('photos') or request.files.getlist('files')
+             or request.files.getlist('photo'))
+    files = [f for f in files if f and f.filename]
+    if not files:
+        return jsonify({"error": "no files in request"}), 400
+    if len(files) > _FP_MAX_FILES:
+        return jsonify({"error": f"Too many photos in one request — send up to {_FP_MAX_FILES} at a time "
+                                 f"(the app uploads in groups).", "max_files": _FP_MAX_FILES}), 400
+    drop_id = (request.form.get('drop_id') or '').strip() or None
+    worker_id = (request.form.get('worker_id') or request.form.get('worker') or '').strip() or None
+    stage = (request.form.get('stage') or '').strip() or None
+    fallback_dt = _fp_parse_batch_date(request.form.get('date')) or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = db()
+    try:
+        if not validate_project_exists(conn, project_code):
+            return jsonify({"error": "project not found"}), 404
+        if drop_id and not conn.execute("SELECT 1 FROM drops WHERE drop_id=? AND project_code=?",
+                                        (drop_id, project_code)).fetchone():
+            return jsonify({"error": "drop not found for this project"}), 400
+        uid = (current_user() or {}).get('id')
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        stored, skipped = [], []
+        for fs in files:
+            name = Path(fs.filename or 'photo').name
+            try:
+                data = fs.read()
+                res = fp.process_image(data, fs.filename, fallback_dt_iso=fallback_dt)
+            except fp.SkipImage as se:
+                skipped.append({"file": name, "reason": str(se)})
+                continue
+            except Exception as ex:
+                logging.warning(f"field photo process failed ({name}): {type(ex).__name__}: {ex}")
+                skipped.append({"file": name, "reason": f"could not process ({type(ex).__name__})"})
+                continue
+            try:
+                file_path, thumb_path = _fp_write(project_code, res)
+            except Exception as ex:
+                logging.error(f"field photo store failed ({name}): {ex}")
+                skipped.append({"file": name, "reason": "could not store the image"})
+                continue
+            cur = conn.execute(
+                "INSERT INTO field_photos (project_code, drop_id, worker_id, stage, taken_at, taken_at_estimated, "
+                "uploaded_at, uploaded_by_uid, file_path, thumb_path, file_name, file_size, mime, width, height, "
+                "orientation_applied) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (project_code, drop_id, worker_id, stage, res["taken_at"], 1 if res["taken_at_estimated"] else 0,
+                 now, uid, file_path, thumb_path, res["file_name"], len(res["display_bytes"]), res["mime"],
+                 res["width"], res["height"], 1 if res["orientation_applied"] else 0))
+            stored.append({"id": cur.lastrowid, "file": res["file_name"], "taken_at": res["taken_at"],
+                           "estimated": res["taken_at_estimated"], "orientation_applied": res["orientation_applied"]})
+        conn.commit()
+        return _fp_no_store(response_wrapper({
+            "stored": stored, "skipped": skipped,
+            "stored_count": len(stored), "skipped_count": len(skipped),
+            "drop_id": drop_id, "landed": "drop" if drop_id else "unassigned",
+        })), 201
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        logging.error(f"POST photos/upload: {type(e).__name__}: {e}")
+        return jsonify({"error": "Upload failed — try again or with fewer photos."}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/projects/<project_code>/photos', methods=['GET'])
+@requires_role(*_FP_ROLES)
+def api_field_photos_list(project_code):
+    """Gallery — PAGINATED. ?group=drop|time|all, ?drop_id, ?worker_id, ?date
+    (YYYY-MM-DD), ?limit (<=200), ?offset. Returns the page + total/has_more +
+    stats tiles + this project's drops (for the filter/assign list). No *_path."""
+    group = (request.args.get('group') or 'drop').lower()
+    drop_f = (request.args.get('drop_id') or '').strip() or None
+    worker_f = (request.args.get('worker_id') or '').strip() or None
+    date_f = (request.args.get('date') or '').strip() or None
+    try:
+        limit = max(1, min(int(request.args.get('limit', 60)), 200))
+        offset = max(0, int(request.args.get('offset', 0)))
+    except (ValueError, TypeError):
+        limit, offset = 60, 0
+    conn = db()
+    try:
+        if not validate_project_exists(conn, project_code):
+            return jsonify({"error": "project not found"}), 404
+        where, params = ["fp.project_code = ?"], [project_code]
+        if drop_f == '__unassigned__':
+            where.append("fp.drop_id IS NULL")
+        elif drop_f:
+            where.append("fp.drop_id = ?")
+            params.append(drop_f)
+        if worker_f:
+            where.append("fp.worker_id = ?")
+            params.append(worker_f)
+        if date_f:
+            where.append("substr(fp.taken_at,1,10) = ?")
+            params.append(date_f)
+        wsql = " AND ".join(where)
+        if group == 'drop':
+            order = "ORDER BY (d.sequence_no IS NULL), d.sequence_no, fp.taken_at DESC, fp.id DESC"
+        else:
+            order = "ORDER BY fp.taken_at DESC, fp.id DESC"
+        total = conn.execute(f"SELECT COUNT(*) FROM field_photos fp WHERE {wsql}", params).fetchone()[0]
+        rows = conn.execute(
+            f"SELECT fp.*, d.sequence_no FROM field_photos fp LEFT JOIN drops d ON d.drop_id = fp.drop_id "
+            f"WHERE {wsql} {order} LIMIT ? OFFSET ?", params + [limit, offset]).fetchall()
+        label_map = _fp_drop_labels(conn, project_code)
+        out = {
+            "photos": [_fieldphoto_public(r, label_map) for r in rows],
+            "total": total, "limit": limit, "offset": offset,
+            "has_more": (offset + len(rows)) < total, "group": group,
+            "stats": _fp_stats(conn, project_code), "drops": _fp_drops_list(conn, project_code),
+        }
+        return _fp_no_store(response_wrapper(out))
+    finally:
+        conn.close()
+
+
+@app.route('/api/projects/<project_code>/photos/unassigned', methods=['GET'])
+@requires_role(*_FP_ROLES)
+def api_field_photos_unassigned(project_code):
+    """The sort tray — Unassigned photos grouped by taken-at (or upload) time
+    clusters. ?by=time|upload. No *_path."""
+    tcol = "uploaded_at" if (request.args.get('by') or 'time').lower() == 'upload' else "taken_at"
+    conn = db()
+    try:
+        if not validate_project_exists(conn, project_code):
+            return jsonify({"error": "project not found"}), 404
+        rows = conn.execute(
+            f"SELECT * FROM field_photos WHERE project_code=? AND drop_id IS NULL "
+            f"ORDER BY {tcol} ASC, id ASC LIMIT 2000", (project_code,)).fetchall()
+        label_map = _fp_drop_labels(conn, project_code)
+        out = {"clusters": _fp_time_clusters(rows, label_map, tcol), "count": len(rows),
+               "by": tcol, "drops": _fp_drops_list(conn, project_code)}
+        return _fp_no_store(response_wrapper(out))
+    finally:
+        conn.close()
+
+
+@app.route('/api/field-photos/assign', methods=['POST'])
+@requires_role(*_FP_ROLES)
+def api_field_photos_assign():
+    """BULK assign — { photo_ids[], drop_id (null=back to Unassigned), stage?,
+    worker? }. ONE UPDATE for the whole selection. The photos must all be in one
+    project and the drop must belong to it."""
+    body = request.get_json(silent=True) or {}
+    ids = []
+    for i in (body.get('photo_ids') or []):
+        try:
+            ids.append(int(i))
+        except (ValueError, TypeError):
+            pass
+    if not ids:
+        return jsonify({"error": "no photo_ids"}), 400
+    if len(ids) > 5000:
+        return jsonify({"error": "too many photos in one assign"}), 400
+    drop_id = (body.get('drop_id') or '').strip() or None
+    stage = body.get('stage')
+    stage = (str(stage).strip() or None) if stage is not None else None
+    worker = body.get('worker_id') if 'worker_id' in body else body.get('worker')
+    worker = (str(worker).strip() or None) if worker is not None else None
+    qm = ",".join("?" * len(ids))
+    conn = db()
+    try:
+        projs = conn.execute(f"SELECT DISTINCT project_code FROM field_photos WHERE id IN ({qm})", ids).fetchall()
+        if not projs:
+            return jsonify({"error": "no such photos"}), 404
+        if len(projs) > 1:
+            return jsonify({"error": "selection spans multiple projects"}), 400
+        pcode = projs[0]["project_code"]
+        if drop_id and not conn.execute("SELECT 1 FROM drops WHERE drop_id=? AND project_code=?",
+                                        (drop_id, pcode)).fetchone():
+            return jsonify({"error": "drop not found for this project"}), 400
+        sets, sp = ["drop_id = ?"], [drop_id]
+        if stage is not None:
+            sets.append("stage = ?")
+            sp.append(stage)
+        if worker is not None:
+            sets.append("worker_id = ?")
+            sp.append(worker)
+        n = conn.execute(f"UPDATE field_photos SET {', '.join(sets)} WHERE id IN ({qm})", sp + ids).rowcount
+        conn.commit()
+        return _fp_no_store(response_wrapper({"assigned": n, "drop_id": drop_id, "project_code": pcode}))
+    finally:
+        conn.close()
+
+
+def _fp_serve(photo_id, col):
+    conn = db()
+    try:
+        r = conn.execute(f"SELECT {col} AS p, mime FROM field_photos WHERE id=?", (photo_id,)).fetchone()
+    finally:
+        conn.close()
+    if not r or not r["p"]:
+        return jsonify({"error": "not found"}), 404
+    p = Path(r["p"])
+    try:
+        if not p.resolve().is_relative_to(_FP_BASE.resolve()) or not p.exists():
+            return jsonify({"error": "not found"}), 404
+    except (OSError, ValueError):
+        return jsonify({"error": "not found"}), 404
+    return send_file(str(p), mimetype=(r["mime"] or "image/jpeg"), conditional=True)
+
+
+@app.route('/api/field-photos/<int:photo_id>/thumb', methods=['GET'])
+@requires_role(*_FP_ROLES)
+def api_field_photo_thumb(photo_id):
+    return _fp_serve(photo_id, "thumb_path")
+
+
+@app.route('/api/field-photos/<int:photo_id>/file', methods=['GET'])
+@requires_role(*_FP_ROLES)
+def api_field_photo_file(photo_id):
+    return _fp_serve(photo_id, "file_path")
+
+
+@app.route('/api/field-photos/<int:photo_id>', methods=['PATCH'])
+@requires_role(*_FP_ROLES)
+def api_field_photo_patch(photo_id):
+    body = request.get_json(silent=True) or {}
+    conn = db()
+    try:
+        row = conn.execute("SELECT project_code FROM field_photos WHERE id=?", (photo_id,)).fetchone()
+        if not row:
+            return jsonify({"error": "not found"}), 404
+        sets, params = [], []
+        for k in ('worker_id', 'stage', 'caption', 'taken_at'):
+            if k in body:
+                v = body[k]
+                sets.append(f"{k} = ?")
+                params.append((str(v).strip() or None) if v is not None else None)
+        if 'drop_id' in body:
+            d = (body.get('drop_id') or '').strip() or None
+            if d and not conn.execute("SELECT 1 FROM drops WHERE drop_id=? AND project_code=?",
+                                      (d, row["project_code"])).fetchone():
+                return jsonify({"error": "drop not found for this project"}), 400
+            sets.append("drop_id = ?")
+            params.append(d)
+        if 'taken_at_estimated' in body:
+            sets.append("taken_at_estimated = ?")
+            params.append(1 if body.get('taken_at_estimated') else 0)
+        if not sets:
+            return jsonify({"error": "no fields to update"}), 400
+        params.append(photo_id)
+        conn.execute(f"UPDATE field_photos SET {', '.join(sets)} WHERE id=?", params)
+        conn.commit()
+        full = dict(conn.execute("SELECT * FROM field_photos WHERE id=?", (photo_id,)).fetchone())
+        return _fp_no_store(response_wrapper(_fieldphoto_public(full, _fp_drop_labels(conn, full["project_code"]))))
+    finally:
+        conn.close()
+
+
+@app.route('/api/field-photos/<int:photo_id>', methods=['DELETE'])
+@requires_role(*_FP_ROLES)
+def api_field_photo_delete(photo_id):
+    conn = db()
+    try:
+        r = conn.execute("SELECT file_path, thumb_path FROM field_photos WHERE id=?", (photo_id,)).fetchone()
+        if not r:
+            return jsonify({"error": "not found"}), 404
+        paths = (r["file_path"], r["thumb_path"])
+        conn.execute("DELETE FROM field_photos WHERE id=?", (photo_id,))
+        conn.commit()
+    finally:
+        conn.close()
+    base = _FP_BASE.resolve()
+    parent = None
+    for pth in paths:
+        try:
+            p = Path(pth)
+            if p.resolve().is_relative_to(base):
+                parent = p.parent
+                p.unlink(missing_ok=True)
+        except Exception:
+            pass
+    try:
+        if parent and parent.resolve().is_relative_to(base) and not any(parent.iterdir()):
+            parent.rmdir()
+    except Exception:
+        pass
+    return response_wrapper({"deleted": photo_id})
 
 
 # ============= STATIC SERVING =============

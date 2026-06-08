@@ -155,6 +155,15 @@ TABLES_TO_SNAPSHOT: list[Tuple[str, list[str], list[str]]] = [
     # document_requirements: a STATIC seeded reference table (like cert_types) — the CRUD
     # smoke never touches it, so before==after -> clean. Identity = the natural key.
     ("document_requirements", ["category", "requirement_key"], ["sort_order"]),
+    # Field Photos (#235 Phase 1). Same backstop logic as the drop-plan tables:
+    # the CRUD smoke subprocess never writes field_photos, so within a meta run
+    # before==after -> clean. Snapshotted so a FUTURE smoke leaving a NON-synthetic
+    # photo row during the CRUD run surfaces. Identity leads with project_code (the
+    # field-photos smoke prefixes SMK-FOTO) so synthetic rows auto-filter as expected
+    # residue. value_cols are drop_id/stage ONLY — file_path / thumb_path / file_name /
+    # caption are NEVER serialized here (path + PII discipline, mirroring the docs +
+    # receipt_image_path rules above).
+    ("field_photos", ["project_code", "id"], ["drop_id", "stage"]),
 ]
 
 
