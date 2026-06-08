@@ -9,7 +9,7 @@
      vendored GridStack (offline-safe, no CDN) + the shared widget design language
      + the shared per-user layout helper (DashLayout → /api/dashboard/layout). -->
 <link rel="stylesheet" href="/files/static/vendor/gridstack.min.css">
-<link rel="stylesheet" href="/files/static/css/widgets.css?v=211">
+<link rel="stylesheet" href="/files/static/css/widgets.css?v=236">
 <script src="/files/static/vendor/gridstack-all.js"></script>
 <script src="/files/static/js/dash_layout.js" defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -765,7 +765,7 @@
         <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Trade</label><input id="pp-edit-trade" type="text" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
         <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Language</label><select id="pp-edit-lang" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;background:white;"><option value="EN">EN</option><option value="ES">ES</option></select></div>
         <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Phone (any format)</label><input id="pp-edit-phone" type="tel" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
-        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">DOB</label><input id="pp-edit-dob" type="date" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">DOB</label><input id="pp-edit-dob" type="date" data-ssc-max="today" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
         <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Onboarded</label><input id="pp-edit-hire" type="date" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
         <div style="grid-column:1 / span 2;"><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Email</label><input id="pp-edit-email" type="email" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
         <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Emergency Name</label><input id="pp-edit-ec-name" type="text" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
@@ -903,7 +903,7 @@
     <div class="form-section-label" data-i18n="modal-step1">Step 1 · Worker Identity</div>
     <div class="form-grid" style="grid-template-columns:2fr 1fr;">
       <input id="in-name" type="text" data-i18n-ph="ph-name" placeholder="Full Legal Name *">
-      <input id="in-dob" type="date">
+      <input id="in-dob" type="date" data-ssc-max="today">
     </div>
     <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
       <input id="in-trade" type="text" data-i18n-ph="ph-trade" placeholder="Trade (e.g. Mason, Rigger)">

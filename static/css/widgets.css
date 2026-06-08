@@ -10,10 +10,37 @@
    outward glow, plus a whisper of neutral depth. Applied here so both the project page
    (#208) and the company console (#210) get it from one source. ===== */
 :root {
-  --accent:#1E73E8;
-  --accent-edge:rgba(30,115,232,.42);
-  --accent-in:rgba(30,115,232,.14);
+  /* ===== GLOBAL design tokens (#236) — the single source of truth, available
+     everywhere INCLUDING modals/overlays that render at the page root. NEVER
+     define the accent only on a per-module wrapper a modal escapes (that was the
+     invisible-button bug: #230 Docs, recurred #235 Field Photos). Lumen azure. */
+  --accent:#4364dc; --accent-ink:#3a5fd0; --accent-soft:#ebf0fe; --accent-edge:rgba(67,100,220,.30);
+  --accent-in:rgba(67,100,220,.14);          /* ph- inward vignette */
+  --ink:#222633; --muted:#8c92a0; --line:#eceef3; --canvas:#fafbfd;
+  /* Lumen+Oat STATUS tokens — status meaning ONLY (never decoration) */
+  --status-complete:#15a07e; --status-complete-soft:#e7f6f0;
+  --status-active:#4364dc;   --status-active-soft:#ebf0fe;
+  --status-behind:#e9685a;   --status-behind-soft:#fceeec;
+  --status-oat:#cabfad;      --status-oat-soft:#f3f0e9;
 }
+
+/* ===== Shared CTA buttons (#236) — ONE primary style site-wide. A primary
+   button MUST always be the accent blue with a visible label; it must NEVER
+   compute to a transparent/white background. Modals point their action button at
+   .btn-primary so it resolves --accent from :root above (not a wrapper token the
+   modal escaped). Secondary = .btn-ghost. ===== */
+.btn-primary { display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  background:var(--accent); color:#fff; border:none; border-radius:10px; padding:10px 16px;
+  font-size:13px; font-weight:600; line-height:1.2; cursor:pointer; font-family:inherit;
+  box-shadow:0 2px 8px rgba(67,100,220,.25); }
+.btn-primary:hover { background:var(--accent-ink); }
+.btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+.btn-primary svg { width:15px; height:15px; flex:none; }
+.btn-ghost { display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  background:#fff; color:var(--ink); border:1px solid var(--line); border-radius:10px;
+  padding:10px 16px; font-size:13px; font-weight:600; line-height:1.2; cursor:pointer; font-family:inherit; }
+.btn-ghost:hover { border-color:var(--accent-edge); }
+.btn-ghost svg { width:15px; height:15px; flex:none; }
 
 /* KPI tiles */
 .ph-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin:16px 0 20px; }

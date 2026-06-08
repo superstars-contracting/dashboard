@@ -253,7 +253,7 @@
     .exp-head h1 { margin:0; font-size:22px; }
     .exp-head .sub { color:#76777E; font-size:13px; margin-top:3px; }
     .exp-hbtns { display:flex; gap:9px; flex-wrap:wrap; }
-    .exp-primary { background:#1E73E8; border:none; color:#fff; border-radius:10px; padding:9px 15px; font-size:13.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
+    .exp-primary { background:var(--accent); border:none; color:#fff; border-radius:10px; padding:9px 15px; font-size:13.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
     .exp-primary:hover { filter:brightness(.96); }
     .exp-ghost { background:#fff; border:1px solid #E8E4DD; color:#14161C; border-radius:10px; padding:9px 15px; font-size:13.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
     .exp-ghost:hover { border-color:#1E73E8; color:#1E73E8; }
@@ -777,7 +777,7 @@
 <!-- #211 calm-blue widget accent — applied via the SHARED widgets.css, loaded
      AFTER the inline #208 styles so the accent (blue band + inward shading + blue
      rings) wins, giving the project page + the company console one source of truth. -->
-<link rel="stylesheet" href="/files/static/css/widgets.css?v=211">
+<link rel="stylesheet" href="/files/static/css/widgets.css?v=236">
 </head>
 <body>
 <!-- #212 nav icons — inline SVG <symbol> defs (defined ONCE, used via <use>).
@@ -1087,7 +1087,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #235 · 2026-06-08 · Field Photos — gallery + Unassigned sort/assign tray + bulk upload (EXIF/HEIC/orientation-safe)</div>
+          <div class="ph-build" id="ph-build-stamp">build #236 · 2026-06-08 · Design system — global tokens + shared .btn-primary + SSCDatePicker auto-wire; Field Photos modal fixed</div>
         </div>
       </section>
 
@@ -1328,8 +1328,8 @@
             </div>
             <div id="pd-bulk" class="pd-hide"><div id="pd-bulk-rows"></div></div>
             <div class="pd-err" id="pd-modal-err"></div>
-            <div class="pd-mbtns" id="pd-single-btns"><button class="pd-cancel" id="pd-cancel" type="button">Cancel</button><button class="pd-save" id="pd-save-single" type="button" disabled><svg class="pd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg>Save document</button></div>
-            <div class="pd-bfoot pd-hide" id="pd-bulk-foot"><span class="pd-bcount" id="pd-bulk-count">0 files</span><button class="pd-save" id="pd-save-bulk" type="button" disabled><svg class="pd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg><span id="pd-bulk-label">Upload all (0)</span></button></div>
+            <div class="pd-mbtns" id="pd-single-btns"><button class="btn-ghost" id="pd-cancel" type="button">Cancel</button><button class="btn-primary" id="pd-save-single" type="button" disabled><svg class="pd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg>Save document</button></div>
+            <div class="pd-bfoot pd-hide" id="pd-bulk-foot"><span class="pd-bcount" id="pd-bulk-count">0 files</span><button class="btn-primary" id="pd-save-bulk" type="button" disabled><svg class="pd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg><span id="pd-bulk-label">Upload all (0)</span></button></div>
           </div>
         </div>
         <div class="section" style="margin-top:26px;border-top:1px solid #eceef3;padding-top:20px;">
@@ -1597,8 +1597,8 @@
           </div>
           <div class="dcr-toolbar">
             <div class="dcr-searchbox"><svg class="dcr-ic" style="width:15px;height:15px;"><use href="#i-search"/></svg><input id="dcr-search" type="text" placeholder="Search reports by ID or date…" autocomplete="off"></div>
-            <label for="dcr-filter-from">From</label><input class="dcr-inp" type="text" id="dcr-filter-from" placeholder="MM-DD-YYYY">
-            <label for="dcr-filter-to">To</label><input class="dcr-inp" type="text" id="dcr-filter-to" placeholder="MM-DD-YYYY">
+            <label for="dcr-filter-from">From</label><input class="dcr-inp ssc-date" type="text" id="dcr-filter-from" placeholder="MM-DD-YYYY">
+            <label for="dcr-filter-to">To</label><input class="dcr-inp ssc-date" type="text" id="dcr-filter-to" placeholder="MM-DD-YYYY">
             <button id="dcr-filter-apply" class="dcr-apply" type="button">Apply</button>
             <span class="dcr-count" id="dcr-archive-status">Loading…</span>
           </div>
@@ -3594,7 +3594,7 @@
               <div id="exp-form-fields">
                 <div class="exp-frow">
                   <div class="exp-field"><label>Vendor</label><input id="exp-f-vendor" placeholder="e.g. Extech / LITSCO"></div>
-                  <div class="exp-field"><label>Date</label><input id="exp-f-date" type="text" placeholder="MM-DD-YYYY"></div>
+                  <div class="exp-field"><label>Date</label><input id="exp-f-date" class="ssc-date" type="text" placeholder="MM-DD-YYYY"></div>
                 </div>
                 <div class="exp-frow">
                   <div class="exp-field"><label>Document type</label><input id="exp-f-doctype" placeholder="Invoice / Receipt / Pick Ticket / PO"></div>
@@ -4012,7 +4012,7 @@
             <div class="fp-msub">Tag the batch once, drop as many as you like — they land Unassigned unless you pick a drop. We read each photo's date + rotation automatically.</div>
             <div class="fp-tagrow">
               <div class="fp-field"><label>Drop</label><select id="fp-up-drop"><option value="">— Unassigned —</option></select></div>
-              <div class="fp-field"><label>Date taken <span class="fp-opt">(fallback if no EXIF)</span></label><input type="text" id="fp-up-date" placeholder="MM/DD/YYYY"></div>
+              <div class="fp-field"><label>Date taken <span class="fp-opt">(fallback if no EXIF)</span></label><input type="text" id="fp-up-date" class="ssc-date" placeholder="MM-DD-YYYY"></div>
             </div>
             <div class="fp-tagrow">
               <div class="fp-field"><label>Worker <span class="fp-opt">(optional)</span></label><input id="fp-up-worker" placeholder="W-####"></div>
@@ -4023,7 +4023,7 @@
             <div class="fp-thumbs fp-hide" id="fp-up-thumbs"></div>
             <div class="fp-progress fp-hide" id="fp-up-progress"></div>
             <div class="fp-err" id="fp-up-err"></div>
-            <div class="fp-mbtns"><button class="fp-cancel" id="fp-up-cancel" type="button">Cancel</button><button class="fp-save" id="fp-up-go" type="button" disabled><svg class="fp-ic"><use href="#i-upload"/></svg><span id="fp-up-go-lbl">Upload</span></button></div>
+            <div class="fp-mbtns"><button class="btn-ghost" id="fp-up-cancel" type="button">Cancel</button><button class="btn-primary" id="fp-up-go" type="button" disabled><svg><use href="#i-upload"/></svg><span id="fp-up-go-lbl">Upload</span></button></div>
           </div>
         </div>
         <!-- lightbox -->
@@ -6936,7 +6936,8 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   // ---------- upload ----------
   function openUpload(){FP.files=[];$('fp-up-err').textContent='';$('fp-up-progress').classList.add('fp-hide');$('fp-up-progress').innerHTML='';renderUpThumbs();
     if(!$('fp-up-drop').options.length||$('fp-up-drop').options.length<=1){renderFilters();}
-    $('fp-up-date').value='';$('fp-up-worker').value='';$('fp-up-stage').value='';$('fp-up-drop').value='';
+    if(window.SSCDatePicker){SSCDatePicker.wire($('fp-up-date'));SSCDatePicker.setISO($('fp-up-date'),'');}else{$('fp-up-date').value='';}
+    $('fp-up-worker').value='';$('fp-up-stage').value='';$('fp-up-drop').value='';
     $('fp-upload-modal').classList.add('show');}
   function closeUpload(){$('fp-upload-modal').classList.remove('show');FP.files=[];}
   function addFiles(list){
@@ -6956,7 +6957,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   }
   async function doUpload(){
     if(!FP.files.length)return;
-    var drop=$('fp-up-drop').value,date=$('fp-up-date').value.trim(),worker=$('fp-up-worker').value.trim(),stage=$('fp-up-stage').value;
+    var drop=$('fp-up-drop').value,date=(window.SSCDatePicker?SSCDatePicker.getISO($('fp-up-date')):$('fp-up-date').value.trim()),worker=$('fp-up-worker').value.trim(),stage=$('fp-up-stage').value;
     var prog=$('fp-up-progress');prog.classList.remove('fp-hide');$('fp-up-go').disabled=true;$('fp-up-cancel').disabled=true;
     var CHUNK=15,done=0,stored=0,skipped=[],total=FP.files.length;
     for(var i=0;i<total;i+=CHUNK){

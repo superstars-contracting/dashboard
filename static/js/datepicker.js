@@ -391,6 +391,14 @@
   // Wire one input. Idempotent — re-wiring is a no-op.
   function wire(input, opts) {
     if (!input || input.dataset.sscDpWired === '1') return;
+    opts = opts || {};
+    // #236 — let a field carry its OWN constraints via data-attrs, so the global
+    // auto-wire honors them without an explicit per-surface wire() call (e.g. a
+    // DOB field tagged data-ssc-max="today" stays capped at today even if the
+    // auto-wire reaches it first). Explicit opts still win.
+    if (opts.max === undefined && input.dataset.sscMax) opts.max = input.dataset.sscMax;
+    if (opts.minYear === undefined && input.dataset.sscMinYear) opts.minYear = +input.dataset.sscMinYear;
+    if (opts.maxYear === undefined && input.dataset.sscMaxYear) opts.maxYear = +input.dataset.sscMaxYear;
     input.dataset.sscDpWired = '1';
     // Switch off native picker — the canonical YYYY-MM-DD lives on
     // dataset.iso; .value carries the MM-DD-YYYY display form for the
@@ -435,9 +443,47 @@
     for (var i = 0; i < nodes.length; i++) wire(nodes[i], opts);
   }
 
+  // #236 — GLOBAL auto-wire. Wire EVERY date field (the standard class
+  // .ssc-date and any native <input type="date">) so no surface ever ships a
+  // raw MM/DD/YYYY input. Safe to call on any subtree; wire() is idempotent.
+  var DATE_SEL = '.ssc-date, input[type="date"]';
+  function autoWire(root, opts) {
+    root = root || document;
+    try { if (root.nodeType === 1 && root.matches && root.matches(DATE_SEL)) wire(root, opts); } catch (_) {}
+    var nodes = (root.querySelectorAll ? root.querySelectorAll(DATE_SEL) : []);
+    for (var i = 0; i < nodes.length; i++) wire(nodes[i], opts);
+  }
+
+  // On page load: wire everything present. Then keep wiring fields that appear
+  // LATER (dynamically-rendered modals / bulk rows) via a MutationObserver, so
+  // a modal opened after load is covered without each surface calling wire().
+  var _autoStarted = false;
+  function startAutoWire() {
+    if (_autoStarted) return;
+    _autoStarted = true;
+    autoWire(document);
+    if (global.MutationObserver) {
+      var obs = new MutationObserver(function (muts) {
+        for (var i = 0; i < muts.length; i++) {
+          var added = muts[i].addedNodes;
+          for (var j = 0; j < added.length; j++) {
+            if (added[j].nodeType === 1) autoWire(added[j]);
+          }
+        }
+      });
+      try { obs.observe(document.documentElement || document.body, { childList: true, subtree: true }); } catch (_) {}
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startAutoWire);
+  } else {
+    startAutoWire();
+  }
+
   global.SSCDatePicker = {
     wire: wire,
     wireAll: wireAll,
+    autoWire: autoWire,
     parseYMD: parseYMD,
     toYMD: toYMD,
     // Shared display + canonical-value helpers. Every surface that
