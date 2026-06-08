@@ -190,6 +190,52 @@ def box_visible(html, css, el_id, root):
             "border": bcol, "border_resolved": bres, "bg": bg, "bg_resolved": gres}
 
 
+# ---------- form-field boxes (#238): inputs/selects/textareas must be bordered ----------
+def selector_decl(css, selector, prop):
+    """Last `prop:value` for a rule whose comma-separated selector list contains
+    `selector` (e.g. ".fp-field input")."""
+    val = None
+    for m in re.finditer(r"([^{}]+)\{([^}]*)\}", css, re.DOTALL):
+        if selector in [s.strip() for s in m.group(1).split(",")]:
+            pm = re.search(prop + r"\s*:\s*([^;]+)", m.group(2))
+            if pm:
+                val = pm.group(1).strip()
+    return val
+
+
+def field_border_visible(html, css, field_id, root):
+    """Resolve a known modal field's effective border (from its `.wrapper tag`
+    rule and/or its own classes) the way a page-root modal would, and report
+    whether it is visible."""
+    tag = find_tag(html, field_id)
+    if not tag:
+        return None
+    tagname = re.match(r"<([a-zA-Z]+)", tag).group(1).lower()
+    classes = (re.search(r'class="([^"]*)"', tag).group(1).split()
+               if re.search(r'class="([^"]*)"', tag) else [])
+    # nearest preceding wrapper class matching *-field
+    pos = html.find('id="' + field_id + '"')
+    wrapper = None
+    for m in re.finditer(r'class="([^"]*)"', html[:pos]):
+        for c in m.group(1).split():
+            if re.match(r"^[\w-]+-field$", c):
+                wrapper = c
+    border = None
+    if wrapper:
+        b = (selector_decl(css, "." + wrapper + " " + tagname, "border-color")
+             or selector_decl(css, "." + wrapper + " " + tagname, "border"))
+        if b:
+            border = b
+    for c in classes:
+        b = class_decl(css, c, "border-color") or class_decl(css, c, "border")
+        if b:
+            border = b   # an explicit class on the field wins
+    bcol = border_color_of(border)
+    bres = resolve_color(bcol, root) if bcol else None
+    return {"visible": is_visible_bg(bres), "wrapper": wrapper, "tag": tagname,
+            "border": bcol, "border_resolved": bres}
+
+
 def main():
     print("== #236 design-conventions guard ==")
     css = requests.get(f"{BASE}/files/static/css/widgets.css", timeout=15).text
@@ -265,6 +311,28 @@ def main():
            (f"border {box['border']}->{box['border_resolved']} · bg {box['bg']}->{box['bg_resolved']}")
            if box else "(not found)")
         ok(name + "_dashed_border", bool(box and box["dashed"]), str(box["dashed"] if box else None))
+
+    # ---- 6) every form field on a known modal must have a VISIBLE box (#238) ----
+    print("\n-- form-field boxes (#238) --")
+    # self-test: a module-token field border (page-root-unresolvable) is caught; the
+    # global token passes.
+    ok("selftest_bare_field_caught", not is_visible_bg(resolve_color("var(--fp-line)", root)),
+       f"var(--fp-line) -> {resolve_color('var(--fp-line)', root)}")
+    ok("selftest_boxed_field_passes", is_visible_bg(resolve_color("var(--line)", root)),
+       f"var(--line) -> {resolve_color('var(--line)', root)}")
+    ok("shared_field_rule_resolves",
+       is_visible_bg(resolve_color(border_color_of(selector_decl(css, ".fp-field input", "border")), root)),
+       f".fp-field input -> {selector_decl(css, '.fp-field input', 'border')}")
+    # real: known modal fields (input/select/textarea) render bordered
+    for fid in ("fp-up-drop", "fp-up-date", "fp-up-desc",
+                "pd-f-cat", "pd-f-title", "pd-f-eff", "pd-f-notes", "exp-f-date"):
+        fb = field_border_visible(html, css_all, fid, root)
+        ok("field_boxed_" + fid, bool(fb and fb["visible"]),
+           (f"{fb['tag']} in .{fb['wrapper']}: {fb['border']}->{fb['border_resolved']}") if fb else "(not found)")
+    # Field Photos: Description is a free-text textarea; Worker/Stage are gone
+    ok("fp_description_is_textarea", bool(re.search(r'<textarea[^>]*id="fp-up-desc"', html)))
+    ok("fp_worker_stage_removed",
+       all(x not in html for x in ('id="fp-up-worker"', 'id="fp-up-stage"', 'id="fp-bar-stage"')))
 
     print(f"\n== RESULT: {len(PASS)} PASS / {len(FAIL)} FAIL ==")
     if FAIL:

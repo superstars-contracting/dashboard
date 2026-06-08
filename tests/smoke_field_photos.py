@@ -120,8 +120,9 @@ def setup():
 
 def functional():
     print("\n-- FUNCTIONAL --")
-    # single upload -> Unassigned
-    r = upload([("single.jpg", jpg(1600, 1200, exif=exif(dt="2026-06-05 09:00:00")))])
+    # single upload -> Unassigned (with a batch Description -> caption, #238)
+    r = upload([("single.jpg", jpg(1600, 1200, exif=exif(dt="2026-06-05 09:00:00")))],
+               caption="day1 north elevation survey")
     ok("upload_single_201", r.status_code == 201, f"HTTP {r.status_code}")
     j = r.json()["data"]
     ok("single_stored_unassigned", j["stored_count"] == 1 and j["landed"] == "unassigned", str(j))
@@ -135,6 +136,11 @@ def functional():
     ok("gallery_stats", "total" in g["stats"] and g["stats"]["total"] >= 5)
     ok("gallery_no_path_leak", not has_path_leak(g))
     ok("gallery_has_drops_list", any(d["label"].startswith("DP-1") for d in g["drops"]))
+    # #238 — the batch Description was saved to caption on upload
+    _single_id = j["stored"][0]["id"]
+    _sp = [p for p in g["photos"] if p["id"] == _single_id]
+    ok("upload_caption_saved", bool(_sp) and _sp[0]["caption"] == "day1 north elevation survey",
+       str(_sp[0].get("caption") if _sp else "(not in page)"))
     # thumb + file serving
     pid = g["photos"][0]["id"]
     th = requests.get(f"{BASE}/api/field-photos/{pid}/thumb", timeout=30)

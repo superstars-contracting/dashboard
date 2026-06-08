@@ -317,7 +317,7 @@
     .exp-frow { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
     @media (max-width:860px){ .exp-frow { grid-template-columns:1fr; } }
     .exp-field label { display:block; color:#76777E; font-size:11px; font-weight:600; letter-spacing:.03em; text-transform:uppercase; margin-bottom:4px; }
-    .exp-field input, .exp-field select { width:100%; height:36px; border:1px solid #E8E4DD; border-radius:9px; padding:0 10px; font-size:13px; background:#fff; color:#14161C; font-family:inherit; }
+    /* #238 — exp-field inputs/selects now use the shared boxed field style (widgets.css :root tokens) */
     .exp-litbl { border:1px solid #E8E4DD; border-radius:11px; overflow:auto; margin:6px 0 12px; }
     .exp-litbl table { width:100%; border-collapse:collapse; font-size:12.5px; min-width:760px; }
     .exp-litbl th { background:#f7f8fa; color:#76777E; padding:8px 10px; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; text-align:left; }
@@ -777,7 +777,7 @@
 <!-- #211 calm-blue widget accent — applied via the SHARED widgets.css, loaded
      AFTER the inline #208 styles so the accent (blue band + inward shading + blue
      rings) wins, giving the project page + the company console one source of truth. -->
-<link rel="stylesheet" href="/files/static/css/widgets.css?v=237">
+<link rel="stylesheet" href="/files/static/css/widgets.css?v=238">
 </head>
 <body>
 <!-- #212 nav icons — inline SVG <symbol> defs (defined ONCE, used via <use>).
@@ -1087,7 +1087,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #237 · 2026-06-08 · Design system — shared .dropzone (visible box) for Field Photos + Docs uploaders</div>
+          <div class="ph-build" id="ph-build-stamp">build #238 · 2026-06-08 · Design system — shared boxed form fields; Field Photos: Description box replaces Worker/Stage</div>
         </div>
       </section>
 
@@ -1266,8 +1266,7 @@
           /* #237 — drop zone now uses the shared .dropzone (widgets.css :root tokens) */
           .pd-field{margin-bottom:12px}
           .pd-field label{display:block;color:var(--pd-muted);font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:5px}
-          .pd-field input,.pd-field select,.pd-field textarea{width:100%;height:38px;border:1px solid var(--pd-line);border-radius:9px;padding:0 11px;font-size:13px;background:#fff;color:var(--pd-ink);font-family:inherit}
-          .pd-field textarea{height:auto;padding:8px 11px;resize:vertical}
+          /* #238 — pd-field inputs/selects/textareas now use the shared boxed field style (widgets.css :root tokens) */
           .pd-two{display:grid;grid-template-columns:1fr 1fr;gap:11px}
           .pd-aistub{display:flex;align-items:center;gap:8px;background:#f4f6f9;border:1px dashed var(--pd-line);border-radius:9px;padding:9px 11px;margin-bottom:13px;font-size:11.5px;color:var(--pd-muted)}.pd-aistub b{color:var(--pd-accent-ink);font-weight:700}
           /* #234 AI auto-read states + low-confidence field flags */
@@ -3907,6 +3906,7 @@
           .fp-photo .fp-grad{position:absolute;left:0;right:0;bottom:0;height:46%;background:linear-gradient(transparent,rgba(20,22,30,.55))}
           .fp-photo .fp-meta{position:absolute;left:8px;right:8px;bottom:7px;display:flex;align-items:center;justify-content:space-between;color:#fff;font-size:10.5px;font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,.4)}
           .fp-photo .fp-wk{background:rgba(255,255,255,.92);color:#2a2e35;border-radius:6px;padding:1px 6px;font-size:9.5px;font-weight:700}
+          .fp-photo .fp-cap{max-width:62%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
           .fp-photo .fp-stg{position:absolute;top:7px;left:7px;background:rgba(20,22,30,.55);color:#fff;border-radius:6px;padding:2px 7px;font-size:9.5px;font-weight:700}
           .fp-photo .fp-est{position:absolute;top:7px;right:7px;background:rgba(202,191,173,.92);color:#5a5345;border-radius:6px;padding:1px 6px;font-size:9px;font-weight:700}
           /* sort tray selection */
@@ -3931,7 +3931,7 @@
           .fp-msub{color:var(--fp-muted);font-size:12px;margin-bottom:15px}
           .fp-tagrow{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:12px}
           .fp-field label{display:block;color:var(--fp-muted);font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:5px}
-          .fp-field input,.fp-field select{width:100%;height:38px;border:1px solid var(--fp-line);border-radius:9px;padding:0 11px;font-size:13px;background:#fff;color:var(--fp-ink);font-family:inherit}
+          /* #238 — fp-field inputs/selects/textareas now use the shared boxed field style (widgets.css :root tokens) */
           .fp-opt{font-size:9.5px;color:var(--fp-muted);font-weight:600;text-transform:none;letter-spacing:0}
           /* #237 — drop zone now uses the shared .dropzone (widgets.css :root tokens) */
           .fp-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:7px;margin-bottom:12px;max-height:200px;overflow:auto}
@@ -3950,7 +3950,7 @@
           .fp-lb-meta{background:#fff;border-radius:12px;padding:14px 16px;width:100%;max-width:680px;color:var(--fp-ink)}
           .fp-lb-meta .fp-lb-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12.5px}
           .fp-lb-meta .fp-lb-tag{background:#f4f6f9;border-radius:7px;padding:3px 9px;font-weight:600;color:#4a4f59}
-          .fp-lb-cap{width:100%;border:1px solid var(--fp-line);border-radius:9px;padding:8px 11px;font-size:13px;font-family:inherit;margin-top:10px}
+          .fp-lb-cap{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:13px;font-family:inherit;margin-top:10px;resize:vertical;min-height:52px;line-height:1.4}
           .fp-lb-acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
           .fp-lb-acts button{font-size:12px;font-weight:600;border-radius:8px;padding:7px 12px;cursor:pointer;border:1px solid var(--fp-line);background:#fff;color:var(--fp-ink);display:inline-flex;align-items:center;gap:6px}
           .fp-lb-acts .fp-lb-save{background:var(--fp-accent);border-color:var(--fp-accent);color:#fff}
@@ -3997,7 +3997,6 @@
           <span class="fp-bar-n" id="fp-bar-n">0 selected</span>
           <span class="fp-bar-lbl">Assign to</span>
           <select id="fp-bar-drop"><option value="">Drop…</option></select>
-          <select id="fp-bar-stage"><option value="">Stage (optional)</option><option>Survey</option><option>Prep</option><option>Scaffold</option><option>Routing</option><option>Patch</option><option>Coating</option><option>Sign-off</option></select>
           <button class="fp-bar-assign" id="fp-bar-assign" disabled>Assign<svg class="fp-ic"><use href="#i-chev"/></svg></button>
           <button class="fp-bar-clear" id="fp-bar-clearbar">Clear</button>
         </div>
@@ -4010,10 +4009,7 @@
               <div class="fp-field"><label>Drop</label><select id="fp-up-drop"><option value="">— Unassigned —</option></select></div>
               <div class="fp-field"><label>Date taken <span class="fp-opt">(fallback if no EXIF)</span></label><input type="text" id="fp-up-date" class="ssc-date" placeholder="MM-DD-YYYY"></div>
             </div>
-            <div class="fp-tagrow">
-              <div class="fp-field"><label>Worker <span class="fp-opt">(optional)</span></label><input id="fp-up-worker" placeholder="W-####"></div>
-              <div class="fp-field"><label>Stage <span class="fp-opt">(optional)</span></label><select id="fp-up-stage"><option value="">—</option><option>Survey</option><option>Prep</option><option>Scaffold</option><option>Routing</option><option>Patch</option><option>Coating</option><option>Sign-off</option></select></div>
-            </div>
+            <div class="fp-field" style="margin-bottom:12px"><label>Description <span class="fp-opt">(optional)</span></label><textarea id="fp-up-desc" rows="2" placeholder="What's in these photos — area, work done, who…"></textarea></div>
             <div class="dropzone" id="fp-dropzone"><svg class="fp-bi"><use href="#i-camera"/></svg><div><b>Drag photos here or browse</b></div><div class="dz-sub">JPG, PNG, HEIC · or take a photo · drop many for a batch</div></div>
             <input type="file" id="fp-file-input" accept="image/*,.heic,.heif,.heic,.webp" multiple style="display:none">
             <div class="fp-thumbs fp-hide" id="fp-up-thumbs"></div>
@@ -6822,12 +6818,13 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     return d?(EL[d.elevation]||'#9aa0a8'):'#cabfad';
   }
   function photoCard(p){
+    var cap=p.caption?String(p.caption):'';
+    var capShort=cap.length>34?cap.slice(0,32)+'…':cap;
     return '<div class="fp-photo" data-pid="'+p.id+'">'
       +'<img loading="lazy" src="'+esc(p.thumb_url)+'" alt="">'
-      +(p.stage?'<span class="fp-stg">'+esc(p.stage)+'</span>':'')
       +(p.taken_at_estimated?'<span class="fp-est">est date</span>':'')
       +'<div class="fp-grad"></div><div class="fp-meta"><span>'+mdyShort(p.taken_at)+'</span>'
-      +(p.worker_id?'<span class="fp-wk">'+esc(p.worker_id)+'</span>':'<span></span>')+'</div></div>';
+      +(cap?'<span class="fp-cap" title="'+esc(cap)+'">'+esc(capShort)+'</span>':'<span></span>')+'</div></div>';
   }
   function renderGroups(){
     var host=$('fp-groups');
@@ -6891,10 +6888,10 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   }
   async function assignSelected(){
     var drop=$('fp-bar-drop').value;if(!drop||!FP.selected.size)return;
-    var stage=$('fp-bar-stage').value||null;var ids=Array.from(FP.selected);
+    var ids=Array.from(FP.selected);
     $('fp-bar-assign').disabled=true;
     try{
-      var r=await fetch('/api/field-photos/assign',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({photo_ids:ids,drop_id:drop,stage:stage})});
+      var r=await fetch('/api/field-photos/assign',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({photo_ids:ids,drop_id:drop})});
       if(r.ok){FP.selected.clear();FP.drops._rendered=false;await loadUnassigned();loadGallery(true);}
     }catch(e){}
     $('fp-bar-assign').disabled=false;
@@ -6905,12 +6902,10 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     var p=FP.byId[id];if(!p)return;FP.lbId=id;
     $('fp-lb-img').src=p.file_url;
     var tags=[];tags.push('<span class="fp-lb-tag">'+(p.drop_label?esc(p.drop_label):'Unassigned')+'</span>');
-    if(p.stage)tags.push('<span class="fp-lb-tag">'+esc(p.stage)+'</span>');
-    if(p.worker_id)tags.push('<span class="fp-lb-tag">'+esc(p.worker_id)+'</span>');
     tags.push('<span class="fp-lb-tag">'+dtLabel(p.taken_at)+(p.taken_at_estimated?' (est)':'')+'</span>');
     $('fp-lb-meta').innerHTML='<div class="fp-lb-row">'+tags.join('')+'</div>'
-      +'<input class="fp-lb-cap" id="fp-lb-cap" placeholder="Add a caption…" value="'+esc(p.caption||'')+'">'
-      +'<div class="fp-lb-acts"><button class="fp-lb-save" id="fp-lb-save">Save caption</button>'
+      +'<textarea class="fp-lb-cap" id="fp-lb-cap" rows="2" placeholder="Description — area, work done, who…">'+esc(p.caption||'')+'</textarea>'
+      +'<div class="fp-lb-acts"><button class="fp-lb-save" id="fp-lb-save">Save description</button>'
       +'<button class="fp-lb-del" id="fp-lb-del"><svg class="fp-ic"><use href="#i-trash"/></svg>Delete</button>'
       +'<span style="font-size:11px;color:#8c92a0;align-self:center">'+esc(p.file_name||'')+' · '+p.width+'×'+p.height+(p.orientation_applied?' · rotated upright':'')+'</span></div>';
     $('fp-lightbox').classList.add('show');
@@ -6921,7 +6916,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   async function saveCaption(id){
     var v=$('fp-lb-cap').value;
     try{var r=await fetch('/api/field-photos/'+id,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({caption:v})});
-      if(r.ok){var j=await r.json();FP.byId[id]=j.data;$('fp-lb-save').textContent='Saved ✓';setTimeout(function(){if($('fp-lb-save'))$('fp-lb-save').textContent='Save caption';},1200);}}catch(e){}
+      if(r.ok){var j=await r.json();FP.byId[id]=j.data;$('fp-lb-save').textContent='Saved ✓';setTimeout(function(){if($('fp-lb-save'))$('fp-lb-save').textContent='Save description';},1200);}}catch(e){}
   }
   async function delPhoto(id){
     if(!confirm('Delete this photo? This removes the image and its thumbnail.'))return;
@@ -6933,7 +6928,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   function openUpload(){FP.files=[];$('fp-up-err').textContent='';$('fp-up-progress').classList.add('fp-hide');$('fp-up-progress').innerHTML='';renderUpThumbs();
     if(!$('fp-up-drop').options.length||$('fp-up-drop').options.length<=1){renderFilters();}
     if(window.SSCDatePicker){SSCDatePicker.wire($('fp-up-date'));SSCDatePicker.setISO($('fp-up-date'),'');}else{$('fp-up-date').value='';}
-    $('fp-up-worker').value='';$('fp-up-stage').value='';$('fp-up-drop').value='';
+    $('fp-up-desc').value='';$('fp-up-drop').value='';
     $('fp-upload-modal').classList.add('show');}
   function closeUpload(){$('fp-upload-modal').classList.remove('show');FP.files=[];}
   function addFiles(list){
@@ -6953,13 +6948,13 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   }
   async function doUpload(){
     if(!FP.files.length)return;
-    var drop=$('fp-up-drop').value,date=(window.SSCDatePicker?SSCDatePicker.getISO($('fp-up-date')):$('fp-up-date').value.trim()),worker=$('fp-up-worker').value.trim(),stage=$('fp-up-stage').value;
+    var drop=$('fp-up-drop').value,date=(window.SSCDatePicker?SSCDatePicker.getISO($('fp-up-date')):$('fp-up-date').value.trim()),caption=$('fp-up-desc').value.trim();
     var prog=$('fp-up-progress');prog.classList.remove('fp-hide');$('fp-up-go').disabled=true;$('fp-up-cancel').disabled=true;
     var CHUNK=15,done=0,stored=0,skipped=[],total=FP.files.length;
     for(var i=0;i<total;i+=CHUNK){
       var chunk=FP.files.slice(i,i+CHUNK);
       var fd=new FormData();chunk.forEach(function(f){fd.append('photos',f,f.name);});
-      if(drop)fd.append('drop_id',drop);if(date)fd.append('date',date);if(worker)fd.append('worker_id',worker);if(stage)fd.append('stage',stage);
+      if(drop)fd.append('drop_id',drop);if(date)fd.append('date',date);if(caption)fd.append('caption',caption);
       prog.innerHTML='<span class="fp-spin"></span>Uploading '+(done+1)+'–'+Math.min(done+chunk.length,total)+' of '+total+'…';
       try{
         var r=await fetch('/api/projects/'+encodeURIComponent(PROJECT_CODE)+'/photos/upload',{method:'POST',credentials:'include',body:fd});

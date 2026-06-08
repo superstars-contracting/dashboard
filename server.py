@@ -8428,6 +8428,9 @@ def api_field_photos_upload(project_code):
     drop_id = (request.form.get('drop_id') or '').strip() or None
     worker_id = (request.form.get('worker_id') or request.form.get('worker') or '').strip() or None
     stage = (request.form.get('stage') or '').strip() or None
+    # #238 — the batch "Description" maps to the caption column (one per batch);
+    # worker_id/stage are retained in the schema but no longer sent by the UI.
+    caption = (request.form.get('caption') or request.form.get('description') or '').strip() or None
     fallback_dt = _fp_parse_batch_date(request.form.get('date')) or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     conn = db()
     try:
@@ -8458,10 +8461,10 @@ def api_field_photos_upload(project_code):
                 skipped.append({"file": name, "reason": "could not store the image"})
                 continue
             cur = conn.execute(
-                "INSERT INTO field_photos (project_code, drop_id, worker_id, stage, taken_at, taken_at_estimated, "
+                "INSERT INTO field_photos (project_code, drop_id, worker_id, stage, caption, taken_at, taken_at_estimated, "
                 "uploaded_at, uploaded_by_uid, file_path, thumb_path, file_name, file_size, mime, width, height, "
-                "orientation_applied) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (project_code, drop_id, worker_id, stage, res["taken_at"], 1 if res["taken_at_estimated"] else 0,
+                "orientation_applied) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (project_code, drop_id, worker_id, stage, caption, res["taken_at"], 1 if res["taken_at_estimated"] else 0,
                  now, uid, file_path, thumb_path, res["file_name"], len(res["display_bytes"]), res["mime"],
                  res["width"], res["height"], 1 if res["orientation_applied"] else 0))
             stored.append({"id": cur.lastrowid, "file": res["file_name"], "taken_at": res["taken_at"],
