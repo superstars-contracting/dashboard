@@ -135,6 +135,61 @@ class _N:
         return ""
 
 
+# ---------- drop-zone boundary (#237): a known modal drop zone must show a box ----------
+def class_decl(css, cls, prop):
+    """Last `prop: value` declaration for a bare `.cls { ... }` rule."""
+    val = None
+    for m in re.finditer(r"(?:^|[,\s}])\." + re.escape(cls) + r"\s*\{([^}]*)\}", css, re.DOTALL):
+        pm = re.search(prop + r"\s*:\s*([^;]+)", m.group(1))
+        if pm:
+            val = pm.group(1).strip()
+    return val
+
+
+_COLOR_TOK = r"(var\([^)]*\)|#[0-9a-fA-F]{3,8}|rgba?\([^)]*\)|hsla?\([^)]*\)|transparent|currentColor|[a-zA-Z]+)"
+
+
+def border_color_of(border_decl):
+    """The color token from a `border` shorthand (skip width/style keywords)."""
+    if not border_decl:
+        return None
+    for t in reversed(re.findall(_COLOR_TOK, border_decl)):
+        if t.lower() in ("solid", "dashed", "dotted", "double", "groove", "ridge", "inset",
+                         "outset", "none", "hidden", "px", "em", "rem"):
+            continue
+        if re.match(r"^\d", t):
+            continue
+        return t
+    return None
+
+
+def box_visible(html, css, el_id, root):
+    """A drop zone is visible iff its border-color OR background resolves (the way
+    a page-root modal would) to a non-transparent value."""
+    tag = find_tag(html, el_id)
+    if not tag:
+        return None
+    classes = (re.search(r'class="([^"]*)"', tag).group(1).split()
+               if re.search(r'class="([^"]*)"', tag) else [])
+    border = bg = None
+    for cls in classes:
+        b = class_decl(css, cls, "border")
+        bc = class_decl(css, cls, "border-color")
+        g = class_background(css, cls)
+        if b:
+            border = b
+        if bc:
+            border = bc            # explicit border-color wins the color
+        if g:
+            bg = g
+    bcol = border_color_of(border)
+    bres = resolve_color(bcol, root) if bcol else None
+    gres = resolve_color(bg, root) if bg else None
+    return {"visible": is_visible_bg(bres) or is_visible_bg(gres),
+            "dashed": bool(border and "dashed" in border),
+            "border": bcol, "border_resolved": bres, "bg": bg, "bg_resolved": gres}
+
+
 def main():
     print("== #236 design-conventions guard ==")
     css = requests.get(f"{BASE}/files/static/css/widgets.css", timeout=15).text
@@ -190,6 +245,26 @@ def main():
     fp_date = re.search(r'<input[^>]*id="fp-up-date"[^>]*>', html)
     ok("fieldphotos_date_is_ssc", bool(fp_date) and "ssc-date" in fp_date.group(0),
        fp_date.group(0)[:100] if fp_date else "(not found)")
+
+    # ---- 5) drop zones must show a VISIBLE box (#237) ----
+    print("\n-- drop-zone boundary (#237) --")
+    # self-test (end-to-end): a module-token (page-root-unresolvable) drop zone is
+    # caught; the shared .dropzone passes.
+    broken = box_visible('<div class="brk-dz" id="brk">x</div>',
+                         ".brk-dz{border:2px dashed var(--fp-accent-edge);background:var(--fp-accent-soft)}", "brk", root)
+    ok("selftest_stripped_dropzone_caught", not broken["visible"],
+       f"border->{broken['border_resolved']} bg->{broken['bg_resolved']}")
+    fixed = box_visible('<div class="dropzone" id="fix">x</div>', css_all, "fix", root)
+    ok("selftest_fixed_dropzone_passes", fixed["visible"],
+       f"border->{fixed['border_resolved']} bg->{fixed['bg_resolved']}")
+    ok("shared_dropzone_defined", class_decl(css, "dropzone", "border") is not None)
+    # real: the Field Photos + Project Documents drop zones show a visible dashed box
+    for name, did in (("fieldphotos_dropzone", "fp-dropzone"), ("docs_dropzone", "pd-drop")):
+        box = box_visible(html, css_all, did, root)
+        ok(name + "_visible_box", bool(box and box["visible"]),
+           (f"border {box['border']}->{box['border_resolved']} · bg {box['bg']}->{box['bg_resolved']}")
+           if box else "(not found)")
+        ok(name + "_dashed_border", bool(box and box["dashed"]), str(box["dashed"] if box else None))
 
     print(f"\n== RESULT: {len(PASS)} PASS / {len(FAIL)} FAIL ==")
     if FAIL:

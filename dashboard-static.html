@@ -777,7 +777,7 @@
 <!-- #211 calm-blue widget accent — applied via the SHARED widgets.css, loaded
      AFTER the inline #208 styles so the accent (blue band + inward shading + blue
      rings) wins, giving the project page + the company console one source of truth. -->
-<link rel="stylesheet" href="/files/static/css/widgets.css?v=236">
+<link rel="stylesheet" href="/files/static/css/widgets.css?v=237">
 </head>
 <body>
 <!-- #212 nav icons — inline SVG <symbol> defs (defined ONCE, used via <use>).
@@ -1087,7 +1087,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #236 · 2026-06-08 · Design system — global tokens + shared .btn-primary + SSCDatePicker auto-wire; Field Photos modal fixed</div>
+          <div class="ph-build" id="ph-build-stamp">build #237 · 2026-06-08 · Design system — shared .dropzone (visible box) for Field Photos + Docs uploaders</div>
         </div>
       </section>
 
@@ -1263,9 +1263,7 @@
           .pd-modetog{display:flex;background:#f4f6f9;border-radius:9px;padding:3px;margin-bottom:14px;gap:3px}
           .pd-modetog button{flex:1;border:none;background:none;font-size:12px;font-weight:600;color:var(--pd-muted);cursor:pointer;padding:6px;border-radius:7px}
           .pd-modetog button.on{background:#fff;color:var(--pd-accent-ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
-          .pd-drop{border:2px dashed var(--pd-accent-edge);border-radius:13px;background:var(--pd-accent-soft);padding:20px;text-align:center;color:var(--pd-muted);margin-bottom:14px;cursor:pointer}
-          .pd-drop.drag{background:#dde7fd;border-color:var(--pd-accent)}
-          .pd-drop .bi{width:28px;height:28px;color:var(--pd-accent);margin-bottom:6px}.pd-drop b{color:var(--pd-ink);font-size:13.5px}.pd-drop .sub{font-size:11px;margin-top:3px}
+          /* #237 — drop zone now uses the shared .dropzone (widgets.css :root tokens) */
           .pd-field{margin-bottom:12px}
           .pd-field label{display:block;color:var(--pd-muted);font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:5px}
           .pd-field input,.pd-field select,.pd-field textarea{width:100%;height:38px;border:1px solid var(--pd-line);border-radius:9px;padding:0 11px;font-size:13px;background:#fff;color:var(--pd-ink);font-family:inherit}
@@ -1312,7 +1310,7 @@
             <div class="pd-msub" id="pd-modal-sub">Add a project document</div>
             <input type="file" id="pd-file-input" multiple accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,.xlsx" style="display:none">
             <div class="pd-modetog" id="pd-modetog"><button data-mode="single" class="on" type="button">Single</button><button data-mode="bulk" type="button">Bulk</button></div>
-            <div class="pd-drop" id="pd-drop"><svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg><div><b id="pd-drop-label">Drag a file here or browse</b></div><div class="sub">PDF, JPG, PNG, HEIC, XLSX · drop several for bulk</div></div>
+            <div class="dropzone" id="pd-drop"><svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg><div><b id="pd-drop-label">Drag a file here or browse</b></div><div class="dz-sub">PDF, JPG, PNG, HEIC, XLSX · drop several for bulk</div></div>
             <div id="pd-single">
               <div class="pd-aistub" id="pd-aistub"><svg class="pd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span id="pd-aistub-txt"><b>AI auto-read</b> — drop a file and the type, category &amp; dates auto-fill.</span></div>
               <div class="pd-two">
@@ -3935,9 +3933,7 @@
           .fp-field label{display:block;color:var(--fp-muted);font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:5px}
           .fp-field input,.fp-field select{width:100%;height:38px;border:1px solid var(--fp-line);border-radius:9px;padding:0 11px;font-size:13px;background:#fff;color:var(--fp-ink);font-family:inherit}
           .fp-opt{font-size:9.5px;color:var(--fp-muted);font-weight:600;text-transform:none;letter-spacing:0}
-          .fp-drop{border:2px dashed var(--fp-accent-edge);border-radius:13px;background:var(--fp-accent-soft);padding:18px;text-align:center;color:var(--fp-muted);margin-bottom:12px;cursor:pointer}
-          .fp-drop.drag{background:#dde7fd;border-color:var(--fp-accent)}
-          .fp-drop .fp-bi{width:30px;height:30px;color:var(--fp-accent);margin-bottom:6px}.fp-drop b{color:var(--fp-ink);font-size:13.5px}.fp-drop .fp-s{font-size:11.5px;margin-top:2px}
+          /* #237 — drop zone now uses the shared .dropzone (widgets.css :root tokens) */
           .fp-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:7px;margin-bottom:12px;max-height:200px;overflow:auto}
           .fp-th{aspect-ratio:1;border-radius:8px;position:relative;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.12);background:#e9edf2}.fp-th img{width:100%;height:100%;object-fit:cover}
           .fp-th .fp-thx{position:absolute;top:1px;right:3px;color:#fff;font-size:13px;text-shadow:0 1px 2px rgba(0,0,0,.7);cursor:pointer}
@@ -4018,7 +4014,7 @@
               <div class="fp-field"><label>Worker <span class="fp-opt">(optional)</span></label><input id="fp-up-worker" placeholder="W-####"></div>
               <div class="fp-field"><label>Stage <span class="fp-opt">(optional)</span></label><select id="fp-up-stage"><option value="">—</option><option>Survey</option><option>Prep</option><option>Scaffold</option><option>Routing</option><option>Patch</option><option>Coating</option><option>Sign-off</option></select></div>
             </div>
-            <div class="fp-drop" id="fp-dropzone"><svg class="fp-bi"><use href="#i-camera"/></svg><div><b>Drag photos here or browse</b></div><div class="fp-s">JPG, PNG, HEIC · or take a photo · drop many for a batch</div></div>
+            <div class="dropzone" id="fp-dropzone"><svg class="fp-bi"><use href="#i-camera"/></svg><div><b>Drag photos here or browse</b></div><div class="dz-sub">JPG, PNG, HEIC · or take a photo · drop many for a batch</div></div>
             <input type="file" id="fp-file-input" accept="image/*,.heic,.heif,.heic,.webp" multiple style="display:none">
             <div class="fp-thumbs fp-hide" id="fp-up-thumbs"></div>
             <div class="fp-progress fp-hide" id="fp-up-progress"></div>

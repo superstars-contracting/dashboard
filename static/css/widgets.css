@@ -42,6 +42,19 @@
 .btn-ghost:hover { border-color:var(--accent-edge); }
 .btn-ghost svg { width:15px; height:15px; flex:none; }
 
+/* ===== Shared file/photo DROP ZONE (#237) — ONE component, used by every
+   uploader (Field Photos, Project Documents, ...). Built on the GLOBAL :root
+   tokens so it ALWAYS shows its box, including inside modals that render at the
+   page root (a per-module --x-accent-edge would resolve to nothing there -> an
+   invisible, box-less drop area). Markup: a container .dropzone with an <svg>
+   icon, a <b> title, and a .dz-sub subtext. ===== */
+.dropzone { border:2px dashed var(--accent-edge); background:var(--accent-soft); border-radius:13px;
+  padding:18px; text-align:center; color:var(--muted); cursor:pointer; margin-bottom:13px; }
+.dropzone.drag { background:#dde7fd; border-color:var(--accent); }
+.dropzone svg { width:30px; height:30px; color:var(--accent); margin-bottom:6px; }
+.dropzone b { display:block; color:var(--ink); font-size:13.5px; }
+.dropzone .dz-sub { font-size:11.5px; margin-top:2px; color:var(--muted); }
+
 /* KPI tiles */
 .ph-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin:16px 0 20px; }
 .ph-kpi { background:#fff; border:1px solid var(--accent-edge); border-radius:14px; padding:16px 18px; display:flex; align-items:center; gap:14px;
