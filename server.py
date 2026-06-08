@@ -4040,6 +4040,83 @@ def api_projdoc_suggest():
     return response_wrapper({'category': _projdoc_suggest_category(request.args.get('filename', ''))})
 
 
+@app.route('/api/projects/<project_code>/documents/scan', methods=['POST'])
+@requires_role(*_PROJDOC_ROLES)
+def api_project_documents_scan(project_code):
+    """#234 Batch B — AI auto-read ONE document on upload. Sends ALL pages (a
+    multi-page PDF and/or images) to the vision model in a SINGLE call with the
+    docs taxonomy (6 categories + the required-doc checklist) embedded, and
+    returns SUGGESTIONS for the modal to confirm: title, doc_type, category,
+    requirement_key, effective_date, expiry_date (LOCAL), confidence + warnings +
+    which fields to double-check. Does NOT save — the operator confirms and the
+    Batch-A /documents upload persists. Key from ENV only; missing key -> clean
+    503 -> manual entry. The file IS sent to the Anthropic API (same trust as
+    receipts/certs). No *_path; gated like the docs module; served no-store."""
+    import document_scanner as scanner
+    files = (request.files.getlist('file') or request.files.getlist('files')
+             or request.files.getlist('pages'))
+    files = [f for f in files if f and f.filename]
+    if not files:
+        return jsonify({"error": "no file"}), 400
+    if len(files) > scanner.MAX_PAGES:
+        return jsonify({"error": f"Too many pages — max {scanner.MAX_PAGES}"}), 400
+    for f in files:
+        if Path(f.filename or '').suffix.lower() not in _PROJDOC_EXT_TYPE:
+            return jsonify({"error": "unsupported file type — use PDF, JPG, PNG, or HEIC"}), 400
+    # DOC_SCAN_FAKE (test-only, NEVER set in prod) bypasses the live model so the
+    # pipeline can be proven deterministically when the API key is absent.
+    fake_path = os.environ.get('DOC_SCAN_FAKE')
+    if not os.environ.get('ANTHROPIC_API_KEY') and not fake_path:
+        return jsonify({"error": "AI auto-read unavailable — ANTHROPIC_API_KEY not configured. "
+                                 "Enter the document details manually.", "ai_available": False}), 503
+    conn = db()
+    try:
+        if not validate_project_exists(conn, project_code):
+            return jsonify({"error": "project not found"}), 404
+        req_rows = conn.execute(
+            "SELECT category, requirement_key, label FROM document_requirements "
+            "ORDER BY category, sort_order").fetchall()
+    finally:
+        conn.close()
+    categories = [(c, _PROJDOC_CATNAMES.get(c, c)) for c in _PROJDOC_CATEGORIES]
+    requirements = [(r['category'], r['requirement_key'], r['label']) for r in req_rows]
+    req_by_cat = {}
+    for cat, key, _label in requirements:
+        req_by_cat.setdefault(cat, set()).add(key)
+    # Read ALL pages into memory and send them in ONE call — no temp files, no
+    # *_path. A multi-page PDF is a single document block (all pages, one read).
+    specs = []
+    for f in files:
+        f.seek(0, os.SEEK_END)
+        size = f.tell()
+        f.seek(0)
+        if size > scanner.MAX_FILE_BYTES:
+            return jsonify({"error": "a page is too large (max 16 MB)"}), 400
+        specs.append(scanner.spec_from_bytes(f.read(), f.filename))
+    try:
+        if fake_path:
+            with open(fake_path, encoding='utf-8') as fh:
+                raw = json.load(fh)
+        else:
+            raw = scanner.call_vision_model(specs, categories, requirements)
+    except scanner.ScanUnavailable:
+        return jsonify({"error": "AI auto-read unavailable — enter manually.", "ai_available": False}), 503
+    except scanner.ScanError:
+        return jsonify({"error": "Couldn't read the document automatically — enter the details manually.",
+                        "scan_failed": True}), 502
+    except Exception as e:
+        logging.error(f"POST documents/scan: {type(e).__name__}: {e}")
+        return jsonify({"error": "Couldn't read the document — enter the details manually.",
+                        "scan_failed": True}), 502
+    suggestion = scanner.process_scan_result(raw, set(_PROJDOC_CATEGORIES), req_by_cat)
+    if not suggestion.get('page_count'):
+        suggestion['page_count'] = len(specs)
+    suggestion['model'] = (raw.get('_meta') or {}).get('model') or scanner.MODEL
+    resp = response_wrapper(suggestion)
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    return resp
+
+
 @app.route('/api/documents/<int:doc_id>/file', methods=['GET'])
 @requires_role(*_PROJDOC_ROLES)
 def api_projdoc_file(doc_id):
@@ -8990,4 +9067,8 @@ if __name__ == '__main__':
     sys.stdout.flush()
     # Loopback only per CLAUDE.md loopback policy: the workstation lives on a
     # shared coworking-space network — the dashboard must not be reachable from LAN.
-    app.run(host='127.0.0.1', port=5050, debug=False, use_reloader=False, threaded=True)
+    # PORT is env-overridable (default 5050) ONLY for the dev-server path — lets a
+    # smoke spin up an isolated instance on another port; production (waitress via
+    # run_server.ps1) is unaffected and still binds 5050.
+    _port = int(os.environ.get('PORT', '5050'))
+    app.run(host='127.0.0.1', port=_port, debug=False, use_reloader=False, threaded=True)

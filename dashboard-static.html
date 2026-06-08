@@ -1086,7 +1086,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #233 · 2026-06-08 · Workers API — dropped *_path PII leak + local dates (DCR roster intact)</div>
+          <div class="ph-build" id="ph-build-stamp">build #234 · 2026-06-08 · Project Documents — Batch B AI auto-read (type · category · requirement · dates) on upload</div>
         </div>
       </section>
 
@@ -1271,6 +1271,15 @@
           .pd-field textarea{height:auto;padding:8px 11px;resize:vertical}
           .pd-two{display:grid;grid-template-columns:1fr 1fr;gap:11px}
           .pd-aistub{display:flex;align-items:center;gap:8px;background:#f4f6f9;border:1px dashed var(--pd-line);border-radius:9px;padding:9px 11px;margin-bottom:13px;font-size:11.5px;color:var(--pd-muted)}.pd-aistub b{color:var(--pd-accent-ink);font-weight:700}
+          /* #234 AI auto-read states + low-confidence field flags */
+          .pd-aistub.rd{color:var(--pd-accent-ink);background:var(--pd-accent-soft);border-style:solid;border-color:var(--pd-accent-edge)}
+          .pd-aistub.rd .pd-ic{animation:pd-spin 1s linear infinite}
+          @keyframes pd-spin{to{transform:rotate(360deg)}}
+          .pd-aistub.ok{color:#15806a;background:#e7f6f0;border-style:solid;border-color:#bfe6d6}.pd-aistub.ok b{color:#15806a}
+          .pd-aistub.warn{color:#a76a1e;background:#fdf4e7;border-style:solid;border-color:#ecd3a8}.pd-aistub.warn b{color:#a76a1e}
+          .pd-aistub.err{color:#a23c3c;background:#fdeeee;border-style:solid;border-color:#ecc2c2}.pd-aistub.err b{color:#a23c3c}
+          .pd-field input.pd-chk,.pd-field select.pd-chk{border-color:#e0a23c;background:#fff8ee}
+          .pd-field.pd-chk-lbl > label::after{content:" · check";color:#c2811e;font-weight:700}
           .pd-mbtns{display:flex;gap:9px;justify-content:flex-end;margin-top:4px}
           .pd-cancel{background:#fff;border:1px solid var(--pd-line);border-radius:9px;padding:10px 16px;font-weight:600;cursor:pointer;color:var(--pd-ink);font-size:13px}
           .pd-save{background:var(--pd-accent);border:none;color:#fff;border-radius:9px;padding:10px 16px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(67,100,220,.25);display:inline-flex;align-items:center;gap:7px;font-size:13px}
@@ -1294,7 +1303,7 @@
           </div>
           <div class="pd-hero" id="pd-hero"><div class="pd-empty" style="margin:0">Loading documents…</div></div>
           <div id="pd-checklist"></div>
-          <div id="pd-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #231 · 2026-06-05 · Project Documents — Blank Forms moved to Templates · #148 placeholder removed</div>
+          <div id="pd-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #234 · 2026-06-08 · Project Documents — Batch B AI auto-read (type · category · requirement · dates) on upload</div>
         </div>
         <div class="pd-overlay" id="pd-modal">
           <div class="pd-modal">
@@ -1304,7 +1313,7 @@
             <div class="pd-modetog" id="pd-modetog"><button data-mode="single" class="on" type="button">Single</button><button data-mode="bulk" type="button">Bulk</button></div>
             <div class="pd-drop" id="pd-drop"><svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg><div><b id="pd-drop-label">Drag a file here or browse</b></div><div class="sub">PDF, JPG, PNG, HEIC, XLSX · drop several for bulk</div></div>
             <div id="pd-single">
-              <div class="pd-aistub"><svg class="pd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span><b>AI auto-read</b> type &amp; expiry — coming soon (Batch B)</span></div>
+              <div class="pd-aistub" id="pd-aistub"><svg class="pd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span id="pd-aistub-txt"><b>AI auto-read</b> — drop a file and the type, category &amp; dates auto-fill.</span></div>
               <div class="pd-two">
                 <div class="pd-field"><label>Category</label><select id="pd-f-cat"></select></div>
                 <div class="pd-field"><label>Fulfills</label><select id="pd-f-req"></select></div>
@@ -6413,6 +6422,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     $('pd-f-notes').value=''; $('pd-modal-err').textContent='';
     $('pd-drop-label').textContent='Drag a file here or browse';
     $('pd-file-input').value='';
+    setAistub('idle'); clearFlags();   // #234 — reset AI auto-read state per open
     if(window.SSCDatePicker){ try{SSCDatePicker.wire($('pd-f-eff'));SSCDatePicker.wire($('pd-f-exp'));SSCDatePicker.setISO($('pd-f-eff'),todayLocal());SSCDatePicker.setISO($('pd-f-exp'),'');}catch(e){} }
     $('pd-modal').classList.add('show');
   }
@@ -6431,7 +6441,8 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   function setFiles(fileList){
     PD.files=Array.prototype.slice.call(fileList||[]);
     if(PD.files.length>1){ setMode('bulk'); }
-    else { setMode('single'); $('pd-drop-label').textContent=PD.files.length?PD.files[0].name:'Drag a file here or browse'; if(PD.files.length&&!$('pd-f-title').value)$('pd-f-title').value=PD.files[0].name.replace(/\.[^.]+$/,''); }
+    else if(PD.files.length===1){ setMode('single'); $('pd-drop-label').textContent=PD.files[0].name; if(!$('pd-f-title').value)$('pd-f-title').value=PD.files[0].name.replace(/\.[^.]+$/,''); scanSingle(PD.files[0]); /* #234 — AI auto-read the dropped file */ }
+    else { setMode('single'); $('pd-drop-label').textContent='Drag a file here or browse'; }
   }
   function renderBulk(){
     var host=$('pd-bulk-rows');if(!host)return;
@@ -6447,6 +6458,58 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     $('pd-bulk-label').textContent='Upload all ('+PD.files.length+')';
     $('pd-save-bulk').disabled=!PD.files.length;
     if(window.SSCDatePicker)host.querySelectorAll('.pd-bexp').forEach(function(el){try{SSCDatePicker.wire(el);}catch(e){}});
+  }
+
+  // ---------- #234 AI auto-read (Batch B) ----------
+  var PD_FIELDMAP={category:'pd-f-cat',requirement_key:'pd-f-req',effective_date:'pd-f-eff',expiry_date:'pd-f-exp',title:'pd-f-title'};
+  var PD_AISTUB_DEFAULT='<b>AI auto-read</b> — drop a file and the type, category &amp; dates auto-fill.';
+  function setAistub(kind,msg){
+    var box=$('pd-aistub'),txt=$('pd-aistub-txt');if(!box||!txt)return;
+    box.classList.remove('rd','ok','warn','err');
+    if(kind==='reading'){box.classList.add('rd');txt.innerHTML='<b>Reading the document…</b>';}
+    else if(kind==='ok'){box.classList.add('ok');txt.innerHTML=msg||'<b>Auto-filled.</b> Review and save.';}
+    else if(kind==='warn'){box.classList.add('warn');txt.innerHTML=msg||'<b>Auto-filled — check the highlighted fields.</b>';}
+    else if(kind==='err'){box.classList.add('err');txt.innerHTML=msg||'<b>Couldn\'t read it</b> — enter the details manually.';}
+    else {txt.innerHTML=PD_AISTUB_DEFAULT;}
+  }
+  function clearFlags(){
+    Object.keys(PD_FIELDMAP).forEach(function(k){var el=$(PD_FIELDMAP[k]);if(el){el.classList.remove('pd-chk');var f=el.closest('.pd-field');if(f)f.classList.remove('pd-chk-lbl');}});
+  }
+  function flagField(key){
+    var el=$(PD_FIELDMAP[key]);if(!el)return;var f=el.closest('.pd-field');
+    el.classList.add('pd-chk');if(f)f.classList.add('pd-chk-lbl');
+    el.addEventListener('change',function(){el.classList.remove('pd-chk');if(f)f.classList.remove('pd-chk-lbl');},{once:true});
+  }
+  function setDate(id,iso){ if(window.SSCDatePicker){try{SSCDatePicker.setISO($(id),iso||'');return;}catch(e){}} var el=$(id);if(el)el.value=iso||''; }
+  function applySuggestion(s){
+    var cat=s.category||'PERMITS';
+    $('pd-f-cat').value=cat;
+    $('pd-f-req').innerHTML=reqOptions(cat,s.requirement_key||'');
+    if(s.requirement_key)$('pd-f-req').value=s.requirement_key;
+    if(s.title)$('pd-f-title').value=s.title;
+    setDate('pd-f-eff',s.effective_date);
+    setDate('pd-f-exp',s.expiry_date);
+    clearFlags();
+    (s.fields_to_check||[]).forEach(flagField);
+    var conf=Math.round((s.confidence||0)*100);
+    if(s.needs_review||(s.fields_to_check&&s.fields_to_check.length)){
+      setAistub('warn','<b>Auto-filled ('+conf+'% confidence)</b> — check the highlighted fields, then save.');
+    } else {
+      setAistub('ok','<b>Auto-filled ('+conf+'% confidence).</b> Review and save.');
+    }
+  }
+  async function scanSingle(file){
+    if(!file)return;
+    setAistub('reading');
+    var fd=new FormData();fd.append('file',file);
+    try{
+      var r=await fetch('/api/projects/'+encodeURIComponent(PROJECT_CODE)+'/documents/scan',{method:'POST',credentials:'include',body:fd});
+      if(r.status===503){setAistub('err','<b>AI auto-read is off</b> — enter the details manually.');return;}
+      if(!r.ok){setAistub('err','<b>Couldn\'t read it automatically</b> — enter the details manually.');return;}
+      var j=await r.json();var s=j&&j.data;
+      if(!s){setAistub('err','<b>Couldn\'t read it automatically</b> — enter the details manually.');return;}
+      applySuggestion(s);
+    }catch(e){setAistub('err','<b>Couldn\'t reach the reader</b> — enter the details manually.');}
   }
 
   async function saveSingle(){
