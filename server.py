@@ -3663,14 +3663,23 @@ def api_projects_list():
 def api_project_workers(project_code):
     """Workers ASSIGNED to a specific project (the filtered roster for the
     project dashboard). Archived workers are filtered out — pass
-    ?include_archived=true to include them."""
+    ?include_archived=true to include them.
+
+    PII posture (#233): returns ONLY the fields the consumers actually use —
+    the DCR labor add-dropdown (employee_id + worker_id + name) and the
+    Project Health KPI tiles (certs_expiring_30d + certs_expired). It does
+    NOT spread the employees row, so no face_image_path / folder_path /
+    phone / dob / pin or any other *_path or column ever reaches the JSON.
+    Cert windows use the LOCAL date (date.today(), never UTC — no
+    off-by-one, per CLAUDE.md dates rule). Gated; served no-store because
+    the payload carries worker names (same posture as /crew-compliance)."""
     try:
         include_archived = (request.args.get('include_archived', '').lower()
                             in ('1', 'true', 'yes'))
         conn = db()
         archive_clause = '' if include_archived else ' AND e.archived_at IS NULL'
         rows = conn.execute(
-            f"""SELECT e.*, pa.role_on_project, pa.start_date AS assignment_start, pa.status AS assignment_status
+            f"""SELECT e.employee_id, e.worker_id, e.name
                FROM employees e
                JOIN project_assignments pa ON pa.employee_id = e.employee_id
                WHERE pa.project_code = ? AND pa.status = 'active'{archive_clause}
@@ -3678,24 +3687,24 @@ def api_project_workers(project_code):
             (project_code,)
         ).fetchall()
 
-        today = datetime.utcnow().date().isoformat()
-        d30 = (datetime.utcnow() + timedelta(days=30)).date().isoformat()
+        today = date.today()
+        today_iso = today.isoformat()
+        d30_iso = (today + timedelta(days=30)).isoformat()
         out = []
         for e in rows:
-            doc_count = conn.execute(
-                "SELECT COUNT(*) FROM worker_documents WHERE employee_id = ?", (e["employee_id"],)
-            ).fetchone()[0]
             certs = conn.execute(
-                "SELECT cert_type_id, expiration_date, status FROM certifications WHERE employee_id = ?",
+                "SELECT expiration_date FROM certifications WHERE employee_id = ?",
                 (e["employee_id"],)
             ).fetchall()
-            cert_count = len(certs)
-            expiring_30 = sum(1 for c in certs if c["expiration_date"] and today <= c["expiration_date"] <= d30)
-            expired = sum(1 for c in certs if c["expiration_date"] and c["expiration_date"] < today)
-            out.append({**dict(e), "doc_count": doc_count, "cert_count": cert_count,
-                        "certs_expiring_30d": expiring_30, "certs_expired": expired})
+            expiring_30 = sum(1 for c in certs if c["expiration_date"] and today_iso <= c["expiration_date"] <= d30_iso)
+            expired = sum(1 for c in certs if c["expiration_date"] and c["expiration_date"] < today_iso)
+            out.append({"employee_id": e["employee_id"], "worker_id": e["worker_id"],
+                        "name": e["name"], "certs_expiring_30d": expiring_30,
+                        "certs_expired": expired})
         conn.close()
-        return response_wrapper(out)
+        resp = response_wrapper(out)
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return resp
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
