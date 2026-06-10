@@ -163,6 +163,17 @@
   .badge-pill.warn { background: var(--warn); }
   .badge-pill.bad { background: var(--bad); }
   .badge-pill.mute { background: var(--mute); }
+
+  /* ==== #240 — console layout: grid lives in the Projects tab ==== */
+  /* Reset layout is a button flavored as the existing .cc-action component. */
+  button.cc-action { font-family: inherit; cursor: pointer; width: 100%; }
+  .cc-grid-wrap { position: relative; }
+  /* DashLayout status hint as a transient toast — must not occupy a permanent row. */
+  .cc-layout-toast { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%) translateY(4px);
+    background: #14161C; color: #fff; font-size: 12px; font-weight: 600; padding: 8px 14px;
+    border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.18); opacity: 0; pointer-events: none;
+    transition: opacity 0.25s, transform 0.25s; z-index: 50; white-space: nowrap; }
+  .cc-layout-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
 </head>
 <body>
@@ -226,69 +237,7 @@
     <div class="ph-kpi"><div><div class="ph-kpi-k">Certs expiring ≤30d</div><div class="ph-kpi-v" id="cc-kpi-certs">—</div><div class="ph-kpi-sub" id="cc-kpi-certs-sub">incl. expired</div></div></div>
   </div>
 
-  <!-- layout controls -->
-  <div class="ph-gridbar">
-    <button class="ph-reset" id="cc-reset-layout" type="button" title="Revert to the default layout">↺ Reset layout</button>
-    <span class="ph-gridbar-hint" id="cc-layout-hint">Drag a widget by its ⠿ handle; drag an edge/corner to resize — your layout saves automatically.</span>
-  </div>
-
-  <!-- WIDGET GRID — GridStack (reuses #209 framework, page_key=company_console) -->
-  <div class="grid-stack" id="cc-grid">
-    <div class="grid-stack-item" gs-id="active-project" gs-x="0" gs-y="0" gs-w="5" gs-h="3">
-      <div class="grid-stack-item-content">
-        <section class="ph-widget" data-widget="active-project">
-          <div class="ph-widget-head"><h3>Active project</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
-          <div class="ph-widget-body" id="cc-active-body"><div class="ph-loading">Loading…</div></div>
-        </section>
-      </div>
-    </div>
-
-    <div class="grid-stack-item" gs-id="compliance" gs-x="5" gs-y="0" gs-w="4" gs-h="3">
-      <div class="grid-stack-item-content">
-        <section class="ph-widget" data-widget="compliance">
-          <div class="ph-widget-head"><h3>Compliance</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
-          <div class="ph-widget-body" id="cc-compliance-body"><div class="ph-loading">Loading…</div></div>
-        </section>
-      </div>
-    </div>
-
-    <div class="grid-stack-item" gs-id="on-site" gs-x="9" gs-y="0" gs-w="3" gs-h="4">
-      <div class="grid-stack-item-content">
-        <section class="ph-widget" data-widget="on-site">
-          <div class="ph-widget-head"><h3>On site today · W-#### only</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
-          <div class="ph-widget-body" id="cc-onsite-body"><div class="ph-loading">Loading…</div></div>
-        </section>
-      </div>
-    </div>
-
-    <div class="grid-stack-item" gs-id="quick-actions" gs-x="0" gs-y="3" gs-w="5" gs-h="2">
-      <div class="grid-stack-item-content">
-        <section class="ph-widget" data-widget="quick-actions">
-          <div class="ph-widget-head"><h3>Quick actions</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
-          <div class="ph-widget-body">
-            <div class="cc-actions">
-              <a class="cc-action" href="/projects/FR-BX-001">Open project</a>
-              <a class="cc-action" href="/dropplan">Drop Plan</a>
-              <a class="cc-action" href="/projects/FR-BX-001#daily-report">New DCR</a>
-              <a class="cc-action" href="/rfi_submission_form.html">Submit RFI</a>
-              <a class="cc-action" id="cc-act-workforce" href="#">Workforce</a>
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
-
-    <div class="grid-stack-item" gs-id="recent-activity" gs-x="5" gs-y="3" gs-w="7" gs-h="3">
-      <div class="grid-stack-item-content">
-        <section class="ph-widget" data-widget="recent-activity">
-          <div class="ph-widget-head"><h3>Recent activity</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
-          <div class="ph-widget-body" id="cc-activity-body"><div class="ph-loading">Loading…</div></div>
-        </section>
-      </div>
-    </div>
-  </div>
-
-  <!-- Tabs -->
+  <!-- Tabs — #240: strip sits directly under the KPI row -->
   <div class="nav-tabs">
     <div class="nav-tab active" data-panel="projects" data-i18n="tab-projects">Projects</div>
     <div class="nav-tab" data-panel="workforce" data-i18n="tab-workforce">Workforce</div>
@@ -308,7 +257,9 @@
     <div class="nav-tab" data-panel="settings" data-i18n="tab-settings">Settings</div>
   </div>
 
-  <!-- PROJECTS -->
+  <!-- PROJECTS — #240: Active Projects first, widget grid below. The grid is
+       Projects-tab content: any other active tab replaces everything below
+       the strip, so the grid hides with the panel. -->
   <div class="panel active" data-panel="projects">
     <div class="section">
       <h2 data-i18n="p-active-projects-title">Active Projects</h2>
@@ -316,6 +267,70 @@
       <div class="project-grid" id="project-grid">
         <div class="placeholder" data-i18n="loading-projects">Loading projects…</div>
       </div>
+    </div>
+
+    <!-- WIDGET GRID — GridStack (reuses #209 framework, page_key=company_console).
+         #240 moved it inside the Projects panel; #cc-grid identity + gs-ids are
+         unchanged so per-user saved layouts keep restoring. -->
+    <div class="cc-grid-wrap">
+      <div class="grid-stack" id="cc-grid">
+        <div class="grid-stack-item" gs-id="active-project" gs-x="0" gs-y="0" gs-w="5" gs-h="3">
+          <div class="grid-stack-item-content">
+            <section class="ph-widget" data-widget="active-project">
+              <div class="ph-widget-head"><h3 data-i18n="w-active-project">Active project</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
+              <div class="ph-widget-body" id="cc-active-body"><div class="ph-loading">Loading…</div></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="grid-stack-item" gs-id="compliance" gs-x="5" gs-y="0" gs-w="4" gs-h="3">
+          <div class="grid-stack-item-content">
+            <section class="ph-widget" data-widget="compliance">
+              <div class="ph-widget-head"><h3 data-i18n="w-compliance">Compliance</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
+              <div class="ph-widget-body" id="cc-compliance-body"><div class="ph-loading">Loading…</div></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="grid-stack-item" gs-id="on-site" gs-x="9" gs-y="0" gs-w="3" gs-h="4">
+          <div class="grid-stack-item-content">
+            <section class="ph-widget" data-widget="on-site">
+              <div class="ph-widget-head"><h3 data-i18n="w-on-site">On site today · W-#### only</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
+              <div class="ph-widget-body" id="cc-onsite-body"><div class="ph-loading">Loading…</div></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="grid-stack-item" gs-id="quick-actions" gs-x="0" gs-y="3" gs-w="5" gs-h="2">
+          <div class="grid-stack-item-content">
+            <section class="ph-widget" data-widget="quick-actions">
+              <div class="ph-widget-head"><h3 data-i18n="w-quick-actions">Quick actions</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
+              <div class="ph-widget-body">
+                <div class="cc-actions">
+                  <a class="cc-action" href="/projects/FR-BX-001" data-i18n="qa-open-project">Open project</a>
+                  <a class="cc-action" href="/dropplan" data-i18n="qa-dropplan">Drop Plan</a>
+                  <a class="cc-action" href="/projects/FR-BX-001#daily-report" data-i18n="qa-new-dcr">New DCR</a>
+                  <a class="cc-action" href="/rfi_submission_form.html" data-i18n="qa-submit-rfi">Submit RFI</a>
+                  <a class="cc-action" id="cc-act-workforce" href="#" data-i18n="qa-workforce">Workforce</a>
+                  <button class="cc-action" id="cc-reset-layout" type="button" title="Revert to the default layout" data-i18n="qa-reset-layout">↺ Reset layout</button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div class="grid-stack-item" gs-id="recent-activity" gs-x="5" gs-y="3" gs-w="7" gs-h="3">
+          <div class="grid-stack-item-content">
+            <section class="ph-widget" data-widget="recent-activity">
+              <div class="ph-widget-head"><h3 data-i18n="w-recent-activity">Recent activity</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
+              <div class="ph-widget-body" id="cc-activity-body"><div class="ph-loading">Loading…</div></div>
+            </section>
+          </div>
+        </div>
+      </div>
+      <!-- #240 — DashLayout status messages land here; shown as a transient
+           toast (no permanent row). Same id the framework already targets. -->
+      <div class="cc-layout-toast" id="cc-layout-hint" aria-live="polite"></div>
     </div>
   </div>
 
@@ -991,11 +1006,22 @@ const I18N = {
     'tab-labor-rate': 'Labor Rate',
     'tab-specs': 'Specs Library',
     'p-specs-title': 'Specifications Library',
-    'p-specs-sub': 'Manufacturer specs catalog. Each row links to the official TDS; the "Attach to Project" action puts the spec under that project\'s Project Documents (Specifications subsection).',
+    'p-specs-sub': 'Manufacturer specs catalog. Each row links to the official TDS; the "Attach to Project" action files the spec under Project Documents (Specifications subsection) for that project.',
     'tab-settings': 'Settings',
     'p-active-projects-title': 'Active Projects',
     'p-active-projects-sub': 'Click any project to drill into its dashboard.',
     'loading-projects': 'Loading projects…',
+    'w-active-project': 'Active project',
+    'w-compliance': 'Compliance',
+    'w-on-site': 'On site today · W-#### only',
+    'w-quick-actions': 'Quick actions',
+    'w-recent-activity': 'Recent activity',
+    'qa-open-project': 'Open project',
+    'qa-dropplan': 'Drop Plan',
+    'qa-new-dcr': 'New DCR',
+    'qa-submit-rfi': 'Submit RFI',
+    'qa-workforce': 'Workforce',
+    'qa-reset-layout': '↺ Reset layout',
     'p-workforce-title': 'Workforce',
     'p-workforce-sub': 'All workers in the company. Add new workers here — they join the master roster and can be assigned to any project.',
     'btn-onboard': '+ ONBOARD',
@@ -1103,6 +1129,17 @@ const I18N = {
     'p-active-projects-title': 'Proyectos Activos',
     'p-active-projects-sub': 'Haz clic en cualquier proyecto para ver su tablero.',
     'loading-projects': 'Cargando proyectos…',
+    'w-active-project': 'Proyecto activo',
+    'w-compliance': 'Cumplimiento',
+    'w-on-site': 'En obra hoy · solo W-####',
+    'w-quick-actions': 'Acciones rápidas',
+    'w-recent-activity': 'Actividad reciente',
+    'qa-open-project': 'Abrir proyecto',
+    'qa-dropplan': 'Drop Plan',
+    'qa-new-dcr': 'Nuevo DCR',
+    'qa-submit-rfi': 'Enviar RFI',
+    'qa-workforce': 'Personal',
+    'qa-reset-layout': '↺ Restablecer diseño',
     'p-workforce-title': 'Personal',
     'p-workforce-sub': 'Todos los trabajadores de la empresa. Agrega nuevos trabajadores aquí — se unirán al registro maestro y podrán ser asignados a cualquier proyecto.',
     'btn-onboard': '+ Incorporar',
@@ -3547,7 +3584,7 @@ applyLanguage();
 })();
 </script>
 
-<div class="container"><div class="ph-build" id="cc-build-stamp">build #213 · 2026-06-01 · build sync</div></div>
+<div class="container"><div class="ph-build" id="cc-build-stamp">build #240 · 2026-06-10 · Console layout — tabs under KPIs · Active Projects first · widget grid in Projects tab · Reset in Quick Actions</div></div>
 
 <script>
 /* ===== Company console widgets (#210) — live data + reused #209 drag framework.
@@ -3673,6 +3710,11 @@ applyLanguage();
     // "Workforce" quick action → switch to the existing Workforce tab (same page)
     const wf=$('cc-act-workforce');
     if(wf) wf.addEventListener('click',(e)=>{ e.preventDefault(); const tab=document.querySelector('.nav-tab[data-panel="workforce"]'); if(tab){ tab.click(); tab.scrollIntoView({behavior:'smooth',block:'start'}); } });
+    // #240 — DashLayout writes status text into #cc-layout-hint; surface each
+    // write as a transient toast instead of a permanent row. Observer is wired
+    // BEFORE init so the initial "saved layout restored / default" status shows.
+    const hint=$('cc-layout-hint');
+    if(hint){ let hideT=null; new MutationObserver(()=>{ if(!hint.textContent.trim())return; hint.classList.add('show'); clearTimeout(hideT); hideT=setTimeout(()=>hint.classList.remove('show'),2600); }).observe(hint,{childList:true,characterData:true,subtree:true}); }
     // reuse the #209 drag framework (vendored GridStack + generic endpoints)
     if(window.DashLayout) DashLayout.init({pageKey:'company_console', gridSelector:'#cc-grid', resetBtnId:'cc-reset-layout', hintId:'cc-layout-hint', defaultLayout:DEFAULT_LAYOUT});
     setInterval(load, 60000);
