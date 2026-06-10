@@ -157,8 +157,15 @@ cp superstars.db "data_room/db_backups/superstars-pre-<op>-$(date +%Y%m%d-%H%M%S
 - **#72 — Comp-data governance / SQLCipher.** Encrypt the SQLite DB at
   rest (SQLCipher wrapper). BitLocker is the only encryption layer
   right now; a stolen workstation with BitLocker disabled exposes the
-  DB. Roadmap item but worth pulling forward before #71 lands real
-  pay-rate data.
+  DB. **Decision 2026-06-10 (#239):** the old pull-forward trigger
+  ("before real pay-rate data lands") fired when Labor Rates (#220–#222)
+  shipped — consciously NOT pulling SQLCipher forward. BitLocker covers
+  at-rest on the workstation, and SQLCipher does not address the live
+  attack surfaces (a running server reads a decrypted DB either way).
+  Re-bundled into the **Backblaze backup task** — the point where DB
+  copies first leave the BitLocker boundary; encrypted backups are the
+  minimum bar there. New trigger: implement with (or before) Backblaze,
+  not tied to Labor Rates.
 - **#53 — Tailscale ACL.** Today the tailnet is open within the org;
   any device on the tailnet can hit the dashboard. Need ACL: which
   tailscale users / device-tags can reach `127.0.0.1:5050` via serve.
