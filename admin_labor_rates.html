@@ -153,7 +153,7 @@
       <tbody id="lr-pending-tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
     </table></div>
   </div>
-  <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:2px;" id="ph-build-stamp">build #222 · 2026-06-02 · Labor Rates — rates display as saved text · click-to-edit submits pending change</div>
+  <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:2px;" id="ph-build-stamp">build #241 · 2026-06-12 · Labor Rates — worker selector replaces typed IDs · ids normalized server-side · status drives daily-report selectors</div>
 </div>
 
 <div class="overlay" id="lr-overlay">
@@ -162,7 +162,8 @@
       <h3><span id="lr-panel-title">Edit rate</span><button class="closex" id="lr-close">×</button></h3>
       <div class="pid" id="lr-panel-id">—</div>
       <div class="pendbar" id="lr-pendbar" style="display:none;"></div>
-      <div class="field" id="lr-wid-field"><label>Worker ID</label><input id="lr-f-wid" placeholder="W-####"></div>
+      <!-- #241 — selector, never a free-typed id (the 'w-0016' lesson) -->
+      <div class="field" id="lr-wid-field"><label>Worker</label><select id="lr-f-wid"><option value="">— Select worker —</option></select></div>
       <div class="field"><label>Trade</label><select id="lr-f-trade"><option>Mechanic</option><option>Laborer</option><option>Rope Access</option><option>Superintendent</option></select></div>
       <div class="prow">
         <div class="field"><label>Rate $/hr</label><input id="lr-f-rate" placeholder="0.00"></div>
@@ -194,7 +195,7 @@
   const jget=u=>fetch(u,{credentials:'include'}).then(r=>r.ok?r.json():Promise.reject(r));
   const jpost=(u,b)=>fetch(u,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});
 
-  let ROLE='', ROSTER={active:[],inactive:[]}, editWid=null, addMode=false;
+  let ROLE='', ROSTER={active:[],inactive:[]}, editWid=null, addMode=false, pendingPreselect=null;
 
   async function boot(){
     try{ const me=await jget('/api/auth/me'); ROLE=((me.user||me.data||me)||{}).role||''; $('lr-who').textContent=(ROLE||'').toUpperCase(); }catch(e){}
@@ -205,6 +206,24 @@
       $('lr-pending-frame').style.display=''; loadRoster(); loadPending();
     }
     wire();
+    // #241 — an add-worker flow can land here with ?add_worker=W-#### to open
+    // the Add form with that worker pre-selected (no id ever typed by hand).
+    const addw=new URLSearchParams(location.search).get('add_worker');
+    if(addw && ROLE!=='pm'){ pendingPreselect=addw; openPanel(null,true); }
+  }
+
+  // #241 — the Add form's worker list: rostered workers with no rate on file
+  // yet, numeric W-#### order, labeled "W-#### — name". Server-validated too.
+  async function loadEligible(preselect){
+    const sel=$('lr-f-wid');
+    sel.innerHTML='<option value="">Loading…</option>'; sel.disabled=true;
+    try{
+      const j=await jget('/api/labor-rates/eligible-workers'); const rows=j.data||[];
+      if(!rows.length){ sel.innerHTML='<option value="">All rostered workers already have a rate</option>'; return; }
+      sel.innerHTML='<option value="">— Select worker —</option>'+rows.map(w=>'<option value="'+esc(w.worker_id)+'">'+esc(w.worker_id)+' — '+esc(w.name||w.worker_id)+'</option>').join('');
+      sel.disabled=false;
+      if(preselect){ const p=String(preselect).trim().toUpperCase(); if(rows.some(w=>w.worker_id===p)) sel.value=p; }
+    }catch(e){ sel.innerHTML='<option value="">Could not load workers</option>'; }
   }
   function wire(){
     if(window.SSCDatePicker) SSCDatePicker.wire($('lr-f-date'));
@@ -324,7 +343,8 @@
     $('lr-deact-btn').style.display=(!isAdd && w && w.status==='active')?'':'none';
     if(window.SSCDatePicker) SSCDatePicker.wire($('lr-f-date'));
     if(isAdd){
-      $('lr-f-wid').value=''; $('lr-f-trade').value='Mechanic'; $('lr-f-rate').value=''; $('lr-f-status').value='active';
+      loadEligible(pendingPreselect); pendingPreselect=null;
+      $('lr-f-trade').value='Mechanic'; $('lr-f-rate').value=''; $('lr-f-status').value='active';
       if(window.SSCDatePicker) SSCDatePicker.setISO($('lr-f-date'),todayISO());
       $('lr-panel-id').textContent='New worker';
       $('lr-hist-title').textContent='Rate history'; $('lr-hist-body').innerHTML='<div class="muted" style="font-size:12px;">No history yet.</div>';
@@ -363,7 +383,7 @@
     try{
       if(addMode){
         const wid=($('lr-f-wid').value||'').trim();
-        if(!wid){ toast('Worker ID required'); return; }
+        if(!wid){ toast('Select a worker'); return; }
         const r=await jpost('/api/labor-rates/state',{worker_id:wid,trade:$('lr-f-trade').value,rate:rate,effective_date:dateISO,status:$('lr-f-status').value});
         if(r.ok){ toast('Worker rate added'); closePanel(); loadRoster(); } else { const j=await r.json().catch(()=>({})); toast(j.error||'Add failed'); }
       } else {

@@ -3680,13 +3680,23 @@ def api_project_workers(project_code):
         include_archived = (request.args.get('include_archived', '').lower()
                             in ('1', 'true', 'yes'))
         conn = db()
+        # #241 — labor_worker_state.status is the single live source of truth
+        # for 'retired on the Labor Rates page'. Deactivate (PM-approved) ->
+        # instantly excluded here (so the DCR labor selector drops them);
+        # reactivate -> instantly back. Workers with no labor file at all
+        # (no state row) stay selectable — they just show 'Rate not set' on
+        # payroll. Historical rows (sign_in_log etc.) are untouched either way.
+        # include_archived=true is the audit escape hatch: it bypasses BOTH
+        # the archive filter and the labor-inactive filter.
         archive_clause = '' if include_archived else ' AND e.archived_at IS NULL'
+        labor_clause = '' if include_archived else " AND COALESCE(ls.status, 'active') = 'active'"
         rows = conn.execute(
             f"""SELECT e.employee_id, e.worker_id, e.name
                FROM employees e
                JOIN project_assignments pa ON pa.employee_id = e.employee_id
-               WHERE pa.project_code = ? AND pa.status = 'active'{archive_clause}
-               ORDER BY e.name""",
+               LEFT JOIN labor_worker_state ls ON ls.worker_id = e.worker_id
+               WHERE pa.project_code = ? AND pa.status = 'active'{archive_clause}{labor_clause}
+               ORDER BY CAST(SUBSTR(e.worker_id, 3) AS INTEGER)""",
             (project_code,)
         ).fetchall()
 
@@ -4722,6 +4732,31 @@ LABOR_TRADES = ('Mechanic', 'Laborer', 'Rope Access', 'Superintendent')
 _LR_FULL_ROLES = ('admin', 'c_suite')
 _LR_APPROVE_ROLES = ('admin', 'c_suite', 'pm')
 
+# #241 — canonical Worker ID shape (CLAUDE.md terminology rule: literal 'W-' +
+# zero-padded 4-digit sequence). EVERY endpoint that accepts a worker id from a
+# request normalizes through _lr_worker_id() — the lowercase free-typed
+# 'w-0016' that broke the payroll rate join must be impossible to store again.
+_WORKER_ID_RE = _re.compile(r'^W-\d{4}$')
+
+
+def _lr_worker_id(conn, raw, require_employee=False):
+    """Normalize + validate a request-supplied worker id.
+
+    Returns (worker_id, employee_id_or_None). Raises ValueError with an
+    operator-facing message when the shape is wrong or (when
+    require_employee=True) the worker does not exist in employees.
+    Normalization = strip + UPPERCASE, so 'w-0016' becomes 'W-0016' before
+    any lookup or write. Write-side normalization is the chosen invariant
+    (joins stay case-sensitive; the data can simply never go in wrong)."""
+    wid = (raw or '').strip().upper()
+    if not _WORKER_ID_RE.match(wid):
+        raise ValueError("worker_id must match W-#### (e.g. W-0016)")
+    emp = conn.execute(
+        "SELECT employee_id FROM employees WHERE worker_id = ?", (wid,)).fetchone()
+    if require_employee and not emp:
+        raise ValueError(f"unknown worker_id {wid} — not in the workforce roster")
+    return wid, (emp['employee_id'] if emp else None)
+
 
 def _lr_actor():
     u = current_user() or {}
@@ -4808,7 +4843,10 @@ def api_lr_submit_change():
     conn = db()
     try:
         body = request.get_json(silent=True) or {}
-        wid = (body.get('worker_id') or '').strip()
+        try:
+            wid, _ = _lr_worker_id(conn, body.get('worker_id'))
+        except ValueError as ve:
+            return jsonify({"error": str(ve)}), 400
         st = conn.execute("SELECT * FROM labor_worker_state WHERE worker_id=?", (wid,)).fetchone()
         if not st:
             return jsonify({"error": "unknown worker"}), 404
@@ -4914,7 +4952,10 @@ def api_lr_request_deactivate():
     conn = db()
     try:
         body = request.get_json(silent=True) or {}
-        wid = (body.get('worker_id') or '').strip()
+        try:
+            wid, _ = _lr_worker_id(conn, body.get('worker_id'))
+        except ValueError as ve:
+            return jsonify({"error": str(ve)}), 400
         st = conn.execute("SELECT * FROM labor_worker_state WHERE worker_id=?", (wid,)).fetchone()
         if not st:
             return jsonify({"error": "unknown worker"}), 404
@@ -5043,6 +5084,10 @@ def api_lr_set_status(worker_id):
     so this endpoint refuses a direct ->inactive (no admin bypass of the gate)."""
     conn = db()
     try:
+        try:
+            worker_id, _ = _lr_worker_id(conn, worker_id)
+        except ValueError as ve:
+            return jsonify({"error": str(ve)}), 400
         if not conn.execute("SELECT 1 FROM labor_worker_state WHERE worker_id=?", (worker_id,)).fetchone():
             return jsonify({"error": "unknown worker"}), 404
         status = (request.get_json(silent=True) or {}).get('status')
@@ -5063,6 +5108,10 @@ def api_lr_set_trade(worker_id):
     """Trade assignment. Immediate admin action — not PM-gated."""
     conn = db()
     try:
+        try:
+            worker_id, _ = _lr_worker_id(conn, worker_id)
+        except ValueError as ve:
+            return jsonify({"error": str(ve)}), 400
         if not conn.execute("SELECT 1 FROM labor_worker_state WHERE worker_id=?", (worker_id,)).fetchone():
             return jsonify({"error": "unknown worker"}), 404
         trade = (request.get_json(silent=True) or {}).get('trade')
@@ -5080,13 +5129,20 @@ def api_lr_set_trade(worker_id):
 @requires_role(*_LR_FULL_ROLES)
 def api_lr_add_worker():
     """Add a NEW worker's initial rate. Immediate admin action (approved initial
-    history) — not PM-gated; only subsequent CHANGES need PM sign-off."""
+    history) — not PM-gated; only subsequent CHANGES need PM sign-off.
+
+    #241 — worker_id is normalized + validated and MUST exist in employees.
+    The free-text id that let 'w-0016' in (employee_id silently NULL, so the
+    worker_rates bridge never ran and payroll rendered 'Rate not set') is
+    closed at this gate; the UI now submits from a selector, and this check
+    is the belt-and-suspenders for any non-UI caller."""
     conn = db()
     try:
         body = request.get_json(silent=True) or {}
-        wid = (body.get('worker_id') or '').strip()
-        if not wid:
-            return jsonify({"error": "worker_id required"}), 400
+        try:
+            wid, eid = _lr_worker_id(conn, body.get('worker_id'), require_employee=True)
+        except ValueError as ve:
+            return jsonify({"error": str(ve)}), 400
         if conn.execute("SELECT 1 FROM labor_worker_state WHERE worker_id=?", (wid,)).fetchone():
             return jsonify({"error": "worker already has a rate"}), 409
         trade = body.get('trade')
@@ -5104,8 +5160,6 @@ def api_lr_add_worker():
         except ValueError:
             return jsonify({"error": "effective_date must be YYYY-MM-DD"}), 400
         status = body.get('status') if body.get('status') in ('active', 'inactive') else 'active'
-        emp = conn.execute("SELECT employee_id FROM employees WHERE worker_id=?", (wid,)).fetchone()
-        eid = emp['employee_id'] if emp else None
         uid, role = _lr_actor()
         now = datetime.now().isoformat()
         conn.execute("INSERT INTO labor_worker_state (worker_id, employee_id, trade, current_rate, "
@@ -5126,6 +5180,33 @@ def api_lr_add_worker():
             except Exception:
                 pass
         return response_wrapper({"worker_id": wid, "trade": trade, "status": status}), 201
+    finally:
+        conn.close()
+
+
+@app.route('/api/labor-rates/eligible-workers', methods=['GET'])
+@requires_role(*_LR_FULL_ROLES)
+def api_lr_eligible_workers():
+    """#241 — workers selectable in the 'Add worker rate' form: on the active
+    project roster (active assignment, not archived) and NOT already on the
+    labor-rates file. Replaces the free-typed Worker ID input — the enabling
+    defect behind the 'w-0016' malformed id. Numeric W-#### order (one
+    ordering convention for every worker selector). Carries names for the
+    'W-#### — name' labels (admin/c_suite-gated page) — served no-store."""
+    conn = db()
+    try:
+        rows = conn.execute(
+            """SELECT DISTINCT e.worker_id, e.name
+               FROM employees e
+               JOIN project_assignments pa ON pa.employee_id = e.employee_id
+               LEFT JOIN labor_worker_state ls ON ls.worker_id = e.worker_id
+               WHERE pa.status = 'active' AND e.archived_at IS NULL
+                 AND ls.worker_id IS NULL
+               ORDER BY CAST(SUBSTR(e.worker_id, 3) AS INTEGER)""").fetchall()
+        out = [{"worker_id": r["worker_id"], "name": r["name"]} for r in rows]
+        resp = response_wrapper(out, count=len(out))
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return resp
     finally:
         conn.close()
 

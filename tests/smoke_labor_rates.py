@@ -40,6 +40,13 @@ SUPER_EMAIL = "smk-super-lrt@superstars.local"
 PW = "smk-lrt-pw"
 PASS, FAIL = [], []
 
+# #241 — real-row baselines captured at start; cleanup asserts they are
+# UNCHANGED instead of hardcoding the 2026-06 migration count (14). The
+# operator adds real workers between smoke runs — asserting a frozen count
+# made the suite fail on live data drift (W-0016 was the instance).
+REAL_STATE_BASELINE = None
+REAL_WR_BASELINE = None
+
 
 def ok(name, cond, note=""):
     (PASS if cond else FAIL).append(name)
@@ -103,9 +110,10 @@ def find(rost, section, wid):
 
 
 def main():
+    global REAL_STATE_BASELINE, REAL_WR_BASELINE
     print("== #220 Labor Rates smoke ==")
 
-    # ---- 1) MIGRATION intact (no real values printed) ----
+    # ---- 1) REAL ROWS intact (no real values printed; baseline = live count) ----
     conn = db()
     state_n = conn.execute("SELECT COUNT(*) FROM labor_worker_state WHERE worker_id NOT LIKE 'W-9%'").fetchone()[0]
     active_n = conn.execute("SELECT COUNT(*) FROM labor_worker_state WHERE worker_id NOT LIKE 'W-9%' AND status='active'").fetchone()[0]
@@ -114,16 +122,25 @@ def main():
     mism = conn.execute("""SELECT COUNT(*) FROM labor_worker_state s JOIN employees e ON e.worker_id=s.worker_id
         JOIN worker_rates wr ON wr.employee_id=e.employee_id AND wr.effective_to IS NULL
         WHERE s.worker_id NOT LIKE 'W-9%' AND ABS(s.current_rate - wr.hourly_rate) > 0.005""").fetchone()[0]
+    canon_n = conn.execute("SELECT COUNT(*) FROM labor_worker_state WHERE worker_id <> UPPER(worker_id)").fetchone()[0]
+    REAL_STATE_BASELINE = state_n
+    REAL_WR_BASELINE = conn.execute(
+        "SELECT COUNT(*) FROM worker_rates WHERE effective_to IS NULL AND employee_id NOT LIKE 'E-99%'").fetchone()[0]
     conn.close()
-    ok("migration_14_state", state_n == 14, f"{state_n}")
+    ok("real_state_on_file", state_n >= 1, f"{state_n} real workers (live baseline, not a frozen count)")
+    ok("ids_all_canonical_uppercase", canon_n == 0, "#241 — no lowercase worker ids")
     # The active/inactive split is OPERATOR-controlled — real ops deactivate workers via the
     # live dashboard (PM-gated deactivate, #221). Assert every real worker has a valid status
     # (accounting sums to 14), NOT that all 14 are active, so the suite tolerates that drift.
-    ok("migration_status_accounted", valid_status_n == 14, f"{active_n} active / {14 - active_n} inactive (operator-controlled)")
-    ok("migration_initial_history", init_n == 14)
+    ok("migration_status_accounted", valid_status_n == state_n, f"{active_n} active / {state_n - active_n} inactive (operator-controlled)")
+    ok("migration_initial_history", init_n == state_n)
     ok("migration_rates_match_worker_rates", mism == 0, "state.current_rate == worker_rates (no values shown)")
 
     # ---- 2) SUBMIT -> pending (current unchanged, KPI++) ----
+    # #241 — add-worker now REQUIRES the worker to exist in employees (the
+    # free-typed-id hole is closed), so every synthetic gets an employees row.
+    mk_emp("W-9001", "E-99001", "SMK Lrt One", "Laborer")
+    mk_emp("W-9002", "E-99002", "SMK Lrt Two", "Mechanic")
     add_worker("W-9001", "Laborer", 10.00)
     add_worker("W-9002", "Mechanic", 20.00)
     before = roster()
@@ -182,6 +199,8 @@ def main():
     ok("reactivate_same_id_history_kept", find(rost4, "active", "W-9001") is not None and len(hist2) >= 2)
 
     # ---- 6) DEACTIVATE flow (#221) — PM-gated, same queue ----
+    mk_emp("W-9003", "E-99003", "SMK Lrt Three", "Rope Access")
+    mk_emp("W-9004", "E-99004", "SMK Lrt Four", "Superintendent")
     add_worker("W-9003", "Rope Access", 30.00)
     add_worker("W-9004", "Superintendent", 70.00)
     dr = requests.post(f"{BASE}/api/labor-rates/deactivate", json={"worker_id": "W-9003"}, timeout=15)
@@ -260,6 +279,9 @@ def _stress():
     n = 0
     for i in range(200):
         wid = f"W-9{i+100:03d}"
+        # #241 — every state row needs a real employees row now; eid mirrors
+        # the wid digits (W-9100 -> E-99100), inside the E-99% cleanup band.
+        mk_emp(wid, f"E-9{wid[2:]}", f"SMK Stress {i}", trades[i % 4])
         rr = add_worker(wid, trades[i % 4], 10.0 + (i % 30), eff="2026-01-05",
                         status=("inactive" if i % 7 == 0 else "active"))
         if rr.status_code == 201:
@@ -302,7 +324,7 @@ def _cleanup():
     res_emp = conn.execute("SELECT COUNT(*) FROM employees WHERE worker_id LIKE 'W-9%'").fetchone()[0]
     res_wr9 = conn.execute("SELECT COUNT(*) FROM worker_rates WHERE employee_id LIKE 'E-99%'").fetchone()[0]
     real_state = conn.execute("SELECT COUNT(*) FROM labor_worker_state").fetchone()[0]
-    real_wr = conn.execute("SELECT COUNT(*) FROM worker_rates WHERE effective_to IS NULL").fetchone()[0]
+    real_wr = conn.execute("SELECT COUNT(*) FROM worker_rates WHERE effective_to IS NULL AND employee_id NOT LIKE 'E-99%'").fetchone()[0]
     conn.close()
     # synthetic worker_records dirs (E-99..._SMK-TEST) — never touch real worker folders
     dirs = 0
@@ -310,7 +332,9 @@ def _cleanup():
         shutil.rmtree(d, ignore_errors=True); dirs += 1
     print(f"    purged {chg} change rows + synthetic emps; removed {dirs} test photo dir(s); residue state={res_state} change={res_chg} emp={res_emp} wr={res_wr9}")
     ok("cleanup_zero_residue", res_state == 0 and res_chg == 0 and res_emp == 0 and res_wr9 == 0)
-    ok("cleanup_14_real_untouched", real_state == 14 and real_wr == 14, f"state={real_state} worker_rates={real_wr}")
+    ok("cleanup_real_rows_untouched",
+       real_state == REAL_STATE_BASELINE and real_wr == REAL_WR_BASELINE,
+       f"state {real_state} == baseline {REAL_STATE_BASELINE} · active worker_rates {real_wr} == baseline {REAL_WR_BASELINE}")
 
 
 if __name__ == "__main__":

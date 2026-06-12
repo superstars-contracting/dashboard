@@ -129,7 +129,7 @@ def build_week_grid(conn, monday):
            FROM employees e
            JOIN project_assignments pa ON pa.employee_id = e.employee_id
            WHERE pa.status = 'active'
-           ORDER BY CAST(SUBSTR(e.employee_id, 3) AS INTEGER)"""
+           ORDER BY CAST(SUBSTR(e.worker_id, 3) AS INTEGER)"""
     ).fetchall()
 
     # One query for the whole week — index on (date, project_code) covers this.

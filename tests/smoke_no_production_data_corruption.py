@@ -50,12 +50,23 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import sqlite3  # noqa: E402
 
 DB = SCRIPT_DIR / "superstars.db"
-SMOKE_SCRIPT = SCRIPT_DIR / "tests" / "smoke_crud_data_integrity.py"
+# #241 — the standard gate runs BOTH suites inside the snapshot window:
+# the per-section CRUD smoke and the worker-lifecycle smoke. Any suite
+# added here inherits the anti-pollution diff for free.
+SMOKE_SCRIPTS = [
+    SCRIPT_DIR / "tests" / "smoke_crud_data_integrity.py",
+    SCRIPT_DIR / "tests" / "smoke_worker_lifecycle.py",
+]
 VENV_PY = SCRIPT_DIR / "venv" / "Scripts" / "python.exe"
 
 # Identifier prefixes that indicate a row is synthetic (smoke-owned)
 # and therefore expected to appear/disappear during a smoke run.
-SYNTHETIC_PREFIXES = ("SMK-", "SMOKE-", "SYN-", "SMK_")
+# #241 — the repo-wide synthetic id band (W-9xxx workers / E-99xxx
+# employees, per the standing test-data rules) is part of the filter:
+# real worker ids are sequentially allocated (W-00xx at today's scale),
+# so a W-9/E-99 id can only be smoke-owned. Without these, a smoke
+# purging its own stale residue false-flags as production pollution.
+SYNTHETIC_PREFIXES = ("SMK-", "SMOKE-", "SYN-", "SMK_", "W-9", "E-99")
 
 # Tables to snapshot. Each entry is:
 #   (table, identifying_columns, optional_value_columns_for_change_detection)
@@ -297,25 +308,26 @@ def main() -> int:
           f"{sum(len(v) for v in before.values())} rows across "
           f"{len(before)} tables  ({time.time() - t0:.2f}s)")
 
-    # 2. Run the existing CRUD smoke as a subprocess.
-    t1 = time.time()
-    proc = subprocess.run(
-        [str(VENV_PY), str(SMOKE_SCRIPT)],
-        capture_output=True, text=True, timeout=600,
-        cwd=str(SCRIPT_DIR),
-    )
-    print(f"  smoke subprocess returncode={proc.returncode}  "
-          f"({time.time() - t1:.1f}s)")
-    if proc.returncode != 0:
-        # Surface the smoke's own failure first; pollution check is
-        # secondary if the suite outright failed.
-        print("  smoke FAILED — last 20 stdout lines:")
-        for line in (proc.stdout or "").splitlines()[-20:]:
-            print(f"    {line}")
-        print("  stderr (last 10):")
-        for line in (proc.stderr or "").splitlines()[-10:]:
-            print(f"    {line}")
-        return 1
+    # 2. Run every gated smoke suite as a subprocess (CRUD + lifecycle).
+    for script in SMOKE_SCRIPTS:
+        t1 = time.time()
+        proc = subprocess.run(
+            [str(VENV_PY), str(script)],
+            capture_output=True, text=True, timeout=600,
+            cwd=str(SCRIPT_DIR),
+        )
+        print(f"  {script.name} returncode={proc.returncode}  "
+              f"({time.time() - t1:.1f}s)")
+        if proc.returncode != 0:
+            # Surface the smoke's own failure first; pollution check is
+            # secondary if the suite outright failed.
+            print(f"  {script.name} FAILED — last 20 stdout lines:")
+            for line in (proc.stdout or "").splitlines()[-20:]:
+                print(f"    {line}")
+            print("  stderr (last 10):")
+            for line in (proc.stderr or "").splitlines()[-10:]:
+                print(f"    {line}")
+            return 1
 
     # 3. After snapshot
     after = snapshot_all()

@@ -23,6 +23,7 @@ import sys
 from pathlib import Path
 
 import requests
+# (Path is used by the #241 i18n-apostrophe guard below.)
 
 import _smoke_auth  # noqa: E402
 _smoke_auth.setup()
@@ -333,6 +334,52 @@ def main():
     ok("fp_description_is_textarea", bool(re.search(r'<textarea[^>]*id="fp-up-desc"', html)))
     ok("fp_worker_stage_removed",
        all(x not in html for x in ('id="fp-up-worker"', 'id="fp-up-stage"', 'id="fp-bar-stage"')))
+
+    # ---- 7) i18n dicts: no escaped possessive apostrophes (#241; CLAUDE.md JS rule) ----
+    # #240 found a `project\'s` inside company-dashboard's I18N dict that a manual
+    # grep had missed (#239). Automated here: FAIL if any \' escape appears inside
+    # an I18N dictionary block in any repo-root .html.
+    print("\n-- i18n apostrophe guard (#241) --")
+
+    def i18n_blocks(text):
+        """Every `I18N = {...}` object literal, extracted by brace counting."""
+        blocks = []
+        for m in re.finditer(r"\bI18N\s*=\s*\{", text):
+            depth = 0
+            start = m.end() - 1
+            for j in range(start, len(text)):
+                if text[j] == "{":
+                    depth += 1
+                elif text[j] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        blocks.append(text[start:j + 1])
+                        break
+        return blocks
+
+    def i18n_escaped_apostrophes(text):
+        hits = []
+        for bi, block in enumerate(i18n_blocks(text)):
+            for n, line in enumerate(block.splitlines(), 1):
+                if "\\'" in line:
+                    hits.append(f"I18N block {bi + 1} line {n}")
+        return hits
+
+    bad_doc = "const I18N = { en: { 'k': 'the worker\\'s folder' } };"
+    ok("selftest_i18n_apostrophe_caught", len(i18n_escaped_apostrophes(bad_doc)) == 1)
+    good_doc = "const I18N = { en: { 'k': 'the worker folder' } };"
+    ok("selftest_i18n_clean_passes", len(i18n_escaped_apostrophes(good_doc)) == 0)
+    root_dir = Path(__file__).resolve().parent.parent
+    scanned = 0
+    for page in sorted(root_dir.glob("*.html")):
+        text = page.read_text(encoding="utf-8", errors="replace")
+        if "I18N" not in text:
+            continue
+        scanned += 1
+        hits = i18n_escaped_apostrophes(text)
+        ok("i18n_no_escaped_apostrophes_" + page.name, not hits,
+           "; ".join(hits[:3]) if hits else "clean")
+    ok("i18n_guard_scanned_pages", scanned >= 1, f"{scanned} page(s) with an I18N dict")
 
     print(f"\n== RESULT: {len(PASS)} PASS / {len(FAIL)} FAIL ==")
     if FAIL:
