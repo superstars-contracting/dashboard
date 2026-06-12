@@ -22,6 +22,10 @@
   --status-active:#4364dc;   --status-active-soft:#ebf0fe;
   --status-behind:#e9685a;   --status-behind-soft:#fceeec;
   --status-oat:#cabfad;      --status-oat-soft:#f3f0e9;
+  /* #244 — derived family members used by the money/oat treatments:
+     deep green for gradient ends, readable ink on oat-soft tints. */
+  --status-complete-deep:#0c7a5f;
+  --oat-ink:#8a8064;
 }
 
 /* ===== Shared CTA buttons (#236) — ONE primary style site-wide. A primary

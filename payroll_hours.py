@@ -117,7 +117,26 @@ def build_week_grid(conn, monday):
         "grand_total": float,
       }
 
-    Worker pool: employees with at least one ACTIVE project_assignment.
+    Worker pool (#244): employees with at least one ACTIVE project_assignment,
+    further scoped by labor_worker_state.status — the single source of truth
+    for the active roster since #241 (LEFT-JOIN semantics: no state row =
+    active). A worker on the sheet is either
+      - labor-ACTIVE (including zero-hour workers — those are the "no
+        sign-ins" payroll exception, counted in no_signin_count), or
+      - labor-INACTIVE but with hours in THIS week (check-cutting history
+        must not rewrite when a worker is later retired).
+    Inactive workers with zero hours in the week are not part of the
+    week's roster at all — retired, not "no sign-ins."
+
+    KNOWN LIMITATION (reported in #244, deliberately not silently chosen):
+    the model stores only CURRENT status. Approved 'deactivate' rows are
+    timestamped in labor_rate_change, but reactivation is an instant
+    status flip with no history row — so "was this worker active during
+    week X" is NOT answerable for arbitrary past weeks. Consequence: a
+    worker who was active-with-zero-hours in a past week and was deactivated
+    afterwards will not appear on that past week's sheet. Workers with
+    hours always appear, so payable history is never rewritten.
+
     Sums hours across all projects for a given (worker, date) — payroll
     doesn't care which project a worker was on, just the total.
     """
@@ -131,6 +150,10 @@ def build_week_grid(conn, monday):
            WHERE pa.status = 'active'
            ORDER BY CAST(SUBSTR(e.worker_id, 3) AS INTEGER)"""
     ).fetchall()
+
+    # #244 — current labor status per worker_id (single source of truth).
+    labor_status = {r["worker_id"]: r["status"] for r in conn.execute(
+        "SELECT worker_id, status FROM labor_worker_state").fetchall()}
 
     # One query for the whole week — index on (date, project_code) covers this.
     placeholders = ",".join("?" * len(date_strs))
@@ -151,17 +174,22 @@ def build_week_grid(conn, monday):
     grid_workers = []
     totals_by_day = [0.0] * 5
     grand_total = 0.0
+    roster_active_count = 0
+    no_signin_count = 0
 
     for w in workers:
         eid = w["employee_id"]
+        labor_active = labor_status.get(w["worker_id"], "active") != "inactive"
         days = []
         weekly_total = 0.0
+        day_hours_by_index = []
         for i, dstr in enumerate(date_strs):
             day_rows = by_emp_day.get((eid, dstr), [])
             if not day_rows:
                 day = {"date": dstr, "sign_in_id": None, "time_in": None,
                        "time_out": None, "hours": 0.0, "project_code": None,
                        "has_entry": False}
+                day_hours_by_index.append(0.0)
             else:
                 # Sum hours across all projects for this (worker, date)
                 day_hours = 0.0
@@ -181,13 +209,24 @@ def build_week_grid(conn, monday):
                     "row_count": len(day_rows),  # >1 means multi-project day
                 }
                 weekly_total += day_hours
-                totals_by_day[i] += day_hours
+                day_hours_by_index.append(day_hours)
             days.append(day)
+        # #244 inclusion rule — see docstring. Inactive + no hours this
+        # week -> not on this week's sheet (retired, not "no sign-ins").
+        if not labor_active and weekly_total <= 0:
+            continue
+        if labor_active:
+            roster_active_count += 1
+            if weekly_total <= 0:
+                no_signin_count += 1
+        for i, dh in enumerate(day_hours_by_index):
+            totals_by_day[i] += dh
         grid_workers.append({
             "employee_id": eid,
             "worker_id": w["worker_id"],
             "name": w["name"],
             "trade": w["trade"],
+            "labor_active": labor_active,
             "days": days,
             "weekly_total": round(weekly_total, 2),
         })
@@ -218,4 +257,9 @@ def build_week_grid(conn, monday):
         "totals_by_day": [round(t, 2) for t in totals_by_day],
         "grand_total": round(grand_total, 2),
         "no_work_by_date": no_work_by_date,
+        # #244 — corrected roster math (see docstring): the denominator is
+        # labor-ACTIVE workers; no_signin_count = active with zero hours.
+        "roster_active_count": roster_active_count,
+        "no_signin_count": no_signin_count,
+        "paid_count": sum(1 for gw in grid_workers if gw["weekly_total"] > 0),
     }

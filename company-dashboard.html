@@ -9,7 +9,7 @@
      vendored GridStack (offline-safe, no CDN) + the shared widget design language
      + the shared per-user layout helper (DashLayout → /api/dashboard/layout). -->
 <link rel="stylesheet" href="/files/static/vendor/gridstack.min.css">
-<link rel="stylesheet" href="/files/static/css/widgets.css?v=238">
+<link rel="stylesheet" href="/files/static/css/widgets.css?v=244">
 <script src="/files/static/vendor/gridstack-all.js"></script>
 <script src="/files/static/js/dash_layout.js" defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -164,7 +164,7 @@
   .badge-pill.ok { color: var(--status-complete); background: var(--status-complete-soft); }
   .badge-pill.warn { color: #8a6516; background: rgba(186,136,56,.16); }
   .badge-pill.bad { color: var(--status-behind); background: var(--status-behind-soft); }
-  .badge-pill.mute { color: #8a8064; background: var(--status-oat-soft); }
+  .badge-pill.mute { color: var(--oat-ink, #8a8064); background: var(--status-oat-soft); }
 
   /* ==== #242 — Workforce reskin on the shared design system ==== */
   table.roster .wf-id { font-weight: 700; color: var(--accent); }
@@ -177,7 +177,7 @@
   .wf-chip.mech { color: #0E7490; background: rgba(14,116,144,.12); }
   .wf-chip.lab { color: #6D28D9; background: rgba(109,40,217,.10); }
   .wf-chip.oth { color: #4F46E5; background: rgba(79,70,229,.10); }
-  .wf-chip.none { color: #8a8064; background: var(--status-oat-soft); }
+  .wf-chip.none { color: var(--oat-ink, #8a8064); background: var(--status-oat-soft); }
   /* boxed ghost ACTION buttons; the issue variant is azure-tinted (the
      outstanding-action affordance) */
   .cred-btn { background: #fff; border: 1px solid var(--line); color: var(--ink); font-size: 11px; padding: 4px 10px; border-radius: 8px; cursor: pointer; white-space: nowrap; font-weight: 600; font-family: inherit; }
@@ -677,23 +677,37 @@
     place to wrap, no spread responsibility.
   -->
   <div class="panel" data-panel="labor-rate">
-    <div class="section">
-      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;flex-wrap:wrap;gap:12px;">
-        <div>
+    <!-- #244 — crafted Lumen+Oat card: hero (money + pills + week navigator,
+         NO chart per operator amendment), exception-first sheet, floating
+         totals card. Comp gating unchanged: rate/amount render only when
+         rates_visible (admin/c_suite); for other roles the hero shows hours. -->
+    <div class="section lrt-card">
+      <div class="lrt-hero">
+        <div class="lrt-hero-left">
           <h2 data-i18n="p-labor-rate-title">Labor Rate Tracker</h2>
           <div class="h2-sub" data-i18n="p-labor-rate-sub">Check-cutting sheet: weekly hours worked × hourly rate. Hours auto-populate from the daily reports — same source as the Hours Log.</div>
+          <div class="lrt-money-label" id="lrt-money-label" data-i18n="lrt-week-payroll">Week Payroll</div>
+          <div class="lrt-money" id="lrt-payroll">—</div>
+          <div class="lrt-money-sub" id="lrt-payroll-sub">&nbsp;</div>
+          <div class="lrt-pills">
+            <span class="lrt-pill" id="lrt-pill-hours" style="display:none;"><i class="dot azure"></i><span class="t"></span></span>
+            <span class="lrt-pill" id="lrt-pill-paid" style="display:none;"><i class="dot green"></i><span class="t"></span></span>
+            <span class="lrt-pill" id="lrt-pill-nosign" style="display:none;"><i class="dot oat"></i><span class="t"></span></span>
+          </div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <button id="lrt-prev" type="button" style="background:white;border:1px solid var(--brand-red);color:var(--brand-red);padding:6px 12px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;">‹ Prev</button>
-          <div id="lrt-range" style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:14px;font-weight:700;min-width:220px;text-align:center;">—</div>
-          <button id="lrt-next" type="button" style="background:white;border:1px solid var(--brand-red);color:var(--brand-red);padding:6px 12px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;">Next ›</button>
+        <div class="lrt-hero-right">
+          <div class="lrt-weeknav">
+            <button id="lrt-prev" type="button" title="Previous week">‹</button>
+            <div id="lrt-range">—</div>
+            <button id="lrt-next" type="button" title="Next week">›</button>
+          </div>
         </div>
       </div>
-      <!-- Audit / source notice (replaces the prior SAMPLE-data banner
-           after #158 wired real rates). Operator can set / change rates
-           via /admin/labor-rates (admin/c_suite only). -->
-      <div id="lrt-source-notice" style="background:#FAF7F1;border:1px solid var(--border);border-left:4px solid var(--brand-red);color:var(--ink-soft);font-size:11px;padding:7px 12px;border-radius:3px;margin-bottom:12px;display:none;align-items:center;gap:8px;">
-        <span data-i18n="p-labor-rate-source">Rates from <strong>worker_rates</strong> (effective on this week's Monday). Edit at <a href="/admin/labor-rates" style="color:var(--brand-red);font-weight:600;">/admin/labor-rates</a>. All changes are audit-logged.</span>
+      <div class="lrt-body">
+      <!-- Audit / source notice — lumen-ghost info box (#244). Operator can
+           set / change rates via /admin/labor-rates (admin/c_suite only). -->
+      <div id="lrt-source-notice" class="lrt-note">
+        <span data-i18n="p-labor-rate-source">Rates from <strong>worker_rates</strong> (effective on this week's Monday). Edit at <a href="/admin/labor-rates">/admin/labor-rates</a>. All changes are audit-logged.</span>
       </div>
       <!-- #191 — sign_in_log ↔ DCR-artifact divergence banner.
            Hidden when the displayed week has no divergence. Surfaces
@@ -731,26 +745,71 @@
           <tfoot id="lrt-tfoot"></tfoot>
         </table>
       </div>
+      <!-- #244 — floating totals card replaces the dark tfoot band -->
+      <div id="lrt-totals-card" class="lrt-totals" style="display:none;"></div>
       <div style="margin-top:10px;font-size:11px;color:var(--mute);">
         <span data-i18n="p-labor-rate-help">Straight wages — Amount Owed = Total Hours × Rate. Not burdened (no taxes / comp / insurance). The Hours Log is the editable source — daily hours appear here automatically once a worker has signed in.</span>
       </div>
+      </div><!-- /.lrt-body -->
     </div>
   </div>
   <style>
-    /* Subtle tint on the two gated columns so the comp region reads
-       as visually distinct. Future server-side gate drops everything
-       with class="lrt-comp" — both the colgroup hook and the
-       individual <th>/<td> nodes that JS adds. */
-    #lrt-grid col.lrt-comp { background: rgba(177, 30, 46, 0.04); }
-    #lrt-grid th.lrt-comp, #lrt-grid td.lrt-comp { border-left: 1px dashed var(--hairline); }
-    #lrt-grid th.lrt-comp:first-of-type, #lrt-grid td.lrt-comp:first-of-type { border-left: 2px dashed var(--brand-red); }
-    #lrt-grid .lrt-amount { color: #2F7C57; font-weight: 700; font-variant-numeric: tabular-nums; }
-    #lrt-grid .lrt-rate { color: var(--ink-soft, #4A4A4A); font-variant-numeric: tabular-nums; }
+    /* ==== #244 — LRT crafted Lumen+Oat skin (tokens only) ==== */
+    .lrt-card { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 0; overflow: hidden; }
+    .lrt-card::before { content: ''; display: block; height: 3px; background: linear-gradient(90deg, var(--accent), var(--accent-soft)); }
+    .lrt-hero { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; flex-wrap: wrap; padding: 18px 22px 16px; border-bottom: 1px solid var(--line);
+      background: radial-gradient(440px 150px at 12% 0%, var(--accent-soft) 0%, rgba(255,255,255,0) 62%),
+                  radial-gradient(440px 160px at 90% 100%, var(--status-oat-soft) 0%, rgba(255,255,255,0) 55%), #fff; }
+    .lrt-money-label { font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 12px; }
+    .lrt-money { font-size: 44px; font-weight: 800; line-height: 1.05; letter-spacing: -.01em; font-variant-numeric: tabular-nums;
+      background: linear-gradient(135deg, var(--status-complete), var(--status-complete-deep)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .lrt-money-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .lrt-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .lrt-pill { display: inline-flex; align-items: center; gap: 7px; background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 600; color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.05); }
+    .lrt-pill .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .lrt-pill .dot.azure { background: var(--accent); }
+    .lrt-pill .dot.green { background: var(--status-complete); }
+    .lrt-pill .dot.oat { background: var(--status-oat); }
+    .lrt-weeknav { display: inline-flex; align-items: stretch; border: 1px solid var(--line); border-radius: 11px; overflow: hidden; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
+    .lrt-weeknav button { border: none; background: #fff; color: var(--accent); font-size: 17px; font-weight: 700; padding: 8px 13px; cursor: pointer; font-family: inherit; line-height: 1; }
+    .lrt-weeknav button:hover { background: var(--accent-soft); }
+    .lrt-weeknav #lrt-range { background: var(--accent-soft); color: var(--ink); font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; padding: 0 16px; min-width: 190px; }
+    .lrt-body { padding: 16px 22px 18px; }
+    .lrt-note { display: none; align-items: center; gap: 8px; background: var(--accent-soft); border: 1px solid var(--accent-edge); color: var(--muted); font-size: 11px; padding: 8px 12px; border-radius: 9px; margin-bottom: 12px; }
+    .lrt-note a { color: var(--accent); font-weight: 700; }
+    /* gated comp columns — visually distinct, now on the azure system */
+    #lrt-grid col.lrt-comp { background: rgba(67, 100, 220, 0.04); }
+    #lrt-grid th.lrt-comp, #lrt-grid td.lrt-comp { border-left: 1px dashed var(--line); }
+    #lrt-grid th.lrt-comp:first-of-type, #lrt-grid td.lrt-comp:first-of-type { border-left: 2px dashed var(--accent-edge); }
     #lrt-grid .lrt-num { font-variant-numeric: tabular-nums; text-align: right; }
-    #lrt-grid thead th { background: var(--cream); font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--mute); padding: 8px 6px; border-bottom: 2px solid var(--brand-red); text-align: left; font-weight: 700; }
+    #lrt-grid thead th { background: #fff; font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); padding: 8px 6px; border-bottom: 2px solid var(--line); text-align: left; font-weight: 700; }
     #lrt-grid thead th.lrt-num { text-align: right; }
-    #lrt-grid tbody td { padding: 8px 6px; border-bottom: 1px solid var(--hairline); vertical-align: middle; }
-    #lrt-grid tfoot td { padding: 10px 6px; font-weight: 700; border-top: 2px solid var(--ink); background: #fbfbfc; }
+    #lrt-grid tbody td { padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    #lrt-grid tbody tr:hover td { background: var(--accent-soft); }
+    #lrt-grid tfoot td { padding: 0; border: none; }
+    .lrt-worker { display: flex; align-items: center; gap: 10px; }
+    .lrt-av { width: 34px; height: 34px; border-radius: 50%; flex: none; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 700; overflow: hidden; position: relative; }
+    .lrt-av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .lrt-wname { font-weight: 700; font-size: 12.5px; color: var(--ink); }
+    .lrt-wmeta { font-size: 10.5px; color: var(--muted); }
+    .lrt-wmeta .wid { color: var(--accent); font-weight: 700; letter-spacing: .04em; }
+    .lrt-full { color: #9aa0ab; }
+    .lrt-partial { display: inline-block; background: var(--status-oat-soft); border: 1px solid var(--status-oat); color: var(--oat-ink); border-radius: 7px; padding: 1px 7px; font-weight: 700; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .lrt-bar { height: 3px; border-radius: 2px; background: var(--line); margin-top: 4px; overflow: hidden; }
+    .lrt-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-ink)); }
+    .lrt-bar.short i { background: var(--status-oat); }
+    #lrt-grid .lrt-rate { font-variant-numeric: tabular-nums; }
+    #lrt-grid .lrt-rate b { color: var(--ink); }
+    #lrt-grid .lrt-rate .sfx { color: var(--muted); font-weight: 500; font-size: 10.5px; }
+    #lrt-grid .lrt-amount { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .lrt-nosign-tag { display: inline-block; background: var(--status-oat-soft); border: 1px solid var(--status-oat); color: var(--oat-ink); border-radius: 999px; padding: 1px 8px; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-left: 6px; vertical-align: 1px; }
+    .lrt-totals { margin-top: 14px; background: linear-gradient(135deg, #fff, var(--status-oat-soft)); border: 1px solid var(--status-oat); border-radius: 14px; box-shadow: 0 4px 14px rgba(0,0,0,.06); padding: 12px 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .lrt-totals .cap { font-size: 10px; font-weight: 800; letter-spacing: .1em; color: var(--oat-ink); text-transform: uppercase; }
+    .lrt-totals .dt { display: flex; flex-direction: column; align-items: center; }
+    .lrt-totals .dt b { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ink); }
+    .lrt-totals .dt s { font-size: 9.5px; color: var(--muted); text-decoration: none; text-transform: uppercase; }
+    .lrt-totals .seg { border: 1px solid var(--status-oat); border-radius: 10px; padding: 6px 12px; background: #fff; display: flex; flex-direction: column; align-items: center; }
+    .lrt-grand { margin-left: auto; background: linear-gradient(135deg, var(--status-complete), var(--status-complete-deep)); color: #fff; font-weight: 800; border-radius: 11px; padding: 9px 16px; font-size: 15px; box-shadow: 0 4px 14px rgba(21,160,126,.35); font-variant-numeric: tabular-nums; }
   </style>
 
   <!-- SETTINGS -->
@@ -1089,6 +1148,14 @@ const I18N = {
     'col-amount-owed': 'Amount Owed',
     'lrt-grand-total': 'GRAND TOTAL',
     'lrt-daily-totals': 'DAILY TOTALS',
+    'lrt-week-payroll': 'Week Payroll',
+    'lrt-week-hours': 'Week Hours',
+    'lrt-checks': 'checks to cut',
+    'lrt-rates-eff': 'rates effective Mon',
+    'lrt-pill-hrs': 'hrs',
+    'lrt-pill-paid': 'active workers paid',
+    'lrt-pill-nosign': 'no sign-ins',
+    'lrt-total-hrs': 'Total hrs',
     'p-settings-title': 'Settings',
     'p-settings-sub': 'Company info, issuer signature, integrations.',
     'p-settings-placeholder': 'Settings UI — coming next. Today, edit api-keys.txt directly.',
@@ -1209,6 +1276,14 @@ const I18N = {
     'col-amount-owed': 'Monto Adeudado',
     'lrt-grand-total': 'TOTAL GENERAL',
     'lrt-daily-totals': 'TOTALES DIARIOS',
+    'lrt-week-payroll': 'Nómina Semanal',
+    'lrt-week-hours': 'Horas Semanales',
+    'lrt-checks': 'cheques por cortar',
+    'lrt-rates-eff': 'tarifas vigentes lun',
+    'lrt-pill-hrs': 'hrs',
+    'lrt-pill-paid': 'trabajadores activos pagados',
+    'lrt-pill-nosign': 'sin registros',
+    'lrt-total-hrs': 'Horas tot.',
     'p-settings-title': 'Ajustes',
     'p-settings-sub': 'Información de la empresa, firma del emisor, integraciones.',
     'p-settings-placeholder': 'Interfaz de ajustes — próximamente. Por ahora, edita api-keys.txt directamente.',
@@ -3389,71 +3464,85 @@ applyLanguage();
     </tr>`;
   }
 
+  // #244 — trade-hued avatar gradient (the non-semantic palette, mirrors the
+  // Workforce chips) + headshot via the gated #223 route (no path in any JSON;
+  // 404 -> the <img> removes itself and the initials show).
+  const LRT_HUES = {
+    superintendent: ['#475569', '#64748B'],
+    mechanic: ['#0E7490', '#0891B2'],
+    laborer: ['#6D28D9', '#7C3AED'],
+  };
+  function lrtHues(trade) {
+    const k = String(trade || '').toLowerCase();
+    for (const key in LRT_HUES) { if (k.includes(key)) return LRT_HUES[key]; }
+    return ['#4F46E5', '#3730A3'];  // indigo — other trades
+  }
+  function lrtInitials(name) {
+    const p = String(name || '').trim().split(/\s+/).filter(Boolean);
+    return (((p[0] || '')[0] || '') + (p.length > 1 ? ((p[p.length - 1] || '')[0] || '') : '')).toUpperCase() || '·';
+  }
+  function lrtAvatar(w) {
+    const hues = lrtHues(w.trade);
+    return `<span class="lrt-av" style="background:linear-gradient(135deg,${hues[0]},${hues[1]})">${esc(lrtInitials(w.name))}<img src="/api/employees/${encodeURIComponent(w.employee_id)}/face-photo" alt="" loading="lazy" onerror="this.remove()"></span>`;
+  }
+  function lrtT(key) {
+    const dict = I18N[currentLang] || I18N.en;
+    return dict[key] != null ? dict[key] : (I18N.en[key] || key);
+  }
+
   function renderBody(workers, noWorkByDate) {
     if (!workers || !workers.length) {
       $('lrt-tbody').innerHTML = '<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--mute);">No active workers.</td></tr>';
       return;
     }
-    // Filter: render only workers with ≥1 sign-in this week
-    // (weekly_total > 0). The handoff is explicit — a no-work day
-    // WITHIN the week is per-column flagging (already wired), NOT
-    // a reason to drop the worker. The filter is per-week activity,
-    // not per-day. At 50+ workers, rendering everyone is unreadable;
-    // the absentees-this-week aren't payroll-relevant rows.
-    // The Hours Log (a sibling consumer of build_week_grid) still
-    // shows the full active roster so absences are visible there
-    // for time-entry; only the LRT applies this filter.
-    const totalRosterCount = workers.length;
-    const activeWorkers = workers.filter(w => (w.weekly_total || 0) > 0);
-    const hiddenCount = totalRosterCount - activeWorkers.length;
-    if (!activeWorkers.length) {
-      $('lrt-tbody').innerHTML = `<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--mute);">No worker had a sign-in this week. ${totalRosterCount > 0 ? '<span style="color:var(--ink-soft);">(${totalRosterCount} on the roster.)</span>' : ''}</td></tr>`;
-      return;
-    }
-    const rows = activeWorkers.map(w => {
+    // #244 — the server pool is already correct (active roster + retired-
+    // with-hours). Active workers with ZERO hours are the payroll exception:
+    // they render flagged (oat tag), never silently hidden.
+    const rows = workers.map(w => {
+      const total = w.weekly_total || 0;
+      const noSign = (w.labor_active !== false) && total <= 0;
       const dayCells = w.days.map(d => {
         const h = d.hours;
         const nw = noWorkByDate && noWorkByDate[d.date];
         if (nw) {
-          // No-Work Day — the column header carries the reason; per-row
-          // cells render a small dash so the column reads "muted, no
-          // entry expected" instead of "blank, data missing".
+          // No-Work Day — column header carries the reason (pre-#244 treatment kept).
           return `<td class="lrt-num" style="background:#FFF4E6;color:#A0561B;">—</td>`;
         }
-        const cell = (h && h > 0) ? h.toFixed(2) : '<span style="color:var(--mute);">—</span>';
-        return `<td class="lrt-num">${cell}</td>`;
+        if (!h || h <= 0) return `<td class="lrt-num"><span style="color:var(--mute);">—</span></td>`;
+        if (h >= 8) return `<td class="lrt-num"><span class="lrt-full">${h.toFixed(2)}</span></td>`;
+        return `<td class="lrt-num"><span class="lrt-partial">${h.toFixed(2)}</span></td>`;
       }).join('');
-      const total = w.weekly_total || 0;
-      // Server-driven comp data (#158). hourly_rate is present ONLY when
-      // the caller's role is admin/c_suite AND the worker has a rate set.
-      // Missing rate (admin viewer + no rate) -> rate_not_set: true.
-      // Non-authorized caller -> field absent on every worker (handled
-      // at the grid level by rates_visible flag).
+      // Server-driven comp data (#158): hourly_rate present ONLY for
+      // admin/c_suite (and a set rate); rate_not_set for admin w/o rate;
+      // both fields absent entirely for non-comp roles (gating unchanged).
       let rateCell, amountCell;
       if (w.hourly_rate != null) {
         const amount = total * Number(w.hourly_rate);
-        rateCell   = `<td class="lrt-num lrt-comp lrt-rate">${fmtMoney(w.hourly_rate)}</td>`;
+        rateCell   = `<td class="lrt-num lrt-comp lrt-rate"><b>${fmtMoney(w.hourly_rate)}</b><span class="sfx">/hr</span></td>`;
         amountCell = `<td class="lrt-num lrt-comp lrt-amount">${fmtMoney(amount)}</td>`;
       } else if (w.rate_not_set) {
         rateCell   = `<td class="lrt-num lrt-comp lrt-rate" style="color:var(--warn);font-size:11px;font-weight:700;">Rate not set</td>`;
         amountCell = `<td class="lrt-num lrt-comp lrt-amount" style="color:var(--mute);">—</td>`;
       } else {
-        // Non-admin viewer — the columns shouldn't be visible at all
-        // (rates_visible=false hides the comp columns at the colgroup
-        // level), but if we render here, omit values defensively.
         rateCell   = '';
         amountCell = '';
       }
-      // worker_id (W-####) in the row's sans font per the
-      // ID/code-column convention (CLAUDE.md terminology rule).
+      const pct = Math.max(0, Math.min(100, (total / 40) * 100));
+      const barHtml = total > 0
+        ? `<div class="lrt-bar${total < 40 ? ' short' : ''}"><i style="width:${pct.toFixed(0)}%"></i></div>`
+        : '';
       return `<tr>
         <td>
-          <div style="font-size:11px;color:var(--brand-red);font-weight:700;letter-spacing:0.04em;">${esc(w.worker_id || '—')}</div>
-          <div style="font-weight:600;">${esc(w.name || '—')}</div>
-          <div style="font-size:10px;color:var(--mute);">${esc(w.trade || '')}</div>
+          <div class="lrt-worker">
+            ${lrtAvatar(w)}
+            <div>
+              <div class="lrt-wname">${esc(w.name || '—')}${noSign ? `<span class="lrt-nosign-tag">${esc(lrtT('lrt-pill-nosign'))}</span>` : ''}</div>
+              <div class="lrt-wmeta"><span class="wid">${esc(w.worker_id || '—')}</span> · ${esc(w.trade || '—')}</div>
+            </div>
+          </div>
         </td>
         ${dayCells}
-        <td class="lrt-num"><strong>${total.toFixed(2)}</strong></td>
+        <td class="lrt-num lrt-totalcell"><strong>${total.toFixed(2)}</strong>${barHtml}</td>
         ${rateCell}
         ${amountCell}
       </tr>`;
@@ -3462,25 +3551,21 @@ applyLanguage();
   }
 
   function renderFoot(grid) {
-    const dailyTotals = grid.totals_by_day || [];
-    const dailyCells = dailyTotals.map(t => `<td class="lrt-num">${(t || 0).toFixed(2)}</td>`).join('');
-    // Grand-total amount owed comes from the server (#158) when the
-    // role can see comp data. Otherwise it's omitted entirely.
-    const showComp = grid.rates_visible === true;
-    let rateFoot = '';
-    let amountFoot = '';
-    if (showComp) {
-      const grand = grid.grand_amount_owed;
-      rateFoot   = `<td class="lrt-num lrt-comp" style="color:var(--mute);">—</td>`;
-      amountFoot = `<td class="lrt-num lrt-comp lrt-amount">${grand != null ? fmtMoney(grand) : '—'}</td>`;
-    }
-    $('lrt-tfoot').innerHTML = `<tr>
-      <td style="text-align:right;" data-i18n="lrt-daily-totals">DAILY TOTALS</td>
-      ${dailyCells}
-      <td class="lrt-num">${(grid.grand_total || 0).toFixed(2)}</td>
-      ${rateFoot}
-      ${amountFoot}
-    </tr>`;
+    // #244 — the dark tfoot band is gone; totals live in the floating card.
+    $('lrt-tfoot').innerHTML = '';
+    const card = $('lrt-totals-card');
+    if (!card) return;
+    const labels = dayLabels();
+    const days = (grid.totals_by_day || []).map((t, i) =>
+      `<span class="dt"><b>${(t || 0).toFixed(2)}</b><s>${esc(labels[i] || '')}</s></span>`).join('');
+    const grandChip = (grid.rates_visible === true && grid.grand_amount_owed != null)
+      ? `<span class="lrt-grand">${fmtMoney(grid.grand_amount_owed)}</span>`
+      : '';
+    card.innerHTML = `<span class="cap">${esc(lrtT('lrt-daily-totals'))}</span>
+      ${days}
+      <span class="seg"><b>${(grid.grand_total || 0).toFixed(2)}</b><s style="font-size:9.5px;color:var(--muted);text-decoration:none;text-transform:uppercase;">${esc(lrtT('lrt-total-hrs'))}</s></span>
+      ${grandChip}`;
+    card.style.display = 'flex';
   }
 
   // #191 — sign_in_log ↔ DCR divergence banner: target project (the
@@ -3532,17 +3617,35 @@ applyLanguage();
       renderHead(grid.dates, grid.no_work_by_date || {}, ratesVisible);
       renderBody(grid.workers, grid.no_work_by_date || {});
       renderFoot(grid);
-      // Status banner: active-this-week / on-roster count so the
-      // operator knows the filter is on and how many were hidden.
-      const total = (grid.workers || []).length;
-      const active = (grid.workers || []).filter(w => (w.weekly_total || 0) > 0).length;
-      if (total === 0) {
-        setStatus('No active workers in the roster.', 'var(--mute)');
-      } else if (active === total) {
-        setStatus(`All ${total} active worker(s) had sign-ins this week.`, '#2F7C57');
+      // #244 — hero: the money figure (or hours, for non-comp roles) + the
+      // three quiet pills replace the old "Showing X of Y" status line. The
+      // roster math is the server's corrected counts: denominator = labor-
+      // ACTIVE workers; no-sign-ins = active with zero hours (pill renders
+      // only when > 0); retired workers are not part of the week's roster.
+      const paid = grid.paid_count != null ? grid.paid_count
+                 : (grid.workers || []).filter(w => (w.weekly_total || 0) > 0).length;
+      const noSign = grid.no_signin_count || 0;
+      const effLabel = window.SSCDatePicker ? SSCDatePicker.fmtMDY(grid.week_start) : grid.week_start;
+      if (ratesVisible && grid.grand_amount_owed != null) {
+        $('lrt-money-label').textContent = lrtT('lrt-week-payroll');
+        $('lrt-payroll').textContent = fmtMoney(grid.grand_amount_owed);
+        $('lrt-payroll-sub').textContent = `${paid} ${lrtT('lrt-checks')} · ${lrtT('lrt-rates-eff')} ${effLabel}`;
       } else {
-        setStatus(`Showing ${active} of ${total} worker(s) — ${total - active} had no sign-ins this week.`, 'var(--mute)');
+        $('lrt-money-label').textContent = lrtT('lrt-week-hours');
+        $('lrt-payroll').textContent = (grid.grand_total || 0).toFixed(2);
+        $('lrt-payroll-sub').textContent = `${paid} ${lrtT('lrt-pill-paid')}`;
       }
+      const setPill = (id, show, text) => {
+        const el = $(id);
+        if (!el) return;
+        el.style.display = show ? 'inline-flex' : 'none';
+        const t = el.querySelector('.t');
+        if (t) t.textContent = text;
+      };
+      setPill('lrt-pill-hours', true, `${(grid.grand_total || 0).toFixed(2)} ${lrtT('lrt-pill-hrs')}`);
+      setPill('lrt-pill-paid', true, `${paid} ${lrtT('lrt-pill-paid')}`);
+      setPill('lrt-pill-nosign', noSign > 0, `${noSign} ${lrtT('lrt-pill-nosign')}`);
+      setStatus('');
     } catch (e) {
       console.warn('[LRT] load failed:', e);
       setStatus('Network error — retry', '#B11E2E');
@@ -3620,7 +3723,7 @@ applyLanguage();
 })();
 </script>
 
-<div class="container"><div class="ph-build" id="cc-build-stamp">build #243 · 2026-06-12 · SSCDatePicker on Lumen azure — selected day · Today button · focus accents, tokenized company-wide</div></div>
+<div class="container"><div class="ph-build" id="cc-build-stamp">build #244 · 2026-06-12 · Labor Rate Tracker — crafted hero · exception-first sheet · floating totals · roster math fixed to active-only</div></div>
 
 <script>
 /* ===== Company console widgets (#210) — live data + reused #209 drag framework.
