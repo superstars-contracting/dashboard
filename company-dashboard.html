@@ -846,7 +846,7 @@
   <div style="padding:20px 28px;border-bottom:1px solid #E8E4DD;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:white;z-index:5;">
     <div>
       <div style="font-size:11px;color:#76777E;letter-spacing:1px;text-transform:uppercase;font-weight:700;" id="pp-id">—</div>
-      <h2 id="pp-name" style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:24px;font-weight:700;margin-top:4px;">—</h2>
+      <h2 style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:24px;font-weight:700;margin-top:4px;"><span id="pp-name">—</span><span id="pp-inactive-badge" class="badge-pill mute" style="display:none;margin-left:10px;vertical-align:6px;">Inactive</span></h2>
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
       <button id="pp-edit-btn" style="background:#B11E2E;color:white;border:none;padding:6px 14px;border-radius:4px;font-size:12px;cursor:pointer;font-weight:600;letter-spacing:0.5px;">Edit</button>
@@ -1121,6 +1121,7 @@ const I18N = {
     'p-workforce-title': 'Workforce',
     'p-workforce-sub': 'All workers in the company. Add new workers here — they join the master roster and can be assigned to any project.',
     'btn-onboard': '+ ONBOARD',
+    'wf-inactive': 'Inactive',
     'btn-print-ids': '🖨 Print All IDs',
     'ph-dob': 'Date of Birth · MM-DD-YYYY',
     'col-worker-id': 'Worker ID',
@@ -1250,6 +1251,7 @@ const I18N = {
     'p-workforce-title': 'Personal',
     'p-workforce-sub': 'Todos los trabajadores de la empresa. Agrega nuevos trabajadores aquí — se unirán al registro maestro y podrán ser asignados a cualquier proyecto.',
     'btn-onboard': '+ Incorporar',
+    'wf-inactive': 'Inactivo',
     'btn-print-ids': '🖨 Imprimir IDs',
     'ph-dob': 'Fecha de Nacimiento · MM-DD-YYYY',
     'col-worker-id': 'ID del Trabajador',
@@ -1694,9 +1696,12 @@ applyLanguage();
         else if (r.certs_expiring_30d > 0) health = `<span class="badge-pill warn">${r.certs_expiring_30d} &lt;30d</span>`;
         const status = (r.intake_status === 'complete') ? '<span class="badge-pill ok">Complete</span>' : '<span class="badge-pill mute">Pending</span>';
         const safeId = esc(r.employee_id);
+        const inactiveBadge = (r.labor_status === 'inactive')
+          ? `<span class="badge-pill mute" style="margin-left:6px;">${esc((I18N[currentLang] || I18N.en)['wf-inactive'] || 'Inactive')}</span>`
+          : '';
         return `<tr data-emp="${safeId}" data-name="${esc(r.name || '')}">
           <td class="wf-id">${esc(r.worker_id || '—')}</td>
-          <td style="font-weight:600;">${esc(r.name || '—')}</td>
+          <td style="font-weight:600;">${esc(r.name || '—')}${inactiveBadge}</td>
           <td>${tradeChip(r.trade)}</td>
           <td style="font-size:11px;text-transform:uppercase;color:#76777E;">${esc((r.language || '—').toUpperCase().slice(0,2))}</td>
           <td class="wf-phone">${esc(formatPhone(r.phone))}</td>
@@ -2052,6 +2057,12 @@ applyLanguage();
       // terminology rule: nothing user-facing should show E- codes).
       $('#pp-id').textContent = e.worker_id || '—';
       $('#pp-name').textContent = e.name || '—';
+      // #246 — master surfaces badge deactivated workers, never hide them
+      const ppInact = document.getElementById('pp-inactive-badge');
+      if (ppInact) {
+        ppInact.style.display = (e.labor_status === 'inactive') ? '' : 'none';
+        ppInact.textContent = (I18N[currentLang] || I18N.en)['wf-inactive'] || 'Inactive';
+      }
       $('#pp-trade').textContent = e.trade || '—';
       $('#pp-lang').textContent = (e.language || '—').toUpperCase();
       $('#pp-phone').textContent = formatPhone(e.phone);
@@ -3763,7 +3774,7 @@ applyLanguage();
 })();
 </script>
 
-<div class="container"><div class="ph-build" id="cc-build-stamp">build #245 · 2026-06-12 · Labor Rate Tracker — clean hero · aligned tfoot totals · hours-only rows with no-sign-in strip · cream cost columns</div></div>
+<div class="container"><div class="ph-build" id="cc-build-stamp">build #246 · 2026-06-12 · Canonical roster — deactivation propagates to every surface · Inactive badges on Workforce + profile</div></div>
 
 <script>
 /* ===== Company console widgets (#210) — live data + reused #209 drag framework.

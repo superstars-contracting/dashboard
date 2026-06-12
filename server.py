@@ -3036,7 +3036,9 @@ def get_employees():
 @app.route('/api/employees/<emp_id>', methods=['GET'])
 def get_employee(emp_id):
     conn = db()
-    emp_row = conn.execute("SELECT * FROM employees WHERE employee_id = ?", (emp_id,)).fetchone()
+    # #246 — canonical roster view: labor_status rides along so the profile
+    # modal (a MASTER surface) can badge deactivated workers.
+    emp_row = conn.execute("SELECT * FROM v_worker_roster WHERE employee_id = ?", (emp_id,)).fetchone()
     if not emp_row:
         conn.close()
         return jsonify({"error": "Employee not found"}), 404
@@ -3355,15 +3357,23 @@ def worker_login():
             return jsonify({"error": "Invalid PIN"}), 401
 
         conn = db()
+        # #246 — resolve against the canonical roster so labor status gates
+        # sign-in: a deactivated (retired) worker's PIN no longer signs in —
+        # new hours for a retired worker were the last propagation hole.
+        # Reactivation on Labor Rates instantly restores sign-in.
         rows = conn.execute(
-            "SELECT employee_id, name FROM employees "
-            "WHERE pin = ? AND pin IS NOT NULL AND pin != ''",
+            "SELECT employee_id, name, labor_status FROM v_worker_roster "
+            "WHERE pin = ? AND pin IS NOT NULL AND pin != '' "
+            "AND archived_at IS NULL",
             (pin,)
         ).fetchall()
 
         if len(rows) == 0:
             conn.close()
             return jsonify({"error": "Invalid PIN"}), 401
+        if all(r["labor_status"] == 'inactive' for r in rows):
+            conn.close()
+            return jsonify({"error": "Worker is inactive — see the office"}), 403
         if len(rows) > 1:
             # import_workers.py blocks PIN collisions pre-flight, so this branch
             # is defensive — never auth on ambiguity, log for investigation.
@@ -3680,22 +3690,19 @@ def api_project_workers(project_code):
         include_archived = (request.args.get('include_archived', '').lower()
                             in ('1', 'true', 'yes'))
         conn = db()
-        # #241 — labor_worker_state.status is the single live source of truth
-        # for 'retired on the Labor Rates page'. Deactivate (PM-approved) ->
-        # instantly excluded here (so the DCR labor selector drops them);
-        # reactivate -> instantly back. Workers with no labor file at all
-        # (no state row) stay selectable — they just show 'Rate not set' on
-        # payroll. Historical rows (sign_in_log etc.) are untouched either way.
-        # include_archived=true is the audit escape hatch: it bypasses BOTH
-        # the archive filter and the labor-inactive filter.
-        archive_clause = '' if include_archived else ' AND e.archived_at IS NULL'
-        labor_clause = '' if include_archived else " AND COALESCE(ls.status, 'active') = 'active'"
+        # #246 — the active-roster rule lives in the CANONICAL VIEW
+        # v_active_workers (#241 semantics: labor_worker_state.status,
+        # missing-row-means-active, archived excluded). Deactivate ->
+        # instantly gone from this selector; reactivate -> instantly back;
+        # historical rows (sign_in_log etc.) untouched either way.
+        # include_archived=true is the audit escape hatch: raw employees,
+        # no filters.
+        src = 'employees' if include_archived else 'v_active_workers'
         rows = conn.execute(
             f"""SELECT e.employee_id, e.worker_id, e.name
-               FROM employees e
+               FROM {src} e
                JOIN project_assignments pa ON pa.employee_id = e.employee_id
-               LEFT JOIN labor_worker_state ls ON ls.worker_id = e.worker_id
-               WHERE pa.project_code = ? AND pa.status = 'active'{archive_clause}{labor_clause}
+               WHERE pa.project_code = ? AND pa.status = 'active'
                ORDER BY CAST(SUBSTR(e.worker_id, 3) AS INTEGER)""",
             (project_code,)
         ).fetchall()
@@ -3735,12 +3742,17 @@ def api_project_crew_compliance(project_code):
     try:
         include_archived = (request.args.get('include_archived', '').lower()
                             in ('1', 'true', 'yes'))
-        archive_clause = '' if include_archived else ' AND e.archived_at IS NULL'
+        # #246 — OPERATIONAL surface: the crew = the canonical active roster
+        # (v_active_workers: #241 rule, one place). Deactivating a worker on
+        # Labor Rates removes their card/row/counts here instantly; the
+        # readiness hero math downstream is computed over this filtered set.
+        # include_archived=true stays the raw audit hatch.
+        src = 'employees' if include_archived else 'v_active_workers'
         rows = conn.execute(
             f"""SELECT e.employee_id, e.worker_id, e.name, e.trade, e.face_image_path, e.intake_status
-                FROM employees e
+                FROM {src} e
                 JOIN project_assignments pa ON pa.employee_id = e.employee_id
-                WHERE pa.project_code = ? AND pa.status = 'active'{archive_clause}
+                WHERE pa.project_code = ? AND pa.status = 'active'
                 ORDER BY e.name""",
             (project_code,)).fetchall()
         today = date.today()
@@ -5735,7 +5747,12 @@ def api_company_summary():
     """Roll-up metrics for the Company Overview top-of-page banner."""
     try:
         conn = db()
-        total_workers = conn.execute("SELECT COUNT(*) FROM employees").fetchone()[0]
+        # #246 — "workers in the system" = the master (non-archived) roster;
+        # archived workers no longer inflate the KPI. Labor-inactive workers
+        # still count here (they are in the system — the console Workforce
+        # page shows them with an Inactive badge).
+        total_workers = conn.execute(
+            "SELECT COUNT(*) FROM employees WHERE archived_at IS NULL").fetchone()[0]
         active_projects = conn.execute(
             "SELECT COUNT(*) FROM projects WHERE status = 'active' OR status IS NULL"
         ).fetchone()[0]
@@ -5945,11 +5962,14 @@ def api_worker_create():
 
 @app.route('/api/workers/<employee_id>', methods=['GET'])
 def api_worker_get(employee_id):
-    """Return full worker record + all documents + all certs."""
+    """Return full worker record + all documents + all certs.
+
+    #246 — sourced from the canonical roster view so labor_status rides
+    along: the profile modal (a MASTER surface) badges deactivated workers."""
     try:
         conn = db()
         emp = conn.execute(
-            "SELECT * FROM employees WHERE employee_id = ?", (employee_id,)
+            "SELECT * FROM v_worker_roster WHERE employee_id = ?", (employee_id,)
         ).fetchone()
         if not emp:
             conn.close()
@@ -6786,15 +6806,18 @@ def api_workers_intake_summary():
         # startup to stay light.
         from cof_issuer import has_valid_prerequisite
         conn = db()
+        # #246 — MASTER surface: every (non-archived) worker stays visible;
+        # labor_status rides along so the Workforce roster renders an
+        # Inactive badge instead of silently hiding retired workers.
         if include_archived:
             emps = conn.execute(
-                "SELECT employee_id, worker_id, name, trade, phone, language, intake_status, folder_path, archived_at "
-                "FROM employees ORDER BY worker_id"
+                "SELECT employee_id, worker_id, name, trade, phone, language, intake_status, folder_path, archived_at, labor_status "
+                "FROM v_worker_roster ORDER BY worker_id"
             ).fetchall()
         else:
             emps = conn.execute(
-                "SELECT employee_id, worker_id, name, trade, phone, language, intake_status, folder_path "
-                "FROM employees WHERE archived_at IS NULL ORDER BY worker_id"
+                "SELECT employee_id, worker_id, name, trade, phone, language, intake_status, folder_path, labor_status "
+                "FROM v_worker_roster WHERE archived_at IS NULL ORDER BY worker_id"
             ).fetchall()
 
         today = datetime.utcnow().date().isoformat()

@@ -180,6 +180,30 @@ def _run(conn, base_state, base_emp):
     hist = requests.get(f"{BASE}/api/labor-rates/history/{WID}", timeout=15).json()["data"]
     ok("history_intact_after_deactivate", len(hist) >= 2, f"{len(hist)} rows")
 
+    # ---- 6b) #246 — propagation across EVERY surface class ----
+    g2 = requests.get(f"{BASE}/api/payroll/hours", params={"week_start": monday}, timeout=20).json()["data"]
+    ok("lrt_excludes_deactivated", not any(w.get("worker_id") == WID for w in g2.get("workers", [])))
+    cc = requests.get(f"{BASE}/api/projects/{PROJECT}/crew-compliance", timeout=20).json()["data"]
+    ccw = cc.get("workers") if isinstance(cc, dict) else cc
+    ok("crew_compliance_excludes_deactivated",
+       not any(w.get("worker_id") == WID for w in (ccw or [])))
+    inv = requests.get(f"{BASE}/api/workers/intake-summary", timeout=20).json()["data"]
+    mine = next((w for w in inv if w.get("worker_id") == WID), None)
+    ok("workforce_keeps_worker_with_inactive_status",
+       bool(mine) and mine.get("labor_status") == "inactive")
+    # PIN sign-in gate — a retired worker's PIN must not create new hours.
+    # Only safe to exercise when the synthetic PIN collides with no one.
+    pin_taken = conn.execute(
+        "SELECT COUNT(*) FROM employees WHERE pin='9941' AND employee_id != ?", (EID,)).fetchone()[0]
+    if not pin_taken:
+        conn.execute("UPDATE employees SET pin='9941' WHERE employee_id=?", (EID,))
+        conn.commit()
+        rs = requests.post(f"{BASE}/api/worker/login",
+                           json={"phone_or_pin": "9941", "latitude": 0, "longitude": 0}, timeout=15)
+        ok("pin_signin_blocked_when_inactive", rs.status_code == 403, f"HTTP {rs.status_code}")
+    else:
+        print("  [note] PIN gate check skipped — synthetic PIN would collide with a real worker")
+
     # ---- 7) REACTIVATE -> back, same id + same rate ----
     ra = requests.post(f"{BASE}/api/labor-rates/state/{WID}/status", json={"status": "active"}, timeout=15)
     ok("reactivate_200", ra.status_code == 200, f"HTTP {ra.status_code}")
@@ -187,6 +211,15 @@ def _run(conn, base_state, base_emp):
     ok("selector_includes_reactivated", WID in ids3)
     st2 = conn.execute("SELECT current_rate FROM labor_worker_state WHERE worker_id=?", (WID,)).fetchone()
     ok("rate_survives_lifecycle", st2 is not None and abs(float(st2["current_rate"]) - FAKE_RATE) < 0.005)
+    # #246 — restoration propagates everywhere too
+    cc2 = requests.get(f"{BASE}/api/projects/{PROJECT}/crew-compliance", timeout=20).json()["data"]
+    ccw2 = cc2.get("workers") if isinstance(cc2, dict) else cc2
+    ok("crew_compliance_restores_reactivated",
+       any(w.get("worker_id") == WID for w in (ccw2 or [])))
+    inv2 = requests.get(f"{BASE}/api/workers/intake-summary", timeout=20).json()["data"]
+    mine2 = next((w for w in inv2 if w.get("worker_id") == WID), None)
+    ok("workforce_active_after_reactivate",
+       bool(mine2) and mine2.get("labor_status") == "active")
 
     # ---- CLEANUP — scoped to the exact synthetic ids only ----
     _purge_synthetic(conn)

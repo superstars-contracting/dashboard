@@ -147,6 +147,12 @@ SELECT MAX(employee_id) FROM workers  -- WRONG: "E-012" > "E-00013" textually
 This rule caused the E-00013 collision bug. Apply the same pattern to any
 zero-padded ID format (employee, card, RFI, etc.).
 
+**Roster rule (#246):** worker lists MUST consume the canonical roster
+source — `v_active_workers` (operational surfaces) or `v_worker_roster`
+(master surfaces, with the Inactive badge) — never join
+`labor_worker_state` directly in a surface. One rule, one place; every
+new surface inherits deactivation propagation for free.
+
 ## 4. JS rule: avoid possessive apostrophes in i18n string literals
 
 `'modal-step3': "the worker\\'s folder is created"` will crash JS parsing in

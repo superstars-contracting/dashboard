@@ -86,8 +86,12 @@ EDGE_PATHS = [
     Path(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
 ]
 
-# Order: W-0001..W-0012 (CoF), then W-0013, W-0014 (Company ID).
-WORKER_ORDER = [f"W-{i:04d}" for i in range(1, 15)]
+# #246 — the bundle pool is the CANONICAL active roster (v_active_workers),
+# in numeric W-#### order, derived at gather time. The previous hardcoded
+# W-0001..W-0014 list was doubly stale: it MISSED workers onboarded after
+# W-0014 and still PRINTED retired (labor-inactive) workers. Deactivated
+# workers keep their issued credential rows (history) — they just stop
+# appearing in fresh bundles; reactivation restores them.
 
 # #189 — cache file convention. Naming is `SuperstarsContracting-AllIDs-
 # <fingerprint>.pdf` where <fingerprint> is the SHA256/16 of the
@@ -201,19 +205,13 @@ def gather_bundle_inputs():
         emp_rows = c.execute(
             """SELECT employee_id, worker_id, name, trade, pin, phone,
                       face_image_path
-                 FROM employees
-                WHERE worker_id IN ({})""".format(
-                ",".join(["?"] * len(WORKER_ORDER))
-            ),
-            tuple(WORKER_ORDER),
+                 FROM v_active_workers
+                ORDER BY CAST(SUBSTR(worker_id, 3) AS INTEGER)"""
         ).fetchall()
-        emp_by_wid = {r["worker_id"]: dict(r) for r in emp_rows}
 
         workers_summary = []
-        for wid in WORKER_ORDER:
-            row = emp_by_wid.get(wid)
-            if not row:
-                continue
+        for row in (dict(r) for r in emp_rows):
+            wid = row["worker_id"]
             eid = row["employee_id"]
             cof = c.execute(
                 "SELECT card_id, issued_date, expires_date, "
@@ -642,10 +640,10 @@ def build_bundle(fronts_by_type, shared_backs, output_pdf, base_url):
 
     A page boundary is also a credential-type boundary: a single
     front-page is always all CoF OR all Company ID, never mixed,
-    because the back tile only fits ONE credential type. With the
-    current operator roster (CoF for W-0001..W-0012, Company ID for
-    W-0013..W-0014) this falls out naturally: pages 1/3/5 are pure
-    CoF; page 7 is pure Company ID. Code asserts this invariant.
+    because the back tile only fits ONE credential type. #246 — the
+    caller pre-sorts fronts by (cred_type, numeric W-####) so the
+    grouping is guaranteed by construction, not roster coincidence.
+    Code still asserts the invariant.
     """
     PER_PAGE = 4  # 2 cols × 2 rows
     pages = []
@@ -657,8 +655,8 @@ def build_bundle(fronts_by_type, shared_backs, output_pdf, base_url):
         while len(chunk) < PER_PAGE:
             chunk.append(None)
         # Determine the credential type for this sheet — every entry in
-        # the chunk must agree (the WORKER_ORDER keeps CoFs together
-        # before Company IDs, so this is true in practice).
+        # the chunk must agree (the caller's (cred_type, W-####) pre-sort
+        # keeps CoFs together before Company IDs — #246).
         chunk_types = {e[1] for e in chunk if e is not None}
         if len(chunk_types) > 1:
             raise RuntimeError(
@@ -945,20 +943,20 @@ def main(base_url="http://127.0.0.1:5050", *, force_regenerate=False):
     workdir = Path(tempfile.mkdtemp(prefix="cred_bundle_"))
     t_per_card = time.time()
     try:
-        for wid in WORKER_ORDER:
-            c = sqlite3.connect(str(DB))
-            c.row_factory = sqlite3.Row
-            try:
-                emp = c.execute(
-                    "SELECT employee_id FROM employees WHERE worker_id = ?",
-                    (wid,),
-                ).fetchone()
-            finally:
-                c.close()
-            if not emp:
-                print(f"  {wid}: not found — SKIPPED")
-                continue
-            emp_id = emp["employee_id"]
+        # #246 — same canonical pool as gather_bundle_inputs: the active
+        # roster in numeric order (no hardcoded id list to go stale).
+        c = sqlite3.connect(str(DB))
+        c.row_factory = sqlite3.Row
+        try:
+            pool = c.execute(
+                "SELECT worker_id, employee_id FROM v_active_workers "
+                "ORDER BY CAST(SUBSTR(worker_id, 3) AS INTEGER)"
+            ).fetchall()
+        finally:
+            c.close()
+        for prow in pool:
+            wid = prow["worker_id"]
+            emp_id = prow["employee_id"]
             ctx_pkg = fetch_card_context(emp_id)
             if not ctx_pkg:
                 print(f"  {wid}: no active credential — SKIPPED")
@@ -967,6 +965,13 @@ def main(base_url="http://127.0.0.1:5050", *, force_regenerate=False):
             html = env.get_template(template_name).render(**ctx)
             fronts_meta.append((wid, cred_type, html))
             print(f"  {wid}: {cred_type:11}  jinja=OK")
+
+        # #246 — group like credential types (CoF sheets, then Company ID),
+        # numeric W-#### within each group. Each 2x2 sheet must be a single
+        # type (build_bundle raises on mixed sheets); the old hardcoded
+        # ordering satisfied that only by roster coincidence.
+        fronts_meta.sort(key=lambda f: (0 if f[1] == 'cof' else 1,
+                                        int(f[0][2:]) if f[0][2:].isdigit() else 99999))
 
         if not fronts_meta:
             print("\n  BUNDLE: no workers prepared")

@@ -143,17 +143,17 @@ def build_week_grid(conn, monday):
     dates = week_dates(monday)
     date_strs = [d.isoformat() for d in dates]
 
+    # #246 — pool from the CANONICAL roster view (v_worker_roster carries
+    # labor_status with the #241 LEFT-JOIN semantics defined in ONE place);
+    # this module applies its own inclusion rule (active OR has-hours) on top.
     workers = conn.execute(
-        """SELECT DISTINCT e.employee_id, e.worker_id, e.name, e.trade
-           FROM employees e
+        """SELECT DISTINCT e.employee_id, e.worker_id, e.name, e.trade,
+                  e.labor_status
+           FROM v_worker_roster e
            JOIN project_assignments pa ON pa.employee_id = e.employee_id
            WHERE pa.status = 'active'
            ORDER BY CAST(SUBSTR(e.worker_id, 3) AS INTEGER)"""
     ).fetchall()
-
-    # #244 — current labor status per worker_id (single source of truth).
-    labor_status = {r["worker_id"]: r["status"] for r in conn.execute(
-        "SELECT worker_id, status FROM labor_worker_state").fetchall()}
 
     # One query for the whole week — index on (date, project_code) covers this.
     placeholders = ",".join("?" * len(date_strs))
@@ -179,7 +179,7 @@ def build_week_grid(conn, monday):
 
     for w in workers:
         eid = w["employee_id"]
-        labor_active = labor_status.get(w["worker_id"], "active") != "inactive"
+        labor_active = w["labor_status"] != "inactive"
         days = []
         weekly_total = 0.0
         day_hours_by_index = []
