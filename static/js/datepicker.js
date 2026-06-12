@@ -1,6 +1,9 @@
 /* SSC Date Picker — small custom popup that REPLACES the native
  * <input type="date"> calendar across every dashboard surface. No external
- * library. Brand-matched (Inter + #B11E2E red accent). Header has prev/next
+ * library. On the shared Lumen azure system (#243): accents use the global
+ * --accent tokens from widgets.css, with literal fallbacks so the picker
+ * stays correct on pages that don't load the shared stylesheet
+ * (admin_labor_rates, rfi_submission_form). Header has prev/next
  * month, a month <select>, and a year <select> covering ~1940..(current+5)
  * for instant decade jumps (the whole point — DOB shouldn't require 480
  * prev-month clicks).
@@ -21,7 +24,14 @@
 (function(global) {
   'use strict';
 
-  var BRAND_RED = '#B11E2E';
+  // #243 — Lumen azure accents, tokenized. var(--token, fallback): the token
+  // resolves on pages that load widgets.css; the fallback mirrors the token's
+  // value for the two pages that don't. NEVER reintroduce brand red here —
+  // the picker is a shared component and recolors at the component level only.
+  var ACCENT = 'var(--accent, #4364dc)';
+  var ACCENT_INK = 'var(--accent-ink, #3a5fd0)';
+  var ACCENT_SOFT = 'var(--accent-soft, #ebf0fe)';
+  var ACCENT_EDGE = 'var(--accent-edge, rgba(67,100,220,.30))';
   var HAIR = '#E8E4DD';
   var INK = '#14161C';
   var MUTE = '#76777E';
@@ -54,7 +64,7 @@
       '  font-family:inherit;font-size:13px;background:#fff;color:' + INK + ';',
       '  cursor:pointer;font-weight:600;',
       '}',
-      '.ssc-dp-popup select:focus{outline:1px solid ' + BRAND_RED + ';outline-offset:0;}',
+      '.ssc-dp-popup select:focus{outline:1px solid ' + ACCENT + ';outline-offset:0;}',
       '.ssc-dp-popup .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}',
       '.ssc-dp-popup .dow{',
       '  text-align:center;font-size:10px;text-transform:uppercase;',
@@ -67,9 +77,9 @@
       '.ssc-dp-popup .day:hover{background:#F1EEE8;}',
       '.ssc-dp-popup .day.muted{color:#C8C0B4;cursor:default;}',
       '.ssc-dp-popup .day.muted:hover{background:transparent;}',
-      '.ssc-dp-popup .day.today{outline:1px solid ' + BRAND_RED + ';outline-offset:-1px;font-weight:700;}',
-      '.ssc-dp-popup .day.selected{background:' + BRAND_RED + ';color:#fff;font-weight:700;}',
-      '.ssc-dp-popup .day.selected:hover{background:' + BRAND_RED + ';}',
+      '.ssc-dp-popup .day.today{outline:1px solid ' + ACCENT + ';outline-offset:-1px;font-weight:700;}',
+      '.ssc-dp-popup .day.selected{background:' + ACCENT + ';color:#fff;font-weight:700;box-shadow:0 2px 6px rgba(67,100,220,.30);}',
+      '.ssc-dp-popup .day.selected:hover{background:' + ACCENT_INK + ';}',
       '.ssc-dp-popup .day.disabled{color:#C8C0B4;cursor:not-allowed;text-decoration:line-through;}',
       '.ssc-dp-popup .day.disabled:hover{background:transparent;}',
       '.ssc-dp-popup .foot{',
@@ -82,9 +92,10 @@
       '  font-family:inherit;color:' + INK + ';font-weight:600;',
       '}',
       '.ssc-dp-popup .foot button:hover{background:#F1EEE8;}',
-      '.ssc-dp-popup .foot button.today-btn{color:' + BRAND_RED + ';border-color:' + BRAND_RED + ';}',
+      '.ssc-dp-popup .foot button.today-btn{color:' + ACCENT + ';border-color:' + ACCENT_EDGE + ';background:' + ACCENT_SOFT + ';}',
+      '.ssc-dp-popup .foot button.today-btn:hover{background:#dde7fd;}',
       'input[data-ssc-dp]{cursor:pointer;background:#fff;}',
-      'input[data-ssc-dp]:focus{outline:1px solid ' + BRAND_RED + ';}',
+      'input[data-ssc-dp]:focus{outline:1px solid ' + ACCENT + ';}',
     ].join('');
     document.head.appendChild(s);
   }
