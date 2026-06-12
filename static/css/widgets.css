@@ -26,6 +26,9 @@
      deep green for gradient ends, readable ink on oat-soft tints. */
   --status-complete-deep:#0c7a5f;
   --oat-ink:#8a8064;
+  /* #245 — warm cream surface family (cost columns, totals row) */
+  --cream:#faf7f1;
+  --cream-line:#efe9dd;
 }
 
 /* ===== Shared CTA buttons (#236) — ONE primary style site-wide. A primary

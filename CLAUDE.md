@@ -211,6 +211,27 @@ foreach ($conn in $c) { cmd /c "taskkill /F /T /PID $($conn.OwningProcess)" }
 Smoke-test scripts in `tests/` use this pattern in their `finally`
 block. Ad-hoc `subprocess.Popen` diagnostics should too.
 
+**Production restart procedure (#244 zombie incident).** The listener
+tree-kill above is NOT enough for a production-code deploy: a
+`Start-ScheduledTask` that fires while the port is still held leaves a
+**zombie waitress pair that never exits**, and Windows lets it
+double-bind 5050 later — it then serves STALE code while the page
+looks current (the build stamp is read from disk; imported Python
+modules are not). Deploy restarts go like this, every time:
+
+```powershell
+Stop-ScheduledTask -TaskName "SSC Dashboard Server"
+# kill EVERY dashboard python process — not just current listeners
+Get-Process python -ErrorAction SilentlyContinue |
+  ForEach-Object { cmd /c "taskkill /F /T /PID $($_.Id)" }
+# confirm the port is FULLY free before starting once
+Get-NetTCPConnection -LocalPort 5050 -State Listen -ErrorAction SilentlyContinue
+Start-ScheduledTask -TaskName "SSC Dashboard Server"
+```
+
+Then verify by **API behavior** — hit an endpoint whose response the
+new build changes — never by the build stamp alone.
+
 **Flask binds to `127.0.0.1:5050` ONLY. NEVER `0.0.0.0`.** Tailscale
 serve proxies external traffic to the loopback. Binding to `0.0.0.0`
 would expose the dashboard to the LAN — and PII with it.

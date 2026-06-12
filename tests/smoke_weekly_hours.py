@@ -1,23 +1,35 @@
 #!/usr/bin/env python3
 """PII-safe smoke for the Weekly Hours Log.
 
+DEV-DB ONLY — NOT part of the standard gate. The refuse-to-run guard
+(see clean_test_data) exits immediately when real DCRs exist for the
+project, so on the live operator DB this smoke does nothing. Run it
+against a dev DB with no issued DCRs.
+
+#245 — the smoke now spawns its server on a PRIVATE port (5152), never
+5050: a spawn against the production port can double-bind on Windows
+and leave a stale-code zombie (the #244 incident; see CLAUDE.md
+"Production restart procedure").
+
 Invoke manually:
 
   python tests/smoke_weekly_hours.py
 
-Asserts per HANDOFF_WEEKLY_HOURS_LOG verification section:
-  1. Default week selector resolves to May 11-15, 2026.
+Asserts:
+  1. Default week selector resolves to the last completed Mon-Fri week
+     (computed via payroll_hours.last_completed_week — no pinned dates).
   2. Per-day hours and per-worker weekly totals correct (lunch always -30).
-  3. Grand total = sum of all workers' weeks.
+  3. Grand total = sum of all workers' weeks; #244/#245 pool semantics
+     (active-only roster + hours-bearing history; no_signin_count).
   4. CSV export values match the grid exactly.
   5. PDF renders non-empty with letterhead + table.
   6. A cell edit writes through to sign_in_log; the DCR labor aggregator
      reads the SAME number — single source of truth.
 
-PII discipline: uses E-00001 / E-00002 as synthetic test workers (the
-existing roster), asserts by employee_id + counts + numeric values only.
-Never prints names, phones, or *_path values. Test data is fully cleaned
-up at the end regardless of pass/fail (try/finally).
+PII discipline: uses E-00001 / E-00002 (dev-DB rows), asserts by
+employee_id + counts + numeric values only. Never prints names, phones,
+or *_path values. Test data is fully cleaned up at the end regardless
+of pass/fail (try/finally).
 """
 import csv
 import io
@@ -29,7 +41,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 D = Path(__file__).resolve().parent.parent
@@ -38,15 +50,23 @@ DB = D / "superstars.db"
 LOG = D / "tests" / "_smoke_weekly_hours_server.log"
 
 PROJECT = "FR-BX-001"
-EMP_A = "E-00001"  # synthetic for this smoke
+EMP_A = "E-00001"  # dev-DB test workers (real ids — the refusal guard protects live data)
 EMP_B = "E-00002"
-WEEK_START = "2026-05-11"  # Monday of last completed week vs today=2026-05-20
-WEEK_END = "2026-05-15"
-WEEK_DATES = ["2026-05-11", "2026-05-12", "2026-05-13", "2026-05-14", "2026-05-15"]
+PORT = "5152"  # private port — NEVER 5050 (see module docstring)
+
+# #245 — the target week is computed, not pinned: the old hardcoded
+# 2026-05-11 made every assertion stale after that week passed.
+sys.path.insert(0, str(D))
+from payroll_hours import last_completed_week, compute_worked_hours  # noqa: E402
+
+_mon, _fri = last_completed_week(date.today())
+WEEK_START = _mon.isoformat()
+WEEK_END = _fri.isoformat()
+WEEK_DATES = [(_mon + timedelta(days=i)).isoformat() for i in range(5)]
 
 
 def hit(method, path, body=None):
-    url = "http://127.0.0.1:5050" + path
+    url = f"http://127.0.0.1:{PORT}" + path
     data = None
     h = {}
     if body is not None:
@@ -141,15 +161,13 @@ print(f"  expected default week: {WEEK_START}..{WEEK_END}")
 print(f"  synthetic workers: {EMP_A}, {EMP_B}")
 clean_test_data()
 
-# Helper assertion BEFORE starting the server
+# Helper assertion BEFORE starting the server (fixed historical date —
+# pure-function check, valid forever)
 from datetime import date as _date
 
-sys.path.insert(0, str(D))
-from payroll_hours import last_completed_week, compute_worked_hours
-
 mon, fri = last_completed_week(_date(2026, 5, 20))
-expect(f"helper: last_completed_week(2026-05-20) -> ({WEEK_START}, {WEEK_END})",
-       (mon.isoformat(), fri.isoformat()) == (WEEK_START, WEEK_END),
+expect("helper: last_completed_week(2026-05-20) -> (2026-05-11, 2026-05-15)",
+       (mon.isoformat(), fri.isoformat()) == ("2026-05-11", "2026-05-15"),
        f"got ({mon.isoformat()}, {fri.isoformat()})")
 expect("helper: worked_hours(07:00, 15:30) == 8.00",
        compute_worked_hours("07:00", "15:30") == 8.0)
@@ -161,8 +179,12 @@ expect("helper: worked_hours(07:00, None) == 0.00  (missing time_out)",
        compute_worked_hours("07:00", None) == 0.0)
 
 f = open(LOG, "w")
+# #245 — private port via the dev-server PORT env override; never 5050.
+import os as _os
+_env = {**_os.environ, "PORT": PORT}
 proc = subprocess.Popen(
-    [str(VENV_PY), "server.py"], cwd=str(D), stdout=f, stderr=subprocess.STDOUT
+    [str(VENV_PY), "server.py"], cwd=str(D), stdout=f, stderr=subprocess.STDOUT,
+    env=_env,
 )
 try:
     for _ in range(15):
@@ -170,7 +192,7 @@ try:
         try:
             # Probe an unauthenticated endpoint — the auth gate (#48) redirects
             # "/" to /login, so probe /api/health which is in the public allowlist.
-            if urllib.request.urlopen("http://127.0.0.1:5050/api/health", timeout=2).status == 200:
+            if urllib.request.urlopen(f"http://127.0.0.1:{PORT}/api/health", timeout=2).status == 200:
                 break
         except Exception:
             pass
@@ -179,6 +201,8 @@ try:
     else:
         sys.exit(2)
     # Auth gate (#48): login the smoke admin + patch urllib for cookies.
+    # SMOKE_BASE must point at THIS smoke's private-port server.
+    _os.environ["SMOKE_BASE"] = f"http://127.0.0.1:{PORT}"
     import _smoke_auth
     _smoke_auth.setup()
 
@@ -239,6 +263,23 @@ try:
            f"got {other_hours}")
     expect(f"grand_total == 28.50 (only our 2 workers)", grid["grand_total"] == 28.5)
 
+    # ----- Step 3b: #244/#245 pool semantics -----
+    # The roster = labor-ACTIVE workers (zero-hour actives included, counted
+    # as no_signin_count) + any labor-INACTIVE worker WITH hours this week
+    # (payable history). Inactive + zero hours must not be in the pool.
+    print("\n--- Step 3b: #244/#245 worker-pool semantics ---")
+    expect("grid carries #244 roster keys",
+           all(k in grid for k in ("roster_active_count", "no_signin_count", "paid_count")))
+    expect("pool rule: every worker is labor-active OR has hours",
+           all(w.get("labor_active", True) or (w.get("weekly_total") or 0) > 0
+               for w in grid["workers"]))
+    ns_payload = sum(1 for w in grid["workers"]
+                     if w.get("labor_active", True) and (w.get("weekly_total") or 0) <= 0)
+    expect("no_signin_count matches the payload", grid["no_signin_count"] == ns_payload,
+           f"meta={grid['no_signin_count']} payload={ns_payload}")
+    expect("paid_count matches workers with hours",
+           grid["paid_count"] == sum(1 for w in grid["workers"] if (w.get("weekly_total") or 0) > 0))
+
     # ----- Step 4: CSV export matches the grid -----
     print("\n--- Step 4: CSV export matches grid ---")
     s, body, hdrs = hit("GET", f"/api/payroll/hours.csv?week_start={WEEK_START}")
@@ -295,16 +336,17 @@ try:
         a2 = find_worker(grid2, EMP_A)
         expect(f"after PUT: {EMP_A} Mon hours == 7.50", a2["days"][0]["hours"] == 7.5)
         # Now issue a DCR for that Monday and confirm the labor section uses the
-        # same worked-hours figure (the SHARED helper).
+        # same worked-hours figure (the SHARED helper). Week-relative (#245) —
+        # the old hardcoded 2026-05-11 went stale the week after it was written.
         hit("POST", "/api/work-log", body={
-            "project_code": PROJECT, "date": "2026-05-11",
+            "project_code": PROJECT, "date": WEEK_DATES[0],
             "trade_area": "test", "description": "hours-smoke",
         })
-        s, body, _ = hit("POST", f"/api/projects/{PROJECT}/daily/2026-05-11/issue",
+        s, body, _ = hit("POST", f"/api/projects/{PROJECT}/daily/{WEEK_DATES[0]}/issue",
                           body={"audience": "internal"})
         expect("DCR issue returns 201", s == 201)
         # Pull the aggregator's view of that day's labor and find EMP_A
-        s, body, _ = hit("GET", f"/api/projects/{PROJECT}/daily/2026-05-11?audience=internal")
+        s, body, _ = hit("GET", f"/api/projects/{PROJECT}/daily/{WEEK_DATES[0]}?audience=internal")
         dcr = json.loads(body)["data"]
         labor_rows = dcr.get("labor", {}).get("rows", [])
         a_in_dcr = next((r for r in labor_rows if r.get("employee_id") == EMP_A), None)
