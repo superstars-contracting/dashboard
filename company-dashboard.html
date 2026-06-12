@@ -184,6 +184,30 @@
   .cred-btn:hover { border-color: var(--accent-edge); color: var(--accent); }
   .cred-btn.issue { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-edge); }
 
+  /* ==== #249 — Cert Library: Lumen+Oat reskin (:root tokens only) ==== */
+  /* Frame: the #244 crafted-card treatment — white card, 18px radius, thin
+     azure->soft gradient top hairline. padding:0 so the hairline bleeds
+     edge-to-edge; head/body carry the section padding instead. */
+  .cl-card { background: #fff; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; margin-bottom: 24px; }
+  .cl-card::before { content: ''; display: block; height: 3px; background: linear-gradient(90deg, var(--accent), var(--accent-soft)); }
+  .cl-head { padding: 24px 28px 0; }
+  .cl-body { padding: 10px 28px 24px; }
+  /* Category band rows — oat-soft band, 1px warm rules, small-caps oat-ink
+     label with a small azure rounded-square marker (replaces the red text +
+     red rules). */
+  #cert-lib-tbody tr.cl-cat td { background: var(--status-oat-soft); border-top: 1px solid var(--status-oat); border-bottom: 1px solid var(--status-oat);
+    color: var(--oat-ink); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; padding: 7px 12px; }
+  .cl-cat-mark { display: inline-block; width: 8px; height: 8px; border-radius: 2.5px; background: var(--accent); margin-right: 8px; }
+  .cl-code { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cl-name { font-weight: 600; color: var(--ink); }
+  /* Reference links — the azure boxed-link (#242 .cred-btn.issue variant):
+     soft azure bg, azure text, soft azure border, 8px radius; hover deepens
+     within the lumen-soft family (--accent-in is the deeper :root tint). */
+  .cl-ref { display: inline-block; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-edge);
+    border-radius: 8px; padding: 3px 10px; font-size: 11px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+  .cl-ref:hover { background: var(--accent-in); border-color: var(--accent); }
+  #cert-lib-tbody tr:not(.cl-cat):hover td { background: var(--accent-soft); }
+
   /* ==== #240 — console layout: grid lives in the Projects tab ==== */
   /* Reset layout is a button flavored as the existing .cc-action component. */
   button.cc-action { font-family: inherit; cursor: pointer; width: 100%; }
@@ -441,18 +465,26 @@
   </div>
 
   <!-- CERT LIBRARY -->
+  <!-- #249 — Lumen+Oat crafted card (the #244 treatment). The CoF-prereq
+       column is display-removed (operator decision 2026-06-12): the flag is
+       DB plumbing that drives automatic CoF issuance on cert scan/upload —
+       it stays in the payload and in every issuance path, just unrendered. -->
   <div class="panel" data-panel="cert-library">
-    <div class="section">
-      <h2 data-i18n="p-cert-lib-title">Certification Library</h2>
-      <div class="h2-sub" data-i18n="p-cert-lib-sub">Catalog of cert types the system recognizes. New ones get added automatically when workers bring in unfamiliar certs.</div>
-      <table class="roster">
-        <thead>
-          <tr><th data-i18n="col-code">Code</th><th data-i18n="col-name">Name</th><th data-i18n="col-cof-prereq">CoF Prereq</th><th data-i18n="col-reference">Reference</th></tr>
-        </thead>
-        <tbody id="cert-lib-tbody">
-          <tr><td colspan="4" style="padding:20px;text-align:center;color:#76777E;" data-i18n="loading-library">Loading library…</td></tr>
-        </tbody>
-      </table>
+    <div class="cl-card">
+      <div class="cl-head">
+        <h2 data-i18n="p-cert-lib-title">Certification Library</h2>
+        <div class="h2-sub" data-i18n="p-cert-lib-sub">Catalog of cert types the system recognizes. New ones get added automatically when workers bring in unfamiliar certs.</div>
+      </div>
+      <div class="cl-body">
+        <table class="roster">
+          <thead>
+            <tr><th data-i18n="col-code">Code</th><th data-i18n="col-name">Name</th><th data-i18n="col-reference">Reference</th></tr>
+          </thead>
+          <tbody id="cert-lib-tbody">
+            <tr><td colspan="3" style="padding:20px;text-align:center;color:#76777E;" data-i18n="loading-library">Loading library…</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -1140,7 +1172,6 @@ const I18N = {
     'view-company-id': 'View Company ID',
     'col-code': 'Code',
     'col-validity': 'Validity',
-    'col-cof-prereq': 'CoF Prereq',
     'col-reference': 'Reference',
     'loading-roster': 'Loading roster…',
     'loading-library': 'Loading library…',
@@ -1270,7 +1301,6 @@ const I18N = {
     'view-company-id': 'Ver ID de Compañía',
     'col-code': 'Código',
     'col-validity': 'Validez',
-    'col-cof-prereq': 'Req. CoF',
     'col-reference': 'Referencia',
     'loading-roster': 'Cargando lista…',
     'loading-library': 'Cargando catálogo…',
@@ -1747,30 +1777,33 @@ applyLanguage();
       const rows = (resp && resp.data) || [];
       const tbody = $('#cert-lib-tbody');
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="4" style="padding:20px;text-align:center;color:#76777E;">No cert types. Run apply_cert_library_replace.py to seed the library.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="3" style="padding:20px;text-align:center;color:#76777E;">No cert types. Run apply_cert_library_replace.py to seed the library.</td></tr>';
         return;
       }
       // Group by category — the server returns ORDER BY category, name, so
-      // rows are already sorted; just emit a section header each time the
+      // rows are already sorted; just emit a section band each time the
       // category changes. The reference link opens the DOB-published PDF
       // for the course; non-DOB rows (CPR, OSHA-30) show an em-dash.
+      // #249 — class-styled Lumen+Oat (no inline paint, per the #242 rule).
+      // is_cof_prerequisite still arrives in the payload and is deliberately
+      // NOT rendered: it is the DB flag that drives automatic CoF issuance
+      // on cert scan/upload, not operator-facing information.
       const escAttr = (s) => esc(s);
       let html = '';
       let prevCat = null;
       for (const c of rows) {
         const cat = c.category || 'Uncategorized';
         if (cat !== prevCat) {
-          html += `<tr><td colspan="4" style="background:#FAF7F1;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#B11E2E;border-top:2px solid #B11E2E;">${esc(cat)}</td></tr>`;
+          html += `<tr class="cl-cat"><td colspan="3"><span class="cl-cat-mark"></span>${esc(cat)}</td></tr>`;
           prevCat = cat;
         }
         const refCell = c.reference_url
-          ? `<a href="${escAttr(c.reference_url)}" target="_blank" rel="noopener" style="color:#B11E2E;font-weight:600;text-decoration:none;">DOB PDF →</a>`
+          ? `<a class="cl-ref" href="${escAttr(c.reference_url)}" target="_blank" rel="noopener">DOB PDF →</a>`
           : `<span style="color:#76777E;">—</span>`;
         html += `<tr>
-          <td style="font-size:11px;">${esc(c.cert_type_id)}</td>
-          <td style="font-weight:600;">${esc(c.name)}</td>
-          <td>${c.is_cof_prerequisite ? '<span class="badge-pill ok">Yes</span>' : '<span style="color:#76777E;">—</span>'}</td>
-          <td style="font-size:11px;">${refCell}</td>
+          <td class="cl-code">${esc(c.cert_type_id)}</td>
+          <td class="cl-name">${esc(c.name)}</td>
+          <td>${refCell}</td>
         </tr>`;
       }
       tbody.innerHTML = html;
@@ -3774,7 +3807,7 @@ applyLanguage();
 })();
 </script>
 
-<div class="container"><div class="ph-build" id="cc-build-stamp">build #248 · 2026-06-12 · security — /files serves vendored assets only; generated artifacts behind gated /project-files; exposure smoke in the gate</div></div>
+<div class="container"><div class="ph-build" id="cc-build-stamp">build #249 · 2026-06-12 · Cert Library — Lumen/Oat reskin; CoF-prereq column display-removed (flag + issuance logic untouched)</div></div>
 
 <script>
 /* ===== Company console widgets (#210) — live data + reused #209 drag framework.
