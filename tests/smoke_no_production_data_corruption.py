@@ -301,6 +301,30 @@ def main() -> int:
     print("#195d — Meta-smoke: snapshot real-data tables, run the "
           "full CRUD smoke, diff for non-synthetic pollution.\n")
 
+    # 0a. #247 — self-test the path-guard DETECTOR every run (so a silently
+    # broken scanner can't pass the gate green). Catch-positive + no false
+    # positive on the legit '*_url' shape.
+    import _smoke_auth as _sa
+    _catch = []
+    _sa._scan_json_for_paths(
+        {"folder_path": "x", "data": [{"scan_path": "y"}], "html_url": "/api/c/live",
+         "nested": {"folder": "z"}}, "SELFTEST", _catch)
+    _caught_keys = {h.split("key '")[1].rstrip("'") for h in _catch if "key '" in h}
+    assert _caught_keys == {"folder_path", "data[0].scan_path", "nested.folder"}, \
+        f"path-guard self-test FAILED — caught {_caught_keys}"
+    print("  path-guard self-test: detector catches path keys, ignores *_url — OK")
+
+    # 0. #247 — arm the response *_path guard for every suite in the gate.
+    # _smoke_auth (imported by each subprocess) hooks the patched session and
+    # appends any path-pattern key / path-like value it sees in ANY JSON
+    # response to this file; step 5 fails the gate on hits.
+    guard_file = SCRIPT_DIR / "tests" / "_path_guard_hits.txt"
+    try:
+        guard_file.unlink()
+    except OSError:
+        pass
+    os.environ["PATH_GUARD_HITS"] = str(guard_file)
+
     # 1. Before snapshot
     t0 = time.time()
     before = snapshot_all()
@@ -341,6 +365,19 @@ def main() -> int:
     print("\n  Non-synthetic-row diff (anything here is a smoke "
           "polluting production data):")
     print(format_diff_report(diff))
+
+    # 5. #247 — response *_path guard verdict. Independent of the row diff:
+    # a path field crossing the wire fails the gate even with clean data.
+    path_hits = []
+    if guard_file.exists():
+        path_hits = sorted(set(
+            ln for ln in guard_file.read_text(encoding="utf-8").splitlines() if ln.strip()))
+    if path_hits:
+        print(f"\n  PATH-GUARD FAIL — {len(path_hits)} *_path leak(s) crossed the wire:")
+        for h in path_hits:
+            print(f"    {h}")
+        return 3
+    print("  path-guard: zero path keys/values in any captured JSON response")
 
     print(f"\n  TOTAL: {time.time() - t0:.1f}s")
     if clean:

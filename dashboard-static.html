@@ -1087,7 +1087,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #246 · 2026-06-12 · Employees &amp; Certs on the canonical active roster — deactivated workers excluded from cards · table · readiness math</div>
+          <div class="ph-build" id="ph-build-stamp">build #247 · 2026-06-12 · PII — worker-create / profile responses carry no folder_path; gated routes only</div>
         </div>
       </section>
 
@@ -5073,7 +5073,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
       }
       closeModal();
       await loadRoster();
-      alert(`✓ Worker ${name} created (${resp.data.worker_id || resp.data.employee_id}).\n\nFolder: ${resp.data.folder_path}\n\nClick their row in the roster to upload scans + add certs.`);
+      alert(`✓ Worker ${name} created (${resp.data.worker_id || resp.data.employee_id}).\n\nClick their row in the roster to upload scans + add certs.`);
     } catch (e) {
       alert('Network error: ' + e.message);
     }
@@ -5094,7 +5094,6 @@ document.querySelectorAll('.nav-link').forEach(link => {
           .map(d => `  • ${d.doc_type}: ${d.original_filename}`)
           .join('\n') || '  (none uploaded yet)';
         alert(`${e.employee.name} (${e.employee.worker_id || e.employee.employee_id})\n\n` +
-              `Folder: ${e.employee.folder_path}\n\n` +
               `CERTIFICATIONS:\n${certList}\n\n` +
               `DOCUMENTS:\n${docList}\n\n` +
               `[Profile view with upload + cert form coming next]`);

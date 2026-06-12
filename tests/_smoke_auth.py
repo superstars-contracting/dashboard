@@ -49,6 +49,57 @@ from auth import hash_password  # noqa: E402
 _setup_done = False
 _session: requests.Session | None = None
 
+# ---- #247: response *_path guard ------------------------------------------
+# When PATH_GUARD_HITS is set (the meta-smoke sets it for the whole gate),
+# EVERY JSON response that flows through the patched session is scanned for
+# KEY NAMES matching the filesystem-path pattern: a bare 'folder', or any key
+# ending in 'path' / 'file_path' / 'filepath'. CLAUDE.md §2: files cross the
+# wire via gated id-based routes ONLY — never a path. Tuned to KEYS so legit
+# '*_url' fields (gated routes) don't false-positive. Hits are appended to the
+# file; the meta-smoke fails the gate on any hit.
+import re as _re
+from urllib.parse import urlparse as _urlparse
+
+_PATH_KEY_RE = _re.compile(r"(?i)(^|_)(file_?path|filepath|path|folder)$")
+
+
+def _scan_json_for_paths(obj, route, hits, keypath=""):
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            kp = f"{keypath}.{k}" if keypath else str(k)
+            if isinstance(k, str) and _PATH_KEY_RE.search(k):
+                hits.append(f"{route} :: key '{kp}'")
+            _scan_json_for_paths(v, route, hits, kp)
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj[:80]):
+            _scan_json_for_paths(v, route, hits, f"{keypath}[{i}]")
+
+
+def _install_path_guard(session: requests.Session) -> None:
+    hits_file = os.environ.get("PATH_GUARD_HITS")
+    if not hits_file:
+        return
+
+    def _hook(r, *args, **kwargs):
+        try:
+            if "application/json" not in (r.headers.get("Content-Type") or ""):
+                return r
+            if len(r.content or b"") > 2_000_000:
+                return r
+            data = r.json()
+        except Exception:
+            return r
+        hits = []
+        route = f"{r.request.method} {_urlparse(r.url).path}"
+        _scan_json_for_paths(data, route, hits)
+        if hits:
+            with open(hits_file, "a", encoding="utf-8") as fh:
+                for h in sorted(set(hits)):
+                    fh.write(h + "\n")
+        return r
+
+    session.hooks.setdefault("response", []).append(_hook)
+
 
 def _ensure_user() -> None:
     conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
@@ -133,6 +184,7 @@ def setup(retries: int = 10, retry_delay: float = 0.5) -> None:
         return
     _ensure_user()
     _session = _login_with_retries(retries, retry_delay)
+    _install_path_guard(_session)   # #247 — scan every JSON response for paths
     _patch_requests(_session)
     _patch_urllib(_session.cookies.get("ssc_session"))
     _setup_done = True

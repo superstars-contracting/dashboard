@@ -268,6 +268,36 @@ def db():
 def rows_to_dicts(rows):
     return [dict(row) for row in rows]
 
+
+# #247 — CLAUDE.md §2: no filesystem path EVER crosses the wire. Files are
+# served via gated, id-based routes only. This is the single scrubber every
+# response that spreads a DB row (SELECT *, dict(row), rows_to_dicts) runs
+# through, so a path column can't reach JSON even if a future SELECT adds one.
+# The gate's response-path guard (tests/_smoke_auth.py) enforces the same
+# invariant from the outside. Server-side path handling (building paths from
+# ids, file ops) is untouched — this only strips the OUTBOUND JSON.
+# 'folder_slug' is included because it embeds the worker's name (PII), same
+# class as the paths even though it isn't literally a path.
+_RESPONSE_PATH_KEYS = frozenset({
+    'folder_path', 'face_image_path', 'photo_path', 'file_path', 'filepath',
+    'scan_path', 'html_path', 'pdf_path', 'edge_path', 'signature_path',
+    'datasheet_pdf_path', 'folder_slug',
+})
+
+
+def scrub_paths(obj):
+    """Recursively drop path-bearing keys from dicts/lists IN PLACE; returns
+    obj for convenience. Use at every response site that emits a raw DB row."""
+    if isinstance(obj, dict):
+        for k in [k for k in obj if k in _RESPONSE_PATH_KEYS]:
+            del obj[k]
+        for v in obj.values():
+            scrub_paths(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            scrub_paths(v)
+    return obj
+
 def response_wrapper(data, count=None):
     """Wrap response with metadata"""
     return jsonify({
@@ -1592,7 +1622,8 @@ def _patch_dcr_row(table, row_id, allowed_fields, aliases=None):
         )
         conn.commit()
         row = conn.execute(f"SELECT * FROM {table} WHERE id = ?", (row_id,)).fetchone()
-        return response_wrapper(dict(row)), 200
+        # #247 — generic SELECT * (e.g. photos.file_path); scrub before the wire.
+        return response_wrapper(scrub_paths(dict(row))), 200
     except Exception as e:
         logging.error(f"PATCH /api/{table}/{row_id}: {e}")
         return jsonify({"error": str(e)}), 500
@@ -2408,7 +2439,9 @@ def issue_dcr(project_code, report_date):
             written_files.append(client["html_path"])
             conn.commit()
             conn.close()
-            return response_wrapper({
+            # #247 — scrub: pdf_status carries pdf_path/edge_path (the UI only
+            # reads ok/error/size). *_url stay (gated/served routes).
+            return response_wrapper(scrub_paths({
                 "audience": "both",
                 "generated_at": generated_at,
                 "internal_url": internal["html_url"],
@@ -2423,13 +2456,13 @@ def issue_dcr(project_code, report_date):
                 "pdf_url": internal.get("pdf_url"),
                 "pdf_status": internal.get("pdf_status"),
                 "drive_status": internal.get("drive_status"),
-            }), 201
+            })), 201
         else:
             result = _issue_one_dcr(conn, project_code, report_date, audience, seq)
             written_files.append(result["html_path"])
             conn.commit()
             conn.close()
-            return response_wrapper({
+            return response_wrapper(scrub_paths({
                 "report_id": result["report_id"],
                 "audience": result["audience"],
                 "html_url": result["html_url"],
@@ -2439,7 +2472,7 @@ def issue_dcr(project_code, report_date):
                 "pdf_url": result.get("pdf_url"),
                 "pdf_status": result.get("pdf_status"),
                 "drive_status": result.get("drive_status"),
-            }), 201
+            })), 201
     except (KeyError, ValueError) as e:
         try: conn.rollback()
         except Exception: pass
@@ -2811,7 +2844,8 @@ def update_employee(emp_id):
         # CLAUDE.md PII discipline: pin is not volunteered in normal responses.
         # Only surfaced when this call caused the change so the operator can
         # share the new PIN with the worker once.
-        result = dict(row) if row else {}
+        # #247 — SELECT * carries face_image_path/folder_path/photo_path; scrub.
+        result = scrub_paths(dict(row)) if row else {}
         result.pop('pin', None)
         if pin_changed:
             result['pin_changed'] = True
@@ -2992,8 +3026,8 @@ def create_certification():
         new_id = conn.execute("SELECT last_insert_rowid() as id").fetchone()['id']
         row = conn.execute("SELECT * FROM certifications WHERE id = ?", (new_id,)).fetchone()
         conn.close()
-        
-        return response_wrapper(dict(row) if row else {}), 201
+        # #247 — certifications SELECT * carries scan_path/file_path; scrub.
+        return response_wrapper(scrub_paths(dict(row)) if row else {}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -3031,7 +3065,8 @@ def get_employees():
             "SELECT * FROM employees WHERE archived_at IS NULL"
         ).fetchall()
     conn.close()
-    return response_wrapper(rows_to_dicts(rows), len(rows))
+    # #247 — SELECT * carries face_image_path/folder_path/photo_path; scrub.
+    return response_wrapper(scrub_paths(rows_to_dicts(rows)), len(rows))
 
 @app.route('/api/employees/<emp_id>', methods=['GET'])
 def get_employee(emp_id):
@@ -3050,7 +3085,8 @@ def get_employee(emp_id):
     ).fetchall()
     employee['certifications'] = rows_to_dicts(cert_rows)
     conn.close()
-    return response_wrapper(employee)
+    # #247 — employee SELECT * + cert rows (scan_path) — scrub the whole tree.
+    return response_wrapper(scrub_paths(employee))
 
 @app.route('/api/certifications', methods=['GET'])
 def get_certifications():
@@ -3604,7 +3640,8 @@ def upload_photo():
             new_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()['id']
             row = conn.execute("SELECT * FROM photos WHERE id = ?", (new_id,)).fetchone()
             conn.close()
-            return response_wrapper(dict(row)), 201
+            # #247 — photos.file_path stripped; the gated `url` field stays.
+            return response_wrapper(scrub_paths(dict(row))), 201
         except Exception as db_err:
             conn.close()
             try:
@@ -3645,7 +3682,8 @@ def get_photos():
             (date_filter, project_code)
         ).fetchall()
         conn.close()
-        return response_wrapper(rows_to_dicts(rows) if rows else [])
+        # #247 — photos.file_path stripped; the gated `url` field stays.
+        return response_wrapper(scrub_paths(rows_to_dicts(rows)) if rows else [])
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 # ============= PROJECTS (Company Console) =============
@@ -5367,8 +5405,10 @@ def api_spec_products():
     try:
         conn = db()
         rows = conn.execute(
+            # #247 — datasheet_pdf_path dropped (path-named, NULL across all
+            # 107 rows, zero consumers); spec_url is the public TDS link.
             f"SELECT id, manufacturer, category, product_line, product_name, "
-            f"       product_code, description, spec_url, datasheet_pdf_path, "
+            f"       product_code, description, spec_url, "
             f"       tags, created_at "
             f"FROM spec_products{where_sql} "
             f"ORDER BY manufacturer, category, product_line, product_name",
@@ -5403,7 +5443,7 @@ def api_project_document_specs_list(project_code):
             "SELECT pds.id AS link_id, pds.added_at, pds.added_by, pds.notes, "
             "       sp.id AS spec_product_id, sp.manufacturer, sp.category, "
             "       sp.product_line, sp.product_name, sp.product_code, "
-            "       sp.description, sp.spec_url, sp.datasheet_pdf_path, sp.tags "
+            "       sp.description, sp.spec_url, sp.tags "  # #247 — no datasheet_pdf_path
             "FROM project_document_specs pds "
             "JOIN spec_products sp ON sp.id = pds.spec_product_id "
             "WHERE pds.project_code = ? "
@@ -5949,11 +5989,12 @@ def api_worker_create():
 
         conn.commit()
         conn.close()
+        # #247 — no folder_path / folder_slug (name-bearing) in the response.
+        # The worker folder is a server-side concept; the UI shows worker_id.
         return response_wrapper({
             "employee_id": employee_id,
+            "worker_id": worker_id,
             "name": name,
-            "folder_path": str(folder),
-            "folder_slug": folder_slug,
             "assigned_to": project_codes,
         })
     except Exception as e:
@@ -5990,11 +6031,29 @@ def api_worker_get(employee_id):
         ).fetchall()
         conn.close()
 
-        return response_wrapper({
+        # #247 — emit GATED file_url (the /worker-files/ route, auth-gated) in
+        # place of the raw file_path the document thumbnail used to read. Same
+        # /worker-files/<rel> pattern the cert/face responses already use.
+        doc_dicts = []
+        for d in docs:
+            dd = dict(d)
+            fp = dd.get('file_path')
+            if fp:
+                try:
+                    rel = Path(fp).resolve().relative_to(WORKER_RECORDS_DIR.resolve())
+                    dd['file_url'] = "/worker-files/" + str(rel).replace("\\", "/")
+                except (ValueError, OSError):
+                    dd['file_url'] = None
+            doc_dicts.append(dd)
+
+        # employee/docs/certs all SELECT * (face_image_path, folder_path,
+        # photo_path, file_path, scan_path). Scrub the whole tree; consumers use
+        # the gated routes (face-photo, file_url) + original_filename, not paths.
+        return response_wrapper(scrub_paths({
             "employee": dict(emp),
-            "documents": [dict(d) for d in docs],
+            "documents": doc_dicts,
             "certifications": [dict(c) for c in certs],
-        })
+        }))
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
@@ -6105,9 +6164,15 @@ def api_worker_upload(employee_id):
         conn.commit()
         conn.close()
 
+        # #247 — gated file_url, never the raw path.
+        try:
+            _rel = target_path.resolve().relative_to(WORKER_RECORDS_DIR.resolve())
+            _file_url = "/worker-files/" + str(_rel).replace("\\", "/")
+        except (ValueError, OSError):
+            _file_url = None
         return response_wrapper({
             "doc_id": doc_id,
-            "file_path": str(target_path),
+            "file_url": _file_url,
             "size_bytes": size,
             "doc_type": doc_type,
             "doc_label": doc_label,
@@ -6218,7 +6283,8 @@ def api_worker_patch_cert(employee_id, cert_id):
         )
         conn.commit()
         row = conn.execute("SELECT * FROM certifications WHERE id = ?", (cert_id,)).fetchone()
-        return response_wrapper(dict(row)), 200
+        # #247 — certifications SELECT * carries scan_path/file_path; scrub.
+        return response_wrapper(scrub_paths(dict(row))), 200
     except Exception as e:
         logging.error(f"PATCH /api/workers/{employee_id}/certs/{cert_id}: {e}")
         return jsonify({"error": str(e)}), 500
@@ -6354,8 +6420,7 @@ def api_certification_extract(employee_id):
             return jsonify({
                 "error": "AI extraction disabled — ANTHROPIC_API_KEY not configured",
                 "ai_available": False,
-                "image_path": str(target_path),
-                "image_url": image_url,
+                "image_url": image_url,  # #247 — gated route, no image_path
                 "note": "Image saved. Use manual entry to record cert data.",
             }), 503
 
@@ -6365,17 +6430,16 @@ def api_certification_extract(employee_id):
             cert_types = load_cert_types_from_db(DB_PATH)
             extracted = extract_cert_from_image(target_path, cert_types)
         except (RuntimeError, FileNotFoundError) as e:
-            app.logger.error(f"cert extraction failed for {target_path}: {e}")
+            app.logger.error(f"cert extraction failed for {target_path.name}: {e}")
             return jsonify({
                 "error": f"extraction failed: {e}",
-                "image_path": str(target_path),
+                "image_url": image_url,  # #247 — gated route, no image_path
                 "note": "image saved on disk; operator can retry or use manual entry",
             }), 500
 
         return response_wrapper({
             "extracted": extracted,
-            "image_path": str(target_path),
-            "image_url": image_url,
+            "image_url": image_url,  # #247 — gated route, no image_path
         })
     except Exception as e:
         app.logger.error(f"POST /api/employees/{employee_id}/certifications/extract failed: {e}")
@@ -6402,7 +6466,22 @@ def api_certification_save(employee_id):
         expiration_date = (data.get("expiration_date") or "").strip() or None
         issuing_body = (data.get("issuing_body") or "").strip() or None
         notes = (data.get("notes") or "").strip() or None
-        scan_path = (data.get("scan_path") or "").strip() or None
+        # #247 — the client round-trips the GATED image_url (/worker-files/<rel>),
+        # never a filesystem path. Resolve it back to a path server-side and
+        # confine it to WORKER_RECORDS_DIR. (Legacy scan_path body still accepted
+        # but only if it resolves inside the worker-records root.)
+        scan_path = None
+        _img_url = (data.get("image_url") or "").strip()
+        if _img_url.startswith("/worker-files/"):
+            _cand = (WORKER_RECORDS_DIR / _img_url[len("/worker-files/"):]).resolve()
+            if str(_cand).startswith(str(WORKER_RECORDS_DIR.resolve())) and _cand.exists():
+                scan_path = str(_cand)
+        if scan_path is None:
+            _legacy = (data.get("scan_path") or "").strip()
+            if _legacy:
+                _cand = Path(_legacy).resolve()
+                if str(_cand).startswith(str(WORKER_RECORDS_DIR.resolve())):
+                    scan_path = str(_cand)
 
         if not cert_type_id:
             return jsonify({"error": "cert_type_id is required"}), 400
@@ -6471,11 +6550,11 @@ def api_certification_save(employee_id):
         ).fetchone()
         conn.close()
 
-        return response_wrapper({
+        return response_wrapper(scrub_paths({
             "cert_id": new_id,
             "already_exists": False,
             "row": dict(row),
-        }), 201
+        })), 201
     except Exception as e:
         app.logger.error(f"POST /api/employees/{employee_id}/certifications failed: {e}")
         return jsonify({"error": str(e)}), 500
@@ -6538,7 +6617,7 @@ def api_certifications_list(employee_id):
                 row["status_derived"] = "expiring"
             else:
                 row["status_derived"] = "valid"
-            # Compact a browser-friendly URL for the scan, alongside the raw path.
+            # #247 — emit the GATED scan_url only; scan_path is scrubbed below.
             sp = row.get("scan_path")
             if sp:
                 try:
@@ -6550,7 +6629,7 @@ def api_certifications_list(employee_id):
                 row["scan_url"] = None
             out.append(row)
 
-        return response_wrapper(out, count=len(out))
+        return response_wrapper(scrub_paths(out), count=len(out))
     except Exception as e:
         app.logger.error(f"GET /api/employees/{employee_id}/certifications failed: {e}")
         return jsonify({"error": str(e)}), 500
@@ -6657,10 +6736,13 @@ def api_employee_face_photo(employee_id):
         relative = displayable_path.relative_to(WORKER_RECORDS_DIR.resolve())
         image_url = "/worker-files/" + str(relative).replace("\\", "/")
 
+        # #247 — image_url is the GATED route; no face_image_path on the wire.
+        # heic_conversion reduced to a boolean (its original/jpeg keys held
+        # filesystem paths) — the UI only needs "did the conversion succeed".
+        heic_ok = bool(heic_conversion and heic_conversion.get("ok")) if heic_conversion else None
         return response_wrapper({
-            "face_image_path": str(displayable_path),
             "image_url": image_url,
-            "heic_conversion": heic_conversion,
+            "heic_converted": heic_ok,
         })
     except Exception as e:
         app.logger.error(f"POST /api/employees/{employee_id}/face-photo failed: {e}")
@@ -6690,7 +6772,7 @@ def api_employee_face_photo_delete(employee_id):
         if not emp["face_image_path"]:
             return response_wrapper({
                 "employee_id": employee_id,
-                "face_image_path": None,
+                "has_photo": False,
                 "files_unlinked": 0,
                 "already_absent": True,
             }), 200
@@ -6713,7 +6795,7 @@ def api_employee_face_photo_delete(employee_id):
                             files_unlinked += 1
                         except OSError as e:
                             app.logger.warning(
-                                f"face-photo unlink failed for {employee_id} {old}: {e}"
+                                f"face-photo unlink failed for {employee_id} {old.name}: {e}"
                             )
             except Exception as e:
                 app.logger.warning(
@@ -6722,7 +6804,7 @@ def api_employee_face_photo_delete(employee_id):
 
         return response_wrapper({
             "employee_id": employee_id,
-            "face_image_path": None,
+            "has_photo": False,
             "files_unlinked": files_unlinked,
             "already_absent": False,
         }), 200
@@ -6891,7 +6973,9 @@ def api_workers_intake_summary():
                 "current_credential": current_credential,
             })
         conn.close()
-        return response_wrapper(out)
+        # #247 — dict(e) spreads folder_path (name-bearing); no consumer reads
+        # it on the Workforce roster. Scrub before it crosses the wire.
+        return response_wrapper(scrub_paths(out))
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 

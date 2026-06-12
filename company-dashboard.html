@@ -2080,9 +2080,9 @@ applyLanguage();
       } else {
         docList.innerHTML = docs.map(doc => {
           const isImage = doc.mime_type && doc.mime_type.startsWith('image/');
-          // Build a safe URL — file_path is absolute on the server, we serve via /worker-files/
-          const relativePath = (doc.file_path || '').split('worker_records')[1] || '';
-          const url = '/worker-files' + relativePath.replace(/\\/g, '/');
+          // #247 — gated file_url comes from the server (/worker-files/ route);
+          // the raw file_path is no longer in the response (CLAUDE.md §2).
+          const url = doc.file_url || '';
           const thumb = isImage
             ? `<img src="${esc(url)}" style="width:80px;height:80px;object-fit:cover;border-radius:4px;border:1px solid #E8E4DD;">`
             : `<div style="width:80px;height:80px;background:#FAF7F1;border-radius:4px;border:1px solid #E8E4DD;display:flex;align-items:center;justify-content:center;font-size:11px;color:#76777E;">${esc((doc.mime_type || '').split('/')[1] || 'doc').toUpperCase()}</div>`;
@@ -2731,7 +2731,8 @@ applyLanguage();
           expiration_date: _iso('expiration_date') || null,
           issuing_body: q('issuing_body').value.trim() || null,
           notes: q('notes').value.trim() || null,
-          scan_path: imagePath,
+          // #247 — round-trip the GATED url, never a filesystem path.
+          image_url: imageUrl,
         };
         if (!payload.cert_type_id) {
           errorEl.textContent = 'Cert type is required.';
@@ -2786,7 +2787,6 @@ applyLanguage();
     if (!result) return;  // user cancelled
 
     let extracted = {};
-    let imagePath = null;
     let imageUrl = null;
     let extractionError = null;
 
@@ -2803,11 +2803,11 @@ applyLanguage();
         if (resp.ok) {
           const d = body.data || body;
           extracted = d.extracted || {};
-          imagePath = d.image_path || null;
           imageUrl = d.image_url || null;
         } else {
-          // Extract failed but the image may have been saved before the API call.
-          imagePath = (body && body.image_path) || null;
+          // Extract failed but the image may have been saved before the API
+          // call — its gated url rides on the error body so a manual save links it.
+          imageUrl = (body && body.image_url) || null;
           extractionError = (body && body.error) || `extraction failed (${resp.status})`;
         }
       } catch (e) {
@@ -2817,7 +2817,7 @@ applyLanguage();
     }
     // result === 'manual' path: extracted stays {}, no image. Form opens blank.
 
-    await openCertReviewModal({extracted, imagePath, imageUrl, extractionError});
+    await openCertReviewModal({extracted, imageUrl, extractionError});
   }
 
   // Wire Scan Cert button.
@@ -3102,7 +3102,7 @@ applyLanguage();
       // Relation dropdown has a paired Other-text input — reset both via helper.
       clearRelationField('in-ec-relation');
       await Promise.all([loadMetrics(), loadProjects(), loadWorkforce()]);
-      alert(`✓ Worker created: ${name}\nWorker ID: ${resp.data.worker_id || resp.data.employee_id}\nAssigned to: ${resp.data.assigned_to.join(', ') || '(no projects)'}\nFolder: ${resp.data.folder_path}`);
+      alert(`✓ Worker created: ${name}\nWorker ID: ${resp.data.worker_id || resp.data.employee_id}\nAssigned to: ${resp.data.assigned_to.join(', ') || '(no projects)'}`);
     } catch (e) { alert('Network error: ' + e.message); }
   });
 
@@ -3774,7 +3774,7 @@ applyLanguage();
 })();
 </script>
 
-<div class="container"><div class="ph-build" id="cc-build-stamp">build #246 · 2026-06-12 · Canonical roster — deactivation propagates to every surface · Inactive badges on Workforce + profile</div></div>
+<div class="container"><div class="ph-build" id="cc-build-stamp">build #247 · 2026-06-12 · PII — no filesystem path crosses the wire; gated file_url/image_url everywhere; response-path guard in the gate</div></div>
 
 <script>
 /* ===== Company console widgets (#210) — live data + reused #209 drag framework.
