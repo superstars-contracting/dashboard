@@ -26,7 +26,8 @@ rules by what they say (e.g., `per CLAUDE.md loopback policy`,
   graceful fallback when the lib is absent). Neither is the design surface —
   invoke them only when generating final deliverables or batch output.
 - The `/preview/*` routes (see `preview_routes.py`) serve every template
-  directly in the browser. Use them.
+  directly in the browser. Use them. (Since #248 they sit behind the
+  dashboard login like every operator surface — sign in once.)
 - **Why this rule exists:** the CoF card iteration cost ~15 cycles fighting
   WeasyPrint-specific quirks (flex/grid failures, SVG text rendering, inline-block
   hacks). Every one of those would have been a 30-second browser refresh if we'd
@@ -197,8 +198,15 @@ migration, mass UPDATE, anything that mutates more than one operator-
 expected row:
 
 ```bash
-cp superstars.db "data_room/db_backups/superstars-pre-<op-name>-$(date +%Y%m%d-%H%M%S).db"
+cp superstars.db "../snapshots/superstars-pre-<op-name>-$(date +%Y%m%d-%H%M%S).db"
 ```
+
+Snapshots live in `C:\Users\SSC-Admin\Superstars\snapshots` — OUTSIDE
+the project root, never under any served or servable tree. (#248: the
+old `data_room/db_backups` target sat inside the public /files mount,
+so every daily snapshot was downloadable without auth.) The daily
+"Superstars DB Snapshot" scheduled task (`snapshot_db.ps1`) writes to
+the same directory.
 
 The snapshot is the evidence + the recovery point. Already saved us
 once after a mid-cleanup DB went to 0 bytes; we want it again the next
@@ -339,10 +347,16 @@ sessions; cookie is opaque, 12-hour sliding. Schema lives in
 
 **Gating:** `auth.apply_auth_gate(app)` registers a `before_request` hook
 that redirects unauthenticated HTML requests to `/login?next=...` and
-returns 401 JSON for unauthenticated `/api/*` requests. Public exemptions:
-`/login`, `/api/auth/*`, `/api/health`, `/api/today`, `/api/worker/*`,
-`/worker-app`, `/files/*`, `/preview/*`. For per-route role gating use
-`@requires_role('admin', 'c_suite')` (e.g., once Labor Rates #158 lands).
+returns 401 JSON for unauthenticated `/api/*` requests. Public exemptions
+(#248): `/login`, `/api/auth/*`, `/api/health`, `/api/today`,
+`/api/worker/*`, `/worker-app` (+ its PWA manifest/service-worker shell
+files), and `/files/static/*` — vendored assets ONLY. The whole-project
+`/files/*` mount and the `/preview/*` exemption were REMOVED in #248
+(they exposed the DB, source, snapshots, and rendered project documents
+to anonymous fetches). Generated artifacts are served by the
+session-gated `/project-files/` route; never re-widen `/files`. For
+per-route role gating use `@requires_role('admin', 'c_suite')` (e.g.,
+once Labor Rates #158 lands).
 
 **Bootstrap (FIRST RUN ON A FRESH DEPLOY — REQUIRED):**
 
@@ -443,6 +457,7 @@ The tools catch what slips past discipline; they do not license carelessness. So
 | `static/js/auth_menu.js` | Header user menu (name · role · Sign out) on both dashboards. |
 | `tests/_smoke_auth.py` | Smoke-suite helper: seeds smoke admin, patches `requests`/`urllib` so existing tests authenticate. |
 | `tests/smoke_auth.py` | Auth foundation end-to-end smoke: login, gate, logout, exemptions. |
+| `tests/smoke_static_exposure.py` | #248 exposure gate: public serving = vendored `/files/static/*` only; DB / source / snapshots / `.env` unservable by ANY route incl. traversal; artifacts require a session. Part of the standard gate. |
 
 ## Architecture
 

@@ -731,7 +731,9 @@ class DCRHTMLRenderer:
             return self._sec_empty(10, "Photos", "", "None attached.")
         tiles = []
         for p in photos[:12]:  # cap at 12 — keeps PDF page count sane
-            url = p.get('url') or (('/files/' + p.get('file_path')) if p.get('file_path') else None)
+            # photos.url is the gated /project-files/ URL (#248); the
+            # file_path fallback mirrors that scheme for legacy rows.
+            url = p.get('url') or (('/project-files/' + p.get('file_path')) if p.get('file_path') else None)
             cap = []
             loc = p.get('location')
             desc = p.get('description')

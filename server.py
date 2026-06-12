@@ -17,7 +17,13 @@ DB_PATH = SCRIPT_DIR / "superstars.db"
 COMPANY_DASHBOARD_PATH = SCRIPT_DIR / "company-dashboard.html"
 DASHBOARD_PATH = SCRIPT_DIR / "dashboard-static.html"
 
-app = Flask(__name__, static_folder=str(SCRIPT_DIR), static_url_path='/files')
+# #248 — PUBLIC static serving is the vendored-asset subtree ONLY. The
+# pre-#248 mount was the ENTIRE project dir at /files, which made the DB,
+# source, docs, and daily DB snapshots downloadable with no login. Keeping
+# the /files/static/... URL shape means zero changes for every page that
+# references shell assets (css/js/fonts/vendor).
+app = Flask(__name__, static_folder=str(SCRIPT_DIR / 'static'),
+            static_url_path='/files/static')
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # Browser-preview blueprint: /preview/* URLs for HTML-first design iteration.
@@ -27,10 +33,12 @@ app.register_blueprint(preview_bp)
 
 # Dashboard auth foundation (#48): wires /login, /api/auth/* and a
 # before_request gate that redirects unauthenticated requests to /login
-# (HTML) / returns 401 (JSON). The gate exempts /api/worker/*, /worker-app,
-# /api/health, /api/today, /files/* (static assets), and /preview/* —
-# worker-app PIN sign-in is untouched. Per-route role gating uses
-# @requires_role from auth.py.
+# (HTML) / returns 401 (JSON). The gate exempts /api/worker/*, /worker-app
+# (+ its PWA manifest/service-worker shell files), /api/health, /api/today,
+# and /files/static/* (vendored assets ONLY — #248) — worker-app PIN sign-in
+# is untouched. /preview/* lost its exemption in #248: it serves rendered
+# project documents (internal DCRs etc.), so it requires a session like any
+# other operator surface. Per-route role gating uses @requires_role from auth.py.
 from auth import apply_auth_gate, requires_role, current_user  # noqa: F401 (requires_role re-exported for future use)
 apply_auth_gate(app)
 
@@ -47,6 +55,84 @@ ALLOWED_DOC_MIME_TYPES = {
     'application/pdf',
 }
 ALLOWED_DOC_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.pdf'}
+
+# ============= #248 — FILE-SERVING ALLOWLISTS (by construction) =============
+# Generated-artifact subtrees reachable through the gated /project-files/
+# route. Everything else under data_room/ is deliberately ABSENT: db_backups
+# and server_logs are never servable; receipts, project_docs, and
+# field_photos already have their own gated id-based routes with their own
+# role rules (listing them here would loosen those).
+_ARTIFACT_ROOTS = (
+    SCRIPT_DIR / "data_room" / "reports",
+    SCRIPT_DIR / "data_room" / "photos",
+    SCRIPT_DIR / "data_room" / "forms",
+    SCRIPT_DIR / "data_room" / "toolbox_talks",
+    SCRIPT_DIR / "data_room" / "signage",
+    SCRIPT_DIR / "data_room" / "credentials",
+)
+
+# Extensions an artifact may carry. Code / config / db / log / csv are absent
+# BY DESIGN — a future artifact type gets its extension added here
+# consciously, never inherited by accident.
+_ARTIFACT_EXTENSIONS = {
+    '.html', '.pdf', '.png', '.jpg', '.jpeg', '.gif', '.webp',
+    '.heic', '.heif', '.svg',
+}
+
+# Legacy root output dirs reachable through the authed root catch-all
+# (pre-data_room era generators still write here). Top-level dirs NOT listed
+# (tests, venv, worker_records, intake, data_room, static, ...) are
+# unreachable through that route by construction.
+_ROOT_SERVE_DIRS = {
+    'meetings', 'drop_plans', 'site_closures', 'toolbox_talks',
+    'meeting_workflow_run', 'rfi_workflow_run',
+}
+
+
+def _split_safe_rel(rel):
+    """Normalize a URL-supplied relative path into segments, or None if it
+    smells like traversal: absolute paths, drive letters/ADS colons,
+    backslashes are normalized first, then any '..' or dot-leading segment
+    is rejected outright."""
+    if not rel:
+        return None
+    raw = str(rel).replace('\\', '/')
+    if raw.startswith('/') or ':' in raw:
+        return None
+    parts = [p for p in raw.split('/') if p not in ('', '.')]
+    if not parts or any(p == '..' or p.startswith('.') for p in parts):
+        return None
+    return parts
+
+
+def _safe_artifact_path(rel):
+    """Resolve rel (project-relative) and return it ONLY if it is a real file
+    inside one of _ARTIFACT_ROOTS with an allowlisted extension. Traversal is
+    rejected before joining; containment is re-asserted on the resolved path
+    (belt and suspenders)."""
+    parts = _split_safe_rel(rel)
+    if parts is None:
+        return None
+    candidate = SCRIPT_DIR.joinpath(*parts)
+    if candidate.suffix.lower() not in _ARTIFACT_EXTENSIONS:
+        return None
+    try:
+        resolved = candidate.resolve()
+    except OSError:
+        return None
+    if not any(resolved.is_relative_to(root.resolve()) for root in _ARTIFACT_ROOTS):
+        return None
+    if not resolved.is_file():
+        return None
+    return resolved
+
+
+def _file_url_for(rel_path):
+    """URL scheme for a project-relative file (#248): vendored static/ assets
+    stay on the public /files/static mount; everything else is a generated
+    artifact served through the gated /project-files/ route."""
+    rel = str(rel_path).replace('\\', '/').lstrip('/')
+    return ('/files/' + rel) if rel.startswith('static/') else ('/project-files/' + rel)
 
 
 # ============= DASHBOARD ROUTES =============
@@ -2068,7 +2154,7 @@ def _issue_one_dcr(conn, project_code, report_date, audience, seq):
     by the caller and shared across audiences.
 
     HTML is written ATOMICALLY (.tmp then rename) so a concurrent fetch via
-    /files/ during a re-issue can never catch a half-written file."""
+    /project-files/ during a re-issue can never catch a half-written file."""
     from dcr_aggregator import aggregate_dcr
     from render_dcr_html import DCRHTMLRenderer
     dcr = aggregate_dcr(project_code, report_date, audience)
@@ -2085,7 +2171,7 @@ def _issue_one_dcr(conn, project_code, report_date, audience, seq):
     tmp_file.write_text(html, encoding='utf-8')
     tmp_file.replace(out_file)  # atomic on POSIX and Windows
     rel = out_file.relative_to(SCRIPT_DIR).as_posix()
-    html_url = f"/files/{rel}"
+    html_url = f"/project-files/{rel}"
 
     # PDF render: internal audience only (the "full record" copy that gets
     # archived). Client audience stays HTML-only — it's the consumer-facing
@@ -2107,7 +2193,7 @@ def _issue_one_dcr(conn, project_code, report_date, audience, seq):
             logging.warning(f"DCR {report_id}: Edge not installed, PDF skipped: {e}")
         if pdf_status.get('ok'):
             pdf_path = pdf_target
-            pdf_url = f"/files/{pdf_target.relative_to(SCRIPT_DIR).as_posix()}"
+            pdf_url = f"/project-files/{pdf_target.relative_to(SCRIPT_DIR).as_posix()}"
             # Drive archive — copy the local PDF into the project's synced
             # folder. Failure here is a WARN, never an error: local PDF is
             # always retained; Drive may simply not be configured/running.
@@ -2345,7 +2431,7 @@ def issue_dcr(project_code, report_date):
         return jsonify({"error": "Project not found"}), 400
     # Track HTML files written so we can roll them back if the transaction
     # fails. Otherwise a half-issued DCR leaves orphan HTML on disk that the
-    # /files/ static route would happily serve.
+    # gated /project-files/ route would happily serve.
     written_files = []
     try:
         # ---- #194 roster completeness gate ----
@@ -2577,7 +2663,7 @@ def list_reports(project_code):
         else:
             d['audience'] = None
         if d['audience'] and d.get('dcr_sequence') is not None and d.get('report_type') == 'DCR':
-            d['html_url'] = f"/files/data_room/reports/dcr/{project_code}/{d['dcr_sequence']:03d}/{d['audience']}.html"
+            d['html_url'] = f"/project-files/data_room/reports/dcr/{project_code}/{d['dcr_sequence']:03d}/{d['audience']}.html"
         else:
             d['html_url'] = None
         d['display_id'] = _display_id(rid)
@@ -2618,7 +2704,7 @@ def latest_report(project_code):
     d = dict(row)
     d['audience'] = audience
     if d.get('dcr_sequence') is not None and d.get('report_type') == 'DCR':
-        d['html_url'] = f"/files/data_room/reports/dcr/{project_code}/{d['dcr_sequence']:03d}/{audience}.html"
+        d['html_url'] = f"/project-files/data_room/reports/dcr/{project_code}/{d['dcr_sequence']:03d}/{audience}.html"
     else:
         d['html_url'] = None
     d['display_id'] = _display_id(d.get('report_id'))
@@ -3626,7 +3712,7 @@ def upload_photo():
         photo_file.save(str(file_path))
 
         rel = file_path.relative_to(SCRIPT_DIR).as_posix()
-        url = f"/files/{rel}"
+        url = f"/project-files/{rel}"
 
         conn = db()
         try:
@@ -4404,9 +4490,9 @@ def api_project_lookahead_render(project_code):
 def api_blank_forms():
     """Catalog of reusable blank (template) forms.
 
-    Returns every row in blank_forms with a file_url synthesized for
-    /files/data_room/forms/<filename> so the operator's UI can link
-    straight to the file without a second round-trip.
+    Returns every row in blank_forms with a file_url synthesized for the
+    gated /project-files/data_room/forms/<filename> route so the operator's
+    UI can link straight to the file without a second round-trip.
 
     Optional category filter.
     """
@@ -4429,7 +4515,7 @@ def api_blank_forms():
         out = []
         for r in rows:
             d = dict(r)
-            d['file_url'] = '/files/data_room/forms/' + d['filename']
+            d['file_url'] = '/project-files/data_room/forms/' + d['filename']
             out.append(d)
         return response_wrapper(out, count=len(out))
     except Exception as e:
@@ -4510,7 +4596,7 @@ def api_credentials_batch_print():
             f"path={rel} ({output.stat().st_size} bytes)"
         )
         return response_wrapper({
-            "url": "/files/" + rel,
+            "url": "/project-files/" + rel,
             # Operator-facing download name — the on-disk path includes
             # the fingerprint, but the browser saves it under the
             # friendly dated name (via the JS anchor's download attr).
@@ -5283,8 +5369,8 @@ def api_toolbox_talks_library():
     """Catalog of Ch 33 toolbox talks (EN + ES PDFs per talk).
 
     Mirrors /api/blank-forms + /api/signage-templates shape. Returns
-    every row in `toolbox_talks` with synthesized URLs for both
-    languages under /files/data_room/toolbox_talks/.
+    every row in `toolbox_talks` with synthesized gated URLs for both
+    languages under /project-files/data_room/toolbox_talks/.
 
     Optional category filter (Site / Fall / Scaffold / Demo / General).
 
@@ -5312,8 +5398,8 @@ def api_toolbox_talks_library():
         out = []
         for r in rows:
             d = dict(r)
-            d['file_url_en'] = '/files/data_room/toolbox_talks/' + d['filename_en']
-            d['file_url_es'] = '/files/data_room/toolbox_talks/' + d['filename_es']
+            d['file_url_en'] = '/project-files/data_room/toolbox_talks/' + d['filename_en']
+            d['file_url_es'] = '/project-files/data_room/toolbox_talks/' + d['filename_es']
             out.append(d)
         return response_wrapper(out, count=len(out))
     except Exception as e:
@@ -5326,8 +5412,9 @@ def api_signage_templates():
     """Catalog of standard construction-site signs (signage_templates).
 
     Mirrors /api/blank-forms shape. Returns every row with a file_url
-    synthesized for /files/data_room/signage/<filename> so the operator's
-    UI can link straight to the rendered PDF without a second round-trip.
+    synthesized for the gated /project-files/data_room/signage/<filename>
+    route so the operator's UI can link straight to the rendered PDF
+    without a second round-trip.
 
     Optional category filter (Safety / PPE / DOB / Site).
     """
@@ -5351,7 +5438,7 @@ def api_signage_templates():
         out = []
         for r in rows:
             d = dict(r)
-            d['file_url'] = '/files/data_room/signage/' + d['filename']
+            d['file_url'] = '/project-files/data_room/signage/' + d['filename']
             out.append(d)
         return response_wrapper(out, count=len(out))
     except Exception as e:
@@ -7172,13 +7259,14 @@ def serve_card_live(emp_id, cred_type):
                     photo_url = ''
 
         # Signature stays FROZEN — it's the issuer's at issuance time, not
-        # the worker's. Same /files/ path logic as the static issuer code.
+        # the worker's. Same path logic as the static issuer code; the URL
+        # scheme is gated for artifacts (#248) via _file_url_for.
         signature_url = ''
         sig_path = card.get('signature_path')
         if sig_path:
             sig_full = SCRIPT_DIR / sig_path.lstrip('/')
             if sig_full.exists():
-                signature_url = '/files/' + sig_path
+                signature_url = _file_url_for(sig_path)
 
         cnd = card.get('card_number_display') or card.get('card_id') or ''
         # ISSUED_DATE / EXPIRES_DATE rendered as MM-DD-YYYY (the display rule);
@@ -7343,21 +7431,21 @@ def issue_employee_credential(emp_id):
             subdir = 'company_id'
             cnd = card['card_number_display']
             expires_str = ''
-        # PHOTO_URL_OR_BLANK + SIGNATURE_URL: "/files/<rel>" if the file
-        # exists, else empty string (the template's {% if %} fallback
-        # handles the no-photo / no-signature case).
+        # PHOTO_URL_OR_BLANK + SIGNATURE_URL: gated "/project-files/<rel>"
+        # (#248) if the file exists, else empty string (the template's
+        # {% if %} fallback handles the no-photo / no-signature case).
         photo_url = ''
         photo_snapshot = card.get('photo_snapshot_path')
         if photo_snapshot:
             photo_full = SCRIPT_DIR / photo_snapshot.lstrip('/')
             if photo_full.exists():
-                photo_url = '/files/' + photo_snapshot
+                photo_url = _file_url_for(photo_snapshot)
         signature_url = ''
         sig_path = card.get('signature_path')
         if sig_path:
             sig_full = SCRIPT_DIR / sig_path.lstrip('/')
             if sig_full.exists():
-                signature_url = '/files/' + sig_path
+                signature_url = _file_url_for(sig_path)
         ctx = {
             'NAME': emp['name'] or '',
             'EMPLOYEE_ID': emp_id,
@@ -7402,7 +7490,7 @@ def issue_employee_credential(emp_id):
         conn.commit()
         conn.close()
         conn = None
-        html_url = '/files/' + html_rel
+        html_url = '/project-files/' + html_rel
 
         response_body = {
             "type": cred_type,
@@ -8891,24 +8979,84 @@ def api_field_photo_delete(photo_id):
     return response_wrapper({"deleted": photo_id})
 
 
-# ============= STATIC SERVING =============
+# ============= STATIC / FILE SERVING (#248 — allowlist by construction) =============
+#
+# Three tiers, least privilege first:
+#   1. /files/static/*  — PUBLIC. Vendored shell assets ONLY. Served by
+#      Flask's built-in static route (static_folder is the static/ subtree —
+#      see app = Flask(...) at the top), so nothing outside static/ is
+#      reachable here BY CONSTRUCTION. Same URLs + same caching machinery as
+#      the pre-#248 whole-project mount, so offline-safe / cache-bust
+#      behavior is unchanged for the shell.
+#   2. /project-files/<rel> — GATED. Generated artifacts under the
+#      _ARTIFACT_ROOTS allowlist (defined at the top of this file).
+#   3. /<path:filename> — GATED root catch-all for legacy root outputs,
+#      restricted to _ROOT_SERVE_DIRS + artifact extensions.
+# NEVER SERVABLE by any route, any auth state: *.db / -wal / -shm, DB
+# snapshots, *.py, *.md, .env*, dotfiles, tests/ — by construction here,
+# asserted by tests/smoke_static_exposure.py in the gate.
 
 
-@app.route('/files/<path:filepath>', methods=['GET'])
-def serve_files(filepath):
-    try:
-        return send_from_directory(str(SCRIPT_DIR), filepath)
-    except FileNotFoundError:
-        return jsonify({"error": "File not found"}), 404
+@app.route('/project-files/<path:relpath>', methods=['GET'])
+@requires_role('admin', 'c_suite', 'pm', 'super')
+def serve_project_file(relpath):
+    """Gated artifact serving (#248). Generated artifacts carry project data
+    (DCR renders, site photos, credential card exports) — never public. The
+    before_request gate authenticates the session (this prefix is NOT
+    exempt and gets 401 JSON when anonymous, never a /login redirect — #172:
+    a redirect cached against an <img> URL poisons the browser cache). The
+    role list is every dashboard role, spelled out so a future restricted
+    role does not inherit artifact access silently."""
+    target = _safe_artifact_path(relpath)
+    if target is None:
+        return jsonify({"error": "not found"}), 404
+    return send_file(str(target))
+
+
+@app.route('/worker-app-manifest.json')
+def worker_app_manifest():
+    """Worker-app PWA manifest — public shell file (code/config, no data).
+    Public-exact in auth.py (#248); needs an explicit route because the
+    hardened catch-all below denies .json by design."""
+    resp = send_file(str(SCRIPT_DIR / 'worker-app-manifest.json'), max_age=0)
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+    return resp
+
+
+@app.route('/worker-app-sw.js')
+def worker_app_sw():
+    """Worker-app service worker — public shell file. Explicit route for the
+    same reason as the manifest; the after_request hook already no-caches
+    *-sw.js so updates reach devices."""
+    return send_file(str(SCRIPT_DIR / 'worker-app-sw.js'))
 
 
 @app.route('/<path:filename>')
 def static_files(filename):
-    """Serve any other file in the outputs folder by name (e.g. /DCR-FR-BX-001-2026-05-05-internal.html, /drop_plans/DP-001.html)"""
-    file_path = SCRIPT_DIR / filename
-    if file_path.exists() and file_path.is_file():
-        return send_file(str(file_path))
-    return jsonify({"error": "File not found", "path": filename}), 404
+    """Authed catch-all for legacy root outputs by name (e.g.
+    /DCR-FR-BX-001-2026-05-05-internal.html, /drop_plans/DP-001.html,
+    /rfi_submission_form.html). #248: allowlist by construction — root-level
+    files plus _ROOT_SERVE_DIRS, artifact extensions only, traversal-proof.
+    Sensitive trees (data_room/, worker_records/, tests/, ...) are not
+    reachable here: data_room artifacts go through /project-files/, worker
+    files through /worker-files/."""
+    parts = _split_safe_rel(filename)
+    if parts is None:
+        return jsonify({"error": "File not found", "path": filename}), 404
+    if len(parts) > 1 and parts[0] not in _ROOT_SERVE_DIRS:
+        return jsonify({"error": "File not found", "path": filename}), 404
+    candidate = SCRIPT_DIR.joinpath(*parts)
+    if candidate.suffix.lower() not in _ARTIFACT_EXTENSIONS:
+        return jsonify({"error": "File not found", "path": filename}), 404
+    try:
+        resolved = candidate.resolve()
+        if not resolved.is_relative_to(SCRIPT_DIR.resolve()):
+            return jsonify({"error": "File not found", "path": filename}), 404
+    except OSError:
+        return jsonify({"error": "File not found", "path": filename}), 404
+    if not resolved.is_file():
+        return jsonify({"error": "File not found", "path": filename}), 404
+    return send_file(str(resolved))
 
 
 @app.after_request

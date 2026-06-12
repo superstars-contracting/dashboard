@@ -21,7 +21,7 @@ RESETS (FR-BX-001 only):
 
 Safety (per CLAUDE.md snapshot rule + Build-a-Layer Playbook non-negotiables):
   1. Snapshots superstars.db FIRST, before any write, to
-     data_room/db_backups/superstars-pre-dropplan-reset-<localstamp>.db,
+     ../snapshots/superstars-pre-dropplan-reset-<localstamp>.db,
      and aborts if the snapshot is missing/empty.
   2. All mutations run in a single transaction (BEGIN IMMEDIATE) — a failure
      rolls the whole reset back, leaving the DB untouched.
@@ -46,7 +46,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DB = SCRIPT_DIR / "superstars.db"
-BACKUPS = SCRIPT_DIR / "data_room" / "db_backups"
+BACKUPS = SCRIPT_DIR.parent / "snapshots"  # #248: snapshots live OUTSIDE the project root (never servable)
 PROJECT = "FR-BX-001"
 
 # rows of this project's drops — the scope for the child tables

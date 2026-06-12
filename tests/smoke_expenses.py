@@ -75,7 +75,7 @@ def db():
 
 def snapshot():
     ts = time.strftime("%Y%m%d-%H%M%S")
-    dest = SCRIPT_DIR / "data_room" / "db_backups" / f"superstars-pre-{ts}-smoke-expenses.db"
+    dest = SCRIPT_DIR.parent / "snapshots"  # #248: snapshots live OUTSIDE the project root (never servable) / f"superstars-pre-{ts}-smoke-expenses.db"
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(str(DB_PATH), str(dest))
     return dest.name

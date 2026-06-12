@@ -91,7 +91,7 @@ def fmt_lat(xs):
 
 def snapshot_db(label):
     ts = time.strftime("%Y%m%d-%H%M%S")
-    backups = SCRIPT_DIR / "data_room" / "db_backups"
+    backups = SCRIPT_DIR.parent / "snapshots"  # #248: snapshots live OUTSIDE the project root (never servable)
     backups.mkdir(parents=True, exist_ok=True)
     dest = backups / f"superstars-pre-{label}-{ts}.db"
     shutil.copy2(str(DB_PATH), str(dest))

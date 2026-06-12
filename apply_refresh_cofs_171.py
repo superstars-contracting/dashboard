@@ -86,13 +86,14 @@ def rerender_static_html(emp_id, card_row):
     if snap:
         full = SCRIPT_DIR / snap.lstrip("/")
         if full.exists():
-            photo_url = "/files/" + snap
+            # #248 — artifacts are served by the gated /project-files/ route
+            photo_url = "/project-files/" + snap
     sig_url = ""
     sig_path = card_row["signature_path"]
     if sig_path:
         sf = SCRIPT_DIR / sig_path.lstrip("/")
         if sf.exists():
-            sig_url = "/files/" + sig_path
+            sig_url = "/project-files/" + sig_path
     cnd = card_row["card_number_display"] or card_row["card_id"]
     ctx = {
         "NAME": emp["name"] or "",

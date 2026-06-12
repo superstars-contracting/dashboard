@@ -1087,7 +1087,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #247 · 2026-06-12 · PII — worker-create / profile responses carry no folder_path; gated routes only</div>
+          <div class="ph-build" id="ph-build-stamp">build #248 · 2026-06-12 · security — static serving restricted to vendored assets; artifacts gated via /project-files</div>
         </div>
       </section>
 
@@ -3652,7 +3652,7 @@
               <h2 style="margin-bottom:4px;">RFI Log</h2>
               <div id="rfi-reg-summary" style="font-size:12px;color:#76777E;">Loading…</div>
             </div>
-            <a href="/files/rfi_submission_form.html" target="_blank" style="font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:10px 18px;border:none;border-radius:4px;background:#B11E2E;color:white;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
+            <a href="/rfi_submission_form.html" target="_blank" style="font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:10px 18px;border:none;border-radius:4px;background:#B11E2E;color:white;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               New RFI
             </a>
@@ -4513,7 +4513,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
 // Templates grid below — colored left border by category (same _color
 // map), "CATEGORY · PDF" tag, bold title, "Open ↗" link, same grid — so
 // the two Templates sections match exactly. Loads /api/blank-forms; PDFs
-// open in a new tab via the /files/ static route (open/print intact).
+// open in a new tab via the gated /project-files/ route (open/print intact).
 (function() {
   const _esc = (s) => (s == null ? '' : String(s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'));
@@ -4565,7 +4565,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
 
 // ---- Templates page — Signage Templates subsection (#160) ----------
 // Card-grid library of standard site signs. Loads /api/signage-templates;
-// each PDF opens in a new tab via /files/data_room/signage/<filename>.
+// each PDF opens in a new tab via /project-files/data_room/signage/<filename>.
 (function() {
   const _esc = (s) => (s == null ? '' : String(s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'));

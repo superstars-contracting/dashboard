@@ -22,7 +22,9 @@ data_room/
   credentials/          Generated CoF + Company ID card HTML exports
     cof/                CoF cards by employee_id
     company_id/         Company ID cards by employee_id
-  db_backups/           Local DB snapshots (gitignored). See CONTEXT_HANDOFF.md.
+  (db_backups/ moved in #248 — DB snapshots now live OUTSIDE the project
+  root at C:\Users\SSC-Admin\Superstars\snapshots, never under a servable
+  tree. See CONTEXT_HANDOFF.md.)
 ```
 
 ## File Organization

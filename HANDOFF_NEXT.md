@@ -123,7 +123,8 @@ Validated-ceiling table in `TESTING_LIMITS.md`.
 ### Snapshot before any destructive op
 
 ```bash
-cp superstars.db "data_room/db_backups/superstars-pre-<op>-$(date +%Y%m%d-%H%M%S).db"
+# #248: snapshots live OUTSIDE the project root (never under a servable tree)
+cp superstars.db "../snapshots/superstars-pre-<op>-$(date +%Y%m%d-%H%M%S).db"
 ```
 
 ---

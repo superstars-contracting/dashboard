@@ -41,11 +41,17 @@ SESSION_TTL = timedelta(hours=12)  # sliding — refreshed on each authed reques
 
 # Paths that bypass auth entirely. Order: prefix match (startswith) for
 # wildcard buckets; exact match for single paths.
+#
+# #248 — the /files/ exemption narrowed to /files/static/ (vendored shell
+# assets only; the old whole-project mount let anyone download the DB and
+# source). /preview/ LOST its exemption: it serves rendered project
+# documents (internal DCRs etc.), so it now requires a session like every
+# other operator surface. Generated artifacts are served by the gated
+# /project-files/ route, which is intentionally NOT exempt.
 _PUBLIC_PREFIXES = (
     "/api/auth/",         # login, logout, me — see below for /me caveat
     "/api/worker/",       # worker-app PIN flow — unchanged
-    "/files/",            # Flask static_folder mount (CSS/JS/images for the shell)
-    "/preview/",          # browser preview blueprint — used for HTML iteration only on workstation
+    "/files/static/",     # vendored shell assets ONLY (css/js/fonts/vendor)
 )
 _PUBLIC_EXACT = {
     "/login",
@@ -54,6 +60,8 @@ _PUBLIC_EXACT = {
     "/worker-app",
     "/worker-app.html",
     "/api/worker-sign-in",
+    "/worker-app-manifest.json",  # PWA shell (#248) — code/config, no data
+    "/worker-app-sw.js",          # PWA shell (#248)
 }
 
 
@@ -298,6 +306,8 @@ def _wants_json(path: str) -> bool:
     if path.startswith("/api/"):
         return True
     if path.startswith("/worker-files/"):
+        return True
+    if path.startswith("/project-files/"):  # gated artifacts (#248) — same #172 rule
         return True
     accept = request.headers.get("Accept", "")
     return "application/json" in accept and "text/html" not in accept

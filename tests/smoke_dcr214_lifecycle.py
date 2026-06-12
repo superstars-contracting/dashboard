@@ -78,7 +78,7 @@ def db():
 
 def snapshot_db(label):
     ts = time.strftime("%Y%m%d-%H%M%S")
-    backups = SCRIPT_DIR / "data_room" / "db_backups"
+    backups = SCRIPT_DIR.parent / "snapshots"  # #248: snapshots live OUTSIDE the project root (never servable)
     backups.mkdir(parents=True, exist_ok=True)
     dest = backups / f"superstars-pre-{label}-{ts}.db"
     shutil.copy2(str(DB_PATH), str(dest))
@@ -290,7 +290,13 @@ def main():
     print(f"[snapshot] {snap.name}")
 
     real_set, real_n = real_baseline()
-    ok("baseline_16_real_dcrs", real_n == 16, f"found {real_n} (expected 16)")
+    # #248 fixture repair: the original assertion pinned the real-DCR count to
+    # the 16 that existed when #214 was written — it goes stale every time the
+    # operator issues a real DCR (25 found during build #248). The invariant
+    # that matters is identity preservation, asserted at cleanup
+    # (cleanup_real_count_restored / cleanup_real_set_identical); here we only
+    # sanity-check that we're on a real operator DB.
+    ok("baseline_real_dcrs_present", real_n >= 1, f"found {real_n} (expected >= 1)")
     worker = pick_worker()
     if not worker:
         print("ERROR: no active worker to seed labor"); return 2

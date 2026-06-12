@@ -409,13 +409,15 @@ def fetch_card_context(emp_id):
                 photo_url = f"data:{mime};base64,{b64}"
             except Exception:
                 photo_url = ""
-    # Signature
+    # Signature — vendored static/ assets stay on the public /files/static
+    # mount; anything else is a gated artifact (#248).
     sig_url = ""
     sig_path = card.get("signature_path") if cred_type == "cof" else None
     if sig_path:
         sf = SCRIPT_DIR / sig_path.lstrip("/")
         if sf.exists():
-            sig_url = "/files/" + sig_path
+            rel = sig_path.replace("\\", "/").lstrip("/")
+            sig_url = ("/files/" + rel) if rel.startswith("static/") else ("/project-files/" + rel)
 
     cnd = card.get("card_number_display") or card.get("card_id") or ""
     ctx = {
@@ -442,11 +444,17 @@ def render_card_html_to_pdf(html_text, base_url, output_pdf):
     and /worker-files/ URLs resolve via the running server."""
     profile = tempfile.mkdtemp(prefix="cred_print_")
     edge = find_edge()
-    # Write the HTML to a temp file; convert /worker-files/ + /files/
-    # URLs to fully-qualified http://127.0.0.1:5050/... so the headless
-    # Edge sandbox can fetch them (it can't talk to / by default).
+    # Write the HTML to a temp file; convert /worker-files/ + /files/ +
+    # /project-files/ URLs to fully-qualified http://127.0.0.1:5050/... so
+    # the headless Edge sandbox can fetch them (it can't talk to / by
+    # default). NOTE (#248): only /files/static/* is fetchable without a
+    # session — photos are inlined as data: URIs upstream precisely so the
+    # cookie-less Edge never needs a gated URL; the gated rewrites are
+    # belt-and-braces for any straggler (they 401 harmlessly).
     full_html = html_text.replace(
         'src="/worker-files/', f'src="{base_url}/worker-files/'
+    ).replace(
+        'src="/project-files/', f'src="{base_url}/project-files/'
     ).replace(
         'src="/files/', f'src="{base_url}/files/'
     )
@@ -757,6 +765,8 @@ def render_concat_cards_one_edge(card_htmls, base_url, output_pdf):
         # loopback prefix) is the same rewrite the per-card path uses.
         html = html.replace(
             'src="/worker-files/', f'src="{base_url}/worker-files/'
+        ).replace(
+            'src="/project-files/', f'src="{base_url}/project-files/'
         ).replace(
             'src="/files/', f'src="{base_url}/files/'
         )

@@ -190,12 +190,15 @@ You're picking up an established, secured, well-architected foundation. Build on
 
 On 2026-05-18 the working `superstars.db` was unexpectedly replaced with a 0-byte file under unclear circumstances mid-session; no backup existed, and the DB was rebuilt from `workers_import_template.csv` + the schema migrations. To prevent recurrence:
 
-**Manual snapshot before any destructive operation:**
+**Manual snapshot before any destructive operation** (#248: snapshots live
+OUTSIDE the project root — the old `data_room\db_backups` target sat inside
+the served tree and every snapshot was downloadable via the public /files
+mount):
 
 ```powershell
 $ts = Get-Date -Format yyyyMMdd-HHmmss
 Copy-Item C:\Users\SSC-Admin\Superstars\dashboard\superstars.db `
-          C:\Users\SSC-Admin\Superstars\dashboard\data_room\db_backups\superstars-checkpoint-$ts.db
+          C:\Users\SSC-Admin\Superstars\snapshots\superstars-checkpoint-$ts.db
 ```
 
 **Daily scheduled snapshot (set up 2026-05-18, runs 23:00 nightly):**
@@ -211,10 +214,10 @@ schtasks /Delete /TN "Superstars DB Snapshot" /F # remove if no longer needed
 ```powershell
 # 1. Stop the running Flask server first (Ctrl-C in its terminal)
 # 2. Pick a snapshot
-Get-ChildItem C:\Users\SSC-Admin\Superstars\dashboard\data_room\db_backups\ |
+Get-ChildItem C:\Users\SSC-Admin\Superstars\snapshots\ |
     Sort-Object LastWriteTime -Descending | Select-Object Name, Length, LastWriteTime
 # 3. Restore
-Copy-Item C:\Users\SSC-Admin\Superstars\dashboard\data_room\db_backups\<chosen-snapshot>.db `
+Copy-Item C:\Users\SSC-Admin\Superstars\snapshots\<chosen-snapshot>.db `
           C:\Users\SSC-Admin\Superstars\dashboard\superstars.db -Force
 # 4. Restart server
 ```
