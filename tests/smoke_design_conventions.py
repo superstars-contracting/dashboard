@@ -381,6 +381,70 @@ def main():
            "; ".join(hits[:3]) if hits else "clean")
     ok("i18n_guard_scanned_pages", scanned >= 1, f"{scanned} page(s) with an I18N dict")
 
+    # ---- 8) #242 — registered-surface coverage. The guard previously scanned
+    # ONLY the project dashboard, so the Workforce surface (company console)
+    # shipped off-system styling unnoticed. Every registered surface now gets
+    # the applicable checks, and a template registry forces NEW pages to opt in.
+    print("\n-- registered surfaces (#242) --")
+    console_html = requests.get(f"{BASE}/", timeout=20).text
+    console_inline = "\n".join(re.findall(r"<style[^>]*>(.*?)</style>", console_html, re.DOTALL))
+    console_css = css + "\n" + console_inline
+    console_root = parse_root_tokens(console_css)
+
+    # 8a. Workforce primary actions resolve to the shared accent (.btn-primary)
+    for name, bid in (("console_onboard_btn", "add-worker-btn"), ("console_modal_save", "modal-save")):
+        resolved, raw = button_bg(console_html, console_css, bid, console_root)
+        ok(name + "_visible", is_visible_bg(resolved), f"{bid}: {raw} -> {resolved}")
+        ok(name + "_is_accent", (resolved or "").lower() in ("#4364dc", "rgb(67,100,220)"),
+           f"{bid} -> {resolved}")
+
+    # 8b. no raw text-date inputs on the console
+    console_raws = raw_date_inputs(console_html)
+    ok("console_no_raw_date_inputs", len(console_raws) == 0,
+       ("found: " + "; ".join(console_raws)) if console_raws else "none")
+
+    # 8c. every date field in real (non-script) console markup is IDENTIFIED —
+    # a placeholder / data-i18n-ph, or an adjacent <label>. An unlabeled bare
+    # date box was the operator-reported Workforce-intake defect (#242).
+    nonscript = re.sub(r"<script\b.*?</script>", "", console_html, flags=re.DOTALL | re.IGNORECASE)
+    unlabeled = []
+    for m in re.finditer(r"<input[^>]*>", nonscript):
+        tag = m.group(0)
+        if ('type="date"' not in tag) and ("ssc-date" not in tag):
+            continue
+        if ("placeholder=" in tag) or ("data-i18n-ph=" in tag):
+            continue
+        if "<label" in nonscript[max(0, m.start() - 220):m.start()]:
+            continue
+        idm = re.search(r'id="([^"]+)"', tag)
+        unlabeled.append(idm.group(1) if idm else tag[:60])
+    ok("console_date_fields_identified", not unlabeled,
+       ("unlabeled: " + ", ".join(unlabeled)) if unlabeled else "all date fields labeled")
+
+    # 8d. intake-modal fields carry the shared boxed component (.ssc-field)
+    for fid in ("in-name", "in-dob", "in-trade", "in-phone", "in-hire-date", "in-email"):
+        fm = re.search(r'<(?:input|select|textarea)[^>]*id="' + re.escape(fid) + r'"[^>]*>', console_html)
+        ok("console_field_shared_" + fid, bool(fm) and "ssc-field" in (fm.group(0) if fm else ""),
+           (fm.group(0)[:80] if fm else "(not found)"))
+
+    # 8e. TEMPLATE REGISTRY — every repo-root page with form inputs must be
+    # REGISTERED (a live operator surface this guard covers) or explicitly
+    # EXEMPT (legacy, pre-rebuild artifacts). A new template that registers
+    # in neither fails the build — the forcing function that closes the
+    # "guard never looked here" gap for good.
+    REGISTERED = {"company-dashboard.html", "dashboard-static.html", "admin_labor_rates.html",
+                  "login.html", "worker-app.html", "dropplan.html", "rfi_submission_form.html"}
+    EXEMPT = {"facade-dashboard.html", "facade-dashboard-presentation.html"}  # pre-rebuild legacy
+    unregistered = []
+    for page in sorted(root_dir.glob("*.html")):
+        if page.name in REGISTERED or page.name in EXEMPT:
+            continue
+        if re.search(r"<(?:input|select|textarea)\b", page.read_text(encoding="utf-8", errors="replace")):
+            unregistered.append(page.name)
+    ok("templates_registered_or_exempt", not unregistered,
+       ("REGISTER OR EXEMPT: " + ", ".join(unregistered)) if unregistered
+       else f"{len(REGISTERED)} registered / {len(EXEMPT)} exempt")
+
     print(f"\n== RESULT: {len(PASS)} PASS / {len(FAIL)} FAIL ==")
     if FAIL:
         print("FAILURES: " + ", ".join(FAIL))

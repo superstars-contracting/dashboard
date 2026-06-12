@@ -150,19 +150,39 @@
   .modal { background: white; border-radius: 12px; max-width: 760px; width: 100%; padding: 24px 28px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
   .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
   .modal-close { background: none; border: none; font-size: 28px; color: var(--mute); cursor: pointer; line-height: 1; }
-  .form-section-label { font-size: 12px; font-weight: 700; color: var(--mute); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  /* #242 — step labels in the accent; fields use the shared .ssc-field component */
+  .form-section-label { font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
   .form-grid { display: grid; gap: 12px; margin-bottom: 10px; align-items: start; }
-  .form-grid input, .form-grid select { padding: 10px; border: 1px solid var(--hairline); border-radius: 6px; font-size: 14px; font-family: inherit; }
   .modal-footer { display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--hairline); padding-top: 16px; margin-top: 16px; }
 
   /* ==== PLACEHOLDER ==== */
   .placeholder { padding: 30px; text-align: center; color: var(--mute); font-style: italic; border: 1px dashed var(--hairline); border-radius: 8px; }
 
-  .badge-pill { display: inline-block; font-size: 9px; padding: 2px 8px; border-radius: 99px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: white; }
-  .badge-pill.ok { background: var(--ok); }
-  .badge-pill.warn { background: var(--warn); }
-  .badge-pill.bad { background: var(--bad); }
-  .badge-pill.mute { background: var(--mute); }
+  /* #242 — tinted status chips (soft bg + saturated text), never solid fills.
+     PENDING moved off dead gray onto the oat (not-started) family. */
+  .badge-pill { display: inline-block; font-size: 9px; padding: 2px 8px; border-radius: 99px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+  .badge-pill.ok { color: var(--status-complete); background: var(--status-complete-soft); }
+  .badge-pill.warn { color: #8a6516; background: rgba(186,136,56,.16); }
+  .badge-pill.bad { color: var(--status-behind); background: var(--status-behind-soft); }
+  .badge-pill.mute { color: #8a8064; background: var(--status-oat-soft); }
+
+  /* ==== #242 — Workforce reskin on the shared design system ==== */
+  table.roster .wf-id { font-weight: 700; color: var(--accent); }
+  table.roster td.wf-phone { font-variant-numeric: tabular-nums; font-size: 12px; }
+  /* trade chips — NON-SEMANTIC palette (same family as the project page's
+     EC_PALETTE): Superintendent slate, Mechanic teal, Laborer violet,
+     other trades indigo, missing oat-soft. Soft tint bg + saturated text. */
+  .wf-chip { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+  .wf-chip.sup { color: #475569; background: rgba(71,85,105,.12); }
+  .wf-chip.mech { color: #0E7490; background: rgba(14,116,144,.12); }
+  .wf-chip.lab { color: #6D28D9; background: rgba(109,40,217,.10); }
+  .wf-chip.oth { color: #4F46E5; background: rgba(79,70,229,.10); }
+  .wf-chip.none { color: #8a8064; background: var(--status-oat-soft); }
+  /* boxed ghost ACTION buttons; the issue variant is azure-tinted (the
+     outstanding-action affordance) */
+  .cred-btn { background: #fff; border: 1px solid var(--line); color: var(--ink); font-size: 11px; padding: 4px 10px; border-radius: 8px; cursor: pointer; white-space: nowrap; font-weight: 600; font-family: inherit; }
+  .cred-btn:hover { border-color: var(--accent-edge); color: var(--accent); }
+  .cred-btn.issue { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-edge); }
 
   /* ==== #240 — console layout: grid lives in the Projects tab ==== */
   /* Reset layout is a button flavored as the existing .cc-action component. */
@@ -343,12 +363,11 @@
           <div class="h2-sub" data-i18n="p-workforce-sub">All workers in the company. Add new workers here — they join the master roster and can be assigned to any project.</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <button class="btn" id="print-all-ids-btn"
-                  style="display:none;background:white;color:var(--ink);border:1px solid var(--border);"
+          <button class="btn-ghost" id="print-all-ids-btn" style="display:none;" data-i18n="btn-print-ids"
                   title="Generate one printable PDF with every worker's credential — CoF for field workers, Company ID for the rest. Admin/C-Suite only.">
             🖨 Print All IDs
           </button>
-          <button class="btn" id="add-worker-btn" data-i18n="btn-onboard">+ ONBOARD</button>
+          <button class="btn-primary" id="add-worker-btn" data-i18n="btn-onboard">+ ONBOARD</button>
         </div>
       </div>
 
@@ -917,25 +936,26 @@
 
     <div class="form-section-label" data-i18n="modal-step1">Step 1 · Worker Identity</div>
     <div class="form-grid" style="grid-template-columns:2fr 1fr;">
-      <input id="in-name" type="text" data-i18n-ph="ph-name" placeholder="Full Legal Name *">
-      <input id="in-dob" type="date" data-ssc-max="today">
+      <input id="in-name" class="ssc-field" type="text" data-i18n-ph="ph-name" placeholder="Full Legal Name *">
+      <!-- #242 — writes employees.dob (verified: intake save posts dob from this field) -->
+      <input id="in-dob" class="ssc-field" type="date" data-ssc-max="today" data-i18n-ph="ph-dob" placeholder="Date of Birth · MM-DD-YYYY">
     </div>
     <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
-      <input id="in-trade" type="text" data-i18n-ph="ph-trade" placeholder="Trade (e.g. Mason, Rigger)">
-      <select id="in-language">
+      <input id="in-trade" class="ssc-field" type="text" data-i18n-ph="ph-trade" placeholder="Trade (e.g. Mason, Rigger)">
+      <select id="in-language" class="ssc-field">
         <option value="" data-i18n="opt-language">Language</option>
         <option value="en" data-i18n="opt-en">English</option>
         <option value="es" data-i18n="opt-es">Spanish</option>
         <option value="pl" data-i18n="opt-pl">Polish</option>
         <option value="other" data-i18n="opt-other">Other</option>
       </select>
-      <input id="in-phone" type="tel" data-i18n-ph="ph-phone" placeholder="Mobile Phone">
+      <input id="in-phone" class="ssc-field" type="tel" data-i18n-ph="ph-phone" placeholder="Mobile Phone">
     </div>
     <div class="form-grid" style="grid-template-columns:2fr 1fr 1fr;">
-      <input id="in-ec-name" type="text" data-i18n-ph="ph-ec-name" placeholder="Emergency Contact Name">
-      <input id="in-ec-phone" type="tel" data-i18n-ph="ph-ec-phone" placeholder="Emergency Phone">
+      <input id="in-ec-name" class="ssc-field" type="text" data-i18n-ph="ph-ec-name" placeholder="Emergency Contact Name">
+      <input id="in-ec-phone" class="ssc-field" type="tel" data-i18n-ph="ph-ec-phone" placeholder="Emergency Phone">
       <div style="display:flex;flex-direction:column;gap:6px;">
-        <select id="in-ec-relation" data-relation-select="in-ec-relation-other">
+        <select id="in-ec-relation" class="ssc-field" data-relation-select="in-ec-relation-other">
           <option value="" data-i18n="opt-rel-placeholder">Relation</option>
           <option value="Spouse" data-i18n="opt-rel-spouse">Spouse</option>
           <option value="Partner" data-i18n="opt-rel-partner">Partner</option>
@@ -947,7 +967,7 @@
           <option value="Friend" data-i18n="opt-rel-friend">Friend</option>
           <option value="Other" data-i18n="opt-rel-other">Other</option>
         </select>
-        <input id="in-ec-relation-other" type="text" data-i18n-ph="ph-ec-relation-other" placeholder="Specify relation…" style="display:none;">
+        <input id="in-ec-relation-other" class="ssc-field" type="text" data-i18n-ph="ph-ec-relation-other" placeholder="Specify relation…" style="display:none;">
       </div>
     </div>
     <!-- WF-3: PIN field removed — PIN is now derived server-side from the
@@ -955,27 +975,27 @@
          + PATCH /api/employees endpoints both run the same derivation, so
          single-onboards / edits / bulk imports stay consistent. -->
     <div class="form-grid" style="grid-template-columns:1fr 1fr;">
-      <input id="in-hire-date" type="date" data-i18n-ph="ph-hire-date" placeholder="Onboard Date">
-      <input id="in-email" type="email" data-i18n-ph="ph-email" placeholder="Email (optional)">
+      <input id="in-hire-date" class="ssc-field" type="date" data-i18n-ph="ph-hire-date" placeholder="Onboard Date · MM-DD-YYYY">
+      <input id="in-email" class="ssc-field" type="email" data-i18n-ph="ph-email" placeholder="Email (optional)">
     </div>
 
     <div style="margin-top:18px;">
       <div class="form-section-label" data-i18n="modal-step2">Step 2 · Project Assignment</div>
-      <div id="project-checks" style="background:#FAF7F1;padding:12px 14px;border-radius:6px;font-size:13px;color:#76777E;" data-i18n="loading-projects">
+      <div id="project-checks" style="background:var(--accent-soft);border:1px solid var(--accent-edge);padding:12px 14px;border-radius:9px;font-size:13px;color:#76777E;" data-i18n="loading-projects">
         Loading projects…
       </div>
     </div>
 
     <div style="margin-top:18px;">
       <div class="form-section-label" data-i18n="modal-step3">Step 3 · After Save</div>
-      <div style="font-size:12px;color:#76777E;background:#FAF7F1;padding:10px 12px;border-radius:6px;line-height:1.5;" data-i18n="modal-step3-text">
+      <div style="font-size:12px;color:#76777E;background:var(--status-oat-soft);padding:10px 12px;border-radius:9px;line-height:1.5;" data-i18n="modal-step3-text">
         <strong style="color:#14161C;">After Save</strong>, the worker's folder is created. You can then upload scans (DL, SST, cert cards) and add cert details from their profile view.
       </div>
     </div>
 
     <div class="modal-footer">
-      <button class="btn btn-outline" id="modal-cancel" data-i18n="btn-cancel">Cancel</button>
-      <button class="btn" id="modal-save" data-i18n="btn-save-worker">Save Worker</button>
+      <button class="btn-ghost" id="modal-cancel" data-i18n="btn-cancel">Cancel</button>
+      <button class="btn-primary" id="modal-save" data-i18n="btn-save-worker">Save Worker</button>
     </div>
   </div>
 </div>
@@ -1025,6 +1045,8 @@ const I18N = {
     'p-workforce-title': 'Workforce',
     'p-workforce-sub': 'All workers in the company. Add new workers here — they join the master roster and can be assigned to any project.',
     'btn-onboard': '+ ONBOARD',
+    'btn-print-ids': '🖨 Print All IDs',
+    'ph-dob': 'Date of Birth · MM-DD-YYYY',
     'col-worker-id': 'Worker ID',
     'col-name': 'Name',
     'col-trade': 'Trade',
@@ -1097,7 +1119,7 @@ const I18N = {
     'opt-rel-other-relative': 'Other relative',
     'opt-rel-friend': 'Friend',
     'opt-rel-other': 'Other',
-    'ph-hire-date': 'Onboard Date',
+    'ph-hire-date': 'Onboard Date · MM-DD-YYYY',
     'ph-pin': 'App PIN (4 digits)',
     'ph-email': 'Email (optional)',
     'btn-cancel': 'Cancel',
@@ -1143,6 +1165,8 @@ const I18N = {
     'p-workforce-title': 'Personal',
     'p-workforce-sub': 'Todos los trabajadores de la empresa. Agrega nuevos trabajadores aquí — se unirán al registro maestro y podrán ser asignados a cualquier proyecto.',
     'btn-onboard': '+ Incorporar',
+    'btn-print-ids': '🖨 Imprimir IDs',
+    'ph-dob': 'Fecha de Nacimiento · MM-DD-YYYY',
     'col-worker-id': 'ID del Trabajador',
     'col-name': 'Nombre',
     'col-trade': 'Oficio',
@@ -1215,7 +1239,7 @@ const I18N = {
     'opt-rel-other-relative': 'Otro familiar',
     'opt-rel-friend': 'Amigo/a',
     'opt-rel-other': 'Otro',
-    'ph-hire-date': 'Fecha de Onboarding',
+    'ph-hire-date': 'Fecha de Onboarding · MM-DD-YYYY',
     'ph-pin': 'PIN (4 dígitos)',
     'ph-email': 'Correo electrónico (opcional)',
     'btn-cancel': 'Cancelar',
@@ -1475,33 +1499,33 @@ applyLanguage();
     // treated as superseded — not shown in the action.
     const elig = r.eligibility;
     const cur = r.current_credential;
-    const baseStyle = 'background:none;border:1px solid #E8E4DD;color:#B11E2E;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;font-weight:600;';
+    // #242 — buttons are class-styled (.cred-btn / .cred-btn.issue), no inline paint.
     const safeEmp = esc(r.employee_id);
     if (!elig) {
       // Defensive: missing eligibility (older data / schema lag)
-      return `<button class="cred-btn" data-action="unknown" style="background:none;border:1px solid #E8E4DD;color:#76777E;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;font-weight:600;">—</button>`;
+      return `<button class="cred-btn" data-action="unknown">—</button>`;
     }
     // 1. Active CoF wins regardless of current eligibility. If the worker
     //    later loses the prereq, the existing CoF stays valid until the
     //    operator manually revokes it via the profile / credential UI.
     if (cur && cur.type === 'cof') {
       const urlEsc = esc(cur.html_url || '');
-      return `<button class="cred-btn" data-action="view" data-html-url="${urlEsc}" style="${baseStyle}">View CoF</button>`;
+      return `<button class="cred-btn" data-action="view" data-html-url="${urlEsc}">View CoF</button>`;
     }
     // 2. Active Company ID, worker is now CoF-eligible: offer to UPGRADE.
     //    issue_cof on the server marks the existing Company ID as replaced
     //    (CoF supersedes Company ID).
     if (cur && cur.type === 'company_id' && elig === 'cof') {
-      return `<button class="cred-btn" data-action="issue" data-emp="${safeEmp}" data-elig="cof" data-supersede="true" data-old-type="company_id" style="${baseStyle}">Issue CoF</button>`;
+      return `<button class="cred-btn issue" data-action="issue" data-emp="${safeEmp}" data-elig="cof" data-supersede="true" data-old-type="company_id">Issue CoF</button>`;
     }
     // 3. Active Company ID, worker still not CoF-eligible.
     if (cur && cur.type === 'company_id') {
       const urlEsc = esc(cur.html_url || '');
-      return `<button class="cred-btn" data-action="view" data-html-url="${urlEsc}" style="${baseStyle}">View Company ID</button>`;
+      return `<button class="cred-btn" data-action="view" data-html-url="${urlEsc}">View Company ID</button>`;
     }
     // 4. No active credential. Issue per eligibility.
     const eligLabel = credLabel(elig);
-    return `<button class="cred-btn" data-action="issue" data-emp="${safeEmp}" data-elig="${elig}" data-supersede="false" style="${baseStyle}">Issue ${eligLabel}</button>`;
+    return `<button class="cred-btn issue" data-action="issue" data-emp="${safeEmp}" data-elig="${elig}" data-supersede="false">Issue ${eligLabel}</button>`;
   }
 
   async function postIssueCredential(empId, workerName, elig, override) {
@@ -1548,6 +1572,18 @@ applyLanguage();
     postIssueCredential(empId, workerName, elig, !!supersede);
   }
 
+  // #242 — trade -> non-semantic chip (slate/teal/violet; indigo for other
+  // trades; oat-soft when missing). Color is category identity, never status.
+  function tradeChip(trade) {
+    const t = (trade || '').trim();
+    if (!t || t === '—') return '<span class="wf-chip none">—</span>';
+    const k = t.toLowerCase();
+    const cls = k.includes('superintendent') ? 'sup'
+              : k.includes('mechanic') ? 'mech'
+              : k.includes('laborer') ? 'lab' : 'oth';
+    return `<span class="wf-chip ${cls}">${esc(t)}</span>`;
+  }
+
   // Load workforce
   async function loadWorkforce() {
     try {
@@ -1565,11 +1601,11 @@ applyLanguage();
         const status = (r.intake_status === 'complete') ? '<span class="badge-pill ok">Complete</span>' : '<span class="badge-pill mute">Pending</span>';
         const safeId = esc(r.employee_id);
         return `<tr data-emp="${safeId}" data-name="${esc(r.name || '')}">
-          <td style="font-weight:700;color:#B11E2E;">${esc(r.worker_id || '—')}</td>
+          <td class="wf-id">${esc(r.worker_id || '—')}</td>
           <td style="font-weight:600;">${esc(r.name || '—')}</td>
-          <td>${esc(r.trade || '—')}</td>
+          <td>${tradeChip(r.trade)}</td>
           <td style="font-size:11px;text-transform:uppercase;color:#76777E;">${esc((r.language || '—').toUpperCase().slice(0,2))}</td>
-          <td style="font-family:monospace;font-size:11px;">${esc(formatPhone(r.phone))}</td>
+          <td class="wf-phone">${esc(formatPhone(r.phone))}</td>
           <td style="text-align:center;">${r.doc_count}</td>
           <td style="text-align:center;">${r.cert_count}</td>
           <td style="text-align:center;">${health}</td>
@@ -3584,7 +3620,7 @@ applyLanguage();
 })();
 </script>
 
-<div class="container"><div class="ph-build" id="cc-build-stamp">build #240 · 2026-06-10 · Console layout — tabs under KPIs · Active Projects first · widget grid in Projects tab · Reset in Quick Actions</div></div>
+<div class="container"><div class="ph-build" id="cc-build-stamp">build #242 · 2026-06-12 · Workforce on the design system — Lumen ids · trade chips · tinted badges · shared boxed intake fields · guard covers the console</div></div>
 
 <script>
 /* ===== Company console widgets (#210) — live data + reused #209 drag framework.
