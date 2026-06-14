@@ -385,7 +385,20 @@ def scrub_paths(obj):
     return obj
 
 def response_wrapper(data, count=None):
-    """Wrap response with metadata"""
+    """Wrap response with metadata.
+
+    #251 — defense-in-depth for the CLAUDE.md PII rule: every wrapped payload is
+    run through scrub_paths(), so a path-bearing key (folder_path,
+    face_image_path, scan_path, ...) can NEVER reach JSON — even if a response
+    site spreads a raw DB row (SELECT *) and forgets the manual scrub. This makes
+    "no filesystem path on the wire" a STRUCTURAL invariant instead of per-site
+    discipline (the #247 model relied on ~16 hand-placed scrub_paths calls being
+    complete and every future endpoint remembering). Files cross the wire via
+    gated id-based routes only; the per-site scrub_paths calls stay as
+    belt-and-suspenders (idempotent). count is unaffected — scrub drops dict keys,
+    never list elements.
+    """
+    scrub_paths(data)
     return jsonify({
         "data": data,
         "meta": {
