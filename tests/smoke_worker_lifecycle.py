@@ -73,9 +73,17 @@ def numerically_sorted(ids):
 
 
 def add_rate(worker_id):
+    # #251 — effective from the CURRENT WEEK'S MONDAY, not today(). The payroll
+    # check (step 4) queries week_start=Monday; a rate effective "today" isn't in
+    # force on the earlier days of the week, so on any non-Monday the grid reports
+    # rate_not_set and payroll_rate_resolves false-failed (it failed on Sun
+    # 2026-06-14 exactly this way). Anchoring the rate to the queried week-start
+    # makes resolution deterministic every weekday while still genuinely
+    # exercising rate resolution (the rate must still resolve in the grid).
+    week_start = (date.today() - timedelta(days=date.today().weekday())).isoformat()
     return requests.post(f"{BASE}/api/labor-rates/state", json={
         "worker_id": worker_id, "trade": "Laborer", "rate": FAKE_RATE,
-        "effective_date": date.today().isoformat(), "status": "active"}, timeout=15)
+        "effective_date": week_start, "status": "active"}, timeout=15)
 
 
 def _purge_synthetic(conn):

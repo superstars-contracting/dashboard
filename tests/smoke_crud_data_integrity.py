@@ -24,6 +24,7 @@ booleans are printed. No names, no phones, no PINs.
 import io
 import json
 import os
+import re
 import sqlite3
 import string
 import sys
@@ -49,6 +50,23 @@ D_MID = "2026-05-10"
 D_LATE = "2026-05-21"
 
 # ---------- Helpers ----------
+
+# #251 — the no-filesystem-path-on-the-wire contract (CLAUDE.md PII rule),
+# enforced structurally by response_wrapper's scrub_paths. Same key pattern as
+# the gate's response-path guard (tests/_smoke_auth.py): a bare 'folder' or any
+# key ending in path/file_path/filepath. Returns True if ANY such key is present
+# anywhere in the payload — never returns values (PII discipline).
+_PATH_KEY_RE = re.compile(r"(?i)(^|_)(file_?path|filepath|path|folder)$")
+
+
+def has_path_key(obj):
+    if isinstance(obj, dict):
+        return any((isinstance(k, str) and _PATH_KEY_RE.search(k)) or has_path_key(v)
+                   for k, v in obj.items())
+    if isinstance(obj, list):
+        return any(has_path_key(v) for v in obj)
+    return False
+
 
 def db():
     conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
@@ -368,15 +386,27 @@ def test_face_photo(real_emp_id):
         add_note(r, "synth worker create failed")
         return r
     try:
-        # CREATE — upload
+        # CREATE — upload. #251: the response must carry the GATED image_url and
+        # NO *_path key (the #247/#251 PII contract, now enforced structurally by
+        # response_wrapper.scrub_paths). The old code read face_image_path off the
+        # worker GET — a key the PII fix deliberately removed — which KeyError'd
+        # this whole section every run since #247. The test now PROTECTS the fix:
+        # it fails if a path key reappears, and confirms the photo is reachable
+        # via the gated id-based route instead of a filesystem path.
         files = {"file": ("smoke_face.jpg", make_jpeg_bytes(), "image/jpeg")}
         up = requests.post(
             f"{BASE}/api/employees/{syn_id}/face-photo",
             files=files, timeout=15,
         )
+        up_json = up.json() if up.headers.get("Content-Type", "").startswith("application/json") else {}
+        img_url = (up_json.get("data") or {}).get("image_url") or up_json.get("image_url")
+        served = bool(img_url) and requests.get(f"{BASE}{img_url}", timeout=10).status_code == 200
         g = requests.get(f"{BASE}/api/workers/{syn_id}", timeout=10)
-        new_path = g.json()["data"]["employee"]["face_image_path"] if g.status_code == 200 else None
-        r.create = (up.status_code == 200 and bool(new_path))
+        g_json = g.json() if g.status_code == 200 else {}
+        no_path = (g.status_code == 200) and not has_path_key(g_json) and not has_path_key(up_json)
+        r.create = (up.status_code == 200 and bool(img_url) and served and no_path)
+        if not r.create:
+            add_note(r, f"upload={up.status_code} img_url={bool(img_url)} served={served} no_path={no_path}")
         # EDIT = re-upload (overwrites)
         up2 = requests.post(
             f"{BASE}/api/employees/{syn_id}/face-photo",
