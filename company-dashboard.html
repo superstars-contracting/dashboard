@@ -208,6 +208,54 @@
   .cl-ref:hover { background: var(--accent-in); border-color: var(--accent); }
   #cert-lib-tbody tr:not(.cl-cat):hover td { background: var(--accent-soft); }
 
+  /* ==== #250 — Worker Profile modal: Lumen+Oat (:root tokens only) ==== */
+  /* Chrome: 16px radius on the slide-in edge + the 3px azure->soft gradient
+     top hairline (the established crafted-card treatment). */
+  .pp-panel { display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 720px; max-width: 100vw; background: #fff;
+    z-index: 1000; box-shadow: -8px 0 30px rgba(0,0,0,0.15); overflow-y: auto; border-radius: 16px 0 0 16px; }
+  .pp-panel::before { content: ''; display: block; height: 3px; background: linear-gradient(90deg, var(--accent), var(--accent-soft)); }
+  .pp-head { padding: 20px 28px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; background: #fff; z-index: 5; }
+  .pp-wid { font-size: 11px; color: var(--accent); letter-spacing: 1px; text-transform: uppercase; font-weight: 700; }
+  .pp-name-h { font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 24px; font-weight: 700; margin-top: 4px; }
+  .pp-close { background: none; border: none; font-size: 30px; color: var(--muted); cursor: pointer; line-height: 1; }
+  .pp-body { padding: 24px 28px; }
+  .pp-h3 { font-size: 14px; font-weight: 700; color: var(--ink); text-transform: uppercase; letter-spacing: 0.5px; }
+  .pp-sec { margin-bottom: 24px; }
+  .pp-sec-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+  .pp-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  /* Info card (view) + edit card — the oat-soft family, labels oat-ink small-caps */
+  .pp-card { background: var(--status-oat-soft); border-radius: 10px; padding: 14px 16px; margin-bottom: 24px; font-size: 13px; }
+  .pp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; }
+  .pp-grid-edit { gap: 12px 24px; align-items: start; }
+  .pp-label { color: var(--oat-ink); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 2px; }
+  .pp-span2 { grid-column: 1 / span 2; }
+  .pp-err { color: var(--status-behind); font-size: 12px; margin-top: 12px; display: none; font-weight: 600; }
+  .pp-foot { margin-top: 14px; display: flex; gap: 8px; justify-content: flex-end; }
+  /* Face-photo strip — lumen-ghost wash with a soft azure border; the dashed
+     empty slot stays dashed (white well so the hint inside stays legible). */
+  .pp-photo-strip { background: var(--accent-soft); border: 1px solid var(--accent-edge); border-radius: 10px; padding: 14px;
+    display: flex; align-items: center; gap: 14px; }
+  .pp-face-slot { width: 96px; height: 96px; border: 2px dashed var(--accent-edge); border-radius: 8px; background: #fff;
+    display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 11px; text-align: center; flex-shrink: 0; }
+  .pp-photo-hint { font-size: 12px; color: var(--accent-ink); }
+  .pp-pending-hint { font-size: 11px; color: var(--muted); font-style: italic; }
+  /* Document dropzones — the shared .dropzone component; titles azure;
+     hover = azure border + deeper lumen wash (the #249 hover convention). */
+  .pp-drop { margin-bottom: 0; }  /* the shared component's 13px belongs to single-column uploaders, not this grid */
+  .pp-drop b { color: var(--accent); }
+  .pp-drop:hover { border-color: var(--accent); background: var(--accent-in); }
+  /* Destructive affordances — status color, never brand red */
+  .btn-ghost.pp-danger { color: var(--status-behind); }
+  .pp-x { background: none; border: none; color: var(--status-behind); font-size: 18px; cursor: pointer; flex-shrink: 0; padding: 0 4px; }
+  .cred-btn.pp-danger { color: var(--status-behind); }
+  /* Cert + document line items */
+  .pp-cert-card { display: flex; gap: 12px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: #fff; }
+  .pp-doc-card { display: flex; gap: 12px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 9px; margin-bottom: 6px; }
+  .pp-thumb { object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+  .pp-noscan { background: var(--status-oat-soft); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--oat-ink); flex-shrink: 0; }
+  .pp-empty { color: var(--muted); font-style: italic; }
+
   /* ==== #240 — console layout: grid lives in the Projects tab ==== */
   /* Reset layout is a button flavored as the existing .cc-action component. */
   button.cc-action { font-family: inherit; cursor: pointer; width: 100%; }
@@ -874,48 +922,53 @@
 
 <!-- WORKER PROFILE PANEL (slide-in from right) -->
 <div id="profile-bg" style="display:none;position:fixed;inset:0;background:rgba(20,22,28,0.5);z-index:999;"></div>
-<div id="profile-panel" style="display:none;position:fixed;top:0;right:0;bottom:0;width:720px;max-width:100vw;background:white;z-index:1000;box-shadow:-8px 0 30px rgba(0,0,0,0.15);overflow-y:auto;">
-  <div style="padding:20px 28px;border-bottom:1px solid #E8E4DD;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:white;z-index:5;">
+<!-- #250 — Lumen+Oat reskin: chrome/buttons/fields moved onto the shared
+     design system (:root tokens, .btn-primary/.btn-ghost/.ssc-field/.dropzone).
+     Icon markup is UNCHANGED by operator constraint — only the buttons around
+     the existing SVGs were restyled. -->
+<div id="profile-panel" class="pp-panel">
+  <div class="pp-head">
     <div>
-      <div style="font-size:11px;color:#76777E;letter-spacing:1px;text-transform:uppercase;font-weight:700;" id="pp-id">—</div>
-      <h2 style="font-family:'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:24px;font-weight:700;margin-top:4px;"><span id="pp-name">—</span><span id="pp-inactive-badge" class="badge-pill mute" style="display:none;margin-left:10px;vertical-align:6px;">Inactive</span></h2>
+      <div class="pp-wid" id="pp-id">—</div>
+      <h2 class="pp-name-h"><span id="pp-name">—</span><span id="pp-inactive-badge" class="badge-pill mute" style="display:none;margin-left:10px;vertical-align:6px;">Inactive</span></h2>
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
-      <button id="pp-edit-btn" style="background:#B11E2E;color:white;border:none;padding:6px 14px;border-radius:4px;font-size:12px;cursor:pointer;font-weight:600;letter-spacing:0.5px;">Edit</button>
-      <button id="pp-close" style="background:none;border:none;font-size:30px;color:#76777E;cursor:pointer;line-height:1;">×</button>
+      <button id="pp-edit-btn" class="btn-primary" data-i18n="btn-edit">Edit</button>
+      <button id="pp-close" class="pp-close">×</button>
     </div>
   </div>
 
-  <div style="padding:24px 28px;">
+  <div class="pp-body">
 
     <!-- Info card (read-only view) -->
-    <div id="pp-info-card" style="background:#FAF7F1;border-radius:8px;padding:14px 16px;margin-bottom:24px;font-size:13px;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
-        <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Trade</span><strong id="pp-trade">—</strong></div>
-        <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Language</span><strong id="pp-lang">—</strong></div>
-        <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Phone</span><strong id="pp-phone">—</strong></div>
-        <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">DOB</span><strong id="pp-dob">—</strong></div>
-        <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Emergency</span><strong id="pp-ec">—</strong></div>
-        <div><span style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Onboarded</span><strong id="pp-hire">—</strong></div>
+    <div id="pp-info-card" class="pp-card">
+      <div class="pp-grid">
+        <div><span class="pp-label" data-i18n="pp-lbl-trade">Trade</span><strong id="pp-trade">—</strong></div>
+        <div><span class="pp-label" data-i18n="pp-lbl-language">Language</span><strong id="pp-lang">—</strong></div>
+        <div><span class="pp-label" data-i18n="pp-lbl-phone">Phone</span><strong id="pp-phone">—</strong></div>
+        <div><span class="pp-label" data-i18n="pp-lbl-dob">DOB</span><strong id="pp-dob">—</strong></div>
+        <div><span class="pp-label" data-i18n="pp-lbl-emergency">Emergency</span><strong id="pp-ec">—</strong></div>
+        <div><span class="pp-label" data-i18n="pp-lbl-onboarded">Onboarded</span><strong id="pp-hire">—</strong></div>
       </div>
     </div>
 
-    <!-- Edit form (hidden until Edit button clicked) -->
-    <div id="pp-edit-form" style="background:#FAF7F1;border-radius:8px;padding:14px 16px;margin-bottom:24px;font-size:13px;display:none;border:2px solid #B11E2E;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;align-items:start;">
-        <div style="grid-column:1 / span 2;"><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Name *</label><input id="pp-edit-name" type="text" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
-        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Trade</label><input id="pp-edit-trade" type="text" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
-        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Language</label><select id="pp-edit-lang" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;background:white;"><option value="EN">EN</option><option value="ES">ES</option></select></div>
-        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Phone (any format)</label><input id="pp-edit-phone" type="tel" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
-        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">DOB</label><input id="pp-edit-dob" type="date" data-ssc-max="today" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
-        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Onboarded</label><input id="pp-edit-hire" type="date" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
-        <div style="grid-column:1 / span 2;"><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Email</label><input id="pp-edit-email" type="email" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
-        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Emergency Name</label><input id="pp-edit-ec-name" type="text" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
-        <div><label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Emergency Phone</label><input id="pp-edit-ec-phone" type="tel" style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;"></div>
-        <div style="grid-column:1 / span 2;">
-          <label style="color:#76777E;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;">Emergency Relation</label>
-          <select id="pp-edit-ec-relation" data-relation-select="pp-edit-ec-relation-other"
-                  style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;background:white;">
+    <!-- Edit form (hidden until Edit button clicked) — #250: fields on the
+         shared boxed .ssc-field component (visible border + azure focus ring,
+         the #242-flagged hairline fields fixed). -->
+    <div id="pp-edit-form" class="pp-card" style="display:none;">
+      <div class="pp-grid pp-grid-edit">
+        <div class="pp-span2"><label class="pp-label" data-i18n="pp-lbl-name">Name *</label><input id="pp-edit-name" type="text" class="ssc-field"></div>
+        <div><label class="pp-label" data-i18n="pp-lbl-trade">Trade</label><input id="pp-edit-trade" type="text" class="ssc-field"></div>
+        <div><label class="pp-label" data-i18n="pp-lbl-language">Language</label><select id="pp-edit-lang" class="ssc-field"><option value="EN">EN</option><option value="ES">ES</option></select></div>
+        <div><label class="pp-label" data-i18n="pp-lbl-phone-fmt">Phone (any format)</label><input id="pp-edit-phone" type="tel" class="ssc-field"></div>
+        <div><label class="pp-label" data-i18n="pp-lbl-dob">DOB</label><input id="pp-edit-dob" type="date" data-ssc-max="today" class="ssc-field"></div>
+        <div><label class="pp-label" data-i18n="pp-lbl-onboarded">Onboarded</label><input id="pp-edit-hire" type="date" class="ssc-field"></div>
+        <div class="pp-span2"><label class="pp-label" data-i18n="pp-lbl-email">Email</label><input id="pp-edit-email" type="email" class="ssc-field"></div>
+        <div><label class="pp-label" data-i18n="pp-lbl-ec-name">Emergency Name</label><input id="pp-edit-ec-name" type="text" class="ssc-field"></div>
+        <div><label class="pp-label" data-i18n="pp-lbl-ec-phone">Emergency Phone</label><input id="pp-edit-ec-phone" type="tel" class="ssc-field"></div>
+        <div class="pp-span2">
+          <label class="pp-label" data-i18n="pp-lbl-ec-relation">Emergency Relation</label>
+          <select id="pp-edit-ec-relation" data-relation-select="pp-edit-ec-relation-other" class="ssc-field">
             <option value="" data-i18n="opt-rel-placeholder">Relation</option>
             <option value="Spouse" data-i18n="opt-rel-spouse">Spouse</option>
             <option value="Partner" data-i18n="opt-rel-partner">Partner</option>
@@ -929,90 +982,92 @@
           </select>
           <input id="pp-edit-ec-relation-other" type="text" data-i18n-ph="ph-ec-relation-other"
                  placeholder="Specify relation…"
-                 style="width:100%;padding:7px 9px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;box-sizing:border-box;margin-top:6px;display:none;">
+                 class="ssc-field" style="margin-top:6px;display:none;">
         </div>
       </div>
-      <div id="pp-edit-error" style="color:#B11E2E;font-size:12px;margin-top:12px;display:none;font-weight:600;"></div>
-      <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;">
-        <button id="pp-edit-cancel" style="background:none;border:1px solid #E8E4DD;color:#76777E;padding:7px 16px;border-radius:4px;font-size:12px;cursor:pointer;font-weight:600;">Cancel</button>
-        <button id="pp-edit-save" style="background:#B11E2E;color:white;border:none;padding:7px 16px;border-radius:4px;font-size:12px;cursor:pointer;font-weight:600;">Save</button>
+      <div id="pp-edit-error" class="pp-err"></div>
+      <div class="pp-foot">
+        <button id="pp-edit-cancel" class="btn-ghost" data-i18n="btn-cancel">Cancel</button>
+        <button id="pp-edit-save" class="btn-primary" data-i18n="btn-save">Save</button>
       </div>
     </div>
 
     <!-- Face Photo Section -->
-    <div style="margin-bottom:24px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-        <h3 style="font-size:14px;font-weight:700;color:#14161C;text-transform:uppercase;letter-spacing:0.5px;">Face Photo</h3>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <div class="pp-sec">
+      <div class="pp-sec-head">
+        <h3 class="pp-h3" data-i18n="pp-sec-face">Face Photo</h3>
+        <div class="pp-btns">
           <!-- Desktop / secure-context path: live camera via getUserMedia.
                Requires HTTPS (tailscale serve), won't work on plain http. -->
-          <button id="pp-take-face" style="background:#B11E2E;color:white;border:none;padding:8px 16px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <button id="pp-take-face" class="btn-primary">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-            Take ID Photo
+            <span data-i18n="pp-take-face">Take ID Photo</span>
           </button>
           <!-- Mobile / file-input path: works on plain http over Tailscale
                because it routes through the OS file/camera picker instead
                of getUserMedia. Accepts HEIC; server converts to JPEG. -->
-          <label for="pp-upload-face" style="background:#14161C;color:white;border:none;padding:8px 16px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <label for="pp-upload-face" class="btn-ghost">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Upload (mobile)
+            <span data-i18n="pp-upload-face">Upload (mobile)</span>
           </label>
           <input id="pp-upload-face" type="file" accept="image/*" capture="environment" style="display:none;">
           <!-- Remove (#99) — visible only when a face photo is on file;
                renderFacePhoto toggles display based on face_image_path. -->
-          <button id="pp-remove-face" style="background:none;color:#B11E2E;border:1px solid #E8E4DD;padding:8px 16px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;display:none;align-items:center;gap:6px;">
-            Remove Photo
+          <button id="pp-remove-face" class="btn-ghost pp-danger" style="display:none;">
+            <span data-i18n="pp-remove-face">Remove Photo</span>
           </button>
         </div>
       </div>
-      <div style="background:#FAF7F1;border-radius:8px;padding:14px;display:flex;align-items:center;gap:14px;">
-        <div id="pp-face-placeholder" style="width:96px;height:96px;border:2px dashed #E8E4DD;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#76777E;font-size:11px;text-align:center;flex-shrink:0;">No face photo</div>
+      <div class="pp-photo-strip">
+        <div id="pp-face-placeholder" class="pp-face-slot" data-i18n="pp-no-face">No face photo</div>
         <img id="pp-face-img" src="" style="width:96px;height:96px;object-fit:cover;border-radius:8px;display:none;cursor:zoom-in;flex-shrink:0;" alt="Face photo">
-        <div style="font-size:12px;color:#76777E;">
+        <div class="pp-photo-hint" data-i18n="pp-face-hint">
           Used for verification on the project dashboard roster and the CoF card.
         </div>
       </div>
       <!-- Section-level Save/Cancel — visible only while a staged change is pending
            (Take / Upload / Remove update an in-memory preview; the single commit
            point is this Save). Matches the cert/doc 'explicit save + toast' flow. -->
-      <div id="pp-face-actions" style="display:none;justify-content:flex-end;align-items:center;gap:10px;margin-top:10px;">
-        <span id="pp-face-pending-hint" style="font-size:11px;color:#76777E;font-style:italic;">Unsaved changes</span>
-        <button id="pp-face-cancel" style="background:none;border:1px solid #E8E4DD;color:#76777E;padding:8px 16px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;">Cancel</button>
-        <button id="pp-face-save" style="background:#B11E2E;color:white;border:none;padding:8px 18px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;">Save</button>
+      <div id="pp-face-actions" class="pp-foot" style="display:none;align-items:center;gap:10px;margin-top:10px;">
+        <span id="pp-face-pending-hint" class="pp-pending-hint" data-i18n="pp-unsaved">Unsaved changes</span>
+        <button id="pp-face-cancel" class="btn-ghost" data-i18n="btn-cancel">Cancel</button>
+        <button id="pp-face-save" class="btn-primary" data-i18n="btn-save">Save</button>
       </div>
     </div>
 
     <!-- Documents Section -->
-    <div style="margin-bottom:24px;">
-      <h3 style="font-size:14px;font-weight:700;color:#14161C;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Documents</h3>
+    <div class="pp-sec">
+      <h3 class="pp-h3" style="margin-bottom:12px;" data-i18n="pp-sec-docs">Documents</h3>
 
-      <!-- Upload zone -->
+      <!-- Upload zone — the shared dashed .dropzone component (#237); titles
+           azure, hover = azure border + deeper lumen wash. No icon added (the
+           operator constraint: existing icons only, no new ones). -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-        <label style="background:white;border:2px dashed #E8E4DD;border-radius:8px;padding:14px;text-align:center;cursor:pointer;font-size:12px;color:#76777E;transition:border-color 0.15s;" onmouseover="this.style.borderColor='#B11E2E'" onmouseout="this.style.borderColor='#E8E4DD'">
-          <strong style="color:#14161C;display:block;margin-bottom:4px;">+ Upload ID</strong>
-          DL · Passport · IDNYC<br>
+        <label class="dropzone pp-drop">
+          <b data-i18n="pp-up-id-title">+ Upload ID</b>
+          <span class="dz-sub" data-i18n="pp-up-id-sub">DL · Passport · IDNYC</span>
           <input type="file" accept=".jpg,.jpeg,.png,.pdf,.heic,.webp" data-doc-type="id_front" style="display:none;" class="upload-input">
         </label>
-        <label style="background:white;border:2px dashed #E8E4DD;border-radius:8px;padding:14px;text-align:center;cursor:pointer;font-size:12px;color:#76777E;transition:border-color 0.15s;" onmouseover="this.style.borderColor='#B11E2E'" onmouseout="this.style.borderColor='#E8E4DD'">
-          <strong style="color:#14161C;display:block;margin-bottom:4px;">+ Upload Cert Scan</strong>
-          SST · OSHA · Bulk scans<br>
+        <label class="dropzone pp-drop">
+          <b data-i18n="pp-up-cert-title">+ Upload Cert Scan</b>
+          <span class="dz-sub" data-i18n="pp-up-cert-sub">SST · OSHA · Bulk scans</span>
           <input type="file" accept=".jpg,.jpeg,.png,.pdf,.heic,.webp" data-doc-type="cert_combined" style="display:none;" class="upload-input">
         </label>
       </div>
 
       <!-- Document list -->
       <div id="pp-docs-list" style="font-size:12px;">
-        <div style="color:#76777E;font-style:italic;padding:8px 0;">No documents uploaded yet.</div>
+        <div class="pp-empty" style="padding:8px 0;" data-i18n="pp-no-docs">No documents uploaded yet.</div>
       </div>
     </div>
 
     <!-- Certifications Section -->
     <div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <h3 style="font-size:14px;font-weight:700;color:#14161C;text-transform:uppercase;letter-spacing:0.5px;">Certifications</h3>
-        <button id="pp-scan-cert" style="background:#B11E2E;color:white;border:none;padding:8px 16px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+      <div class="pp-sec-head">
+        <h3 class="pp-h3" data-i18n="pp-sec-certs">Certifications</h3>
+        <button id="pp-scan-cert" class="btn-primary">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
-          Scan Cert
+          <span data-i18n="pp-scan-cert">Scan Cert</span>
         </button>
       </div>
 
@@ -1022,7 +1077,7 @@
 
       <!-- Cert cards container -->
       <div id="pp-certs-list" style="display:grid;gap:8px;">
-        <div style="color:#76777E;font-style:italic;padding:14px 0;text-align:center;">No certifications recorded yet. Click <strong>Scan Cert</strong> to add one.</div>
+        <div class="pp-empty" style="padding:14px 0;text-align:center;">No certifications recorded yet. Click <strong>Scan Cert</strong> to add one.</div>
       </div>
     </div>
 
@@ -1241,6 +1296,35 @@ const I18N = {
     'ph-email': 'Email (optional)',
     'btn-cancel': 'Cancel',
     'btn-save-worker': 'Save Worker',
+    'btn-edit': 'Edit',
+    'btn-save': 'Save',
+    'pp-lbl-trade': 'Trade',
+    'pp-lbl-language': 'Language',
+    'pp-lbl-phone': 'Phone',
+    'pp-lbl-dob': 'DOB',
+    'pp-lbl-emergency': 'Emergency',
+    'pp-lbl-onboarded': 'Onboarded',
+    'pp-lbl-name': 'Name *',
+    'pp-lbl-phone-fmt': 'Phone (any format)',
+    'pp-lbl-email': 'Email',
+    'pp-lbl-ec-name': 'Emergency Name',
+    'pp-lbl-ec-phone': 'Emergency Phone',
+    'pp-lbl-ec-relation': 'Emergency Relation',
+    'pp-sec-face': 'Face Photo',
+    'pp-take-face': 'Take ID Photo',
+    'pp-upload-face': 'Upload (mobile)',
+    'pp-remove-face': 'Remove Photo',
+    'pp-no-face': 'No face photo',
+    'pp-face-hint': 'Used for verification on the project dashboard roster and the CoF card.',
+    'pp-unsaved': 'Unsaved changes',
+    'pp-sec-docs': 'Documents',
+    'pp-up-id-title': '+ Upload ID',
+    'pp-up-id-sub': 'DL · Passport · IDNYC',
+    'pp-up-cert-title': '+ Upload Cert Scan',
+    'pp-up-cert-sub': 'SST · OSHA · Bulk scans',
+    'pp-no-docs': 'No documents uploaded yet.',
+    'pp-sec-certs': 'Certifications',
+    'pp-scan-cert': 'Scan Cert',
   },
   es: {
     'office-console': 'Consola de Oficina',
@@ -1370,6 +1454,35 @@ const I18N = {
     'ph-email': 'Correo electrónico (opcional)',
     'btn-cancel': 'Cancelar',
     'btn-save-worker': 'Guardar Trabajador',
+    'btn-edit': 'Editar',
+    'btn-save': 'Guardar',
+    'pp-lbl-trade': 'Oficio',
+    'pp-lbl-language': 'Idioma',
+    'pp-lbl-phone': 'Teléfono',
+    'pp-lbl-dob': 'Fecha de Nac.',
+    'pp-lbl-emergency': 'Emergencia',
+    'pp-lbl-onboarded': 'Onboarding',
+    'pp-lbl-name': 'Nombre *',
+    'pp-lbl-phone-fmt': 'Teléfono (cualquier formato)',
+    'pp-lbl-email': 'Correo',
+    'pp-lbl-ec-name': 'Nombre de Emergencia',
+    'pp-lbl-ec-phone': 'Tel. de Emergencia',
+    'pp-lbl-ec-relation': 'Relación de Emergencia',
+    'pp-sec-face': 'Foto del Rostro',
+    'pp-take-face': 'Tomar Foto de ID',
+    'pp-upload-face': 'Subir (móvil)',
+    'pp-remove-face': 'Quitar Foto',
+    'pp-no-face': 'Sin foto',
+    'pp-face-hint': 'Se usa para verificación en el roster del panel del proyecto y la tarjeta CoF.',
+    'pp-unsaved': 'Cambios sin guardar',
+    'pp-sec-docs': 'Documentos',
+    'pp-up-id-title': '+ Subir ID',
+    'pp-up-id-sub': 'Licencia · Pasaporte · IDNYC',
+    'pp-up-cert-title': '+ Subir Escaneo de Cert.',
+    'pp-up-cert-sub': 'SST · OSHA · Escaneos en lote',
+    'pp-no-docs': 'No hay documentos todavía.',
+    'pp-sec-certs': 'Certificaciones',
+    'pp-scan-cert': 'Escanear Cert.',
   }
 };
 
@@ -1979,7 +2092,7 @@ applyLanguage();
     const btn = document.getElementById('pp-edit-btn');
     if (card) card.style.display = 'block';
     if (form) form.style.display = 'none';
-    if (btn) btn.style.display = 'inline-block';
+    if (btn) btn.style.display = '';  // #250 — restore .btn-primary's class default (inline-flex)
     const errEl = document.getElementById('pp-edit-error');
     if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
     const saveBtn = document.getElementById('pp-edit-save');
@@ -2109,7 +2222,7 @@ applyLanguage();
       const docs = d.documents || [];
       const docList = $('#pp-docs-list');
       if (!docs.length) {
-        docList.innerHTML = '<div style="color:#76777E;font-style:italic;padding:8px 0;">No documents uploaded yet.</div>';
+        docList.innerHTML = '<div class="pp-empty" style="padding:8px 0;">No documents uploaded yet.</div>';
       } else {
         docList.innerHTML = docs.map(doc => {
           const isImage = doc.mime_type && doc.mime_type.startsWith('image/');
@@ -2117,22 +2230,24 @@ applyLanguage();
           // the raw file_path is no longer in the response (CLAUDE.md §2).
           const url = doc.file_url || '';
           const thumb = isImage
-            ? `<img src="${esc(url)}" style="width:80px;height:80px;object-fit:cover;border-radius:4px;border:1px solid #E8E4DD;">`
-            : `<div style="width:80px;height:80px;background:#FAF7F1;border-radius:4px;border:1px solid #E8E4DD;display:flex;align-items:center;justify-content:center;font-size:11px;color:#76777E;">${esc((doc.mime_type || '').split('/')[1] || 'doc').toUpperCase()}</div>`;
+            ? `<img src="${esc(url)}" class="pp-thumb" style="width:80px;height:80px;">`
+            : `<div class="pp-noscan" style="width:80px;height:80px;font-size:11px;">${esc((doc.mime_type || '').split('/')[1] || 'doc').toUpperCase()}</div>`;
           // Replace + Remove actions per #99. Replace = swap the file via
           // the existing confirm modal then delete the old row (atomic from
           // the operator's perspective). Remove = delete the row + file.
+          // #250 — actions on the shared .cred-btn component; destructive
+          // affordance is the status color, never brand red.
           const safeType = esc(doc.doc_type);
-          return `<div style="display:flex;gap:12px;align-items:center;padding:8px;border:1px solid #E8E4DD;border-radius:6px;margin-bottom:6px;">
+          return `<div class="pp-doc-card">
             <a href="${esc(url)}" target="_blank">${thumb}</a>
             <div style="flex:1;min-width:0;">
               <div style="font-weight:600;font-size:12px;">${safeType}</div>
-              <div style="color:#76777E;font-size:11px;word-break:break-all;">${esc(doc.original_filename || '')}</div>
-              <div style="color:#76777E;font-size:10px;">${(doc.file_size_bytes/1024).toFixed(1)} KB · ${esc(doc.uploaded_at || '')}</div>
+              <div style="color:var(--muted);font-size:11px;word-break:break-all;">${esc(doc.original_filename || '')}</div>
+              <div style="color:var(--muted);font-size:10px;">${(doc.file_size_bytes/1024).toFixed(1)} KB · ${esc(doc.uploaded_at || '')}</div>
             </div>
             <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
-              <button onclick="window.replaceDoc(${doc.id}, '${safeType}')" style="background:none;border:1px solid #E8E4DD;color:#14161C;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;font-weight:600;">Replace</button>
-              <button onclick="window.deleteDoc(${doc.id})" style="background:none;border:1px solid #E8E4DD;color:#B11E2E;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;font-weight:600;">Remove</button>
+              <button onclick="window.replaceDoc(${doc.id}, '${safeType}')" class="cred-btn">Replace</button>
+              <button onclick="window.deleteDoc(${doc.id})" class="cred-btn pp-danger">Remove</button>
             </div>
           </div>`;
         }).join('');
@@ -2157,22 +2272,24 @@ applyLanguage();
       const resp = await fetch('/api/employees/' + encodeURIComponent(currentEmployeeId) + '/certifications').then(r => r.json());
       const certs = (resp && resp.data) || [];
       if (!certs.length) {
-        container.innerHTML = '<div style="color:#76777E;font-style:italic;padding:14px 0;text-align:center;">No certifications recorded yet. Click <strong>Scan Cert</strong> to add one.</div>';
+        container.innerHTML = '<div class="pp-empty" style="padding:14px 0;text-align:center;">No certifications recorded yet. Click <strong>Scan Cert</strong> to add one.</div>';
         return;
       }
       container.innerHTML = certs.map(certCardHtml).join('');
     } catch (err) {
       console.warn('[Profile] certs load failed:', err);
-      container.innerHTML = '<div style="color:#B11E2E;font-style:italic;padding:14px 0;text-align:center;">Failed to load certifications.</div>';
+      container.innerHTML = '<div style="color:var(--status-behind);font-style:italic;padding:14px 0;text-align:center;">Failed to load certifications.</div>';
     }
   }
 
   function certCardHtml(c) {
-    const statusColors = {
-      valid: '#2F7C57',
-      expiring: '#B68838',
-      expired: '#B11E2E',
-      unknown: '#76777E',
+    // #250 — status as the #242 tinted chips (soft bg + saturated text),
+    // never solid fills; expired rides the status family, not brand red.
+    const statusChips = {
+      valid: 'ok',
+      expiring: 'warn',
+      expired: 'bad',
+      unknown: 'mute',
     };
     const statusLabels = {
       valid: 'Valid',
@@ -2181,7 +2298,7 @@ applyLanguage();
       unknown: 'No dates',
     };
     const sd = c.status_derived || 'unknown';
-    const statusColor = statusColors[sd] || statusColors.unknown;
+    const statusChip = statusChips[sd] || statusChips.unknown;
     const statusLabel = statusLabels[sd] || statusLabels.unknown;
 
     // Display dates as MM-DD-YYYY (shared formatter via SSCDatePicker.fmtMDY).
@@ -2191,21 +2308,21 @@ applyLanguage();
       : 'no dates recorded';
 
     const thumb = c.scan_url
-      ? `<img src="${esc(c.scan_url)}" onclick="event.stopPropagation();window.showLightbox('${esc(c.scan_url)}')" style="width:60px;height:60px;object-fit:cover;border-radius:4px;border:1px solid #E8E4DD;cursor:zoom-in;flex-shrink:0;" alt="">`
-      : `<div style="width:60px;height:60px;background:#F1EEE8;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#76777E;flex-shrink:0;">No scan</div>`;
+      ? `<img src="${esc(c.scan_url)}" onclick="event.stopPropagation();window.showLightbox('${esc(c.scan_url)}')" class="pp-thumb" style="width:60px;height:60px;cursor:zoom-in;flex-shrink:0;" alt="">`
+      : `<div class="pp-noscan" style="width:60px;height:60px;font-size:10px;">No scan</div>`;
 
-    return `<div data-cert-id="${c.cert_id}" style="display:flex;gap:12px;align-items:center;padding:12px;border:1px solid #E8E4DD;border-radius:6px;background:white;">
+    return `<div data-cert-id="${c.cert_id}" class="pp-cert-card">
       ${thumb}
       <div style="flex:1;min-width:0;">
         <div style="display:flex;align-items:baseline;gap:10px;justify-content:space-between;">
-          <div style="font-weight:700;font-size:13px;color:#14161C;">${esc(c.cert_name || c.cert_type_id)}</div>
-          <span style="background:${statusColor};color:white;font-size:10px;padding:2px 8px;border-radius:99px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0;white-space:nowrap;">${esc(statusLabel)}</span>
+          <div style="font-weight:700;font-size:13px;">${esc(c.cert_name || c.cert_type_id)}</div>
+          <span class="badge-pill ${statusChip}" style="flex-shrink:0;white-space:nowrap;">${esc(statusLabel)}</span>
         </div>
-        <div style="font-size:11px;color:#76777E;margin-top:4px;">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">
           ${c.card_number ? `Card # <span style="font-family:monospace;">${esc(c.card_number)}</span> · ` : ''}${datesLine}${c.issuing_body ? ' · ' + esc(c.issuing_body) : ''}${c.is_cof_prerequisite ? ' · <strong>CoF prereq</strong>' : ''}
         </div>
       </div>
-      <button onclick="event.stopPropagation();window.deleteCert(${c.cert_id})" title="Delete cert" style="background:none;border:none;color:#B11E2E;font-size:18px;cursor:pointer;flex-shrink:0;padding:0 4px;">×</button>
+      <button onclick="event.stopPropagation();window.deleteCert(${c.cert_id})" title="Delete cert" class="pp-x">×</button>
     </div>`;
   }
 
@@ -3807,7 +3924,7 @@ applyLanguage();
 })();
 </script>
 
-<div class="container"><div class="ph-build" id="cc-build-stamp">build #249 · 2026-06-12 · Cert Library — Lumen/Oat reskin; CoF-prereq column display-removed (flag + issuance logic untouched)</div></div>
+<div class="container"><div class="ph-build" id="cc-build-stamp">build #250 · 2026-06-14 · Workforce — worker profile modal on the design system; boxed edit fields; original icons preserved</div></div>
 
 <script>
 /* ===== Company console widgets (#210) — live data + reused #209 drag framework.

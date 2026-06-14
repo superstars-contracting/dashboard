@@ -427,6 +427,17 @@ def main():
         ok("console_field_shared_" + fid, bool(fm) and "ssc-field" in (fm.group(0) if fm else ""),
            (fm.group(0)[:80] if fm else "(not found)"))
 
+    # 8d2 (#250). worker-profile modal EDIT-state fields carry .ssc-field too —
+    # these were the #242-flagged hairline fields the guard's modal list missed
+    # (it only covered the intake modal). Same forcing function: a profile
+    # edit field that drops the shared component fails the build.
+    for fid in ("pp-edit-name", "pp-edit-trade", "pp-edit-lang", "pp-edit-phone",
+                "pp-edit-dob", "pp-edit-hire", "pp-edit-email", "pp-edit-ec-name",
+                "pp-edit-ec-phone", "pp-edit-ec-relation", "pp-edit-ec-relation-other"):
+        fm = re.search(r'<(?:input|select|textarea)[^>]*id="' + re.escape(fid) + r'"[^>]*>', console_html)
+        ok("console_field_shared_" + fid, bool(fm) and "ssc-field" in (fm.group(0) if fm else ""),
+           (fm.group(0)[:80] if fm else "(not found)"))
+
     # 8e. TEMPLATE REGISTRY — every repo-root page with form inputs must be
     # REGISTERED (a live operator surface this guard covers) or explicitly
     # EXEMPT (legacy, pre-rebuild artifacts). A new template that registers
