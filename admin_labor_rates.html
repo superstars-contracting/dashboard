@@ -388,12 +388,22 @@
         if(r.ok){ toast('Worker rate added'); closePanel(); loadRoster(); } else { const j=await r.json().catch(()=>({})); toast(j.error||'Add failed'); }
       } else {
         const cur=byId(editWid);
-        if(cur && $('lr-f-trade').value!==cur.trade){ await jpost('/api/labor-rates/state/'+encodeURIComponent(editWid)+'/trade',{trade:$('lr-f-trade').value}); }
-        if(cur && Math.abs(rate-(cur.current_rate||0))>=0.005){
+        let didTrade=false, didChange=false;
+        if(cur && $('lr-f-trade').value!==cur.trade){ await jpost('/api/labor-rates/state/'+encodeURIComponent(editWid)+'/trade',{trade:$('lr-f-trade').value}); didTrade=true; }
+        // #253 — submit a pending change when the RATE *or* the EFFECTIVE DATE
+        // changed. The old guard fired only on a rate delta, so a date-only edit
+        // (backdating an existing rate) silently did nothing yet still toasted
+        // "Submitted" — both the pending change and the picked date were lost.
+        const rateChanged = cur && Math.abs(rate-(cur.current_rate||0))>=0.005;
+        const dateChanged = cur && dateISO && dateISO!==(cur.effective_date||'');
+        if(rateChanged || dateChanged){
           const r=await jpost('/api/labor-rates/changes',{worker_id:editWid,new_rate:rate,effective_date:dateISO});
-          if(!r.ok){ toast('Submit failed'); return; }
+          if(!r.ok){ const j=await r.json().catch(()=>({})); toast(j.error||'Submit failed'); return; }
+          didChange=true;
         }
-        toast('Submitted for PM approval'); closePanel(); loadRoster(); loadPending();
+        if(didChange){ toast('Submitted for PM approval'); closePanel(); loadRoster(); loadPending(); }
+        else if(didTrade){ toast('Trade updated'); closePanel(); loadRoster(); }
+        else { toast('No change to submit'); }
       }
     } finally { btn.disabled=false; }
   }

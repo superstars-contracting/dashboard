@@ -3174,7 +3174,21 @@ applyLanguage();
 
   // Modal
   const modal = $('#intake-modal');
-  $('#add-worker-btn').addEventListener('click', () => modal.classList.add('active'));
+  // #253 — FULLY reset the onboarding form so every open is a clean slate.
+  // Bug: Cancel/close (and even post-save) left the last-entered data, so
+  // reopening showed it. Clears identity fields; clears the SSCDatePicker dates
+  // via setISO so dataset.iso is wiped too (value='' alone leaves getISO
+  // returning the stale ISO); resets the relation pair; and re-renders project
+  // assignments to their defaults. The intake modal is new-worker-only (edits
+  // use the profile modal), so resetting on open never clobbers a pre-fill.
+  function resetIntakeForm() {
+    ['in-name','in-trade','in-phone','in-ec-name','in-ec-phone','in-email','in-ec-relation-other'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+    ['in-language','in-ec-relation'].forEach(id => { const e = document.getElementById(id); if (e) e.selectedIndex = 0; });
+    ['in-dob','in-hire-date'].forEach(id => { const e = document.getElementById(id); if (e) { if (window.SSCDatePicker) SSCDatePicker.setISO(e, ''); else e.value = ''; } });
+    if (typeof clearRelationField === 'function') clearRelationField('in-ec-relation');
+    if (typeof loadProjects === 'function') { try { loadProjects(); } catch (_) {} }
+  }
+  $('#add-worker-btn').addEventListener('click', () => { resetIntakeForm(); modal.classList.add('active'); });
 
   // Print All IDs (#174) — admin/c_suite only. Server-side @requires_role
   // is the real authority; this is UX. Same gate pattern as the Labor
@@ -3227,9 +3241,9 @@ applyLanguage();
     });
   }
 
-  $('#modal-close').addEventListener('click', () => modal.classList.remove('active'));
-  $('#modal-cancel').addEventListener('click', () => modal.classList.remove('active'));
-  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('active'); });
+  $('#modal-close').addEventListener('click', () => { modal.classList.remove('active'); resetIntakeForm(); });
+  $('#modal-cancel').addEventListener('click', () => { modal.classList.remove('active'); resetIntakeForm(); });
+  modal.addEventListener('click', e => { if (e.target === modal) { modal.classList.remove('active'); resetIntakeForm(); } });
 
   $('#modal-save').addEventListener('click', async () => {
     const name = $('#in-name').value.trim();
@@ -3263,10 +3277,8 @@ applyLanguage();
       }).then(r => r.json());
       if (resp.error) { alert('Save failed: ' + resp.error); return; }
       modal.classList.remove('active');
-      ['in-name','in-dob','in-trade','in-language','in-phone','in-ec-name','in-ec-phone','in-hire-date','in-email'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
-      // Relation dropdown has a paired Other-text input — reset both via helper.
-      clearRelationField('in-ec-relation');
-      await Promise.all([loadMetrics(), loadProjects(), loadWorkforce()]);
+      resetIntakeForm();   // #253 — full clear incl. SSCDatePicker dataset.iso + project checks
+      await Promise.all([loadMetrics(), loadWorkforce()]);
       alert(`✓ Worker created: ${name}\nWorker ID: ${resp.data.worker_id || resp.data.employee_id}\nAssigned to: ${resp.data.assigned_to.join(', ') || '(no projects)'}`);
     } catch (e) { alert('Network error: ' + e.message); }
   });
@@ -3939,7 +3951,7 @@ applyLanguage();
 })();
 </script>
 
-<div class="container"><div class="ph-build" id="cc-build-stamp">build #252 · 2026-06-14 · Workforce — worker profile modal face photo via the gated route (real photo, not placeholder)</div></div>
+<div class="container"><div class="ph-build" id="cc-build-stamp">build #253 · 2026-06-15 · Field fixes — drop stage-date render, labor-rate effective-date + submit-to-PM, onboarding cancel-reset; behavioral guard</div></div>
 
 <script>
 /* ===== Company console widgets (#210) — live data + reused #209 drag framework.
