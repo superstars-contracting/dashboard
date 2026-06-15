@@ -1012,7 +1012,8 @@
           </label>
           <input id="pp-upload-face" type="file" accept="image/*" capture="environment" style="display:none;">
           <!-- Remove (#99) — visible only when a face photo is on file;
-               renderFacePhoto toggles display based on face_image_path. -->
+               applyFacePhotoUI toggles display based on whether the gated
+               face-photo route loaded (currentHasPhoto), never a path. -->
           <button id="pp-remove-face" class="btn-ghost pp-danger" style="display:none;">
             <span data-i18n="pp-remove-face">Remove Photo</span>
           </button>
@@ -1940,7 +1941,7 @@ applyLanguage();
     // Discard any staged-but-not-saved face-photo change on close.
     if (typeof clearFacePending === 'function') {
       clearFacePending();
-      currentFacePath = null;
+      currentHasPhoto = false;
     }
   }
   $('#pp-close').addEventListener('click', closeProfile);
@@ -1953,10 +1954,10 @@ applyLanguage();
     // ?v=Date.now() cache-bust on the new image masked this before:
     // the <img> kept rendering the stale cached pixels until the new
     // request finished, briefly flashing the prior worker. Now we drop
-    // src + show the placeholder, then loadProfile() repopulates with
-    // the new worker's face_image_path.
+    // src + show the placeholder, then loadProfile() repopulates from the
+    // gated route for the new worker.
     if (typeof renderFacePhoto === 'function') {
-      renderFacePhoto(null);
+      renderFacePhoto(null);   // #252 — falsy: clear to placeholder, no fetch
     }
     currentEmployeeId = employeeId;
     ppBg.style.display = 'block';
@@ -2258,8 +2259,10 @@ applyLanguage();
       // d.certifications array.
       await renderCertsForCurrentWorker();
 
-      // Face photo — derive from face_image_path on the employee row.
-      renderFacePhoto(e.face_image_path);
+      // Face photo — #252: load from the gated route (face_image_path is
+      // scrubbed from this response per the PII rule; a path never crosses the
+      // wire). renderFacePhoto(true) pulls /api/employees/<id>/face-photo.
+      renderFacePhoto(true);
     } catch (e) {
       console.warn('[Profile] load failed:', e);
     }
@@ -2335,7 +2338,12 @@ applyLanguage();
   // saved" toast confirms. Cancel discards the staged change and restores
   // the current saved view. Single commit point per edit.
   let facePending = null;       // null | {kind:'set', blob, previewUrl} | {kind:'remove'}
-  let currentFacePath = null;   // last-known server-side face_image_path (post-Save or initial load)
+  // #252 — face_image_path is scrubbed from the API (CLAUDE.md PII rule), so the
+  // saved photo is sourced from the gated route /api/employees/<id>/face-photo,
+  // never a path. currentHasPhoto (set when that gated <img> loads) drives the
+  // Remove affordance; faceCacheBust forces a re-fetch after an upload/replace.
+  let currentHasPhoto = false;
+  let faceCacheBust = '';
 
   function clearFacePending() {
     if (facePending && facePending.previewUrl && facePending.previewUrl.startsWith('blob:')) {
@@ -2370,46 +2378,53 @@ applyLanguage();
       if (actions) actions.style.display = 'flex';
       return;
     }
-    // 3) NO PENDING — render the current saved record (or placeholder).
+    // 3) NO PENDING — show the saved photo (loaded from the GATED route by
+    // loadSavedFacePhoto) or the placeholder. currentHasPhoto reflects whether
+    // that gated <img> loaded; the photo is addressed by employee id, never a
+    // filesystem path (the API scrubs face_image_path per the CLAUDE.md PII rule).
     if (actions) actions.style.display = 'none';
-    const facePath = currentFacePath;
-    if (!facePath) {
-      // Drop the prior image entirely so the panel clears visibly.
-      img.removeAttribute('src');
+    if (currentHasPhoto && currentEmployeeId) {
+      img.style.display = 'block';
+      img.onclick = () => window.showLightbox(gatedFaceUrl());
+      ph.style.display = 'none';
+      if (remove) remove.style.display = 'inline-flex';
+    } else {
       img.style.display = 'none';
       img.onclick = null;
       ph.style.display = 'flex';
       if (remove) remove.style.display = 'none';
-      return;
     }
-    // Server stores an absolute path; turn it into a /worker-files/ URL.
-    const m = facePath.match(/[\/\\]worker_records[\/\\](.+)$/);
-    if (!m) {
-      img.removeAttribute('src');
-      img.style.display = 'none';
-      img.onclick = null;
-      ph.style.display = 'flex';
-      if (remove) remove.style.display = 'none';
-      return;
-    }
-    // Cache-bust: face files always live at the same path (face.jpg per
-    // worker), so a replace looks identical to the browser cache unless
-    // we change the URL. Append a fresh timestamp query so the <img>
-    // requests the new bytes after Save.
-    const url = '/worker-files/' + m[1].replace(/\\/g, '/');
-    img.src = url + (url.indexOf('?') === -1 ? '?' : '&') + 'v=' + Date.now();
-    img.style.display = 'block';
-    img.onclick = () => window.showLightbox(url);
-    ph.style.display = 'none';
-    if (remove) remove.style.display = 'inline-flex';
   }
 
-  // Called by loadProfile with the current saved face_image_path. Also
-  // discards any in-flight staged change so re-opening a profile is clean.
-  function renderFacePhoto(facePath) {
+  // #252 — the gated, id-based face-photo URL (mirrors the labor-rates roster
+  // avatar). No filesystem path ever crosses the wire; faceCacheBust forces a
+  // re-fetch after an upload/replace so the new bytes show immediately.
+  function gatedFaceUrl() {
+    return '/api/employees/' + encodeURIComponent(currentEmployeeId) + '/face-photo?t=' + faceCacheBust;
+  }
+
+  // Load the saved face photo into the strip <img> from the gated route. onload
+  // marks the photo present and re-applies the UI to reveal it; onerror (404 =
+  // no photo on file) falls back to the placeholder.
+  function loadSavedFacePhoto() {
+    const img = $('#pp-face-img');
+    if (!currentEmployeeId) { currentHasPhoto = false; applyFacePhotoUI(); return; }
+    img.onload = () => { currentHasPhoto = true; applyFacePhotoUI(); };
+    img.onerror = () => { currentHasPhoto = false; applyFacePhotoUI(); };
+    img.src = gatedFaceUrl();
+  }
+
+  // #252 — render the face strip: clear (loadSaved falsy — the instant
+  // worker-switch reset) or load (truthy — pull the saved photo from the gated
+  // route). Always discards any in-flight staged change first.
+  function renderFacePhoto(loadSaved) {
     clearFacePending();
-    currentFacePath = facePath || null;
-    applyFacePhotoUI();
+    currentHasPhoto = false;
+    applyFacePhotoUI();            // placeholder immediately
+    if (loadSaved && currentEmployeeId) {
+      faceCacheBust = String(Date.now());
+      loadSavedFacePhoto();        // settles to photo-or-placeholder on load/error
+    }
   }
 
   window.showLightbox = function(url) {
@@ -3010,7 +3025,7 @@ applyLanguage();
   // OR a currently-staged set).
   function stageFaceRemove() {
     const hasStagedSet = facePending && facePending.kind === 'set';
-    if (!currentFacePath && !hasStagedSet) return;
+    if (!currentHasPhoto && !hasStagedSet) return;
     clearFacePending();
     facePending = {kind: 'remove'};
     applyFacePhotoUI();
@@ -3023,8 +3038,8 @@ applyLanguage();
   }
 
   // Save — commit the staged change. POST for set, DELETE for remove.
-  // On success: clear pending, refresh currentFacePath, re-render (with
-  // cache-bust), show toast, refresh the workforce list (face-photo state
+  // On success: clear pending, re-fetch the saved photo from the gated route
+  // (cache-bust), show toast, refresh the workforce list (face-photo state
   // surfaces there).
   async function commitFacePending() {
     if (!currentEmployeeId || !facePending) return;
@@ -3045,8 +3060,8 @@ applyLanguage();
         if (resp.ok) {
           const d = body.data || body;
           clearFacePending();
-          currentFacePath = d.face_image_path || null;
-          applyFacePhotoUI();
+          faceCacheBust = String(Date.now());   // #252 — force a re-fetch of the just-saved photo
+          loadSavedFacePhoto();                  // gated route; onload reveals the new bytes
           const conv = d.heic_conversion;
           const hint = (conv && conv.ok) ? ' (HEIC → JPEG)' :
                        (conv && !conv.ok) ? ' (HEIC convert failed — original kept)' : '';
@@ -3071,7 +3086,7 @@ applyLanguage();
                               {method: 'DELETE'});
         if (r.ok) {
           clearFacePending();
-          currentFacePath = null;
+          currentHasPhoto = false;   // #252 — photo removed; show the placeholder
           applyFacePhotoUI();
           showToast('✓ Face photo saved', 3000);
           if (typeof loadWorkforce === 'function') {
@@ -3924,7 +3939,7 @@ applyLanguage();
 })();
 </script>
 
-<div class="container"><div class="ph-build" id="cc-build-stamp">build #251 · 2026-06-14 · Security — response_wrapper auto-scrubs *_path (no filesystem path on the wire); stale payroll/FacePhoto gate tests repaired</div></div>
+<div class="container"><div class="ph-build" id="cc-build-stamp">build #252 · 2026-06-14 · Workforce — worker profile modal face photo via the gated route (real photo, not placeholder)</div></div>
 
 <script>
 /* ===== Company console widgets (#210) — live data + reused #209 drag framework.
