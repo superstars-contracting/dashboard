@@ -46,6 +46,35 @@ Bake these in by default, every time:
 - Verify in Preview: the primary button's computed background == the accent and its label is present; date fields are `data-ssc-dp`.
 - Run the design-conventions guard smoke.
 
+## 8. Behavioral protocol — verify the LIVED flow, guard the recurring classes
+
+Design conventions (§1–§7) stop *visual* regressions. A second family keeps
+recurring: **behavioral** bugs where the UI looks right but does the wrong
+thing. Fixing those at the root means two standing rules:
+
+**Verify the lived flow, not the API/computed style alone.** Reproduce the
+operator's actual sequence with real clicks in Preview — *pick → submit →
+reload → reopen → open the downstream view* — and confirm the end state. A
+green API call or a correct computed style does not prove the feature works
+(the #253 labor-rate submit "toasted Submitted" while creating nothing; the
+#254 approval looked fine while the tracker still said "Rate not set").
+
+**The recurring behavioral classes (enforced by `smoke_behavior_conventions.py`,
+run in the gate):**
+- **date-chosen-persists** — a user-chosen date is read from the picker
+  (`SSCDatePicker.getISO`) on submit and stored as chosen, never silently `today()`.
+- **submit-creates-record** — a primary "Submit / Approve" fires on the WHOLE
+  change (e.g. rate *or* effective-date), and actually creates its row.
+- **cancel-resets-form** — a modal's Cancel/close resets the form (incl. the
+  SSCDatePicker `dataset.iso`, not just `.value`) so reopening is a clean slate.
+- **cross-view propagation / single source of truth** — a change approved in
+  one place is reflected EVERYWHERE the value is read (e.g. an approved labor
+  rate bridged into the canonical `worker_rates` the tracker resolves). Guard it
+  with a real write-flow assertion that fails on the broken path.
+
+When you add a surface that submits a value, persists a date, or shows a value
+that's set elsewhere, extend the behavioral guard with the matching class.
+
 ## Recurring-bug log (fixed at root)
 - **Invisible primary button** (module-scoped tokens; modal renders outside) — #230 (Docs), recurred #235 (Field Photos) → root fix #236 (tokens globalized + guard).
 - **Raw date field instead of SSCDatePicker** — recurred on several modals → root fix #236 (global auto-wire + guard).

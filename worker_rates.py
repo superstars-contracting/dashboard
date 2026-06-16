@@ -241,6 +241,80 @@ def set_rate(
     return dict(new_row)
 
 
+# ============= APPROVAL BRIDGE (labor_worker_state -> canonical worker_rates) =
+
+def bridge_approved_rate(
+    conn: sqlite3.Connection,
+    *,
+    employee_id: str,
+    hourly_rate: float,
+    effective_from: str,
+    notes: Optional[str],
+    actor_user_id: Optional[int],
+    actor_role: Optional[str],
+) -> int:
+    """Reflect an APPROVED labor-rate change into the canonical worker_rates so
+    EVERY rate-reading surface (the tracker / payroll grid, which resolve via
+    get_rate_effective_on) sees the approved value.
+
+    Unlike set_rate() — the operator-facing add path, which deliberately REJECTS
+    back-dating before the current active rate — this is the approval bridge and
+    must ALWAYS land the approved value for ALL change types: a rate change, a
+    DATE-ONLY change, or a BACKDATE. That gap (set_rate raised on a backdate and
+    the approve handler swallowed it) is the #254 bug — an approved backdate never
+    reached worker_rates, so the tracker showed 'Rate not set'.
+
+    Effective-dated, single-current model (labor_worker_state holds ONE current
+    approved rate): the approved row becomes the current rate from effective_from
+    onward. Rows at/after effective_from are superseded by this approval and are
+    dropped; the row immediately BEFORE it is end-dated at effective_from-1 so
+    earlier weeks keep their historical rate; the approved row is inserted as the
+    new current (effective_to NULL). Runs in the CALLER's transaction (no commit),
+    so the approval + bridge commit atomically. Returns the new worker_rates id.
+    """
+    rate_val = float(hourly_rate)
+    if rate_val <= 0:
+        raise RateError("hourly_rate must be positive")
+    try:
+        eff = datetime.strptime(effective_from, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        raise RateError("effective_from must be YYYY-MM-DD")
+
+    before = get_current_rate(conn, employee_id)  # for the audit before-image
+
+    # Supersede anything on/after the approved effective date (single-current).
+    conn.execute(
+        "DELETE FROM worker_rates WHERE employee_id = ? AND effective_from >= ?",
+        (employee_id, effective_from),
+    )
+    # End-date the most recent remaining (strictly-earlier) row so it stops the
+    # day before the approved rate begins — earlier weeks keep their old rate.
+    prev = conn.execute(
+        "SELECT id FROM worker_rates WHERE employee_id = ? AND effective_from < ? "
+        "ORDER BY effective_from DESC LIMIT 1", (employee_id, effective_from),
+    ).fetchone()
+    if prev:
+        end_date = (eff - timedelta(days=1)).isoformat()
+        conn.execute("UPDATE worker_rates SET effective_to = ? WHERE id = ?",
+                     (end_date, prev["id"]))
+    cur = conn.execute(
+        "INSERT INTO worker_rates "
+        "(employee_id, hourly_rate, effective_from, effective_to, notes, created_by) "
+        "VALUES (?, ?, ?, NULL, ?, ?)",
+        (employee_id, rate_val, effective_from, notes, actor_user_id),
+    )
+    new_id = cur.lastrowid
+    log_audit(
+        conn, action="rate_change", actor_user_id=actor_user_id, actor_role=actor_role,
+        target_type="worker", target_id=employee_id,
+        before=({"hourly_rate": before["hourly_rate"],
+                 "effective_from": before["effective_from"]} if before else None),
+        after={"id": new_id, "hourly_rate": rate_val, "effective_from": effective_from},
+        note=notes or "PM-approved rate change (bridge)",
+    )
+    return new_id
+
+
 # ============= ROLE-GATE HELPER (for response shaping) =============
 
 def role_can_see_rates(role: Optional[str]) -> bool:

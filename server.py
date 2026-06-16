@@ -5054,16 +5054,24 @@ def api_lr_approve(cid):
             conn.execute("UPDATE labor_worker_state SET current_rate=?, effective_date=?, "
                          "updated_at=? WHERE worker_id=?",
                          (_exp_money(ch['new_rate']), ch['effective_date'], now, ch['worker_id']))
-            conn.commit()
-            # bridge approved rate into worker_rates (check-cutting sheet) for real workers
+            # #254 — RELIABLY bridge the approved rate into the canonical
+            # worker_rates so the tracker / payroll grid resolves it, for ALL
+            # change types (rate, DATE-ONLY, BACKDATE). The old path called
+            # set_rate (which REJECTS a backdate) inside a try/except that
+            # swallowed the failure, so an approved backdate never reached
+            # worker_rates and the tracker rendered 'Rate not set' (the bug).
+            # bridge_approved_rate never rejects a backdate. Atomic with the
+            # approval: one commit, so a bridge failure rolls back the whole
+            # approval rather than leaving labor_worker_state and worker_rates
+            # out of sync.
             if ch['employee_id']:
-                try:
-                    from worker_rates import set_rate
-                    set_rate(conn, employee_id=ch['employee_id'], hourly_rate=float(ch['new_rate']),
-                             effective_from=ch['effective_date'], notes='PM-approved rate change',
-                             actor_user_id=uid, actor_role=role)
-                except Exception as we:
-                    logging.warning(f"labor-rate approve {cid}: worker_rates bridge skipped ({type(we).__name__})")
+                from worker_rates import bridge_approved_rate
+                bridge_approved_rate(conn, employee_id=ch['employee_id'],
+                                     hourly_rate=float(ch['new_rate']),
+                                     effective_from=ch['effective_date'],
+                                     notes='PM-approved rate change',
+                                     actor_user_id=uid, actor_role=role)
+            conn.commit()
         st = conn.execute("SELECT * FROM labor_worker_state WHERE worker_id=?", (ch['worker_id'],)).fetchone()
         return response_wrapper(_lr_state_public(st, None))
     finally:
