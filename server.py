@@ -8037,6 +8037,7 @@ def api_compliance_pulse():
 # quantities + stage status; external/client roles get 403 via
 # requires_role. Money writes (expenses) are admin/c_suite only.
 import dropplan_rollups as _rollups
+import lookahead as _lookahead  # #255 — Two-Week Look-Ahead (auto-draft + editable)
 
 _DROPPLAN_ROLES = ('admin', 'c_suite', 'pm', 'super')
 _DROPPLAN_COST_ROLES = ('admin', 'c_suite')
@@ -8107,6 +8108,139 @@ def api_dropplan_rollup(project_code):
     except Exception as e:
         logging.error(f"GET /api/projects/{project_code}/dropplan-rollup: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+
+# ============= TWO-WEEK LOOK-AHEAD (#255) — auto-draft + editable =============
+# Gated as the project Drop-Plan views are. AUTO-DRAFTS planned activity bars
+# from the Drop Plan; the super adjusts by dragging. A re-draft (?refresh=1)
+# re-projects ONLY the untouched source='auto' rows — manual/custom rows survive.
+
+def _lookahead_default_start():
+    """This week's Monday, LOCAL — the natural window start."""
+    t = date.today()
+    return (t - timedelta(days=t.weekday())).isoformat()
+
+
+@app.route('/api/projects/<project_code>/lookahead', methods=['GET'])
+@requires_role(*_DROPPLAN_ROLES)
+def api_lookahead_get(project_code):
+    """Window load. Auto-drafts on first open (no rows yet) or when ?refresh=1
+    (re-projects auto rows, keeps manual/custom). LOCAL dates; no-store."""
+    start = (request.args.get('start') or '').strip() or _lookahead_default_start()
+    try:
+        date.fromisoformat(start)
+    except ValueError:
+        return jsonify({"error": "start must be YYYY-MM-DD"}), 400
+    refresh = request.args.get('refresh') in ('1', 'true', 'yes')
+    conn = db()
+    try:
+        have = conn.execute("SELECT COUNT(*) FROM lookahead_activity WHERE project_code=?",
+                            (project_code,)).fetchone()[0]
+        if refresh or have == 0:
+            _lookahead.draft_lookahead(conn, project_code, start)
+            conn.commit()
+        data = _lookahead.load_window(conn, project_code, start)
+    finally:
+        conn.close()
+    resp = response_wrapper(data)
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    return resp
+
+
+@app.route('/api/projects/<project_code>/lookahead/activities', methods=['POST'])
+@requires_role(*_DROPPLAN_ROLES)
+def api_lookahead_add(project_code):
+    """Add a manual activity — a drop activity OR a custom no-drop/project-wide
+    row. Body: drop_id (nullable), name, activity_type, planned_start,
+    planned_finish, crew, notes. LOCAL dates."""
+    body = request.get_json(silent=True) or {}
+    name = (body.get('name') or '').strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+    atype = (body.get('activity_type') or 'work').strip()
+    if atype not in ('stage', 'work', 'delivery', 'inspection'):
+        return jsonify({"error": "bad activity_type"}), 400
+    ps = (body.get('planned_start') or '').strip()
+    pf = (body.get('planned_finish') or ps).strip()
+    try:
+        date.fromisoformat(ps); date.fromisoformat(pf)
+    except ValueError:
+        return jsonify({"error": "planned_start/finish must be YYYY-MM-DD"}), 400
+    if pf < ps:
+        pf = ps
+    if atype in ('delivery', 'inspection'):
+        pf = ps  # milestones are single-day
+    drop_id = (body.get('drop_id') or None) or None
+    conn = db()
+    try:
+        nxt = conn.execute("SELECT COALESCE(MAX(sort_order),0)+1 FROM lookahead_activity "
+                          "WHERE project_code=?", (project_code,)).fetchone()[0]
+        cur = conn.execute(
+            "INSERT INTO lookahead_activity (project_code, drop_id, name, activity_type, "
+            "planned_start, planned_finish, crew, source, notes, sort_order) "
+            "VALUES (?,?,?,?,?,?,?, 'manual', ?, ?)",
+            (project_code, drop_id, name, atype, ps, pf, body.get('crew'), body.get('notes'), nxt))
+        conn.commit()
+        return response_wrapper({"id": cur.lastrowid}), 201
+    finally:
+        conn.close()
+
+
+@app.route('/api/lookahead/activities/<int:aid>', methods=['PATCH'])
+@requires_role(*_DROPPLAN_ROLES)
+def api_lookahead_patch(aid):
+    """Edit/drag an activity. Dragging (planned_start/finish) or editing
+    (name/crew/type) flips the row to source='manual' so a re-draft never
+    clobbers it. LOCAL dates."""
+    body = request.get_json(silent=True) or {}
+    conn = db()
+    try:
+        row = conn.execute("SELECT * FROM lookahead_activity WHERE id=?", (aid,)).fetchone()
+        if not row:
+            return jsonify({"error": "not found"}), 404
+        row = dict(row)
+        sets, args = [], []
+        if 'planned_start' in body or 'planned_finish' in body:
+            ps = (body.get('planned_start') or row['planned_start'])
+            pf = (body.get('planned_finish') or row['planned_finish'])
+            try:
+                date.fromisoformat(ps); date.fromisoformat(pf)
+            except ValueError:
+                return jsonify({"error": "dates must be YYYY-MM-DD"}), 400
+            if pf < ps:
+                pf = ps
+            if row['activity_type'] in ('delivery', 'inspection'):
+                pf = ps
+            sets += ["planned_start=?", "planned_finish=?"]; args += [ps, pf]
+        if 'name' in body:
+            sets.append("name=?"); args.append((body.get('name') or '').strip())
+        for k in ('crew', 'notes'):
+            if k in body:
+                sets.append(f"{k}=?"); args.append(body.get(k) or None)
+        if 'activity_type' in body and body['activity_type'] in ('stage', 'work', 'delivery', 'inspection'):
+            sets.append("activity_type=?"); args.append(body['activity_type'])
+        if not sets:
+            return jsonify({"error": "nothing to update"}), 400
+        sets += ["source='manual'", "updated_at=CURRENT_TIMESTAMP"]  # any edit locks it manual
+        conn.execute(f"UPDATE lookahead_activity SET {', '.join(sets)} WHERE id=?", (*args, aid))
+        conn.commit()
+        out = dict(conn.execute("SELECT * FROM lookahead_activity WHERE id=?", (aid,)).fetchone())
+        return response_wrapper(out)
+    finally:
+        conn.close()
+
+
+@app.route('/api/lookahead/activities/<int:aid>', methods=['DELETE'])
+@requires_role(*_DROPPLAN_ROLES)
+def api_lookahead_delete(aid):
+    """Remove an activity row."""
+    conn = db()
+    try:
+        conn.execute("DELETE FROM lookahead_activity WHERE id=?", (aid,))
+        conn.commit()
+        return response_wrapper({"deleted": aid})
+    finally:
+        conn.close()
 
 
 def _parse_dim(body, key):

@@ -1087,7 +1087,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #248 · 2026-06-12 · security — static serving restricted to vendored assets; artifacts gated via /project-files</div>
+          <div class="ph-build" id="ph-build-stamp">build #255 · 2026-06-15 · Two-Week Look-Ahead — activity-row Gantt auto-drafted from the Drop Plan; drag-edit, add/remove, paginated print</div>
         </div>
       </section>
 
@@ -1524,56 +1524,277 @@
 
       <!-- SCHEDULE -->
       <section class="view" data-view="schedule">
-        <div class="section">
-          <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;gap:12px;">
+        <style>
+          /* #255 — Two-Week Look-Ahead activity-row Gantt (approved mockup, Lumen+Oat). */
+          .la-wrap{overflow-x:auto}
+          .la-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:12px}
+          .la-sub{color:var(--muted,#8c92a0);font-size:12px;margin-top:2px}
+          .la-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+          .la-lbl{font-size:11px;color:var(--muted,#8c92a0);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+          #la-start{width:128px}
+          .la-btn{padding:6px 12px;font-size:12px;display:inline-flex;align-items:center;gap:6px}
+          .la-ic{width:13px;height:13px}
+          .la-win{font-size:11px;color:var(--muted,#8c92a0);text-align:right;align-self:center}.la-win b{color:var(--ink,#222633)}
+          .la-hero{display:flex;gap:20px;align-items:center;border-top:1px solid var(--line,#eceef3);border-bottom:1px solid var(--line,#eceef3);padding:10px 0;margin:8px 0;flex-wrap:wrap}
+          .la-k b{font-size:16px;font-weight:700}.la-k s{font-size:10.5px;color:var(--muted,#8c92a0);text-decoration:none;margin-left:5px}
+          .la-k.warn b{color:#e9685a}
+          .la-lg{margin-left:auto;display:flex;gap:14px;font-size:11px;color:var(--muted,#8c92a0);flex-wrap:wrap}.la-lg span{display:inline-flex;align-items:center;gap:5px}
+          .la-sw{width:14px;height:9px;border-radius:3px}
+          .la-grid{min-width:980px}
+          .la-ghead{display:grid;grid-template-columns:240px 1fr 46px;border-bottom:2px solid var(--ink,#222633);padding-bottom:5px}
+          .la-ghead .lh{font-size:10px;font-weight:700;color:var(--muted,#8c92a0);letter-spacing:.04em;text-transform:uppercase;align-self:end}
+          .la-days{display:grid;grid-template-columns:repeat(10,1fr)}
+          .la-days .d{font-size:9.5px;font-weight:700;color:var(--muted,#8c92a0);text-align:center;border-left:1px solid #eef0f2;padding:1px 0}
+          .la-days .d.today{background:#fff6e9;color:#b07d2e;border-radius:5px 5px 0 0}.la-days .d s{display:block;font-size:8px;color:#b8bdc6;text-decoration:none}
+          .la-drop{border:1px solid var(--line,#eceef3);border-radius:10px;margin-top:10px;overflow:hidden;box-shadow:0 1px 4px rgba(30,35,45,.04)}
+          .la-drophead{display:grid;grid-template-columns:240px 1fr 46px;background:#f6f8fb;border-bottom:1px solid var(--line,#eceef3);padding:7px 0;align-items:center}
+          .la-dl{padding-left:12px;font-weight:800;font-size:13px;display:flex;align-items:center;gap:8px}
+          .la-elb{width:9px;height:9px;border-radius:3px;background:#6f8bb5;flex:none}
+          .la-dl s{color:var(--muted,#8c92a0);font-size:10px;font-weight:600;text-decoration:none}
+          .la-stat{font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:999px;justify-self:end;margin-right:10px;grid-column:3}
+          .la-stat.active{color:var(--accent-ink,#3a5fd0);background:var(--accent-soft,#ebf0fe)}
+          .la-stat.behind{color:#e9685a;background:#fceeec}
+          .la-stat.soon{color:#8f8675;background:#f3f0e9}
+          .la-ar{display:grid;grid-template-columns:240px 1fr 46px;align-items:center;border-bottom:1px solid #f4f5f7;min-height:34px}
+          .la-ar:last-child{border-bottom:none}
+          .la-an{padding-left:24px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:7px;min-width:0}
+          .la-an .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+          .la-an .crew{margin-left:auto;margin-right:6px;font-size:9.5px;color:var(--muted,#8c92a0);font-weight:600;white-space:nowrap}
+          .la-an.milestone{color:var(--muted,#8c92a0);font-weight:600;font-size:11.5px}
+          .la-an .rm{cursor:pointer;color:#cfd4db;font-weight:700;font-size:15px;line-height:1;padding:0 2px}.la-an .rm:hover{color:#e9685a}
+          .la-track{display:grid;grid-template-columns:repeat(10,1fr);position:relative;height:34px;align-items:center}
+          .la-track .cell{border-left:1px solid #f6f7f9;height:100%}.la-track .cell.today{background:#fff6e9}
+          .la-bar{height:20px;border-radius:6px;display:flex;align-items:center;padding:0 7px;font-size:9.5px;font-weight:700;color:#fff;cursor:grab;box-shadow:0 1px 4px rgba(30,35,45,.14);grid-row:1;position:relative;overflow:hidden;white-space:nowrap;touch-action:none;user-select:none}
+          .la-bar.dragging{cursor:grabbing;opacity:.92;box-shadow:0 3px 10px rgba(30,35,45,.25)}
+          .la-bar.stage,.la-bar.work{background:linear-gradient(90deg,#6a8df5,#4364dc)}
+          .la-bar.behind{background:linear-gradient(90deg,#f08a7c,#e9685a)}
+          .la-bar.soon{background:linear-gradient(90deg,#ded6c8,#cabfad);color:#8f8675;box-shadow:0 1px 3px rgba(30,35,45,.08)}
+          .la-bar .gr{position:absolute;top:0;bottom:0;width:8px;cursor:ew-resize;touch-action:none}.la-bar .gr.l{left:0}.la-bar .gr.r{right:0}
+          .la-mile{grid-row:1;justify-self:center;width:18px;height:18px;background:#fff;border:2px solid #c2914e;transform:rotate(45deg);border-radius:3px;cursor:grab;box-shadow:0 1px 4px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;touch-action:none}
+          .la-mile.insp{border-color:#15a07e}
+          .la-mile span{transform:rotate(-45deg);font-size:9px;display:flex}
+          .la-cflag{font-size:10px;font-weight:700;text-align:center;color:var(--accent-ink,#3a5fd0)}
+          .la-hint{color:var(--muted,#8c92a0);font-size:12px;margin-top:13px}
+          .la-mbg{display:none;position:fixed;inset:0;background:rgba(20,22,28,.5);z-index:1200;align-items:flex-start;justify-content:center;padding:48px 16px;overflow:auto}
+          .la-mbg.show{display:flex}
+          .la-modal{background:#fff;border-radius:12px;max-width:480px;width:100%;padding:20px 22px;box-shadow:0 18px 50px rgba(0,0,0,.28)}
+          .la-modal h3{margin:0 0 14px;font-size:17px}
+          .la-fr{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+          .la-fr .full{grid-column:1/3}
+          .la-fr label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted,#8c92a0);margin-bottom:3px}
+          .la-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}
+          /* ===== PRINT — continuous, no mid-drop split, Page X of Y ===== */
+          @media print {
+            body * { visibility:hidden; }
+            #la-wrap, #la-wrap * { visibility:visible; }
+            #la-wrap{position:absolute;left:0;top:0;width:100%;box-shadow:none;border:none;padding:0;margin:0;overflow:visible}
+            .la-controls,.la-hint,.la-lg,.la-mbg{display:none !important}
+            .la-grid{min-width:0}
+            .la-track .cell.today,.la-days .d.today{background:#f3f3f3 !important;color:#444 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+            .la-bar{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+            /* a drop group (and each activity row) NEVER splits across a page */
+            .la-drop{break-inside:avoid;page-break-inside:avoid}
+            .la-ar{break-inside:avoid;page-break-inside:avoid}
+            .la-drophead{break-after:avoid;page-break-after:avoid}
+            @page{
+              margin:14mm 12mm 16mm 12mm;
+              @top-left{content:"Two-Week Look-Ahead";font:bold 10px Inter,sans-serif;color:#222}
+              @top-right{content:"890 E 135th St · FR-BX-001";font:10px Inter,sans-serif;color:#666}
+              @bottom-center{content:"Page " counter(page) " of " counter(pages);font:10px Inter,sans-serif;color:#666}
+            }
+          }
+        </style>
+        <div class="section la-wrap" id="la-wrap">
+          <div class="la-top">
             <div>
               <h2 style="margin-bottom:0;">Two-Week Look-Ahead</h2>
-              <div style="font-size:12px;color:#76777E;margin-top:4px;">Drop rows × 10 working days · activities from drop_activities · constraints from open schedule-impact RFIs.</div>
+              <div class="la-sub" id="la-sub">Auto-drafted from the Drop Plan · drag to adjust</div>
             </div>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <label style="font-size:11px;color:#76777E;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Start</label>
-              <input type="date" id="la-start" style="padding:6px 10px;border:1px solid #E8E4DD;border-radius:4px;font-size:13px;font-family:inherit;">
-              <button id="la-refresh" type="button" style="background:white;border:1px solid #B11E2E;color:#B11E2E;padding:6px 12px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;">Refresh</button>
-              <button id="la-open" type="button" style="background:#B11E2E;color:white;border:none;padding:6px 12px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;">Open ↗</button>
+            <div class="la-controls">
+              <label class="la-lbl">Start</label>
+              <input type="text" id="la-start" class="ssc-date" placeholder="MM-DD-YYYY">
+              <button id="la-refresh" type="button" class="btn-ghost la-btn"><svg class="la-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>Refresh</button>
+              <button id="la-add" type="button" class="btn-ghost la-btn"><svg class="la-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add activity</button>
+              <button id="la-print" type="button" class="btn-primary la-btn"><svg class="la-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M8 14h8v6H8z"/></svg>Print</button>
+              <div class="la-win" id="la-win"></div>
             </div>
           </div>
-          <!-- Live Look-Ahead renders inline via /api/projects/<code>/lookahead/render?start=YYYY-MM-DD.
-               Iframe so the report's self-contained styles don't leak into the dashboard chrome. -->
-          <iframe id="la-frame" style="width:100%;height:75vh;border:1px solid #E8E4DD;border-radius:6px;background:white;" title="Two-Week Look-Ahead"></iframe>
+          <div class="la-hero" id="la-hero"></div>
+          <div class="la-grid" id="la-board"><div class="ph-loading" style="padding:20px;color:#76777E;">Loading the look-ahead…</div></div>
+          <div class="la-hint">Drag a bar to move it · drag an edge to resize · drag a delivery/inspection diamond to its day. Auto-drafted from the Drop Plan — you adjust. Print = full-page PDF for the trailer wall.</div>
+        </div>
+        <!-- Add activity modal -->
+        <div class="la-mbg" id="la-modal">
+          <div class="la-modal">
+            <h3>Add activity</h3>
+            <div class="la-fr">
+              <div class="full"><label>Drop</label><select id="lam-drop" class="ssc-field"></select></div>
+              <div class="full"><label>Name</label><input id="lam-name" class="ssc-field" type="text" placeholder="e.g. Interior cleaning — rain day"></div>
+              <div><label>Type</label><select id="lam-type" class="ssc-field"><option value="work">Work</option><option value="stage">Stage</option><option value="delivery">Delivery</option><option value="inspection">Inspection</option></select></div>
+              <div><label>Crew</label><input id="lam-crew" class="ssc-field" type="text" placeholder="e.g. Rope · 2"></div>
+              <div><label>Start</label><input id="lam-start" class="ssc-date" type="text" placeholder="MM-DD-YYYY"></div>
+              <div><label>Finish</label><input id="lam-finish" class="ssc-date" type="text" placeholder="MM-DD-YYYY"></div>
+              <div class="full"><label>Notes</label><input id="lam-notes" class="ssc-field" type="text" placeholder="optional"></div>
+            </div>
+            <div class="la-foot">
+              <button id="lam-cancel" type="button" class="btn-ghost">Cancel</button>
+              <button id="lam-save" type="button" class="btn-primary">Add activity</button>
+            </div>
+          </div>
         </div>
       </section>
       <script>
+      // #255 — Two-Week Look-Ahead: activity-row Gantt, auto-drafted from the
+      // Drop Plan, drag-to-edit (move/resize bars + drag milestone diamonds),
+      // add/remove (incl. custom no-drop), Refresh, paginated Print. LOCAL dates.
       (function() {
         const PROJECT = (typeof PROJECT_CODE !== 'undefined') ? PROJECT_CODE : 'FR-BX-001';
-        const startEl = document.getElementById('la-start');
-        const frame   = document.getElementById('la-frame');
-        const refresh = document.getElementById('la-refresh');
-        const openBtn = document.getElementById('la-open');
-        function todayLocal() {
-          const d = new Date();
-          return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+        const startEl=document.getElementById('la-start');
+        const board=document.getElementById('la-board');
+        const hero=document.getElementById('la-hero');
+        const winEl=document.getElementById('la-win');
+        const modal=document.getElementById('la-modal');
+        let LA=null;  // last-loaded window
+        function tLocal(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+        function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+        function mdy(iso){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso||''));return m?m[2]+'-'+m[3]+'-'+m[1]:(iso||'');}
+        function startISO(){return window.SSCDatePicker?(SSCDatePicker.getISO(startEl)||tLocal()):(startEl.value||tLocal());}
+        function giso(el){return window.SSCDatePicker?SSCDatePicker.getISO(el):el.value;}
+
+        async function laLoad(refresh){
+          board.innerHTML='<div style="padding:20px;color:#76777E;">Loading the look-ahead…</div>';
+          const url='/api/projects/'+encodeURIComponent(PROJECT)+'/lookahead?start='+encodeURIComponent(startISO())+(refresh?'&refresh=1':'');
+          try{ const j=await fetch(url,{credentials:'include'}).then(r=>r.json()); LA=j.data||j; laRender(); }
+          catch(e){ board.innerHTML='<div style="padding:20px;color:#e9685a;">Could not load the look-ahead.</div>'; }
         }
-        function urlFor(startISO) {
-          return '/api/projects/' + encodeURIComponent(PROJECT) + '/lookahead/render?start=' + encodeURIComponent(startISO);
+
+        function dayHeaderHtml(){
+          const cells=LA.days.map(d=>'<div class="d'+(d.is_today?' today':'')+'">'+d.dow+'<s>'+d.md+'</s></div>').join('');
+          return '<div class="la-ghead"><div class="lh" style="padding-left:12px">Activity</div><div class="la-days">'+cells+'</div><div class="lh" style="text-align:center">CONS</div></div>';
         }
-        function load() {
-          // Wired date picker stores canonical YYYY-MM-DD on dataset.iso.
-          const iso = window.SSCDatePicker ? (SSCDatePicker.getISO(startEl) || todayLocal()) : (startEl.value || todayLocal());
-          frame.src = urlFor(iso);
+        function trackCells(){ return LA.days.map(d=>'<div class="cell'+(d.is_today?' today':'')+'"></div>').join(''); }
+        function activityRowHtml(a, status){
+          const isMile = a.activity_type==='delivery' || a.activity_type==='inspection';
+          const crew = a.crew?'<span class="crew">'+esc(a.crew)+'</span>':(isMile?'':'<span class="crew">—</span>');
+          const rm='<span class="rm" data-rm="'+a.id+'" title="Remove">×</span>';
+          let track=trackCells();
+          if(a.grid){
+            if(isMile){
+              const c=a.grid[0];
+              const icon = a.activity_type==='delivery'
+                ? '<svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="#c2914e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v8H3zM14 10h4l3 3v2h-7z"/><circle cx="7" cy="18" r="1.4"/><circle cx="17" cy="18" r="1.4"/></svg>'
+                : '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#15a07e" stroke-width="3" stroke-linecap="round"><path d="M5 12l5 5L20 6"/></svg>';
+              track+='<div class="la-mile'+(a.activity_type==='inspection'?' insp':'')+'" data-mile="'+a.id+'" style="grid-column:'+c+' / '+(c+1)+'"><span>'+icon+'</span></div>';
+            } else {
+              const cls = status==='behind'?'behind':(status==='soon'?'soon':'stage');
+              const span=a.grid[1]-a.grid[0];
+              const lbl = span>=2 ? esc(a.name.slice(0,18)) : '';
+              track+='<div class="la-bar '+cls+'" data-bar="'+a.id+'" style="grid-column:'+a.grid[0]+' / '+a.grid[1]+'"><span class="gr l" data-grip="l"></span>'+lbl+'<span class="gr r" data-grip="r"></span></div>';
+            }
+          }
+          const name = isMile
+            ? '<div class="la-an milestone"><span class="nm">'+(a.activity_type==='delivery'?'🧱 ':'✓ ')+esc(a.name)+'</span>'+crew+rm+'</div>'
+            : '<div class="la-an"><span class="nm">'+esc(a.name)+'</span>'+crew+rm+'</div>';
+          return '<div class="la-ar">'+name+'<div class="la-track">'+track+'</div><div class="la-cflag">—</div></div>';
         }
-        if (window.SSCDatePicker) SSCDatePicker.setISO(startEl, todayLocal());
-        else startEl.value = todayLocal();
-        if (window.SSCDatePicker) SSCDatePicker.wire(startEl);
-        refresh.addEventListener('click', load);
-        openBtn.addEventListener('click', () => {
-          const iso = window.SSCDatePicker ? (SSCDatePicker.getISO(startEl) || todayLocal()) : (startEl.value || todayLocal());
-          window.open(urlFor(iso), '_blank');
+        function dropGroupHtml(g){
+          let head;
+          if(g._general){
+            head='<div class="la-drophead"><div class="la-dl"><span class="la-elb" style="background:#cabfad"></span>'+esc(g.label)+' <s>· project-wide</s></div><div></div><div></div></div>';
+          } else {
+            const statName=g.status==='behind'?'Behind':(g.status==='soon'?'Starts soon':'Active');
+            const sub=g.status==='soon'?'· not started':('· stage '+g.stage_index+' of '+g.stage_total);
+            const behindTag=g.behind_days>0?' <span style="color:#e9685a;font-size:9px;font-weight:700">+'+g.behind_days+' days</span>':'';
+            head='<div class="la-drophead"><div class="la-dl"><span class="la-elb"></span>'+esc(g.label)+behindTag+' <s>'+sub+'</s></div><div></div><span class="la-stat '+g.status+'">'+statName+'</span></div>';
+          }
+          return '<div class="la-drop">'+head+g.activities.map(a=>activityRowHtml(a,g._general?'active':g.status)).join('')+'</div>';
+        }
+        function laRender(){
+          const k=LA.kpis;
+          hero.innerHTML='<div class="la-k"><b>'+k.active_drops+'</b><s>active drops</s></div>'
+            +'<div class="la-k"><b>'+k.activities+'</b><s>activities</s></div>'
+            +'<div class="la-k"><b>'+k.deliveries+'</b><s>deliveries</s></div>'
+            +'<div class="la-k'+(k.behind>0?' warn':'')+'"><b>'+k.behind+'</b><s>behind</s></div>'
+            +'<div class="la-lg"><span><span class="la-sw" style="background:#4364dc"></span>active</span><span><span class="la-sw" style="background:#e9685a"></span>behind</span><span><span class="la-sw" style="background:#cabfad"></span>upcoming</span><span><span style="width:11px;height:11px;border:2px solid #c2914e;transform:rotate(45deg);display:inline-block;border-radius:2px"></span>delivery</span><span><span style="width:11px;height:11px;border:2px solid #15a07e;transform:rotate(45deg);display:inline-block;border-radius:2px"></span>inspection</span></div>';
+          winEl.innerHTML='Window <b>'+mdy(LA.window_start)+' – '+mdy(LA.window_end)+'</b> · 10 working days';
+          let html=dayHeaderHtml();
+          LA.groups.forEach(g=>{ html+=dropGroupHtml(g); });
+          if(LA.general && LA.general.length){
+            html+=dropGroupHtml({label:'General / no drop',_general:true,activities:LA.general});
+          }
+          board.innerHTML=html;
+        }
+
+        // ---- drag to edit (snap to day columns; persist LOCAL planned dates) ----
+        let drag=null;
+        board.addEventListener('pointerdown',e=>{
+          const grip=e.target.closest('.gr'); const bar=e.target.closest('.la-bar'); const mile=e.target.closest('.la-mile');
+          const el=grip?bar:(bar||mile); if(!el)return;
+          const track=el.closest('.la-track'); if(!track)return;
+          const gc=el.style.gridColumn.split('/').map(s=>parseInt(s.trim(),10));
+          drag={el,track,colW:track.clientWidth/10,startX:e.clientX,cs:gc[0],ce:gc[1],
+                kind:(mile&&!bar)?'mile':(grip?('resize'+grip.getAttribute('data-grip').toUpperCase()):'move'),
+                aid:(mile&&!bar)?mile.getAttribute('data-mile'):bar.getAttribute('data-bar')};
+          el.classList.add('dragging'); try{el.setPointerCapture(e.pointerId);}catch(_){} e.preventDefault();
         });
-        startEl.addEventListener('change', load);
-        // Lazy-load on first nav into the Schedule view; the iframe is
-        // cheap to leave empty until the operator looks at it.
-        const navLink = document.querySelector('.nav-link[data-view="schedule"]');
-        if (navLink) navLink.addEventListener('click', () => { if (!frame.src) load(); });
+        board.addEventListener('pointermove',e=>{
+          if(!drag)return;
+          const delta=Math.round((e.clientX-drag.startX)/drag.colW);
+          let cs=drag.cs, ce=drag.ce;
+          if(drag.kind==='move'){ const w=ce-cs; cs=Math.max(1,Math.min(11-w,drag.cs+delta)); ce=cs+w; }
+          else if(drag.kind==='resizeL'){ cs=Math.max(1,Math.min(drag.ce-1,drag.cs+delta)); ce=drag.ce; }
+          else if(drag.kind==='resizeR'){ cs=drag.cs; ce=Math.max(drag.cs+1,Math.min(11,drag.ce+delta)); }
+          else { const c=Math.max(1,Math.min(10,drag.cs+delta)); cs=c; ce=c+1; }
+          drag.el.style.gridColumn=cs+' / '+ce; drag._cs=cs; drag._ce=ce;
+        });
+        board.addEventListener('pointerup',async ()=>{
+          if(!drag)return; const d=drag; drag=null; d.el.classList.remove('dragging');
+          const cs=d._cs||d.cs, ce=d._ce||d.ce;
+          const ps=(d.kind==='mile')?LA.days[cs-1].iso:LA.days[cs-1].iso;
+          const pf=(d.kind==='mile')?LA.days[cs-1].iso:LA.days[ce-2].iso;
+          try{ await fetch('/api/lookahead/activities/'+d.aid,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({planned_start:ps,planned_finish:pf})}); }catch(_){}
+        });
+
+        // ---- remove ----
+        board.addEventListener('click',async e=>{
+          const rm=e.target.closest('[data-rm]'); if(!rm)return;
+          await fetch('/api/lookahead/activities/'+rm.getAttribute('data-rm'),{method:'DELETE',credentials:'include'});
+          laLoad(false);
+        });
+
+        // ---- add ----
+        function openAdd(){
+          const sel=document.getElementById('lam-drop');
+          sel.innerHTML='<option value="">— No drop / project-wide —</option>'+((LA?LA.groups:[]).map(g=>'<option value="'+esc(g.drop_id)+'">'+esc(g.label)+'</option>').join(''));
+          ['lam-name','lam-crew','lam-notes'].forEach(id=>document.getElementById(id).value='');
+          document.getElementById('lam-type').value='work';
+          const seed=(LA?LA.window_start:startISO());
+          if(window.SSCDatePicker){ ['lam-start','lam-finish'].forEach(id=>{const el=document.getElementById(id);SSCDatePicker.wire(el);SSCDatePicker.setISO(el,seed);}); }
+          modal.classList.add('show');
+        }
+        function closeAdd(){ modal.classList.remove('show'); }
+        document.getElementById('la-add').addEventListener('click',openAdd);
+        document.getElementById('lam-cancel').addEventListener('click',closeAdd);
+        modal.addEventListener('click',e=>{ if(e.target===modal)closeAdd(); });
+        document.getElementById('lam-save').addEventListener('click',async ()=>{
+          const name=document.getElementById('lam-name').value.trim(); if(!name){alert('Name is required');return;}
+          const body={drop_id:document.getElementById('lam-drop').value||null,name,
+            activity_type:document.getElementById('lam-type').value,
+            crew:document.getElementById('lam-crew').value||null,notes:document.getElementById('lam-notes').value||null,
+            planned_start:giso(document.getElementById('lam-start')),planned_finish:giso(document.getElementById('lam-finish'))};
+          const r=await fetch('/api/projects/'+encodeURIComponent(PROJECT)+'/lookahead/activities',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+          if(r.ok){ closeAdd(); laLoad(false); } else { const j=await r.json().catch(()=>({})); alert(j.error||'Add failed'); }
+        });
+
+        // ---- controls ----
+        document.getElementById('la-refresh').addEventListener('click',()=>laLoad(true));
+        document.getElementById('la-print').addEventListener('click',()=>window.print());
+        if(window.SSCDatePicker){ SSCDatePicker.setISO(startEl,tLocal()); SSCDatePicker.wire(startEl); } else { startEl.value=tLocal(); }
+        startEl.addEventListener('change',()=>laLoad(false));
+        let loaded=false;
+        const navLink=document.querySelector('.nav-link[data-view="schedule"]');
+        if(navLink) navLink.addEventListener('click',()=>{ if(!loaded){loaded=true;laLoad(false);} });
+        if(document.querySelector('section[data-view="schedule"].active')){ loaded=true; laLoad(false); }
       })();
       </script>
 

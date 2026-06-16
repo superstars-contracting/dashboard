@@ -170,6 +170,64 @@ def behavioral_propagation_check():
         _prop_teardown()
 
 
+# ---- (#255) look-ahead persistence: drag / add / remove survive a reload ------
+
+_LA_PROJ = "ZZ-SMOKE-LA"
+
+
+def _la_teardown():
+    conn = sqlite3.connect(str(DB_PATH), timeout=60)
+    try:
+        conn.execute("DELETE FROM lookahead_activity WHERE project_code=?", (_LA_PROJ,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _la_all(win):
+    return list(win.get("general", [])) + [a for g in win.get("groups", []) for a in g.get("activities", [])]
+
+
+def behavioral_lookahead_check():
+    """The Two-Week Look-Ahead is the editable master-schedule source of truth, so
+    an ADDED activity must persist, a DRAGGED activity's LOCAL planned dates must
+    survive a reload (and lock it source='manual'), and a REMOVED one must be
+    gone. Drives add -> drag(PATCH) -> remove(DELETE) on a synthetic project and
+    asserts each round-trips through a fresh GET. Returns (ok_bool, note)."""
+    _la_teardown()
+    base = f"{BASE}/api/projects/{_LA_PROJ}/lookahead"
+    try:
+        r = requests.post(base + "/activities", json={
+            "name": "ZZ smoke activity", "activity_type": "work",
+            "planned_start": "2026-06-15", "planned_finish": "2026-06-16"}, timeout=15)
+        if r.status_code not in (200, 201):
+            return False, f"add failed ({r.status_code})"
+        aid = (r.json().get("data") or {}).get("id")
+        if not aid:
+            return False, "add returned no id"
+        win = requests.get(base + "?start=2026-06-15", timeout=15).json()["data"]
+        if not any(a["id"] == aid for a in _la_all(win)):
+            return False, "added activity did not persist"
+        # drag: PATCH new LOCAL planned dates -> must persist + lock manual
+        p = requests.patch(f"{BASE}/api/lookahead/activities/{aid}",
+                           json={"planned_start": "2026-06-18", "planned_finish": "2026-06-19"}, timeout=15)
+        if p.status_code != 200:
+            return False, f"drag PATCH failed ({p.status_code})"
+        win2 = requests.get(base + "?start=2026-06-15", timeout=15).json()["data"]
+        a = next((x for x in _la_all(win2) if x["id"] == aid), None)
+        if not (a and a["planned_start"] == "2026-06-18" and a["planned_finish"] == "2026-06-19"
+                and a["source"] == "manual"):
+            return False, "dragged planned dates did not persist (or did not lock manual)"
+        # remove: DELETE -> must be gone
+        requests.delete(f"{BASE}/api/lookahead/activities/{aid}", timeout=15)
+        win3 = requests.get(base + "?start=2026-06-15", timeout=15).json()["data"]
+        if any(x["id"] == aid for x in _la_all(win3)):
+            return False, "removed activity still present"
+        return True, "add + drag (persisted LOCAL dates, locked manual) + remove all round-trip"
+    finally:
+        _la_teardown()
+
+
 def main():
     # ---- self-test: prove the matchers discriminate broken vs fixed ----------
     print("== self-test (prove each matcher fails on the broken pattern) ==")
@@ -230,6 +288,14 @@ def main():
     except Exception as e:
         prop_ok, prop_note = False, f"check errored: {type(e).__name__}: {e}"
     ok("approved_rate_propagates_to_tracker", prop_ok, prop_note)
+
+    # ---- (#255) look-ahead: drag / add / remove persist across a reload -------
+    print("\n== look-ahead persistence (drag / add / remove round-trip) ==")
+    try:
+        la_ok, la_note = behavioral_lookahead_check()
+    except Exception as e:
+        la_ok, la_note = False, f"check errored: {type(e).__name__}: {e}"
+    ok("lookahead_drag_add_remove_persist", la_ok, la_note)
 
     print(f"\n== RESULT: {len(PASS)} PASS / {len(FAIL)} FAIL ==")
     if FAIL:
