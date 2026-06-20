@@ -280,3 +280,27 @@ def project_rollup(conn: sqlite3.Connection, project_code: str, include_cost: bo
             (project_code,)).fetchone()[0]
         out["total_expenses"] = exp if exp is not None else 0.0
     return out
+
+
+def progress_pair(conn: sqlite3.Connection, drop_id: str,
+                  project_code: Optional[str] = None) -> dict:
+    """The ONE derived value the stage-write endpoint returns so every surface
+    (drop-plan card, drop-report, progress widget/hero) recomputes off the same
+    canonical stage-status source — never a stored/cached % that can go stale (#256).
+
+    Returns the per-drop % AND the project overall %, both freshly derived from
+    drop_stage_status via drop_progress / project_rollup. The overall % is the
+    weighted rollup (Σ complete / Σ applicable across drops), so it matches the
+    per-drop math exactly. project_code is looked up from the drop when omitted."""
+    prog = drop_progress(conn, drop_id)
+    if project_code is None:
+        row = conn.execute("SELECT project_code FROM drops WHERE drop_id=?", (drop_id,)).fetchone()
+        project_code = row["project_code"] if row else None
+    overall = (project_rollup(conn, project_code, include_cost=False)["overall_progress_pct"]
+               if project_code else 0.0)
+    return {
+        "drop_pct": prog["pct"],
+        "overall_pct": overall,
+        "progress": prog,
+        "project_code": project_code,
+    }

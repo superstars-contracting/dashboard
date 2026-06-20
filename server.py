@@ -8537,19 +8537,49 @@ def api_dropplan_post_expense(project_code):
 @app.route('/api/dropplan/drops/<drop_id>/stages/<int:step_no>', methods=['PATCH'])
 @requires_role(*_DROPPLAN_ROLES)
 def api_dropplan_patch_stage(drop_id, step_no):
-    """Update a drop's stage status (status incl. n_a, dates, working days)."""
+    """Set a drop's stage state — and return the RECOMPUTED per-drop % and overall %.
+
+    The % is DERIVED on read from drop_stage_status (the single source every
+    surface uses); completing a stage is the only signal that moves it. So this
+    endpoint keeps status and the dates COHERENT server-side so the caller can't
+    leave a date without the matching status (the #256 field bug, where a start
+    date never flipped the stage to in_progress and there was no way to complete):
+
+      (1) set a START date  -> status in_progress (from not_started)
+      (2) mark COMPLETE w/ a LOCAL completion date -> status complete, % +1/total
+      (3) un-complete        -> status in_progress, completion date cleared, % reverts
+
+    Dates are LOCAL 'YYYY-MM-DD' (never UTC). Each response carries drop_pct +
+    overall_pct (the one derived helper) so all three surfaces render the same value."""
     try:
         body = request.get_json(silent=True) or {}
-        fields = {}
-        if 'status' in body:
-            if body['status'] not in ('not_started', 'in_progress', 'complete', 'n_a'):
-                return jsonify({"error": "bad status"}), 400
-            fields['status'] = body['status']
-        for k in ('started_on', 'completed_on', 'working_days_actual', 'note'):
-            if k in body:
-                fields[k] = body[k]
-        if not fields:
+        has_status = 'status' in body
+        new_status = body.get('status')
+        if has_status and new_status not in ('not_started', 'in_progress', 'complete', 'n_a'):
+            return jsonify({"error": "bad status"}), 400
+
+        def _vdate(key):
+            """('provided', val|None) when key present (val validated, '' -> None);
+            ('absent', None) otherwise. Raises ValueError on a non-LOCAL-date value."""
+            if key not in body:
+                return ('absent', None)
+            v = body[key]
+            if v is None or str(v).strip() == '':
+                return ('provided', None)
+            s = str(v).strip()
+            datetime.strptime(s, '%Y-%m-%d')   # LOCAL YYYY-MM-DD; raises on bad input
+            return ('provided', s)
+
+        try:
+            st_state, st_val = _vdate('started_on')
+            cp_state, cp_val = _vdate('completed_on')
+        except ValueError:
+            return jsonify({"error": "started_on/completed_on must be LOCAL YYYY-MM-DD"}), 400
+
+        if not (has_status or st_state == 'provided' or cp_state == 'provided'
+                or 'working_days_actual' in body or 'note' in body):
             return jsonify({"error": "no fields to update"}), 400
+
         conn = db()
         try:
             old = conn.execute("SELECT status, started_on, completed_on, working_days_actual "
@@ -8557,6 +8587,37 @@ def api_dropplan_patch_stage(drop_id, step_no):
                                (drop_id, step_no)).fetchone()
             if old is None:
                 return jsonify({"error": "stage row not found"}), 404
+
+            # ---- derive a COHERENT (status, dates) triple --------------------
+            final_started = st_val if st_state == 'provided' else old['started_on']
+            final_completed = cp_val if cp_state == 'provided' else old['completed_on']
+            if has_status:
+                final_status = new_status
+            elif cp_state == 'provided' and cp_val:
+                final_status = 'complete'                       # a completion date completes it
+            elif st_state == 'provided' and st_val and old['status'] == 'not_started':
+                final_status = 'in_progress'                   # a start date starts it
+            else:
+                final_status = old['status']
+
+            if final_status == 'complete':
+                if not final_completed:                        # UI always sends the chosen/backdated date
+                    final_completed = date.today().isoformat()  # LOCAL fallback only
+            elif final_status == 'in_progress':
+                final_completed = None                         # un-complete clears the completion date
+            elif final_status == 'not_started':
+                final_started = None
+                final_completed = None                         # full reset (e.g. un-N/A)
+            # 'n_a': leave the resolved dates as-is
+
+            fields = {'status': final_status,
+                      'started_on': final_started,
+                      'completed_on': final_completed}
+            if 'working_days_actual' in body:
+                fields['working_days_actual'] = body['working_days_actual']
+            if 'note' in body:
+                fields['note'] = body['note']
+
             # Column names come from the fixed whitelist above, not user input.
             sets = ", ".join(f"{k}=?" for k in fields)
             conn.execute(f"UPDATE drop_stage_status SET {sets} WHERE drop_id=? AND step_no=?",
@@ -8567,6 +8628,11 @@ def api_dropplan_patch_stage(drop_id, step_no):
             row = dict(conn.execute(
                 "SELECT drop_id, step_no, status, started_on, completed_on, working_days_actual, note "
                 "FROM drop_stage_status WHERE drop_id=? AND step_no=?", (drop_id, step_no)).fetchone())
+            # the ONE derived value — per-drop % AND project overall %, recomputed live
+            pair = _rollups.progress_pair(conn, drop_id)
+            row["drop_pct"] = pair["drop_pct"]
+            row["overall_pct"] = pair["overall_pct"]
+            row["progress"] = pair["progress"]
         finally:
             conn.close()
         return response_wrapper(row)

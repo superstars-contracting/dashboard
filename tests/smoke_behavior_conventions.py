@@ -93,6 +93,19 @@ def m_stage_chip_specific_empty(html):
     return uses_specific and not broken
 
 
+def m_stage_complete_control(html):
+    """(#256) the Drop Plan stage row exposes a backdatable COMPLETE control and an
+    UN-COMPLETE toggle, and the completion date rides a SSCDatePicker input. Pre-#256
+    the row had only a start-date chip + N/A toggle, so a stage could never be marked
+    complete — and since % counts only completed stages, the number could never move
+    (and stayed wrong after a hard refresh). The affordance to set the COMPLETION
+    signal must exist, be reversible, and use the date picker (backdatable)."""
+    has_complete = "data-complete=" in html
+    has_uncomplete = "data-uncomplete=" in html
+    has_completion_datepicker = "dp-cdatechip" in html  # SSCDatePicker-wired completion date
+    return has_complete and has_uncomplete and has_completion_datepicker
+
+
 # ---- (#254) cross-view BEHAVIORAL check: approved rate -> tracker resolution --
 
 _PROP_EID, _PROP_WID = "E-99254", "W-9954"
@@ -228,6 +241,149 @@ def behavioral_lookahead_check():
         _la_teardown()
 
 
+# ---- (#256) stage completion -> per-drop & overall % derived live, single-source --
+# The recurring class here is the #255 family (divergent / stale % source). The
+# fix: % is DERIVED on read from the canonical stage-status (drop_stage_status),
+# and COMPLETING a stage is the only signal that moves it. This drives the real
+# write-flow on a SYNTHETIC project+drop so the live FR-BX-001 data is untouched.
+
+_SC_PROJ = "ZZ-SMOKE-256"
+_SC_DROP = "ZZ-SMK-256-DP1"
+_SC_STEPS = 5
+
+
+def _sc_teardown():
+    conn = sqlite3.connect(str(DB_PATH), timeout=60)
+    try:
+        conn.execute("PRAGMA busy_timeout=60000;")
+        conn.execute("DELETE FROM audit_log WHERE action LIKE 'dropplan_%' AND target_id LIKE ?", (_SC_DROP + "#%",))
+        conn.execute("DELETE FROM drop_stage_status WHERE drop_id=?", (_SC_DROP,))
+        conn.execute("DELETE FROM drops WHERE drop_id=?", (_SC_DROP,))
+        conn.execute("DELETE FROM stage_template_steps WHERE template_id IN "
+                     "(SELECT template_id FROM stage_templates WHERE project_code=?)", (_SC_PROJ,))
+        conn.execute("DELETE FROM stage_templates WHERE project_code=?", (_SC_PROJ,))
+        conn.execute("DELETE FROM projects WHERE project_code=?", (_SC_PROJ,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _sc_setup():
+    conn = sqlite3.connect(str(DB_PATH), timeout=60)
+    try:
+        conn.execute("PRAGMA busy_timeout=60000;")
+        conn.execute("INSERT INTO projects(project_code,name) VALUES(?, 'ZZ Smoke 256 Progress')", (_SC_PROJ,))
+        conn.execute("INSERT INTO stage_templates(project_code,name) VALUES(?, 'ZZ Smoke 256 template')", (_SC_PROJ,))
+        tid = conn.execute("SELECT template_id FROM stage_templates WHERE project_code=?", (_SC_PROJ,)).fetchone()[0]
+        for n in range(1, _SC_STEPS + 1):
+            conn.execute("INSERT INTO stage_template_steps(template_id,step_no,name,default_working_days) "
+                         "VALUES(?,?,?,2)", (tid, n, f"Stage {n}"))
+        conn.execute("INSERT INTO drops(drop_id,project_code,elevation,sequence_no,lifecycle) "
+                     "VALUES(?,?, 'North', 1, 'scaffold_active')", (_SC_DROP, _SC_PROJ))
+        for n in range(1, _SC_STEPS + 1):
+            conn.execute("INSERT INTO drop_stage_status(drop_id,step_no,status) VALUES(?,?, 'not_started')", (_SC_DROP, n))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _sc_drop_pct():
+    """The value the Drop-Plan card AND the Drop-Report read: drop_detail.progress.pct."""
+    r = requests.get(f"{BASE}/api/dropplan/drops/{_SC_DROP}", timeout=15)
+    return (r.json().get("data") or {}).get("progress", {}).get("pct")
+
+
+def _sc_overall_pct():
+    """The value the progress WIDGET / hero read: project_rollup.overall_progress_pct."""
+    r = requests.get(f"{BASE}/api/dropplan/projects/{_SC_PROJ}/rollup", timeout=15)
+    return (r.json().get("data") or {}).get("overall_progress_pct")
+
+
+def behavioral_stage_completion_check():
+    """#256 — completing a stage is the signal that moves %. On a SYNTHETIC
+    project+drop (5 stages):
+      * a BACKDATED START date -> stage in_progress, % unchanged (per the model);
+      * mark COMPLETE with a PAST date -> per-drop % +1/total AND overall % move,
+        and the recomputed values come back IN the PATCH response (no extra fetch);
+      * completion date is stored as the chosen PAST date, never silently today;
+      * (b) the value is identical across the drop-plan card, the drop-report, the
+        widget endpoints AND the canonical helper (single-source — fails on divergence);
+      * (c) it persists across a reload; un-complete reverts it (and clears completed_on).
+    Returns (ok_bool, note). Scoped teardown; real data untouched; numbers only."""
+    import dropplan_rollups as R
+    _sc_teardown()
+    _sc_setup()
+    try:
+        today = date.today()
+        last_week = (today - timedelta(days=7)).isoformat()
+        per = round(100.0 / _SC_STEPS, 1)  # 20.0
+
+        if _sc_drop_pct() != 0.0 or _sc_overall_pct() != 0.0:
+            return False, "baseline % not 0"
+
+        # (1) BACKDATED START -> in_progress, % unchanged, response carries recomputed %
+        r = requests.patch(f"{BASE}/api/dropplan/drops/{_SC_DROP}/stages/1",
+                           json={"started_on": last_week}, timeout=15)
+        if r.status_code != 200:
+            return False, f"start PATCH failed ({r.status_code})"
+        j = r.json().get("data") or {}
+        if j.get("status") != "in_progress":
+            return False, "start date did not set status in_progress (the recompute-signal gap)"
+        if "drop_pct" not in j or "overall_pct" not in j:
+            return False, "PATCH response missing recomputed drop_pct/overall_pct"
+        if j.get("drop_pct") != 0.0 or j.get("overall_pct") != 0.0:
+            return False, "start date moved % (should stay 0 until a stage is complete)"
+
+        # (2) COMPLETE with a PAST date -> +1/total per-drop & overall; date is the PAST date
+        r = requests.patch(f"{BASE}/api/dropplan/drops/{_SC_DROP}/stages/1",
+                           json={"status": "complete", "completed_on": last_week}, timeout=15)
+        if r.status_code != 200:
+            return False, f"complete PATCH failed ({r.status_code})"
+        j = r.json().get("data") or {}
+        if j.get("status") != "complete":
+            return False, "complete did not set status complete"
+        if j.get("completed_on") == today.isoformat() or j.get("completed_on") != last_week:
+            return False, f"completion date not the chosen PAST date (got {j.get('completed_on')!r})"
+        if j.get("drop_pct") != per or j.get("overall_pct") != per:
+            return False, f"% did not rise to {per} on complete (drop={j.get('drop_pct')} overall={j.get('overall_pct')})"
+
+        # (3) SINGLE SOURCE — card, report, widget endpoints + helper all agree
+        hconn = sqlite3.connect(str(DB_PATH), timeout=60)
+        hconn.row_factory = sqlite3.Row
+        try:
+            helper_drop = R.drop_progress(hconn, _SC_DROP)["pct"]
+            helper_overall = R.project_rollup(hconn, _SC_PROJ, include_cost=False)["overall_progress_pct"]
+        finally:
+            hconn.close()
+        vals = [_sc_drop_pct(), _sc_overall_pct(), helper_drop, helper_overall, per]
+        if len(set(vals)) != 1:
+            return False, f"surfaces diverge (not single-source): {vals}"
+
+        # (4) PERSISTS across a reload (re-read the canonical source + the chosen date)
+        if _sc_drop_pct() != per or _sc_overall_pct() != per:
+            return False, "completed % did not persist across reload"
+        det = requests.get(f"{BASE}/api/dropplan/drops/{_SC_DROP}", timeout=15).json().get("data") or {}
+        st1 = next((s for s in det.get("stages", []) if s["step_no"] == 1), {})
+        if st1.get("completed_on") != last_week:
+            return False, "completion date did not persist as the past date across reload"
+
+        # (5) UN-COMPLETE -> reverts %, clears completed_on, persists
+        r = requests.patch(f"{BASE}/api/dropplan/drops/{_SC_DROP}/stages/1",
+                           json={"status": "in_progress"}, timeout=15)
+        j = r.json().get("data") or {}
+        if j.get("drop_pct") != 0.0 or j.get("overall_pct") != 0.0:
+            return False, "un-complete did not revert %"
+        if j.get("completed_on") is not None:
+            return False, "un-complete did not clear completed_on"
+        if _sc_drop_pct() != 0.0 or _sc_overall_pct() != 0.0:
+            return False, "reverted % did not persist across reload"
+
+        return True, (f"complete +{per} per-drop & overall (single-source across card/report/widget/helper), "
+                      "PAST date stored, persists across reload, un-complete reverts")
+    finally:
+        _sc_teardown()
+
+
 def main():
     # ---- self-test: prove the matchers discriminate broken vs fixed ----------
     print("== self-test (prove each matcher fails on the broken pattern) ==")
@@ -244,6 +400,11 @@ def main():
     ok("selftest_stage_chip_empty",
        m_stage_chip_specific_empty("class=\"dp-datechip'+(iso?'':' dp-datechip-empty')+'\"")
        and not m_stage_chip_specific_empty("class=\"dp-datechip'+(iso?'':' dp-empty')+'\""))
+    ok("selftest_stage_complete_control",
+       m_stage_complete_control("<button data-complete='1'></button><button data-uncomplete='1'></button>"
+                                "<input class='dp-cdatechip' data-completestep='1'>")
+       and not m_stage_complete_control("<input class='dp-datechip' data-datestep='1'>"
+                                        "<button data-na='1'>N/A</button>"))
 
     # ---- live surfaces -------------------------------------------------------
     print("\n== surfaces ==")
@@ -281,6 +442,10 @@ def main():
     ok("dropstage_chip_specific_empty_class", m_stage_chip_specific_empty(project),
        "stage date chip uses dp-datechip-empty (not the generic .dp-empty)")
 
+    # (#256) the Drop Plan stage row has a backdatable Complete control + un-complete
+    ok("dropstage_complete_control_present", m_stage_complete_control(project),
+       "stage row exposes data-complete + data-uncomplete + SSCDatePicker completion date")
+
     # ---- (#254) cross-view propagation: approved rate reflected in the tracker -
     print("\n== cross-view behavioral (approved rate -> tracker resolution) ==")
     try:
@@ -296,6 +461,14 @@ def main():
     except Exception as e:
         la_ok, la_note = False, f"check errored: {type(e).__name__}: {e}"
     ok("lookahead_drag_add_remove_persist", la_ok, la_note)
+
+    # ---- (#256) stage completion -> per-drop & overall % derived live, single-source -
+    print("\n== stage completion (per-drop & overall % derived live, single-source) ==")
+    try:
+        sc_ok, sc_note = behavioral_stage_completion_check()
+    except Exception as e:
+        sc_ok, sc_note = False, f"check errored: {type(e).__name__}: {e}"
+    ok("stage_complete_moves_pct_single_source_persists", sc_ok, sc_note)
 
     print(f"\n== RESULT: {len(PASS)} PASS / {len(FAIL)} FAIL ==")
     if FAIL:

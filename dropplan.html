@@ -170,7 +170,7 @@
     </div>
 
     <footer id="build-stamp" style="margin-top:32px;padding-top:14px;border-top:1px solid var(--border);color:var(--mute);font-size:11px;letter-spacing:.04em;">
-      build #205 · 2026-05-29 · inline drop detail
+      build #256 · 2026-06-20 · per-drop &amp; overall % derived live from stage completion; overall KPI refreshes on stage edit
     </footer>
   </main>
 
@@ -392,6 +392,7 @@
     const card=CUR_PANEL.previousElementSibling;
     const d=await renderPanel(CUR_PANEL, CUR_DROP);
     if(d && card) refreshCard(card, d);
+    await loadRollup();   // #256 — a stage edit moves the OVERALL %; refresh the top KPI live (no manual reload)
   }
 
   function stepRowHtml(s){

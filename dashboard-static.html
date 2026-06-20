@@ -1087,7 +1087,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #255 · 2026-06-15 · Two-Week Look-Ahead — activity-row Gantt auto-drafted from the Drop Plan; drag-edit, add/remove, paginated print</div>
+          <div class="ph-build" id="ph-build-stamp">build #256 · 2026-06-20 · Drop Plan progress — per-drop &amp; overall % derived live from stage completion (single source); stage Complete (backdatable) + un-complete</div>
         </div>
       </section>
 
@@ -1434,13 +1434,20 @@
           .dp-sname{flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dp-sname.na{color:#b7bcc4;text-decoration:line-through}.dp-sname.cur{font-weight:700}
           .dp-gate{font-size:9px;color:var(--behind-ink);font-weight:700;text-transform:uppercase;margin-left:6px}
           .dp-sdate{color:var(--dp-muted);font-size:12px;white-space:nowrap}
-          .dp-natoggle{font-size:10px;font-weight:700;color:var(--dp-muted);border:1px solid var(--dp-line);border-radius:6px;padding:3px 7px;cursor:pointer;background:#fff;flex:none}
+          .dp-natoggle,.dp-complete,.dp-uncomplete,.dp-completecancel{font-size:10px;font-weight:700;color:var(--dp-muted);border:1px solid var(--dp-line);border-radius:6px;padding:3px 7px;cursor:pointer;background:#fff;flex:none}
           .dp-natoggle.on{color:var(--active-ink);border-color:var(--dp-edge);background:var(--active-soft)}
+          /* #256 — per-stage Complete control (neutral chip; STATUS color only on
+             hover as an affordance hint — green=complete, coral=undo). The persistent
+             status colors stay on the stage dot/bar, never on the action buttons. */
+          .dp-complete:hover{color:var(--done-ink);border-color:var(--done-dot);background:var(--done-soft)}
+          .dp-uncomplete:hover{color:var(--behind-ink);border-color:var(--behind-ink);background:var(--behind-soft)}
+          .dp-completego{font-size:10px;font-weight:700;color:#fff;border:1px solid var(--dp-blue);border-radius:6px;padding:3px 9px;cursor:pointer;background:var(--dp-blue);flex:none}
+          .dp-completego:hover{filter:brightness(.95)}
           /* #225 — stage start-date chips + activate-drop banner */
           .dp-sdate{display:inline-flex;align-items:center}
           /* #226 — small inline date-chip pill (the picker input is CONSTRAINED so it never blows up) */
-          .dp-datechip{font-size:11.5px;line-height:1;color:var(--dp-ink);border:1px solid var(--dp-line);border-radius:7px;padding:5px 9px 5px 24px;cursor:pointer;font-family:inherit;height:auto;width:106px;min-width:0;text-align:left;white-space:nowrap;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%238c92a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M3 9h18M8 2v4M16 2v4'/%3E%3C/svg%3E") no-repeat 8px center}
-          .dp-datechip::placeholder{color:var(--active-ink);font-weight:600}
+          .dp-datechip,.dp-cdatechip{font-size:11.5px;line-height:1;color:var(--dp-ink);border:1px solid var(--dp-line);border-radius:7px;padding:5px 9px 5px 24px;cursor:pointer;font-family:inherit;height:auto;width:106px;min-width:0;text-align:left;white-space:nowrap;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%238c92a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M3 9h18M8 2v4M16 2v4'/%3E%3C/svg%3E") no-repeat 8px center}
+          .dp-datechip::placeholder,.dp-cdatechip::placeholder{color:var(--active-ink);font-weight:600}
           /* #253 — empty-state modifier is chip-SPECIFIC. It used to be the bare
              .dp-empty, which collides with the generic empty-state rule below
              (.dp-empty{padding:28px;text-align:center}) used for "No drops" /
@@ -1500,7 +1507,7 @@
           </div>
           <div id="dp-elev"></div>
           <div id="dp-stage" class="dp-hide"></div>
-          <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:18px;" id="dp-build-stamp">build #228 · 2026-06-05 · Drop Plan — By-Stage columns fixed height · scroll inside the box</div>
+          <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:18px;" id="dp-build-stamp">build #256 · 2026-06-20 · Drop Plan — stage Complete (backdatable date) + un-complete; per-drop &amp; overall % derived live from completion (single source)</div>
         </div>
       </section>
 
@@ -6362,7 +6369,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   var ICCHEVD='<svg class="dp-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
   var ICBOLT='<svg class="dp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>';
   var ICCAL='<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:5px;color:#8c92a0"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>';
-  var DP={drops:[],sov:[],patchSov:null,template:null,view:'elevation',expanded:null,detail:{},collapsed:{},units:{length:'in',width:'in',depth:'in'},wired:false};
+  var DP={drops:[],sov:[],patchSov:null,template:null,view:'elevation',expanded:null,detail:{},collapsed:{},units:{length:'in',width:'in',depth:'in'},completing:null,overallPct:null,wired:false};
 
   function $(id){return document.getElementById(id);}
   function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
@@ -6391,6 +6398,10 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     try{
       var dj=await jget('/api/dropplan/projects/'+encodeURIComponent(PROJECT_CODE)+'/drops');
       DP.drops=(dj&&dj.data)||[];
+      // #256 — overall % comes from the canonical project_rollup (the ONE derived value the
+      // widget + report read), never a separate client-side recompute that could round differently.
+      var rj=await jget('/api/dropplan/projects/'+encodeURIComponent(PROJECT_CODE)+'/rollup');
+      DP.overallPct=(rj&&rj.data&&rj.data.overall_progress_pct);
       if(!DP.sov.length){
         var sj=await jget('/api/dropplan/projects/'+encodeURIComponent(PROJECT_CODE)+'/sov-lines');
         DP.sov=(sj&&sj.data)||[];
@@ -6418,12 +6429,13 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
 
   function renderHero(){
     var a=aggregate(),el=$('dp-hero'); if(!el)return;
-    var C=263.9,off=C*(1-a.pct/100),seg=function(n){return a.total?(100*n/a.total):0;};
+    var ov=(DP.overallPct!=null?DP.overallPct:a.pct);   // #256 — canonical overall (project_rollup); single source w/ widget+report
+    var C=263.9,off=C*(1-ov/100),seg=function(n){return a.total?(100*n/a.total):0;};
     el.innerHTML=
       '<div class="dp-ring"><svg width="92" height="92"><defs><linearGradient id="dp-lo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a8df5"></stop><stop offset="1" stop-color="#4364dc"></stop></linearGradient></defs>'
       +'<circle cx="46" cy="46" r="42" fill="none" stroke="#f3f0e9" stroke-width="9"></circle>'
       +'<circle cx="46" cy="46" r="42" fill="none" stroke="url(#dp-lo)" stroke-width="9" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+off.toFixed(1)+'"></circle></svg>'
-      +'<div class="dp-pct"><b>'+a.pct+'%</b><s>complete</s></div></div>'
+      +'<div class="dp-pct"><b>'+ov+'%</b><s>complete</s></div></div>'
       +'<div class="dp-herobody"><div class="dp-ht">Restoration progress · all drops</div>'
       +'<div class="dp-bar"><i style="width:'+seg(a.complete)+'%;background:'+GRAD.complete+'"></i><i style="width:'+seg(a.active)+'%;background:'+GRAD.active+'"></i><i style="width:'+seg(a.behind)+'%;background:'+GRAD.behind+'"></i></div>'
       +'<div class="dp-legend"><span><span class="dp-dot" style="background:'+DOT.complete+'"></span>'+a.complete+' complete</span>'
@@ -6529,12 +6541,25 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
       var cls=st.status==='complete'?'done':st.status==='in_progress'?'cur':st.status==='n_a'?'na':'todo';
       var ncls=st.status==='n_a'?'na':st.status==='in_progress'?'cur':'';
       var gate=st.is_cure_gate?'<span class="dp-gate">cure gate</span>':(st.is_signoff_gate?'<span class="dp-gate">sign-off</span>':'');
+      var completing=DP.completing&&DP.completing.drop===d.drop_id&&String(DP.completing.step)===String(st.step_no);
       var right;
       if(st.status==='n_a'){
         right='<button class="dp-natoggle on" data-na="'+st.step_no+'" data-drop="'+esc(d.drop_id)+'">N/A</button>';
+      }else if(st.status==='complete'){
+        // #256 — completed: editable + BACKDATABLE completion date (SSCDatePicker) + reversible un-complete
+        var ciso=st.completed_on||'';
+        right='<span class="dp-sdate"><input type="date" class="dp-cdatechip" data-completestep="'+st.step_no+'" data-drop="'+esc(d.drop_id)+'"'+(ciso?(' data-iso="'+esc(ciso)+'"'):'')+'></span>'
+          +'<button class="dp-uncomplete" data-uncomplete="'+st.step_no+'" data-drop="'+esc(d.drop_id)+'">Un-complete</button>';
+      }else if(completing){
+        // #256 — inline complete editor: pick a completion date (default today, BACKDATABLE) then confirm
+        right='<span class="dp-sdate"><input type="date" class="dp-cdatechip" data-completedate="'+st.step_no+'" data-drop="'+esc(d.drop_id)+'"></span>'
+          +'<button class="dp-completego" data-completeconfirm="'+st.step_no+'" data-drop="'+esc(d.drop_id)+'">&#10003; Mark complete</button>'
+          +'<button class="dp-completecancel" data-completecancel="1">Cancel</button>';
       }else{
+        // not_started / in_progress: editable START date chip (-> in_progress) + Complete + N/A
         var iso=st.started_on||'';   // #225 editable START date chip per stage (SSCDatePicker)
         right='<span class="dp-sdate"><input type="date" class="dp-datechip'+(iso?'':' dp-datechip-empty')+'" placeholder="Set date" data-datestep="'+st.step_no+'" data-drop="'+esc(d.drop_id)+'"'+(iso?(' data-iso="'+esc(iso)+'"'):'')+'></span>'
+          +'<button class="dp-complete" data-complete="'+st.step_no+'" data-drop="'+esc(d.drop_id)+'">Complete</button>'
           +'<button class="dp-natoggle" data-na="'+st.step_no+'" data-drop="'+esc(d.drop_id)+'">N/A</button>';
       }
       return '<div class="dp-step"><span class="dp-sdot '+cls+'"></span><span class="dp-sname '+ncls+'">'+esc(st.name)+gate+'</span>'+right+'</div>';
@@ -6556,6 +6581,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   }
 
   async function toggleExpand(dropId){
+    DP.completing=null;   // #256 — never carry a half-open complete editor across drops
     if(DP.expanded===dropId){DP.expanded=null;renderView();return;}
     DP.expanded=dropId;
     if(!DP.detail[dropId]){
@@ -6574,7 +6600,10 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     return Promise.all([jget('/api/dropplan/drops/'+encodeURIComponent(dropId)),jget('/api/dropplan/drops/'+encodeURIComponent(dropId)+'/quantity-entries')])
       .then(function(r){
         DP.detail[dropId]={detail:(r[0]&&r[0].data)||{},patches:((r[1]&&r[1].data)||[]).filter(function(e){return e.volume_cf!=null;})};
-        return jget('/api/dropplan/projects/'+encodeURIComponent(PROJECT_CODE)+'/drops').then(function(dj){DP.drops=(dj&&dj.data)||DP.drops;renderHero();renderView();});
+        return Promise.all([
+          jget('/api/dropplan/projects/'+encodeURIComponent(PROJECT_CODE)+'/drops'),
+          jget('/api/dropplan/projects/'+encodeURIComponent(PROJECT_CODE)+'/rollup')   // #256 canonical overall
+        ]).then(function(rr){DP.drops=(rr[0]&&rr[0].data)||DP.drops;DP.overallPct=(rr[1]&&rr[1].data&&rr[1].data.overall_progress_pct);renderHero();renderView();});
       });
   }
 
@@ -6616,10 +6645,33 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
       if(el.dataset.dpwired)return; el.dataset.dpwired='1';
       try{ SSCDatePicker.wire(el); SSCDatePicker.setISO(el,todayLocal()); }catch(e){}
     });
+    // #256 — completion-date chips (complete-state edit + the inline complete editor):
+    // SSCDatePicker, defaulting to today but EDITABLE/BACKDATABLE (LOCAL date).
+    Array.prototype.forEach.call(wrap.querySelectorAll('.dp-cdatechip'),function(el){
+      if(el.dataset.dpwired)return; el.dataset.dpwired='1';
+      try{ SSCDatePicker.wire(el); var iso=el.getAttribute('data-iso'); SSCDatePicker.setISO(el,iso||todayLocal()); }catch(e){}
+    });
   }
   async function setStageDate(dropId,stepNo,iso){
     if(!iso)return;
+    // #256 — a START date now flips the stage to in_progress server-side (the endpoint
+    // keeps status + dates coherent), so the dot advances and the status reads in-progress.
     try{ await fetch('/api/dropplan/drops/'+encodeURIComponent(dropId)+'/stages/'+stepNo,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({started_on:iso})}); await refreshDetail(dropId); }catch(e){}
+  }
+  // #256 — Complete is the signal that moves %. Reveal an inline editor so the
+  // completion DATE is chosen (defaults to today, BACKDATABLE) before committing.
+  function startComplete(dropId,stepNo){ DP.completing={drop:dropId,step:String(stepNo)}; renderView(); }
+  function cancelComplete(){ DP.completing=null; renderView(); }
+  async function completeStage(dropId,stepNo,iso){
+    DP.completing=null;
+    try{ await fetch('/api/dropplan/drops/'+encodeURIComponent(dropId)+'/stages/'+stepNo,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'complete',completed_on:iso||todayLocal()})}); await refreshDetail(dropId); }catch(e){}
+  }
+  async function uncompleteStage(dropId,stepNo){
+    try{ await fetch('/api/dropplan/drops/'+encodeURIComponent(dropId)+'/stages/'+stepNo,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'in_progress'})}); await refreshDetail(dropId); }catch(e){}
+  }
+  async function setCompletionDate(dropId,stepNo,iso){
+    if(!iso)return;   // edit the BACKDATABLE completion date on an already-complete stage
+    try{ await fetch('/api/dropplan/drops/'+encodeURIComponent(dropId)+'/stages/'+stepNo,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({completed_on:iso})}); await refreshDetail(dropId); }catch(e){}
   }
   async function activateDrop(dropId){
     var el=document.querySelector('.dp-actdate[data-actdate="'+dropId+'"]');
@@ -6639,6 +6691,11 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
       var na=e.target.closest('[data-na]'); if(na){toggleNA(na.getAttribute('data-drop'),na.getAttribute('data-na'));return;}
       var add=e.target.closest('[data-addpatch]'); if(add){addPatch(add.getAttribute('data-addpatch'));return;}
       var ag=e.target.closest('[data-activatego]'); if(ag){activateDrop(ag.getAttribute('data-activatego'));return;}
+      // #256 — stage Complete control (open editor -> pick backdatable date -> confirm), + un-complete
+      var cmp=e.target.closest('[data-complete]'); if(cmp){startComplete(cmp.getAttribute('data-drop'),cmp.getAttribute('data-complete'));return;}
+      var cgo=e.target.closest('[data-completeconfirm]'); if(cgo){var stp=cgo.getAttribute('data-completeconfirm');var inp=wrap.querySelector('.dp-cdatechip[data-completedate="'+stp+'"]');var iso=(inp&&window.SSCDatePicker)?(SSCDatePicker.getISO(inp)||todayLocal()):((inp&&inp.value)||todayLocal());completeStage(cgo.getAttribute('data-drop'),stp,iso);return;}
+      var ccx=e.target.closest('[data-completecancel]'); if(ccx){cancelComplete();return;}
+      var unc=e.target.closest('[data-uncomplete]'); if(unc){uncompleteStage(unc.getAttribute('data-drop'),unc.getAttribute('data-uncomplete'));return;}
       var ub=e.target.closest('[data-unitfor] button[data-u]'); if(ub){var tog=ub.parentNode,k=tog.getAttribute('data-unitfor');DP.units[k]=ub.getAttribute('data-u');Array.prototype.forEach.call(tog.querySelectorAll('button'),function(b){b.classList.remove('on');});ub.classList.add('on');liveVol();return;}
       var et=e.target.closest('[data-elevtoggle]'); if(et){var el=et.getAttribute('data-elevtoggle');DP.collapsed[el]=!DP.collapsed[el];renderByElevation();return;}
       if(e.target.closest('.dp-exp'))return;
@@ -6647,7 +6704,11 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     });
     wrap.addEventListener('input',function(e){if(e.target.closest('.dp-exp')&&e.target.getAttribute('data-dim'))liveVol();});
     // #225 — a stage date chip changed -> persist started_on (LOCAL date via SSCDatePicker)
-    wrap.addEventListener('change',function(e){var dc=e.target.closest('.dp-datechip'); if(dc){var iso=window.SSCDatePicker?SSCDatePicker.getISO(dc):dc.value; setStageDate(dc.getAttribute('data-drop'),dc.getAttribute('data-datestep'),iso);}});
+    wrap.addEventListener('change',function(e){
+      var dc=e.target.closest('.dp-datechip'); if(dc){var iso=window.SSCDatePicker?SSCDatePicker.getISO(dc):dc.value; setStageDate(dc.getAttribute('data-drop'),dc.getAttribute('data-datestep'),iso); return;}
+      // #256 — editing the completion date of an already-complete stage re-persists it (BACKDATABLE)
+      var cd=e.target.closest('.dp-cdatechip[data-completestep]'); if(cd){var ciso=window.SSCDatePicker?SSCDatePicker.getISO(cd):cd.value; setCompletionDate(cd.getAttribute('data-drop'),cd.getAttribute('data-completestep'),ciso); return;}
+    });
   }
 
   document.querySelectorAll('.nav-link[data-view="drop-plans"]').forEach(function(l){
