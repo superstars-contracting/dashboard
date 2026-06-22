@@ -6271,7 +6271,14 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   });
 
   // ---- Drop Report ----
-  var PROJECT='FR-BX-001', CLIENT='Compass Point, LLC', PROJ_NAME='890 E 135th St';
+  // PROJECT is path-scoped — same derivation as the Drop Plan board + home progress
+  // widget (default FR-BX-001 when absent) — so the report follows whatever project's
+  // dashboard you're on. CLIENT/PROJ_NAME are pulled live from the project record
+  // (loadMeta, via GET /api/projects/<code>), never hardcoded; they degrade to the
+  // project code if that fetch fails.
+  var _drpc=(location.pathname.match(/\/projects\/([^\/]+)/)||[])[1];
+  var PROJECT=_drpc?decodeURIComponent(_drpc):'FR-BX-001';
+  var CLIENT='', PROJ_NAME=PROJECT;
   var SLABEL={not_started:['Not started','na'],in_progress:['In progress','prog'],complete:['Complete','done'],n_a:['N/A','na']};
   function pad(n){return String(n).padStart(2,'0');}
   function todayMDY(){var d=new Date();return pad(d.getMonth()+1)+'/'+pad(d.getDate())+'/'+d.getFullYear();}
@@ -6282,14 +6289,25 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   function statusOf(d){var lc=(d.lifecycle||'');if(lc==='not_started')return 'not_started';var pct=(d.progress&&d.progress.pct)||0;if(pct>=100)return 'complete';return 'active';}
   var loaded=false;
 
+  function loadMeta(){
+    // Pull client + name from the project record so the report header is correct on
+    // any project. Absent/failed fetch leaves the path-scoped code-only defaults.
+    return jget('/api/projects/'+encodeURIComponent(PROJECT)).then(function(j){
+      var p=(j&&j.data)||null;
+      if(p){ CLIENT=p.client||''; PROJ_NAME=p.name||PROJECT; }
+    });
+  }
+
   function loadDrops(){
     var sel=document.getElementById('dr-select'); if(!sel)return;
-    jget('/api/dropplan/projects/'+PROJECT+'/drops').then(function(j){
+    loadMeta().then(function(){
+    jget('/api/dropplan/projects/'+encodeURIComponent(PROJECT)+'/drops').then(function(j){
       var drops=(j&&j.data)||[];
       if(!drops.length){ sel.innerHTML='<option value="">No drops</option>'; document.getElementById('dr-report').innerHTML='<div class="ph-loading">No drops yet.</div>'; return; }
       drops.sort(function(a,b){ var sa=statusOf(a)==='active'?0:1, sb=statusOf(b)==='active'?0:1; if(sa!==sb)return sa-sb; return (a.sequence_no||0)-(b.sequence_no||0); });
       sel.innerHTML=drops.map(function(d){ var st=statusOf(d); var tag=st==='active'?' · active':(st==='complete'?' · complete':''); return '<option value="'+esc(d.drop_id)+'">Drop '+esc(d.sequence_no)+' · '+esc(d.elevation||'')+tag+'</option>'; }).join('');
       renderReport(drops[0].drop_id);
+    });
     });
   }
 

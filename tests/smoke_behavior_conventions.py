@@ -106,6 +106,25 @@ def m_stage_complete_control(html):
     return has_complete and has_uncomplete and has_completion_datepicker
 
 
+def m_dropreport_path_scoped(html):
+    """(#257) cross-view / single-source: the Drop Report view must derive its
+    project from /projects/<code> in the path — exactly like the Drop Plan board
+    and the home progress widget — and pull the header CLIENT / PROJ_NAME from the
+    project record (GET /api/projects/<code>). The bug it guards: the report
+    HARDCODED PROJECT='FR-BX-001' + CLIENT='Compass Point, LLC' +
+    PROJ_NAME='890 E 135th St', so on ANY other project's dashboard it loaded
+    FR-BX-001's drops and printed FR-BX-001's client/address. Asserts the
+    fix-positive shape AND the absence of the specific hardcoded declaration."""
+    derives_from_path = "var _drpc=(location.pathname.match(" in html
+    pulls_record = ("function loadMeta()" in html
+                    and "/api/projects/'+encodeURIComponent(PROJECT)" in html)
+    no_hardcoded_project = re.search(r"PROJECT='FR-BX-001'\s*,\s*CLIENT=", html) is None
+    no_hardcoded_client = "CLIENT='Compass Point, LLC'" not in html
+    no_hardcoded_name = "PROJ_NAME='890 E 135th St'" not in html
+    return (derives_from_path and pulls_record and no_hardcoded_project
+            and no_hardcoded_client and no_hardcoded_name)
+
+
 # ---- (#254) cross-view BEHAVIORAL check: approved rate -> tracker resolution --
 
 _PROP_EID, _PROP_WID = "E-99254", "W-9954"
@@ -405,6 +424,12 @@ def main():
                                 "<input class='dp-cdatechip' data-completestep='1'>")
        and not m_stage_complete_control("<input class='dp-datechip' data-datestep='1'>"
                                         "<button data-na='1'>N/A</button>"))
+    ok("selftest_dropreport_path_scoped",
+       m_dropreport_path_scoped(
+           "var _drpc=(location.pathname.match(/x/)||[])[1]; function loadMeta(){ "
+           "jget('/api/projects/'+encodeURIComponent(PROJECT)); }")
+       and not m_dropreport_path_scoped(
+           "var PROJECT='FR-BX-001', CLIENT='Compass Point, LLC', PROJ_NAME='890 E 135th St';"))
 
     # ---- live surfaces -------------------------------------------------------
     print("\n== surfaces ==")
@@ -445,6 +470,11 @@ def main():
     # (#256) the Drop Plan stage row has a backdatable Complete control + un-complete
     ok("dropstage_complete_control_present", m_stage_complete_control(project),
        "stage row exposes data-complete + data-uncomplete + SSCDatePicker completion date")
+
+    # (#257) the Drop Report follows /projects/<code> (not hardcoded to FR-BX-001)
+    ok("dropreport_path_scoped_not_hardcoded", m_dropreport_path_scoped(project),
+       "Drop Report derives project from the path + pulls client/name from the record "
+       "(no FR-BX-001 / 'Compass Point, LLC' / '890 E 135th St' hardcode)")
 
     # ---- (#254) cross-view propagation: approved rate reflected in the tracker -
     print("\n== cross-view behavioral (approved rate -> tracker resolution) ==")
