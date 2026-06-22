@@ -196,3 +196,6 @@ MIGRATION_REPORT.txt
 # Keep it in the repo for visibility but be aware it's there.
 # Uncomment to exclude if it gets sensitive enough:
 # subscriptions_ledger.csv
+
+# #259 dev-only local Postgres (binaries + data) — never commit
+.pgdev/

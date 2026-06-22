@@ -65,12 +65,24 @@ def expect(label: str, ok: bool, detail: str = "") -> bool:
     return ok
 
 
+def _purge_user(conn, user_id) -> None:
+    """Delete a user + its FK children (login_audit/role_change_audit/sessions) in
+    the right order. Postgres enforces FKs and SQLite runs FK=ON here, so children
+    MUST go first or the user delete is blocked (#259)."""
+    conn.execute("DELETE FROM login_audit WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM role_change_audit WHERE user_id = ? OR changed_by = ?", (user_id, user_id))
+    conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+
 def seed_user() -> int:
     conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
     conn.execute("PRAGMA foreign_keys=ON;")
-    # Idempotent on the fixed email: clear any prior fixture row first so a failed
-    # teardown can't collide, then insert flagged is_system=1.
-    conn.execute("DELETE FROM users WHERE email = ?", (TEST_EMAIL,))
+    # Idempotent on the fixed email: clear any prior fixture row + its FK children
+    # first so a failed teardown can't collide, then insert flagged is_system=1.
+    prior = conn.execute("SELECT id FROM users WHERE email = ?", (TEST_EMAIL,)).fetchone()
+    if prior:
+        _purge_user(conn, prior[0])
     conn.execute(
         "INSERT INTO users (email, password_hash, role, full_name, is_active, is_system) "
         "VALUES (?, ?, 'admin', ?, 1, 1)",
@@ -86,8 +98,7 @@ def cleanup_user(user_id: int) -> None:
     try:
         conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
         conn.execute("PRAGMA foreign_keys=ON;")
-        conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
-        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        _purge_user(conn, user_id)
         conn.commit()
         conn.close()
     except Exception as e:

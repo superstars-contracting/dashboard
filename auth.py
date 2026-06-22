@@ -32,6 +32,8 @@ from typing import Iterable, Optional
 import bcrypt
 from flask import g, jsonify, make_response, redirect, request, send_file
 
+import db_layer  # #259 — env-driven SQLite/Postgres layer (SQLite default)
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 DB_PATH = SCRIPT_DIR / "superstars.db"
 LOGIN_PAGE_PATH = SCRIPT_DIR / "login.html"
@@ -98,12 +100,10 @@ def verify_password(plaintext: str, hashed: str) -> bool:
 # ============= DB HELPER (local — avoids import cycle with server.py) =============
 
 def _db():
-    conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA busy_timeout=60000;")
-    conn.execute("PRAGMA foreign_keys=ON;")
-    return conn
+    # #259 — env-driven (SSC_DB_URL). SQLite default returns the SAME native sqlite3
+    # connection as before (Row, WAL, busy_timeout, foreign_keys=ON); a postgres URL
+    # returns the psycopg-backed wrapper (Postgres enforces FKs natively).
+    return db_layer.connect(pragma_fk=True)
 
 
 def _now_iso() -> str:

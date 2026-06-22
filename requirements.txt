@@ -66,3 +66,4 @@ pypdf>=6.0
 # anthropic>=0.40          # Anthropic API client when AI features added
 # python-dotenv>=1.0       # load .env file (if we switch from os.environ direct)
 # pysqlcipher3>=1.2        # encrypted SQLite (Tier 1 security upgrade)
+psycopg[binary]>=3.1  # #259 — Postgres driver (dev/optional; SQLite remains default)

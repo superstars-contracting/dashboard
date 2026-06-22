@@ -8,6 +8,9 @@ import json
 import os
 import uuid
 
+# #259 — env-driven DB layer (SSC_DB_URL): SQLite default (unchanged) or Postgres.
+import db_layer
+
 # Vision-based cert extraction (requires ANTHROPIC_API_KEY in env — launch
 # the server via `op run --env-file=".env.template" -- python server.py`).
 from cert_extractor import extract_cert_from_image, load_cert_types_from_db
@@ -349,12 +352,10 @@ logging.basicConfig(
 )
 
 def db():
-    # 60s timeout + WAL mode = server reads coexist with batch writers (e.g. nyc_compliance).
-    conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA busy_timeout=60000;")
-    return conn
+    # #259 — routed through the env-driven layer (SSC_DB_URL). SQLite is the DEFAULT
+    # and returns the SAME native sqlite3 connection as before (60s timeout, Row,
+    # WAL + busy_timeout); a postgres:// URL returns the psycopg-backed wrapper.
+    return db_layer.connect()
 
 def rows_to_dicts(rows):
     return [dict(row) for row in rows]
