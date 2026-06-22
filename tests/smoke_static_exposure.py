@@ -39,7 +39,10 @@ PORT = int(os.environ.get("SMOKE_STATIC_PORT", "5151"))
 BASE = f"http://127.0.0.1:{PORT}"
 SRV_LOG = SCRIPT_DIR / "tests" / "_static_exposure_srv.log"
 
-TEST_EMAIL = f"smoke-staticexp-{uuid.uuid4().hex[:8]}@example.test"
+# #258 — FIXED reserved email (was a random suffix that accumulated standing admin
+# fixtures); one row ever, flagged is_system=1 (hidden + invariant-exempt). Password
+# stays RANDOM per run, never logged.
+TEST_EMAIL = "smoke-staticexp-fixture@example.test"
 TEST_PASSWORD = "SmokeExp!" + uuid.uuid4().hex[:16]
 
 sys.path.insert(0, str(SCRIPT_DIR))
@@ -182,9 +185,10 @@ def stop_server(proc: subprocess.Popen | None) -> None:
 def seed_user() -> int:
     conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
     conn.execute("PRAGMA foreign_keys=ON;")
+    conn.execute("DELETE FROM users WHERE email = ?", (TEST_EMAIL,))   # idempotent on the fixed email
     conn.execute(
-        "INSERT INTO users (email, password_hash, role, full_name, is_active) "
-        "VALUES (?, ?, 'admin', ?, 1)",
+        "INSERT INTO users (email, password_hash, role, full_name, is_active, is_system) "
+        "VALUES (?, ?, 'admin', ?, 1, 1)",
         (TEST_EMAIL, hash_password(TEST_PASSWORD), "Smoke Static Exposure"),
     )
     conn.commit()

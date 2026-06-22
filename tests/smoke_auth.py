@@ -41,7 +41,11 @@ SCRIPT_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = SCRIPT_DIR / "superstars.db"
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
 
-TEST_EMAIL = f"smoke-auth-{uuid.uuid4().hex[:8]}@example.test"
+# #258 — FIXED reserved email (was a random-suffix address that created a NEW row
+# each run and accumulated as standing admin fixtures in the live DB). One row ever,
+# flagged is_system=1 (hidden from the console + ignored by the invariant). Password
+# stays RANDOM per run (no standing backdoor) and is never logged.
+TEST_EMAIL = "smoke-auth-fixture@example.test"
 TEST_PASSWORD = "SmokeAuth!" + uuid.uuid4().hex[:16]
 TEST_NAME = "Smoke Auth Test"
 
@@ -64,9 +68,12 @@ def expect(label: str, ok: bool, detail: str = "") -> bool:
 def seed_user() -> int:
     conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
     conn.execute("PRAGMA foreign_keys=ON;")
+    # Idempotent on the fixed email: clear any prior fixture row first so a failed
+    # teardown can't collide, then insert flagged is_system=1.
+    conn.execute("DELETE FROM users WHERE email = ?", (TEST_EMAIL,))
     conn.execute(
-        "INSERT INTO users (email, password_hash, role, full_name, is_active) "
-        "VALUES (?, ?, 'admin', ?, 1)",
+        "INSERT INTO users (email, password_hash, role, full_name, is_active, is_system) "
+        "VALUES (?, ?, 'admin', ?, 1, 1)",
         (TEST_EMAIL, hash_password(TEST_PASSWORD), TEST_NAME),
     )
     conn.commit()

@@ -17,6 +17,7 @@ PM only the queue, roster 403; super 403); stress 200 + scoped cleanup (zero
 residue incl. synthetic employees + test photo dirs; 14 real untouched).
 """
 import os
+import secrets
 import shutil
 import sqlite3
 import sys
@@ -37,7 +38,7 @@ from auth import hash_password  # noqa: E402
 
 PM_EMAIL = "smk-pm-lrt@superstars.local"
 SUPER_EMAIL = "smk-super-lrt@superstars.local"
-PW = "smk-lrt-pw"
+PW = secrets.token_urlsafe(18)   # #258 — RANDOM per run; held in-process only, never logged
 PASS, FAIL = [], []
 
 # #241 — real-row baselines captured at start; cleanup asserts they are
@@ -63,10 +64,10 @@ def db():
 def make_user(email, role):
     conn = db()
     if not conn.execute("SELECT 1 FROM users WHERE email=?", (email,)).fetchone():
-        conn.execute("INSERT INTO users (email,password_hash,role,full_name,is_active) VALUES (?,?,?,?,1)",
+        conn.execute("INSERT INTO users (email,password_hash,role,full_name,is_active,is_system) VALUES (?,?,?,?,1,1)",
                      (email, hash_password(PW), role, "SMK " + role))
     else:
-        conn.execute("UPDATE users SET role=?,password_hash=?,is_active=1 WHERE email=?",
+        conn.execute("UPDATE users SET role=?,password_hash=?,is_active=1,is_system=1 WHERE email=?",
                      (role, hash_password(PW), email))
     conn.commit(); conn.close()
     s = requests.Session()

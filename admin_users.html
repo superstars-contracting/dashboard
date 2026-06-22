@@ -13,8 +13,11 @@
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:var(--canvas);color:var(--ink);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;}
   .top{display:flex;align-items:center;gap:12px;padding:16px 26px;background:#fff;border-bottom:1px solid var(--line);}
-  .top .mark{width:30px;height:30px;}
+  .top .mark{width:30px;height:30px;display:block;}
+  .top .brand-home{display:inline-flex;text-decoration:none;}
   .top h1{font-size:16px;font-weight:800;letter-spacing:.3px;}
+  .top .nav-back{font-size:12px;font-weight:700;color:var(--accent-ink);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:5px 11px;}
+  .top .nav-back:hover{border-color:var(--accent-edge);background:var(--accent-soft);}
   .top .who{margin-left:auto;font-size:12px;color:var(--muted);text-align:right;}
   .top .who b{color:var(--ink);font-weight:700;}
   .top .who a{color:var(--accent);text-decoration:none;font-weight:700;margin-left:10px;cursor:pointer;}
@@ -63,8 +66,10 @@
 </head>
 <body>
 <div class="top">
-  <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><polygon points="50,30 55.61,44.27 70.39,44.27 58.39,53.46 63,67.73 50,59.05 37,67.73 41.61,53.46 29.61,44.27 44.39,44.27" fill="#B11E2E"/></svg>
+  <a class="brand-home" href="/" title="Company home"><svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><polygon points="50,30 55.61,44.27 70.39,44.27 58.39,53.46 63,67.73 50,59.05 37,67.73 41.61,53.46 29.61,44.27 44.39,44.27" fill="#B11E2E"/></svg></a>
   <h1>Superstars Contracting · User Management</h1>
+  <a class="nav-back" href="/dashboard">&#8592; Dashboard</a>
+  <a class="nav-back" href="/">Company home</a>
   <div class="who" id="who">—</div>
 </div>
 
@@ -79,7 +84,7 @@
     <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Last login</th><th style="text-align:right;">Actions</th></tr></thead>
     <tbody id="rows"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
   </table>
-  <div style="text-align:center;color:var(--muted);font-size:11px;letter-spacing:.04em;margin-top:24px;padding-top:14px;border-top:1px solid var(--line);">build #257 · 2026-06-22 · Multi-user accounts &amp; roles — admin user management, role catalog, forced first-login reset, server-side authz + audit, single-admin invariant</div>
+  <div style="text-align:center;color:var(--muted);font-size:11px;letter-spacing:.04em;margin-top:24px;padding-top:14px;border-top:1px solid var(--line);">build #258 · 2026-06-22 · Admin console nav (home/dashboard links + admin-only Users entry) · test fixtures hidden via is_system · real-only single-admin invariant · randomized fixture passwords</div>
 </div>
 
 <!-- Create-user modal -->

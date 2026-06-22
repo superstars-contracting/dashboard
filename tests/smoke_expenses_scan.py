@@ -23,6 +23,7 @@ Operator-live safe: synthetic SMK- vendors only; cleanup scoped to SMK-.
 """
 import io
 import os
+import secrets
 import sqlite3
 import sys
 import json
@@ -43,6 +44,7 @@ from auth import hash_password  # noqa: E402
 
 PROJECT = "FR-BX-001"
 PM_EMAIL = "smk-pm-scan@superstars.local"
+PM_PW = secrets.token_urlsafe(18)   # #258 — RANDOM per run; held in-process only, never logged
 
 # taxonomy enums (mirror server)
 CLASSES = ['MASONRY', 'CEMENT_MORTAR', 'CONCRETE_REPAIR', 'SEALANTS_CAULK', 'WATERPROOFING',
@@ -155,12 +157,12 @@ def main():
     # non-admin pm -> 403
     conn = db()
     if not conn.execute("SELECT 1 FROM users WHERE email=?", (PM_EMAIL,)).fetchone():
-        conn.execute("INSERT INTO users (email,password_hash,role,full_name,is_active) VALUES (?,?,'pm','SMK PM',1)",
-                     (PM_EMAIL, hash_password("pw")))
+        conn.execute("INSERT INTO users (email,password_hash,role,full_name,is_active,is_system) VALUES (?,?,'pm','SMK PM',1,1)",
+                     (PM_EMAIL, hash_password(PM_PW)))
     else:
-        conn.execute("UPDATE users SET role='pm',password_hash=?,is_active=1 WHERE email=?", (hash_password("pw"), PM_EMAIL))
+        conn.execute("UPDATE users SET role='pm',password_hash=?,is_active=1,is_system=1 WHERE email=?", (hash_password(PM_PW), PM_EMAIL))
     conn.commit(); conn.close()
-    s = requests.Session(); s.post(f"{BASE}/api/auth/login", json={"email": PM_EMAIL, "password": "pw"}, timeout=10)
+    s = requests.Session(); s.post(f"{BASE}/api/auth/login", json={"email": PM_EMAIL, "password": PM_PW}, timeout=10)
     r403 = s.post(f"{BASE}/api/expenses/scan", files={"files": ("r.png", io.BytesIO(png), "image/png")}, timeout=10)
     ok("scan_non_admin_403", r403.status_code == 403, f"HTTP {r403.status_code}")
 

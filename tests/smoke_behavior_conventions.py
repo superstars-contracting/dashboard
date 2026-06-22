@@ -125,6 +125,24 @@ def m_dropreport_path_scoped(html):
             and no_hardcoded_client and no_hardcoded_name)
 
 
+def m_admin_console_home_nav(html):
+    """(#258) the admin console (/admin/users) must offer a way OUT — a link to the
+    dashboard AND the company home — so the operator is never stranded there
+    (the #257 dead-end bug)."""
+    has_dashboard = 'href="/dashboard"' in html
+    has_home = 'class="brand-home"' in html
+    return has_dashboard and has_home
+
+
+def m_app_admin_users_link(js):
+    """(#258) the main app's shared header chip exposes an admin-ONLY entry point to
+    /admin/users, so an admin can reach user management from the dashboard/console —
+    gated to role=admin (the server route is the real authority; this is the UX link)."""
+    links_to_console = "/admin/users" in js
+    admin_only = "role === 'admin'" in js or "role==='admin'" in js
+    return links_to_console and admin_only
+
+
 # ---- (#254) cross-view BEHAVIORAL check: approved rate -> tracker resolution --
 
 _PROP_EID, _PROP_WID = "E-99254", "W-9954"
@@ -430,6 +448,12 @@ def main():
            "jget('/api/projects/'+encodeURIComponent(PROJECT)); }")
        and not m_dropreport_path_scoped(
            "var PROJECT='FR-BX-001', CLIENT='Compass Point, LLC', PROJ_NAME='890 E 135th St';"))
+    ok("selftest_admin_console_home_nav",
+       m_admin_console_home_nav('<a class="brand-home" href="/"></a><a href="/dashboard">Dashboard</a>')
+       and not m_admin_console_home_nav('<h1>User Management</h1>'))
+    ok("selftest_app_admin_users_link",
+       m_app_admin_users_link("if (user.role === 'admin') { href='/admin/users' }")
+       and not m_app_admin_users_link("<button>Sign out</button>"))
 
     # ---- live surfaces -------------------------------------------------------
     print("\n== surfaces ==")
@@ -475,6 +499,22 @@ def main():
     ok("dropreport_path_scoped_not_hardcoded", m_dropreport_path_scoped(project),
        "Drop Report derives project from the path + pulls client/name from the record "
        "(no FR-BX-001 / 'Compass Point, LLC' / '890 E 135th St' hardcode)")
+
+    # (#258) admin-console navigation — no dead-end + an admin-only entry point
+    try:
+        admin_console = fetch("/admin/users")            # admin session via _smoke_auth
+    except Exception as e:
+        admin_console = ""
+        ok("fetch_admin_console", False, f"/admin/users -> {e}")
+    try:
+        auth_menu_js = fetch("/files/static/js/auth_menu.js")
+    except Exception as e:
+        auth_menu_js = ""
+        ok("fetch_auth_menu_js", False, f"auth_menu.js -> {e}")
+    ok("admin_console_has_home_nav", m_admin_console_home_nav(admin_console),
+       "/admin/users links back to the dashboard + company home (not a dead-end)")
+    ok("app_exposes_admin_users_link", m_app_admin_users_link(auth_menu_js),
+       "header chip exposes an admin-only Users link to /admin/users")
 
     # ---- (#254) cross-view propagation: approved rate reflected in the tracker -
     print("\n== cross-view behavioral (approved rate -> tracker resolution) ==")

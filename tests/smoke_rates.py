@@ -22,6 +22,7 @@ removes it at the end.
 from __future__ import annotations
 
 import os
+import secrets
 import sqlite3
 import sys
 from pathlib import Path
@@ -41,7 +42,7 @@ DB_PATH = SCRIPT_DIR / "superstars.db"
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
 
 PM_EMAIL = "smoke-pm@superstars.local"
-PM_PASSWORD = "smoke-pm-password-please-do-not-reuse"
+PM_PASSWORD = secrets.token_urlsafe(18)   # #258 — RANDOM per run; held in-process only, never logged
 
 # Fake placeholder rates ONLY. Never use real numbers in this file.
 FAKE_RATE_A = 1.00
@@ -69,13 +70,13 @@ def _ensure_pm_user() -> None:
     row = conn.execute("SELECT id FROM users WHERE email = ?", (PM_EMAIL,)).fetchone()
     if row is None:
         conn.execute(
-            "INSERT INTO users (email, password_hash, role, full_name, is_active) "
-            "VALUES (?, ?, 'pm', ?, 1)",
+            "INSERT INTO users (email, password_hash, role, full_name, is_active, is_system) "
+            "VALUES (?, ?, 'pm', ?, 1, 1)",
             (PM_EMAIL, hash_password(PM_PASSWORD), "Smoke PM"),
         )
     else:
         conn.execute(
-            "UPDATE users SET password_hash=?, role='pm', is_active=1, full_name='Smoke PM' "
+            "UPDATE users SET password_hash=?, role='pm', is_active=1, full_name='Smoke PM', is_system=1 "
             "WHERE email=?",
             (hash_password(PM_PASSWORD), PM_EMAIL),
         )

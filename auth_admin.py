@@ -63,13 +63,16 @@ def _gen_temp_password(n: int = 16) -> str:
 
 def _active_admin_count(conn) -> int:
     return conn.execute(
-        "SELECT COUNT(1) FROM users WHERE role='admin' AND status='active' AND is_active=1"
+        # #258 — count only REAL admins (is_system=0). Test fixtures (is_system=1)
+        # are exempt from the single-admin invariant.
+        "SELECT COUNT(1) FROM users WHERE role='admin' AND status='active' "
+        "AND is_active=1 AND COALESCE(is_system,0)=0"
     ).fetchone()[0]
 
 
 def _get_user(conn, user_id: int):
     return conn.execute(
-        "SELECT id, email, role, full_name, display_name, status, is_active, "
+        "SELECT id, email, role, full_name, display_name, status, is_active, is_system, "
         "       must_reset_password, last_login_at, created_at, created_by, deactivated_at "
         "FROM users WHERE id = ?", (user_id,)).fetchone()
 
@@ -101,10 +104,14 @@ def _role_change_audit(conn, user_id, old_role, new_role, changed_by, reason):
 def _list_users():
     conn = _db()
     try:
+        # #258 — show ONLY real accounts. Test fixtures (is_system=1) are hidden so
+        # the operator never sees seeded admins. The filter keys on the FLAG, not on
+        # email guessing: a rogue admin created some other way has is_system=0 and
+        # WOULD still appear here.
         rows = conn.execute(
             "SELECT id, email, role, full_name, display_name, status, is_active, "
             "       must_reset_password, last_login_at, created_at, created_by, deactivated_at "
-            "FROM users ORDER BY "
+            "FROM users WHERE COALESCE(is_system,0)=0 ORDER BY "
             "CASE role WHEN 'admin' THEN 0 WHEN 'c_suite' THEN 1 WHEN 'pm' THEN 2 ELSE 3 END, "
             "LOWER(email)").fetchall()
         return jsonify({"data": [_public_user(r) for r in rows]})

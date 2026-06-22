@@ -49,7 +49,7 @@ from auth import hash_password  # noqa: E402
 PROJ = "SMK-DOCSCAN"
 NOROLE_EMAIL = "smk-norole-scan@superstars.local"
 SMOKE_EMAIL = "smoke@superstars.local"
-SMOKE_PW = "smoke-suite-password-please-do-not-reuse"
+SMOKE_PW = _smoke_auth.SMOKE_PASSWORD   # #258 — the per-run random pw set by _smoke_auth.setup() (no hardcoded backdoor)
 TMP_PORT = "5099"
 BASE2 = f"http://127.0.0.1:{TMP_PORT}"
 

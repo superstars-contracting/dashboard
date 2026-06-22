@@ -28,6 +28,7 @@ briefly so a small startup race against the test server doesn't false-fail.
 from __future__ import annotations
 
 import os
+import secrets
 import sqlite3
 import sys
 import time
@@ -41,7 +42,10 @@ BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
 
 SMOKE_EMAIL = "smoke@superstars.local"
 SMOKE_NAME = "Smoke Test Admin"
-SMOKE_PASSWORD = "smoke-suite-password-please-do-not-reuse"
+# #258 — RANDOM password per run (no standing backdoor in the live DB). Held
+# in-process only for this run's login; never logged. The fixture row is flagged
+# is_system=1 so the admin console hides it and the invariant ignores it.
+SMOKE_PASSWORD = secrets.token_urlsafe(18)
 
 sys.path.insert(0, str(SCRIPT_DIR))
 from auth import hash_password  # noqa: E402
@@ -107,15 +111,15 @@ def _ensure_user() -> None:
     row = conn.execute("SELECT id FROM users WHERE email = ?", (SMOKE_EMAIL,)).fetchone()
     if row is None:
         conn.execute(
-            "INSERT INTO users (email, password_hash, role, full_name, is_active) "
-            "VALUES (?, ?, 'admin', ?, 1)",
+            "INSERT INTO users (email, password_hash, role, full_name, is_active, is_system) "
+            "VALUES (?, ?, 'admin', ?, 1, 1)",
             (SMOKE_EMAIL, hash_password(SMOKE_PASSWORD), SMOKE_NAME),
         )
     else:
-        # Repair the row so the shim's known credential always works regardless
-        # of what previous runs (or a future admin) did to it.
+        # Repair the row so the shim's per-run credential always works, and (re)flag
+        # it is_system=1 so the admin console hides this fixture (#258).
         conn.execute(
-            "UPDATE users SET password_hash = ?, is_active = 1, role = 'admin', full_name = ? "
+            "UPDATE users SET password_hash = ?, is_active = 1, role = 'admin', full_name = ?, is_system = 1 "
             "WHERE email = ?",
             (hash_password(SMOKE_PASSWORD), SMOKE_NAME, SMOKE_EMAIL),
         )

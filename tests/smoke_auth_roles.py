@@ -25,6 +25,7 @@ Run (server up):  python tests/smoke_auth_roles.py
 from __future__ import annotations
 
 import os
+import secrets
 import sqlite3
 import sys
 from pathlib import Path
@@ -39,12 +40,15 @@ from auth import hash_password  # noqa: E402
 
 PASS, FAIL = 0, 0
 ADMIN_EMAIL = "smoke@superstars.local"          # the gate's standing test admin (fixture)
-ADMIN_PW = "smoke-suite-password-please-do-not-reuse"
 PM_EMAIL = "smk257-pm@example.invalid"
 CS_EMAIL = "smk257-cs@example.invalid"
 NEW_EMAIL = "smk257-new@example.invalid"        # created via the admin API (must_reset flow)
-SEED_PW = "smk257-seed-pw-do-not-reuse-9"       # known pw for SQL-seeded synthetic users
-NEW_PW = "smk257-fresh-pw-9chars-min"           # >=12, letter+digit (passes strength)
+# #258 — RANDOM per run (no standing backdoor); held in-process for this run only,
+# never logged. NEW_PW is the password set via the legit set-password API, kept
+# strong (>=12, letter+digit) but non-constant.
+ADMIN_PW = secrets.token_urlsafe(18)
+SEED_PW = secrets.token_urlsafe(18)
+NEW_PW = "Smk257" + secrets.token_urlsafe(8) + "9z"
 
 
 def jbody(resp):
@@ -79,10 +83,10 @@ def ensure_admin():
         row = c.execute("SELECT id FROM users WHERE LOWER(email)=?", (ADMIN_EMAIL,)).fetchone()
         if row:
             c.execute("UPDATE users SET password_hash=?, role='admin', is_active=1, status='active', "
-                      "must_reset_password=0 WHERE id=?", (hash_password(ADMIN_PW), row[0]))
+                      "must_reset_password=0, is_system=1 WHERE id=?", (hash_password(ADMIN_PW), row[0]))
         else:
-            c.execute("INSERT INTO users(email,password_hash,role,full_name,display_name,is_active,status,must_reset_password) "
-                      "VALUES(?,?,'admin','Smoke Admin','Smoke Admin',1,'active',0)",
+            c.execute("INSERT INTO users(email,password_hash,role,full_name,display_name,is_active,status,must_reset_password,is_system) "
+                      "VALUES(?,?,'admin','Smoke Admin','Smoke Admin',1,'active',0,1)",
                       (ADMIN_EMAIL, hash_password(ADMIN_PW)))
         c.commit()
         return c.execute("SELECT id FROM users WHERE LOWER(email)=?", (ADMIN_EMAIL,)).fetchone()[0]
@@ -94,8 +98,8 @@ def seed_user(email, role, must_reset=0, status="active"):
     c = _conn()
     try:
         c.execute("DELETE FROM users WHERE email=?", (email,))
-        c.execute("INSERT INTO users(email,password_hash,role,full_name,display_name,is_active,status,must_reset_password) "
-                  "VALUES(?,?,?,?,?,1,?,?)",
+        c.execute("INSERT INTO users(email,password_hash,role,full_name,display_name,is_active,status,must_reset_password,is_system) "
+                  "VALUES(?,?,?,?,?,1,?,?,1)",
                   (email, hash_password(SEED_PW), role, "SMK 257 " + role, "SMK-257-" + role, status, must_reset))
         c.commit()
         return c.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()[0]
@@ -244,6 +248,46 @@ def main() -> int:
         check("login_audit has login_success", "login_success" in ev, f"{sorted(ev)}")
         check("login_audit has login_fail", "login_fail" in ev, f"{sorted(ev)}")
         check("login_audit has password_set", "password_set" in ev, f"{sorted(ev)}")
+
+        # ---------- (g) #258: is_system fixtures hidden + invariant counts real admins ----------
+        print("\n== (g) #258 is_system: console hides fixtures + invariant counts real admins ==")
+        # (d) the smoke fixture carries is_system=1
+        c = _conn()
+        try:
+            smoke_sys = c.execute("SELECT is_system FROM users WHERE LOWER(email)=?", (ADMIN_EMAIL,)).fetchone()
+        finally:
+            c.close()
+        check("(d) smoke fixture carries is_system=1", bool(smoke_sys) and smoke_sys[0] == 1, f"{smoke_sys}")
+        # seed a synthetic is_system=0 'real-looking' user to prove the filter keys on the
+        # FLAG (not on email guessing): it MUST appear; the is_system=1 fixture must NOT.
+        realish = "smk257-realish@example.invalid"
+        c = _conn()
+        try:
+            c.execute("DELETE FROM users WHERE email=?", (realish,))
+            c.execute("INSERT INTO users(email,password_hash,role,full_name,display_name,is_active,status,is_system) "
+                      "VALUES(?,?, 'pm','SMK Realish','SMK Realish',1,'active',0)", (realish, hash_password(SEED_PW)))
+            c.commit()
+        finally:
+            c.close()
+        listing = jbody(admin.get(f"{BASE}/api/admin/users", timeout=15)).get("data") or []
+        emails = {(u.get("email") or "").lower() for u in listing}
+        check("(a) admin list HIDES the is_system fixture", ADMIN_EMAIL not in emails,
+              f"fixture present={ADMIN_EMAIL in emails}")
+        check("(a) admin list SHOWS an is_system=0 account (keys on flag, not email)", realish in emails)
+        # (c) invariant counts ONLY real (is_system=0) admins
+        import auth_admin  # noqa: E402
+        c = _conn()
+        try:
+            real_admins = c.execute("SELECT COUNT(1) FROM users WHERE role='admin' AND is_system=0 "
+                                    "AND status='active' AND is_active=1").fetchone()[0]
+            all_admins = c.execute("SELECT COUNT(1) FROM users WHERE role='admin' "
+                                   "AND status='active' AND is_active=1").fetchone()[0]
+            counted = auth_admin._active_admin_count(c)
+        finally:
+            c.close()
+        check("(c) _active_admin_count counts ONLY real admins (fixture excluded)",
+              counted == real_admins and all_admins > real_admins,
+              f"counted={counted} real={real_admins} all={all_admins}")
 
     finally:
         # scoped cleanup — ONLY smk257-* rows; real users (incl. the real admin) untouched

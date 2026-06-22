@@ -29,6 +29,7 @@ Covers (the Batch-A verify list):
 import base64
 import io
 import os
+import secrets
 import shutil
 import sqlite3
 import sys
@@ -51,7 +52,7 @@ from auth import hash_password  # noqa: E402
 PROJECT = "FR-BX-001"
 RECEIPTS_BASE = SCRIPT_DIR / "data_room" / "receipts"
 PM_EMAIL = "smk-pm-expense@superstars.local"
-PM_PW = "smk-pm-expense-pw"
+PM_PW = secrets.token_urlsafe(18)   # #258 — RANDOM per run; held in-process only, never logged
 
 # 1x1 PNG
 PNG_1X1 = base64.b64decode(
@@ -256,10 +257,10 @@ def _check_admin_gating(eid):
     conn = db()
     row = conn.execute("SELECT id FROM users WHERE email=?", (PM_EMAIL,)).fetchone()
     if row is None:
-        conn.execute("INSERT INTO users (email,password_hash,role,full_name,is_active) VALUES (?,?,'pm',?,1)",
+        conn.execute("INSERT INTO users (email,password_hash,role,full_name,is_active,is_system) VALUES (?,?,'pm',?,1,1)",
                      (PM_EMAIL, hash_password(PM_PW), "SMK PM"))
     else:
-        conn.execute("UPDATE users SET password_hash=?, role='pm', is_active=1 WHERE email=?",
+        conn.execute("UPDATE users SET password_hash=?, role='pm', is_active=1, is_system=1 WHERE email=?",
                      (hash_password(PM_PW), PM_EMAIL))
     conn.commit(); conn.close()
     s = requests.Session()

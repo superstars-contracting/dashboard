@@ -50,17 +50,28 @@
       '  padding: 4px 10px; cursor: pointer; transition: color .15s, border-color .15s;',
       '}',
       '.auth-menu .au-logout:hover { color: #B11E2E; border-color: #B11E2E; }',
-      '.auth-menu .au-logout:disabled { opacity: 0.6; cursor: not-allowed; }'
+      '.auth-menu .au-logout:disabled { opacity: 0.6; cursor: not-allowed; }',
+      '.auth-menu .au-users {',
+      '  font: inherit; font-size: 11px; font-weight: 700; color: #B11E2E;',
+      '  text-decoration: none; border: 1px solid #E8E4DD; border-radius: 6px;',
+      '  padding: 4px 10px; transition: border-color .15s;',
+      '}',
+      '.auth-menu .au-users:hover { border-color: #B11E2E; }'
     ].join('\n');
     document.head.appendChild(style);
   }
 
   function render(host, user) {
     var role = ROLE_LABEL[user.role] || user.role || '—';
+    // #258 — admin-only entry point to the user-management console. Visible only to
+    // role=admin; /admin/users is gated server-side (this link is UX, not the authority).
+    var adminLink = (user.role === 'admin')
+      ? '<a class="au-users" href="/admin/users" title="User management">Users</a>' : '';
     host.innerHTML =
       '<div class="auth-menu" data-user-id="' + escapeHtml(user.id) + '">' +
         '<span class="au-name">' + escapeHtml(user.full_name || user.email) + '</span>' +
         '<span class="au-role">' + escapeHtml(role) + '</span>' +
+        adminLink +
         '<button type="button" class="au-logout" aria-label="Sign out">Sign out</button>' +
       '</div>';
     var btn = host.querySelector('.au-logout');

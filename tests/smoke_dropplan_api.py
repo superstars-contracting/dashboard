@@ -23,6 +23,7 @@ Run (server must be up):
 from __future__ import annotations
 
 import os
+import secrets
 import sqlite3
 import sys
 from pathlib import Path
@@ -37,7 +38,7 @@ PROJECT = "FR-BX-001"
 from auth import hash_password  # noqa: E402
 
 PASS, FAIL = 0, 0
-PW = "smk-api-pw-do-not-reuse"
+PW = secrets.token_urlsafe(18)   # #258 — RANDOM per run; held in-process only, never logged
 # The auth schema's users.role CHECK permits ONLY these four operational
 # roles — there is no external/client role to create (drop-plan data is
 # unreachable by any non-operational identity by construction). Role denial
@@ -67,10 +68,10 @@ def ensure_user(email, role):
         conn.execute("PRAGMA busy_timeout=60000;")
         row = conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
         if row is None:
-            conn.execute("INSERT INTO users(email,password_hash,role,full_name,is_active) VALUES(?,?,?,?,1)",
+            conn.execute("INSERT INTO users(email,password_hash,role,full_name,is_active,is_system) VALUES(?,?,?,?,1,1)",
                          (email, hash_password(PW), role, f"SMK {role}"))
         else:
-            conn.execute("UPDATE users SET password_hash=?, role=?, is_active=1 WHERE email=?",
+            conn.execute("UPDATE users SET password_hash=?, role=?, is_active=1, is_system=1 WHERE email=?",
                          (hash_password(PW), role, email))
         conn.commit()
     finally:
