@@ -106,8 +106,8 @@ def _install_path_guard(session: requests.Session) -> None:
 
 
 def _ensure_user() -> None:
-    conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
-    conn.execute("PRAGMA foreign_keys=ON;")
+    import db_layer  # #259 — seed into whatever SSC_DB_URL targets (SQLite default or PG test db)
+    conn = db_layer.connect(pragma_fk=True)
     row = conn.execute("SELECT id FROM users WHERE email = ?", (SMOKE_EMAIL,)).fetchone()
     if row is None:
         conn.execute(

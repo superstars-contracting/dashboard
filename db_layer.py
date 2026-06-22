@@ -63,6 +63,8 @@ _INSERT_RE = re.compile(r"^\s*INSERT\s+(?:OR\s+(IGNORE|REPLACE)\s+)?INTO\s+\"?([
 
 def to_pg_sql(sql: str) -> str:
     """Translate qmark placeholders -> pyformat, doubling literal % for psycopg."""
+    # SQLite last_insert_rowid() -> Postgres lastval() (last identity value this session)
+    sql = re.sub(r"last_insert_rowid\s*\(\s*\)", "lastval()", sql, flags=re.IGNORECASE)
     out = []
     in_str = False
     for ch in sql:

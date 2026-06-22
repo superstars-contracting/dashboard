@@ -69,10 +69,8 @@ def has_path_key(obj):
 
 
 def db():
-    conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL;")
-    return conn
+    import db_layer  # #259 — honors SSC_DB_URL (SQLite default or Postgres test db)
+    return db_layer.connect()
 
 def row_count(conn, table, where_sql, params):
     q = f"SELECT COUNT(*) FROM {table} WHERE {where_sql}"

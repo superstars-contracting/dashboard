@@ -37,6 +37,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 DB = SCRIPT_DIR / "superstars.db"
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
 from auth import hash_password  # noqa: E402
+import db_layer  # noqa: E402  # #259 — route direct DB access through the env-driven layer
 
 PASS, FAIL = 0, 0
 ADMIN_EMAIL = "smoke@superstars.local"          # the gate's standing test admin (fixture)
@@ -71,9 +72,8 @@ def check(label, ok, note=""):
 
 
 def _conn():
-    c = sqlite3.connect(str(DB), timeout=60.0)
-    c.execute("PRAGMA busy_timeout=60000;")
-    return c
+    # #259 — honors SSC_DB_URL (SQLite default, or the Postgres test DB).
+    return db_layer.connect()
 
 
 def ensure_admin():
@@ -189,7 +189,9 @@ def main() -> int:
         c = _conn()
         still_admin = c.execute("SELECT role, status FROM users WHERE id=?", (admin_id,)).fetchone()
         c.close()
-        check("acting admin still admin+active after invariant attempts", still_admin == ("admin", "active"), f"{still_admin}")
+        check("acting admin still admin+active after invariant attempts",
+              bool(still_admin) and still_admin["role"] == "admin" and still_admin["status"] == "active",
+              f"{(still_admin['role'], still_admin['status']) if still_admin else None}")
 
         # ---------- (d) deactivation blocks login + kills the session ----------
         print("\n== (d) deactivation kills session + blocks login ==")
