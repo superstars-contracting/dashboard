@@ -42,6 +42,11 @@ app.register_blueprint(preview_bp)
 from auth import apply_auth_gate, requires_role, current_user  # noqa: F401 (requires_role re-exported for future use)
 apply_auth_gate(app)
 
+# Admin account management — multi-user accounts & roles, Phase 1 (#257). Every
+# endpoint is admin-only, gated server-side (the before_request gate runs first).
+import auth_admin  # noqa: E402
+auth_admin.register(app)
+
 # Security: cap upload size. Raised to 256 MB (#235) so a field-photo BATCH POST
 # (many images, several 8-12 MB) isn't rejected at the WSGI layer; the Field
 # Photos UI also uploads in chunks. A request over the cap returns a clean 413
@@ -4879,7 +4884,10 @@ def api_signin_dcr_reconcile(project_code):
 # dates LOCAL; history is role-stamped (no names — PII-safe).
 LABOR_TRADES = ('Mechanic', 'Laborer', 'Rope Access', 'Superintendent')
 _LR_FULL_ROLES = ('admin', 'c_suite')
-_LR_APPROVE_ROLES = ('admin', 'c_suite', 'pm')
+# #257 — individual worker rates/comp are admin/c_suite ONLY. pm was removed from
+# rate approval here (catalog: c_suite/admin approve; pm must NOT see individual
+# rates). Server-side enforced on every rates endpoint; the page is gated too.
+_LR_APPROVE_ROLES = ('admin', 'c_suite')
 
 # #241 — canonical Worker ID shape (CLAUDE.md terminology rule: literal 'W-' +
 # zero-padded 4-digit sequence). EVERY endpoint that accepts a worker id from a
@@ -5369,11 +5377,11 @@ def api_lr_eligible_workers():
 
 
 @app.route('/admin/labor-rates', methods=['GET'])
-@requires_role('admin', 'c_suite', 'pm')
+@requires_role('admin', 'c_suite')
 def admin_labor_rates_page():
-    """Serve the Labor Rates admin page (HTML). Role-gated to admin/c_suite/pm —
-    the page + API scope what each sees (PM gets ONLY the pending queue; the
-    roster/history APIs 403 for PM). super/other get 403 here."""
+    """Serve the Labor Rates admin page (HTML). #257 — admin/c_suite ONLY. pm was
+    removed (pm must NOT see individual worker rates/comp); every rates API is
+    also admin/c_suite-gated server-side. super/external get 403 here."""
     page = SCRIPT_DIR / 'admin_labor_rates.html'
     if not page.exists():
         return jsonify({"error": "admin page not found"}), 404

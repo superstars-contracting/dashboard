@@ -142,9 +142,13 @@ def main() -> int:
         users_ddl = conn.execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").fetchone()[0]
         conn.close()
-        check("auth schema permits ONLY admin/c_suite/pm/super (no external/client role can exist)",
-              "'client'" not in users_ddl and "'external'" not in users_ddl
-              and all(r in users_ddl for r in ("'admin'", "'c_suite'", "'pm'", "'super'")))
+        # #257 — the role catalog was expanded to admin/c_suite/pm/super + the external
+        # tier client/architect/vendor (DEFINED, not onboarded this phase; cost-blind /
+        # project-scoped — no login intake built). Drop-plan data stays unreachable by
+        # external roles because _DROPPLAN_ROLES is operational-only (proven by the
+        # pm/super role-gate OMIT checks below), NOT because the role can't exist.
+        check("auth schema includes the operational roles admin/c_suite/pm/super",
+              all(r in users_ddl for r in ("'admin'", "'c_suite'", "'pm'", "'super'")))
 
         # ---- cure-gate fix (DB read) ----
         conn = sqlite3.connect(str(DB))

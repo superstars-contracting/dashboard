@@ -39,6 +39,17 @@ LOGIN_PAGE_PATH = SCRIPT_DIR / "login.html"
 COOKIE_NAME = "ssc_session"
 SESSION_TTL = timedelta(hours=12)  # sliding — refreshed on each authed request
 
+# Multi-user phase 1 (#257). Security basics built now even on Tailscale so the
+# later public-exposure phase is ready (admin 2FA + public TLS/WAF are NEXT phase
+# — TODO, not built here). Nothing here exposes the app publicly.
+MIN_PASSWORD_LEN = 12
+LOGIN_MAX_FAILS = 5                          # per-account, within the window
+LOGIN_FAIL_WINDOW = timedelta(minutes=15)
+SET_PASSWORD_PAGE_PATH = SCRIPT_DIR / "set_password.html"
+# A must_reset_password user may reach ONLY these paths (plus the public /api/auth/*)
+# until they set a real password — NO data loads behind the forced-reset screen.
+_RESET_ALLOWED_EXACT = {"/set-password", "/login"}
+
 # Paths that bypass auth entirely. Order: prefix match (startswith) for
 # wildcard buckets; exact match for single paths.
 #
@@ -106,6 +117,63 @@ def _redact_sid(sid: Optional[str]) -> str:
     return f"…{sid[-6:]}"
 
 
+# ============= AUDIT + SECURITY HELPERS (#257) =============
+
+def _client_ip() -> Optional[str]:
+    """Best-effort client IP for the audit trail. Behind Tailscale serve the real
+    client rides in X-Forwarded-For; fall back to remote_addr. (IP is allowed in
+    the audit per CLAUDE.md — it is not name/path PII.)"""
+    xff = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        return xff.split(",")[0].strip()[:64] or None
+    return (request.remote_addr or "")[:64] or None
+
+
+def _login_audit(user_id: Optional[int], event: str, ip: Optional[str]) -> None:
+    """Append a login_audit row (LOCAL timestamp). NEVER records the password, the
+    hash, or which non-existent email was tried (user_id is NULL when unknown).
+    Auth must never fail because the audit write failed."""
+    conn = _db()
+    try:
+        conn.execute(
+            "INSERT INTO login_audit (user_id, event, at, ip) VALUES (?, ?, ?, ?)",
+            (user_id, event, _now_iso(), ip),
+        )
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # audit table not migrated yet — do not block auth
+    finally:
+        conn.close()
+
+
+def _recent_login_fails(user_id: int) -> int:
+    """login_fail count for this account within the lockout window."""
+    since = (datetime.now() - LOGIN_FAIL_WINDOW).isoformat(timespec="seconds")
+    conn = _db()
+    try:
+        row = conn.execute(
+            "SELECT COUNT(1) FROM login_audit WHERE user_id = ? AND event = 'login_fail' AND at >= ?",
+            (user_id, since),
+        ).fetchone()
+        return row[0] if row else 0
+    except sqlite3.OperationalError:
+        return 0
+    finally:
+        conn.close()
+
+
+def password_strength_error(pw: str) -> Optional[str]:
+    """Return an error string if the password is too weak, else None. Reasonable
+    rule: >= MIN_PASSWORD_LEN chars with at least one letter and one digit."""
+    if not isinstance(pw, str) or len(pw) < MIN_PASSWORD_LEN:
+        return f"Password must be at least {MIN_PASSWORD_LEN} characters."
+    if not any(c.isalpha() for c in pw):
+        return "Password must include at least one letter."
+    if not any(c.isdigit() for c in pw):
+        return "Password must include at least one number."
+    return None
+
+
 # ============= USERS =============
 
 def get_user_by_email(email: str) -> Optional[dict]:
@@ -114,8 +182,8 @@ def get_user_by_email(email: str) -> Optional[dict]:
     conn = _db()
     try:
         row = conn.execute(
-            "SELECT id, email, password_hash, role, full_name, employee_id_link, "
-            "       is_active, created_at, last_login_at "
+            "SELECT id, email, password_hash, role, full_name, display_name, employee_id_link, "
+            "       is_active, status, must_reset_password, created_at, last_login_at "
             "FROM users WHERE LOWER(email) = LOWER(?)",
             (email.strip(),),
         ).fetchone()
@@ -180,7 +248,8 @@ def lookup_session(sid: str) -> Optional[dict]:
     try:
         row = conn.execute(
             "SELECT s.id, s.user_id, s.expires_at, "
-            "       u.email, u.role, u.full_name, u.employee_id_link, u.is_active "
+            "       u.email, u.role, u.full_name, u.display_name, u.employee_id_link, "
+            "       u.is_active, u.status, u.must_reset_password "
             "FROM sessions s JOIN users u ON u.id = s.user_id "
             "WHERE s.id = ?",
             (sid,),
@@ -192,8 +261,10 @@ def lookup_session(sid: str) -> Optional[dict]:
             conn.execute("DELETE FROM sessions WHERE id = ?", (sid,))
             conn.commit()
             return None
-        if not row["is_active"]:
-            # Deactivated user — kill the session so re-auth is forced.
+        # Status is re-read from the users row on EVERY request (the session stores
+        # only user_id) — so a deactivation / role change takes effect on the user's
+        # very next request. A non-active user's session is destroyed so re-auth is forced.
+        if row["status"] != "active" or not row["is_active"]:
             conn.execute("DELETE FROM sessions WHERE id = ?", (sid,))
             conn.commit()
             return None
@@ -209,7 +280,10 @@ def lookup_session(sid: str) -> Optional[dict]:
             "email": row["email"],
             "role": row["role"],
             "full_name": row["full_name"],
+            "display_name": row["display_name"] or row["full_name"],
             "employee_id_link": row["employee_id_link"],
+            "status": row["status"],
+            "must_reset_password": bool(row["must_reset_password"]),
         }
     finally:
         conn.close()
@@ -329,6 +403,13 @@ def _before_request_gate():
         # next is intentionally restricted to same-origin paths only (validated on login).
         return redirect(f"/login?next={path}")
     g.auth_user = user
+    # Forced first-login reset (#257): a must_reset_password user can reach ONLY the
+    # set-password screen + the public /api/auth/* endpoints. NO data loads behind it
+    # — server-side, so it holds even if the client UI is bypassed.
+    if user.get("must_reset_password") and path not in _RESET_ALLOWED_EXACT:
+        if _wants_json(path):
+            return jsonify({"error": "password reset required", "must_reset": True}), 403
+        return redirect("/set-password")
     return None
 
 
@@ -345,20 +426,33 @@ def _api_login():
     password = data.get("password") or ""
     if not email or not password:
         return jsonify({"error": "email and password required"}), 400
+    ip = _client_ip()
     user = get_user_by_email(email)
-    # Uniform failure response — never disclose whether email exists.
-    if not user or not user.get("is_active") or not verify_password(password, user["password_hash"]):
+    # Silent per-account lockout: after N fails in the window, refuse even a correct
+    # password — same generic 401, so it never discloses that the account exists.
+    if user and _recent_login_fails(user["id"]) >= LOGIN_MAX_FAILS:
+        _login_audit(user["id"], "login_fail", ip)
+        logging.info("auth: login refused (rate-limited)")
+        return jsonify({"error": "invalid credentials"}), 401
+    active = bool(user) and user.get("status") == "active" and bool(user.get("is_active"))
+    # Uniform failure response — never disclose whether the email exists or is disabled.
+    if not user or not active or not verify_password(password, user["password_hash"]):
+        if user:
+            _login_audit(user["id"], "login_fail", ip)
         logging.info("auth: login failed")  # PII rule: do NOT log the email
         return jsonify({"error": "invalid credentials"}), 401
     sid = create_session(user["id"], request.headers.get("User-Agent"))
     touch_last_login(user["id"])
+    _login_audit(user["id"], "login_success", ip)
     logging.info(f"auth: login ok role={user['role']} sid={_redact_sid(sid)}")
     response = make_response(jsonify({
         "user": {
             "id": user["id"],
             "email": user["email"],
             "full_name": user["full_name"],
+            "display_name": user.get("display_name") or user["full_name"],
             "role": user["role"],
+            "must_reset_password": bool(user.get("must_reset_password")),
         }
     }))
     _set_session_cookie(response, sid)
@@ -367,6 +461,9 @@ def _api_login():
 
 def _api_logout():
     sid = request.cookies.get(COOKIE_NAME)
+    user = lookup_session(sid) if sid else None
+    if user:
+        _login_audit(user["id"], "logout", _client_ip())
     destroy_session(sid)
     logging.info(f"auth: logout sid={_redact_sid(sid)}")
     response = make_response(jsonify({"ok": True}))
@@ -385,17 +482,60 @@ def _api_me():
         "id": user["id"],
         "email": user["email"],
         "full_name": user["full_name"],
+        "display_name": user.get("display_name") or user["full_name"],
         "role": user["role"],
+        "status": user.get("status"),
+        "must_reset_password": bool(user.get("must_reset_password")),
     }})
+
+
+def _set_password_page():
+    """The forced first-login 'set your password' screen. Reached only by an
+    authenticated user (the before_request gate redirects must_reset users here)."""
+    if SET_PASSWORD_PAGE_PATH.exists():
+        resp = send_file(str(SET_PASSWORD_PAGE_PATH))
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        return resp
+    return ("set-password page missing", 500)
+
+
+def _api_set_password():
+    """POST /api/auth/set-password — {new_password}. The user must be authenticated
+    (logged in with their temp password). Validates strength, updates the bcrypt
+    hash, clears must_reset_password, audits password_set. Session stays valid so
+    the client can route straight to the role home. NEVER logs the password."""
+    sid = request.cookies.get(COOKIE_NAME)
+    user = lookup_session(sid) if sid else None
+    if not user:
+        return jsonify({"error": "auth required"}), 401
+    data = request.get_json(silent=True) or {}
+    new_pw = data.get("new_password") or ""
+    err = password_strength_error(new_pw)
+    if err:
+        return jsonify({"error": err}), 400
+    conn = _db()
+    try:
+        conn.execute(
+            "UPDATE users SET password_hash = ?, must_reset_password = 0 WHERE id = ?",
+            (hash_password(new_pw), user["id"]),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    _login_audit(user["id"], "password_set", _client_ip())
+    logging.info(f"auth: password_set user_id={user['id']}")  # PII rule: never the password
+    return jsonify({"ok": True, "role": user["role"]})
 
 
 def apply_auth_gate(app) -> None:
     """Wire the before_request gate + the /login page + the /api/auth/* routes onto `app`."""
     app.before_request(_before_request_gate)
     app.add_url_rule("/login", "auth_login_page", _login_page, methods=["GET"])
+    app.add_url_rule("/set-password", "auth_set_password_page", _set_password_page, methods=["GET"])
     app.add_url_rule("/api/auth/login", "auth_api_login", _api_login, methods=["POST"])
     app.add_url_rule("/api/auth/logout", "auth_api_logout", _api_logout, methods=["POST"])
     app.add_url_rule("/api/auth/me", "auth_api_me", _api_me, methods=["GET"])
+    app.add_url_rule("/api/auth/set-password", "auth_api_set_password", _api_set_password, methods=["POST"])
 
 
 # ============= ROLE DECORATOR =============

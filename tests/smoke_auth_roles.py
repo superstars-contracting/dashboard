@@ -1,0 +1,267 @@
+"""smoke_auth_roles.py — multi-user accounts & roles authz guard (#257).
+
+Drives the REAL HTTP flow against the running server with synthetic-only users
+(emails smk257-*@example.invalid; never a real colleague). Asserts the
+load-bearing authorization rules — and FAILS on the pre-#257 server so the gate
+proves the fix:
+
+  (a) pm CANNOT reach the individual-rates endpoints (403); c_suite CAN.
+  (b) a role change takes effect SERVER-SIDE on the user's NEXT request (no
+      re-login, no cached session role).
+  (c) the SINGLE-ADMIN INVARIANT holds: no 2nd admin can be created, no one can
+      be elevated to admin, and an admin cannot downgrade/deactivate THEMSELVES
+      (so the sole admin can never be removed via self-action).
+  (d) deactivation blocks login AND kills the in-flight session immediately.
+  (e) must_reset_password forces the set-password screen before ANY data loads
+      (a crafted API call from a must-reset session is 403, not served).
+  (f) login_audit captures login_success / login_fail / password_set.
+
+PII: synthetic emails + a throwaway temp/known password; NEVER logs a real
+password/hash/temp-password (only booleans + status codes). Scoped cleanup
+removes ONLY smk257-* rows + their sessions/audit. Real users untouched.
+
+Run (server up):  python tests/smoke_auth_roles.py
+"""
+from __future__ import annotations
+
+import os
+import sqlite3
+import sys
+from pathlib import Path
+
+import requests
+
+SCRIPT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(SCRIPT_DIR))
+DB = SCRIPT_DIR / "superstars.db"
+BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
+from auth import hash_password  # noqa: E402
+
+PASS, FAIL = 0, 0
+ADMIN_EMAIL = "smoke@superstars.local"          # the gate's standing test admin (fixture)
+ADMIN_PW = "smoke-suite-password-please-do-not-reuse"
+PM_EMAIL = "smk257-pm@example.invalid"
+CS_EMAIL = "smk257-cs@example.invalid"
+NEW_EMAIL = "smk257-new@example.invalid"        # created via the admin API (must_reset flow)
+SEED_PW = "smk257-seed-pw-do-not-reuse-9"       # known pw for SQL-seeded synthetic users
+NEW_PW = "smk257-fresh-pw-9chars-min"           # >=12, letter+digit (passes strength)
+
+
+def jbody(resp):
+    """Parse JSON defensively — a pre-build 404/405 has no JSON body."""
+    try:
+        return resp.json() or {}
+    except Exception:
+        return {}
+
+
+def check(label, ok, note=""):
+    global PASS, FAIL
+    if ok:
+        PASS += 1
+        print(f"  [PASS] {label}")
+    else:
+        FAIL += 1
+        print(f"  [FAIL] {label}" + (f" — {note}" if note else ""))
+    return bool(ok)
+
+
+def _conn():
+    c = sqlite3.connect(str(DB), timeout=60.0)
+    c.execute("PRAGMA busy_timeout=60000;")
+    return c
+
+
+def ensure_admin():
+    """Seed/repair the standing smoke admin so we can act as admin (idempotent)."""
+    c = _conn()
+    try:
+        row = c.execute("SELECT id FROM users WHERE LOWER(email)=?", (ADMIN_EMAIL,)).fetchone()
+        if row:
+            c.execute("UPDATE users SET password_hash=?, role='admin', is_active=1, status='active', "
+                      "must_reset_password=0 WHERE id=?", (hash_password(ADMIN_PW), row[0]))
+        else:
+            c.execute("INSERT INTO users(email,password_hash,role,full_name,display_name,is_active,status,must_reset_password) "
+                      "VALUES(?,?,'admin','Smoke Admin','Smoke Admin',1,'active',0)",
+                      (ADMIN_EMAIL, hash_password(ADMIN_PW)))
+        c.commit()
+        return c.execute("SELECT id FROM users WHERE LOWER(email)=?", (ADMIN_EMAIL,)).fetchone()[0]
+    finally:
+        c.close()
+
+
+def seed_user(email, role, must_reset=0, status="active"):
+    c = _conn()
+    try:
+        c.execute("DELETE FROM users WHERE email=?", (email,))
+        c.execute("INSERT INTO users(email,password_hash,role,full_name,display_name,is_active,status,must_reset_password) "
+                  "VALUES(?,?,?,?,?,1,?,?)",
+                  (email, hash_password(SEED_PW), role, "SMK 257 " + role, "SMK-257-" + role, status, must_reset))
+        c.commit()
+        return c.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()[0]
+    finally:
+        c.close()
+
+
+def login(email, pw):
+    s = requests.Session()
+    r = s.post(f"{BASE}/api/auth/login", json={"email": email, "password": pw}, timeout=15)
+    return s, r
+
+
+def cleanup():
+    c = _conn()
+    try:
+        ids = [r[0] for r in c.execute("SELECT id FROM users WHERE email LIKE 'smk257-%'").fetchall()]
+        for uid in ids:
+            c.execute("DELETE FROM sessions WHERE user_id=?", (uid,))
+            c.execute("DELETE FROM login_audit WHERE user_id=?", (uid,))
+            c.execute("DELETE FROM role_change_audit WHERE user_id=?", (uid,))
+        c.execute("DELETE FROM users WHERE email LIKE 'smk257-%'")
+        c.commit()
+        return len(ids)
+    finally:
+        c.close()
+
+
+def main() -> int:
+    admin_id = ensure_admin()
+    cleanup()
+    # SQL-seeded synthetic users so the rate-authz tests run on BOTH the pre- and
+    # post-#257 server (the discriminators). API-driven tests follow.
+    pm_id = seed_user(PM_EMAIL, "pm")
+    cs_id = seed_user(CS_EMAIL, "c_suite")
+    try:
+        admin, ar = login(ADMIN_EMAIL, ADMIN_PW)
+        check("admin can log in", ar.status_code == 200, f"{ar.status_code}")
+
+        # ---------- (a) pm BLOCKED from individual rates; c_suite ALLOWED ----------
+        print("\n== (a) rates authz: pm blocked, c_suite allowed ==")
+        pm, _ = login(PM_EMAIL, SEED_PW)
+        cs, _ = login(CS_EMAIL, SEED_PW)
+        r_pm_pending = pm.get(f"{BASE}/api/labor-rates/pending", timeout=15)
+        check("pm -> /api/labor-rates/pending is 403 (individual rates)", r_pm_pending.status_code == 403,
+              f"got {r_pm_pending.status_code} (pre-#257 pm was allowed)")
+        r_pm_roster = pm.get(f"{BASE}/api/labor-rates/roster", timeout=15)
+        check("pm -> /api/labor-rates/roster is 403", r_pm_roster.status_code == 403, f"got {r_pm_roster.status_code}")
+        r_cs_roster = cs.get(f"{BASE}/api/labor-rates/roster", timeout=15)
+        check("c_suite -> /api/labor-rates/roster is 200 (rates visible)", r_cs_roster.status_code == 200,
+              f"got {r_cs_roster.status_code}")
+        r_pm_page = pm.get(f"{BASE}/admin/labor-rates", timeout=15)
+        check("pm -> /admin/labor-rates page is 403 (not just hidden)", r_pm_page.status_code == 403,
+              f"got {r_pm_page.status_code}")
+
+        # ---------- (b) role change takes effect on the NEXT request ----------
+        print("\n== (b) role change instant (server-side, next request) ==")
+        up = admin.post(f"{BASE}/api/admin/users/{pm_id}/role", json={"new_role": "c_suite", "reason": "smk257 upgrade"}, timeout=15)
+        check("admin upgrade pm->c_suite returns 200", up.status_code == 200, f"got {up.status_code}")
+        # SAME pm session — no re-login — now resolves as c_suite and gains rate access:
+        r_after_up = pm.get(f"{BASE}/api/labor-rates/roster", timeout=15)
+        check("upgraded user gains rate access on next request (same session)", r_after_up.status_code == 200,
+              f"got {r_after_up.status_code}")
+        down = admin.post(f"{BASE}/api/admin/users/{pm_id}/role", json={"new_role": "pm", "reason": "smk257 downgrade"}, timeout=15)
+        check("admin downgrade c_suite->pm returns 200", down.status_code == 200, f"got {down.status_code}")
+        r_after_down = pm.get(f"{BASE}/api/labor-rates/roster", timeout=15)
+        check("downgraded user loses rate access on next request", r_after_down.status_code == 403,
+              f"got {r_after_down.status_code}")
+        # audit rows present
+        c = _conn()
+        nrole = c.execute("SELECT COUNT(1) FROM role_change_audit WHERE user_id=?", (pm_id,)).fetchone()[0]
+        c.close()
+        check("role_change_audit recorded both changes (>=2)", nrole >= 2, f"{nrole}")
+
+        # ---------- (c) single-admin invariant ----------
+        print("\n== (c) single-admin invariant ==")
+        c_admin = admin.post(f"{BASE}/api/admin/users",
+                             json={"display_name": "SMK 257 Admin2", "email": "smk257-admin2@example.invalid", "role": "admin"}, timeout=15)
+        check("create 2nd admin REFUSED (403)", c_admin.status_code == 403, f"got {c_admin.status_code}")
+        el = admin.post(f"{BASE}/api/admin/users/{pm_id}/role", json={"new_role": "admin"}, timeout=15)
+        check("elevate to admin REFUSED (403)", el.status_code == 403, f"got {el.status_code}")
+        self_down = admin.post(f"{BASE}/api/admin/users/{admin_id}/role", json={"new_role": "pm"}, timeout=15)
+        check("admin cannot downgrade THEMSELVES (403)", self_down.status_code == 403, f"got {self_down.status_code}")
+        self_deact = admin.post(f"{BASE}/api/admin/users/{admin_id}/deactivate", json={}, timeout=15)
+        check("admin cannot deactivate THEMSELVES (403)", self_deact.status_code == 403, f"got {self_deact.status_code}")
+        # the sole-admin row is untouched by all of the above
+        c = _conn()
+        still_admin = c.execute("SELECT role, status FROM users WHERE id=?", (admin_id,)).fetchone()
+        c.close()
+        check("acting admin still admin+active after invariant attempts", still_admin == ("admin", "active"), f"{still_admin}")
+
+        # ---------- (d) deactivation blocks login + kills the session ----------
+        print("\n== (d) deactivation kills session + blocks login ==")
+        pm2, _ = login(PM_EMAIL, SEED_PW)
+        check("pm session live before deactivation", pm2.get(f"{BASE}/api/auth/me", timeout=15).status_code == 200)
+        da = admin.post(f"{BASE}/api/admin/users/{pm_id}/deactivate", json={}, timeout=15)
+        check("admin deactivate pm returns 200", da.status_code == 200, f"got {da.status_code}")
+        me_after = pm2.get(f"{BASE}/api/auth/me", timeout=15)
+        check("in-flight pm session is killed on next request (401)", me_after.status_code == 401, f"got {me_after.status_code}")
+        _, relog = login(PM_EMAIL, SEED_PW)
+        check("deactivated pm cannot log in (401)", relog.status_code == 401, f"got {relog.status_code}")
+        ra = admin.post(f"{BASE}/api/admin/users/{pm_id}/reactivate", json={}, timeout=15)
+        check("admin reactivate pm returns 200", ra.status_code == 200, f"got {ra.status_code}")
+        _, relog2 = login(PM_EMAIL, SEED_PW)
+        check("reactivated pm can log in again (200)", relog2.status_code == 200, f"got {relog2.status_code}")
+
+        # ---------- (e) must_reset forces reset before data ----------
+        print("\n== (e) forced first-login reset before any data ==")
+        cu = admin.post(f"{BASE}/api/admin/users",
+                        json={"display_name": "SMK 257 New", "email": NEW_EMAIL, "role": "pm"}, timeout=15)
+        check("admin create user returns 201 + temp password", cu.status_code == 201 and bool(jbody(cu).get("temp_password")),
+              f"got {cu.status_code}")
+        temp_pw = jbody(cu).get("temp_password") if cu.status_code == 201 else None
+        check("created user flagged must_reset_password", bool((jbody(cu).get("data") or {}).get("must_reset_password")))
+        if temp_pw:
+            nu, nlog = login(NEW_EMAIL, temp_pw)
+            check("new user can log in with temp password", nlog.status_code == 200, f"got {nlog.status_code}")
+            check("login response signals must_reset_password", bool((jbody(nlog).get("user") or {}).get("must_reset_password")))
+            blocked = nu.get(f"{BASE}/api/dropplan/projects/FR-BX-001/rollup", timeout=15)
+            check("must_reset session BLOCKED from data (403 must_reset, not served)",
+                  blocked.status_code == 403 and bool(jbody(blocked).get("must_reset")), f"got {blocked.status_code}")
+            sp = nu.post(f"{BASE}/api/auth/set-password", json={"new_password": NEW_PW}, timeout=15)
+            check("set-password succeeds (200)", sp.status_code == 200, f"got {sp.status_code}")
+            after = nu.get(f"{BASE}/api/dropplan/projects/FR-BX-001/rollup", timeout=15)
+            check("data loads after password set (200)", after.status_code == 200, f"got {after.status_code}")
+            # weak password rejected (strength rule)
+            cu2 = admin.post(f"{BASE}/api/admin/users",
+                             json={"display_name": "SMK 257 Weak", "email": "smk257-weak@example.invalid", "role": "pm"}, timeout=15)
+            tw = jbody(cu2).get("temp_password") if cu2.status_code == 201 else None
+            if tw:
+                wsess, _ = login("smk257-weak@example.invalid", tw)
+                wr = wsess.post(f"{BASE}/api/auth/set-password", json={"new_password": "short1"}, timeout=15)
+                check("weak password rejected (400)", wr.status_code == 400, f"got {wr.status_code}")
+
+        # ---------- (f) login_audit captured ----------
+        print("\n== (f) login_audit captured ==")
+        # a deliberate bad login -> login_fail
+        login(PM_EMAIL, "wrong-password-xyz")
+        c = _conn()
+        try:
+            ev = {r[0] for r in c.execute(
+                "SELECT DISTINCT event FROM login_audit WHERE user_id IN "
+                "(SELECT id FROM users WHERE email LIKE 'smk257-%')").fetchall()}
+        finally:
+            c.close()
+        check("login_audit has login_success", "login_success" in ev, f"{sorted(ev)}")
+        check("login_audit has login_fail", "login_fail" in ev, f"{sorted(ev)}")
+        check("login_audit has password_set", "password_set" in ev, f"{sorted(ev)}")
+
+    finally:
+        # scoped cleanup — ONLY smk257-* rows; real users (incl. the real admin) untouched
+        n = cleanup()
+        c = _conn()
+        try:
+            leftover = c.execute("SELECT COUNT(1) FROM users WHERE email LIKE 'smk257-%'").fetchone()[0]
+            admins = c.execute("SELECT COUNT(1) FROM users WHERE role='admin'").fetchone()[0]
+        finally:
+            c.close()
+        print(f"\n  cleanup: removed {n} synthetic user(s); smk257 leftover={leftover}; admin rows={admins}")
+        check("cleanup: 0 synthetic leftover", leftover == 0)
+        check("cleanup: admin rows intact (real + fixture)", admins >= 1, f"{admins}")
+
+    print(f"\n=== auth-roles guard: {PASS} passed, {FAIL} failed ===")
+    print("OVERALL:", "PASS" if FAIL == 0 else "FAIL")
+    return 0 if FAIL == 0 else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/files/static/fonts/typography.css">
+<link rel="stylesheet" href="/files/static/css/widgets.css?v=257">
+<title>User Management · Superstars Contracting</title>
+<style>
+  /* Uses the GLOBAL :root tokens from widgets.css (--accent/--ink/--line/...), so the
+     modal — which renders at the page root — resolves them (DESIGN_SYSTEM §1). Color =
+     status only (§5): active=green, pending=amber, disabled=coral. */
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--canvas);color:var(--ink);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;}
+  .top{display:flex;align-items:center;gap:12px;padding:16px 26px;background:#fff;border-bottom:1px solid var(--line);}
+  .top .mark{width:30px;height:30px;}
+  .top h1{font-size:16px;font-weight:800;letter-spacing:.3px;}
+  .top .who{margin-left:auto;font-size:12px;color:var(--muted);text-align:right;}
+  .top .who b{color:var(--ink);font-weight:700;}
+  .top .who a{color:var(--accent);text-decoration:none;font-weight:700;margin-left:10px;cursor:pointer;}
+  .wrap{max-width:1040px;margin:0 auto;padding:26px;}
+  .head-row{display:flex;align-items:center;margin-bottom:18px;gap:14px;}
+  .head-row h2{font-size:20px;font-weight:800;}
+  .head-row .sub{font-size:12.5px;color:var(--muted);}
+  .head-row .spacer{flex:1;}
+  table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+  th,td{text-align:left;padding:12px 14px;font-size:13px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700;background:#fcfcfd;}
+  tr:last-child td{border-bottom:none;}
+  td .nm{font-weight:700;}
+  td .em{color:var(--muted);font-size:12px;}
+  .pill{display:inline-block;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.4px;}
+  .pill.active{color:#0c7a5f;background:var(--status-complete-soft,#e7f6f0);}
+  .pill.pending{color:#8a6516;background:#fbf2dd;}
+  .pill.disabled{color:#a23b30;background:var(--status-behind-soft,#fceeec);}
+  .rolechip{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:7px;background:var(--accent-soft);color:var(--accent-ink);}
+  .rolechip.admin{background:#efe9f7;color:#5b4595;}
+  .muted{color:var(--muted);}
+  .reset-flag{font-size:10.5px;color:#8a6516;font-weight:700;margin-left:6px;}
+  .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+  .btn-sm{font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;}
+  .btn-sm:hover{border-color:var(--accent-edge);}
+  .btn-sm.danger:hover{border-color:var(--status-behind);color:#a23b30;background:var(--status-behind-soft);}
+  .err-bar{background:#fceeec;color:#a23b30;border:1px solid #f3c9c4;border-radius:9px;padding:9px 13px;font-size:13px;margin-bottom:14px;display:none;}
+  .err-bar.show{display:block;}
+  .empty{padding:30px;text-align:center;color:var(--muted);}
+  /* modal — shared shell, global tokens (renders at page root) */
+  .ov{position:fixed;inset:0;background:rgba(20,22,28,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:50;}
+  .ov.show{display:flex;}
+  .modal{width:100%;max-width:440px;background:#fff;border-radius:16px;box-shadow:0 18px 50px rgba(20,22,28,.25);padding:24px;}
+  .modal h3{font-size:17px;font-weight:800;margin-bottom:4px;}
+  .modal .msub{font-size:12.5px;color:var(--muted);margin-bottom:16px;}
+  .modal label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:14px 0 6px;}
+  .modal .ssc-field{width:100%;}
+  .modal-foot{display:flex;gap:10px;justify-content:flex-end;margin-top:22px;}
+  .m-err{color:#a23b30;font-size:12.5px;margin-top:12px;display:none;}
+  .m-err.show{display:block;}
+  .temp-box{background:var(--accent-soft);border:1px solid var(--accent-edge);border-radius:10px;padding:14px;margin-top:14px;text-align:center;}
+  .temp-box .tp{font-family:'Courier New',monospace;font-size:20px;font-weight:800;letter-spacing:1px;color:var(--ink);user-select:all;}
+  .temp-box .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px;}
+  .warn{font-size:12px;color:#8a6516;background:#fbf2dd;border:1px solid #efe2c0;border-radius:8px;padding:8px 11px;margin-top:12px;}
+</style>
+</head>
+<body>
+<div class="top">
+  <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><polygon points="50,30 55.61,44.27 70.39,44.27 58.39,53.46 63,67.73 50,59.05 37,67.73 41.61,53.46 29.61,44.27 44.39,44.27" fill="#B11E2E"/></svg>
+  <h1>Superstars Contracting · User Management</h1>
+  <div class="who" id="who">—</div>
+</div>
+
+<div class="wrap">
+  <div class="head-row">
+    <div><h2>Accounts</h2><div class="sub">Create office accounts, assign roles, and manage access. Workers continue using the worker app.</div></div>
+    <div class="spacer"></div>
+    <button class="btn-primary" id="new-user-btn" type="button">+ Create user</button>
+  </div>
+  <div class="err-bar" id="err-bar"></div>
+  <table>
+    <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Last login</th><th style="text-align:right;">Actions</th></tr></thead>
+    <tbody id="rows"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+  </table>
+  <div style="text-align:center;color:var(--muted);font-size:11px;letter-spacing:.04em;margin-top:24px;padding-top:14px;border-top:1px solid var(--line);">build #257 · 2026-06-22 · Multi-user accounts &amp; roles — admin user management, role catalog, forced first-login reset, server-side authz + audit, single-admin invariant</div>
+</div>
+
+<!-- Create-user modal -->
+<div class="ov" id="ov-create">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div id="create-step">
+      <h3>Create user</h3>
+      <div class="msub">A one-time temporary password is generated; you convey it to the person. They set their own password on first sign-in.</div>
+      <label for="c-name">Display name</label>
+      <input id="c-name" class="ssc-field" type="text" autocomplete="off" placeholder="e.g. Jordan Vega">
+      <label for="c-email">Email</label>
+      <input id="c-email" class="ssc-field" type="email" autocomplete="off" placeholder="name@company.com">
+      <label for="c-role">Role</label>
+      <select id="c-role" class="ssc-field">
+        <option value="c_suite">C-Suite — all operations + full cost &amp; rate approval</option>
+        <option value="pm">PM — project ops + job cost (no individual rates)</option>
+      </select>
+      <div class="m-err" id="create-err"></div>
+      <div class="modal-foot">
+        <button class="btn-ghost" type="button" data-close>Cancel</button>
+        <button class="btn-primary" type="button" id="create-go">Create user</button>
+      </div>
+    </div>
+    <div id="temp-step" style="display:none;">
+      <h3>Account created</h3>
+      <div class="msub" id="temp-for">—</div>
+      <div class="temp-box"><div class="lbl">One-time temporary password</div><div class="tp" id="temp-pw">—</div></div>
+      <div class="warn">Shown only once. Copy it now and give it to the user securely. They’ll be required to set their own password on first sign-in.</div>
+      <div class="modal-foot">
+        <button class="btn-ghost" type="button" id="temp-copy">Copy</button>
+        <button class="btn-primary" type="button" data-close-reload>Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Role-change modal -->
+<div class="ov" id="ov-role">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3>Change role</h3>
+    <div class="msub" id="role-for">—</div>
+    <label for="r-role">New role</label>
+    <select id="r-role" class="ssc-field">
+      <option value="c_suite">C-Suite</option>
+      <option value="pm">PM</option>
+    </select>
+    <label for="r-reason">Reason (optional)</label>
+    <input id="r-reason" class="ssc-field" type="text" autocomplete="off" placeholder="e.g. promoted to operations lead">
+    <div class="m-err" id="role-err"></div>
+    <div class="modal-foot">
+      <button class="btn-ghost" type="button" data-close>Cancel</button>
+      <button class="btn-primary" type="button" id="role-go">Save role</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var ME=null, USERS=[];
+  function $(id){return document.getElementById(id);}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
+  var ROLE_LABEL={admin:'Admin',c_suite:'C-Suite',pm:'PM',super:'Super',client:'Client',architect:'Architect',vendor:'Vendor'};
+  function jget(u){return fetch(u,{credentials:'include'}).then(function(r){return r.json().then(function(j){return {ok:r.ok,status:r.status,j:j};});});}
+  function jpost(u,body){return fetch(u,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}).then(function(r){return r.json().then(function(j){return {ok:r.ok,status:r.status,j:j};}).catch(function(){return {ok:r.ok,status:r.status,j:{}};});});}
+  function showErr(t){var b=$('err-bar');b.textContent=t;b.className='err-bar show';}
+  function clearErr(){$('err-bar').className='err-bar';}
+  function fmtDate(iso){if(!iso)return '—';var m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?(m[2]+'/'+m[3]+'/'+m[1]):'—';}
+
+  function rowHtml(u){
+    var isMe=ME&&ME.id===u.id;
+    var isAdmin=u.role==='admin';
+    var statusPill='<span class="pill '+esc(u.status)+'">'+esc(u.status)+'</span>';
+    var resetFlag=u.must_reset_password?'<span class="reset-flag">must reset</span>':'';
+    var roleChip='<span class="rolechip '+(isAdmin?'admin':'')+'">'+esc(ROLE_LABEL[u.role]||u.role)+'</span>';
+    var acts='';
+    if(isAdmin){
+      // Admin rows are managed out-of-band (single-admin invariant). No UI actions.
+      acts='<span class="muted" style="font-size:11.5px;">'+(isMe?'you · admin':'admin')+'</span>';
+    } else {
+      acts+='<button class="btn-sm" type="button" data-role="'+u.id+'">Change role</button>';
+      acts+='<button class="btn-sm" type="button" data-reset="'+u.id+'">Reset password</button>';
+      if(u.status==='disabled') acts+='<button class="btn-sm" type="button" data-react="'+u.id+'">Reactivate</button>';
+      else acts+='<button class="btn-sm danger" type="button" data-deact="'+u.id+'">Deactivate</button>';
+    }
+    return '<tr><td><div class="nm">'+esc(u.display_name)+resetFlag+'</div><div class="em">'+esc(u.email)+'</div></td>'
+      +'<td>'+roleChip+'</td><td>'+statusPill+'</td><td class="muted">'+fmtDate(u.last_login_at)+'</td>'
+      +'<td><div class="acts">'+acts+'</div></td></tr>';
+  }
+
+  function render(){
+    var tb=$('rows');
+    if(!USERS.length){tb.innerHTML='<tr><td colspan="5" class="empty">No users yet.</td></tr>';return;}
+    tb.innerHTML=USERS.map(rowHtml).join('');
+  }
+
+  async function load(){
+    clearErr();
+    var me=await jget('/api/auth/me');
+    ME=(me.j&&me.j.user)||null;
+    if(!ME){location.href='/login?next=/admin/users';return;}
+    $('who').innerHTML='<b>'+esc(ME.display_name||ME.full_name||ME.email)+'</b> · '+esc(ROLE_LABEL[ME.role]||ME.role)+' <a id="signout">Sign out</a>';
+    $('signout').addEventListener('click',function(){fetch('/api/auth/logout',{method:'POST',credentials:'include'}).then(function(){location.href='/login';});});
+    if(ME.role!=='admin'){document.querySelector('.wrap').innerHTML='<div class="empty">Admins only.</div>';return;}
+    var r=await jget('/api/admin/users');
+    if(!r.ok){showErr((r.j&&r.j.error)||'Could not load users.');return;}
+    USERS=(r.j&&r.j.data)||[];
+    render();
+  }
+
+  // ---- modals ----
+  function closeAll(){document.querySelectorAll('.ov').forEach(function(o){o.className='ov';});}
+  document.addEventListener('click',function(e){
+    if(e.target.closest('[data-close]')){closeAll();return;}
+    if(e.target.closest('[data-close-reload]')){closeAll();load();return;}
+    var ro=e.target.closest('[data-role]'); if(ro){openRole(ro.getAttribute('data-role'));return;}
+    var de=e.target.closest('[data-deact]'); if(de){doDeact(de.getAttribute('data-deact'));return;}
+    var re=e.target.closest('[data-react]'); if(re){doReact(re.getAttribute('data-react'));return;}
+    var rp=e.target.closest('[data-reset]'); if(rp){doReset(rp.getAttribute('data-reset'));return;}
+  });
+
+  // create
+  $('new-user-btn').addEventListener('click',function(){
+    $('c-name').value='';$('c-email').value='';$('c-role').value='c_suite';
+    $('create-err').className='m-err';$('create-step').style.display='';$('temp-step').style.display='none';
+    $('ov-create').className='ov show';$('c-name').focus();
+  });
+  $('create-go').addEventListener('click',async function(){
+    var err=$('create-err');err.className='m-err';
+    var body={display_name:$('c-name').value.trim(),email:$('c-email').value.trim(),role:$('c-role').value};
+    if(!body.display_name||!body.email){err.textContent='Display name and email are required.';err.className='m-err show';return;}
+    var r=await jpost('/api/admin/users',body);
+    if(!r.ok){err.textContent=(r.j&&r.j.error)||'Create failed.';err.className='m-err show';return;}
+    $('temp-for').textContent='For '+(r.j.data.display_name)+' ('+(r.j.data.email)+') · '+(ROLE_LABEL[r.j.data.role]||r.j.data.role);
+    $('temp-pw').textContent=r.j.temp_password;
+    $('create-step').style.display='none';$('temp-step').style.display='';
+  });
+  $('temp-copy').addEventListener('click',function(){
+    var t=$('temp-pw').textContent;
+    if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){$('temp-copy').textContent='Copied';});}
+  });
+
+  // role change
+  var ROLE_TARGET=null;
+  function openRole(id){
+    var u=USERS.filter(function(x){return String(x.id)===String(id);})[0];if(!u)return;
+    ROLE_TARGET=u.id;
+    $('role-for').textContent=u.display_name+' ('+u.email+') · currently '+(ROLE_LABEL[u.role]||u.role);
+    $('r-role').value=(u.role==='pm')?'pm':'c_suite';
+    $('r-reason').value='';$('role-err').className='m-err';
+    $('ov-role').className='ov show';
+  }
+  $('role-go').addEventListener('click',async function(){
+    var err=$('role-err');err.className='m-err';
+    var r=await jpost('/api/admin/users/'+ROLE_TARGET+'/role',{new_role:$('r-role').value,reason:$('r-reason').value.trim()});
+    if(!r.ok){err.textContent=(r.j&&r.j.error)||'Role change failed.';err.className='m-err show';return;}
+    closeAll();load();
+  });
+
+  async function doDeact(id){
+    var u=USERS.filter(function(x){return String(x.id)===String(id);})[0];if(!u)return;
+    if(!confirm('Deactivate '+u.display_name+'? They will be signed out immediately and cannot log in until reactivated.'))return;
+    var r=await jpost('/api/admin/users/'+id+'/deactivate',{});
+    if(!r.ok){showErr((r.j&&r.j.error)||'Deactivate failed.');return;} load();
+  }
+  async function doReact(id){
+    var r=await jpost('/api/admin/users/'+id+'/reactivate',{});
+    if(!r.ok){showErr((r.j&&r.j.error)||'Reactivate failed.');return;} load();
+  }
+  async function doReset(id){
+    var u=USERS.filter(function(x){return String(x.id)===String(id);})[0];if(!u)return;
+    if(!confirm('Issue a new one-time password for '+u.display_name+'? Their current password stops working and they must set a new one.'))return;
+    var r=await jpost('/api/admin/users/'+id+'/reset-password',{});
+    if(!r.ok){showErr((r.j&&r.j.error)||'Reset failed.');return;}
+    $('temp-for').textContent='New temp password for '+u.display_name+' ('+u.email+')';
+    $('temp-pw').textContent=r.j.temp_password;
+    $('create-step').style.display='none';$('temp-step').style.display='';$('ov-create').className='ov show';
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

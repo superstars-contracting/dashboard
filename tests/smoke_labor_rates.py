@@ -155,40 +155,42 @@ def main():
     ok("submit_current_unchanged", w1 and w1["current_rate"] == 10.00, f"current={w1['current_rate'] if w1 else None}")
     ok("submit_pending_kpi_incr", after["kpis"]["pending"] == pend_before + 1)
 
-    # ---- 7a) GATING: PM session ----
+    # ---- 7a) GATING (#257): pm is FULLY blocked from individual rates. Only
+    #          admin/c_suite reach the queue / roster / approve. super blocked too.
     pm = make_user(PM_EMAIL, "pm")
     sup = make_user(SUPER_EMAIL, "super")
-    pm_pending = pm.get(f"{BASE}/api/labor-rates/pending", timeout=15)
-    ok("pm_sees_pending_queue", pm_pending.status_code == 200 and any(p["id"] == change_id for p in pm_pending.json()["data"]))
+    ok("pm_pending_403", pm.get(f"{BASE}/api/labor-rates/pending", timeout=15).status_code == 403)
     ok("pm_roster_403", pm.get(f"{BASE}/api/labor-rates/roster", timeout=10).status_code == 403)
     ok("pm_history_403", pm.get(f"{BASE}/api/labor-rates/history/W-9001", timeout=10).status_code == 403)
     ok("pm_submit_403", pm.post(f"{BASE}/api/labor-rates/changes", json={"worker_id": "W-9001", "new_rate": 99, "effective_date": "2026-06-01"}, timeout=10).status_code == 403)
+    ok("pm_approve_403", pm.post(f"{BASE}/api/labor-rates/changes/{change_id}/approve", timeout=10).status_code == 403)
     ok("super_pending_403", sup.get(f"{BASE}/api/labor-rates/pending", timeout=10).status_code == 403)
     ok("super_roster_403", sup.get(f"{BASE}/api/labor-rates/roster", timeout=10).status_code == 403)
 
-    # ---- 3) PM APPROVES -> applies + history; pending clears ----
-    ap = pm.post(f"{BASE}/api/labor-rates/changes/{change_id}/approve", timeout=15)
-    ok("pm_approve_200", ap.status_code == 200, f"HTTP {ap.status_code}")
+    # ---- 3) ADMIN/C_SUITE APPROVES (#257) -> applies + history; pending clears ----
+    # (requests.* is the smoke-admin session via _smoke_auth.)
+    ap = requests.post(f"{BASE}/api/labor-rates/changes/{change_id}/approve", timeout=15)
+    ok("admin_approve_200", ap.status_code == 200, f"HTTP {ap.status_code}")
     after2 = roster()
     w1b = find(after2, "active", "W-9001")
     ok("approve_applies_rate", w1b and w1b["current_rate"] == 12.00 and not w1b["has_pending"], f"current={w1b['current_rate'] if w1b else None}")
     ok("approve_effective_applied", w1b and w1b["effective_date"] == "2026-06-01")
     hist = requests.get(f"{BASE}/api/labor-rates/history/W-9001", timeout=15).json()["data"]
     appr = [h for h in hist if h["status"] == "approved" and not h["is_initial"]]
-    ok("approve_history_entry", len(appr) >= 1 and appr[0]["new_rate"] == 12.00 and appr[0]["decided_by_role"] == "pm")
+    ok("approve_history_entry", len(appr) >= 1 and appr[0]["new_rate"] == 12.00 and appr[0]["decided_by_role"] in ("admin", "c_suite"))
     ok("history_role_stamped_no_names", all("name" not in h for h in hist) and any(h["submitted_by_role"] for h in hist))
 
-    # ---- 4) PM REJECTS -> current unchanged ----
+    # ---- 4) ADMIN/C_SUITE REJECTS -> current unchanged ----
     r2 = requests.post(f"{BASE}/api/labor-rates/changes", json={"worker_id": "W-9002", "new_rate": 25.00, "effective_date": "2026-06-01"}, timeout=15)
     cid2 = r2.json()["data"]["change_id"]
-    rj = pm.post(f"{BASE}/api/labor-rates/changes/{cid2}/reject", json={"note": "too high"}, timeout=15)
-    ok("pm_reject_200", rj.status_code == 200)
+    rj = requests.post(f"{BASE}/api/labor-rates/changes/{cid2}/reject", json={"note": "too high"}, timeout=15)
+    ok("admin_reject_200", rj.status_code == 200)
     w2 = find(roster(), "active", "W-9002")
     ok("reject_current_unchanged", w2 and w2["current_rate"] == 20.00 and not w2["has_pending"])
 
     # ---- 5) Reactivate (instant admin) + direct set_status->inactive BLOCKED (#221) ----
     dr0 = requests.post(f"{BASE}/api/labor-rates/deactivate", json={"worker_id": "W-9001"}, timeout=15)
-    pm.post(f"{BASE}/api/labor-rates/changes/{dr0.json()['data']['change_id']}/approve", timeout=15)
+    requests.post(f"{BASE}/api/labor-rates/changes/{dr0.json()['data']['change_id']}/approve", timeout=15)
     rost3 = roster()
     ok("deactivate_moves_to_inactive", find(rost3, "inactive", "W-9001") is not None and find(rost3, "active", "W-9001") is None)
     ok("set_status_inactive_blocked",
@@ -209,25 +211,25 @@ def main():
     rd = roster(); w3 = find(rd, "active", "W-9003")
     ok("deactivate_stays_active_pending", w3 is not None and w3["has_pending"] and w3.get("pending_type") == "deactivate")
     ok("deactivate_pending_kpi", rd["kpis"]["pending"] >= 1)
-    pq = pm.get(f"{BASE}/api/labor-rates/pending", timeout=10).json()["data"]
+    pq = requests.get(f"{BASE}/api/labor-rates/pending", timeout=10).json()["data"]
     ok("queue_shows_deactivate_type", any(p["id"] == dcid and p["change_type"] == "deactivate" for p in pq))
     # also have a rate pending in the queue (W-9002 from earlier was rejected; submit a fresh one)
     requests.post(f"{BASE}/api/labor-rates/changes", json={"worker_id": "W-9004", "new_rate": 72.0, "effective_date": "2026-06-01"}, timeout=15)
-    pq2 = pm.get(f"{BASE}/api/labor-rates/pending", timeout=10).json()["data"]
+    pq2 = requests.get(f"{BASE}/api/labor-rates/pending", timeout=10).json()["data"]
     ok("queue_mixed_types", any(p["change_type"] == "deactivate" for p in pq2) and any(p["change_type"] == "rate" for p in pq2))
-    ap = pm.post(f"{BASE}/api/labor-rates/changes/{dcid}/approve", timeout=15)
+    ap = requests.post(f"{BASE}/api/labor-rates/changes/{dcid}/approve", timeout=15)
     ok("deactivate_approve_200", ap.status_code == 200)
     rd2 = roster()
     ok("deactivate_approve_moves_inactive", find(rd2, "inactive", "W-9003") is not None and find(rd2, "active", "W-9003") is None)
     hd = requests.get(f"{BASE}/api/labor-rates/history/W-9003", timeout=15).json()["data"]
     dh = [h for h in hd if h["change_type"] == "deactivate" and h["status"] == "approved"]
-    ok("deactivate_history_entry", len(dh) >= 1 and dh[0]["decided_by_role"] == "pm")
-    # second deactivate -> PM reject -> stays active (W-9004 has a pending rate; submit deactivate supersedes it)
+    ok("deactivate_history_entry", len(dh) >= 1 and dh[0]["decided_by_role"] in ("admin", "c_suite"))
+    # second deactivate -> ADMIN reject -> stays active (W-9004 has a pending rate; submit deactivate supersedes it)
     dr2 = requests.post(f"{BASE}/api/labor-rates/deactivate", json={"worker_id": "W-9004"}, timeout=15)
     dcid2 = dr2.json()["data"]["change_id"]
-    pm.post(f"{BASE}/api/labor-rates/changes/{dcid2}/reject", json={"note": "keep"}, timeout=15)
+    requests.post(f"{BASE}/api/labor-rates/changes/{dcid2}/reject", json={"note": "keep"}, timeout=15)
     ok("deactivate_reject_stays_active", find(roster(), "active", "W-9004") is not None)
-    # admin-only: PM cannot submit a deactivate (403)
+    # #257 — pm cannot submit a deactivate, and (below) cannot reach the queue/cards at all.
     ok("pm_deactivate_403", pm.post(f"{BASE}/api/labor-rates/deactivate", json={"worker_id": "W-9004"}, timeout=10).status_code == 403)
 
     # ---- 7b) WORKER-CARD + PHOTO hover (#221) — gated identity, FAKE names only ----
@@ -250,11 +252,12 @@ def main():
     pa = requests.get(f"{BASE}/api/labor-rates/worker-photo/W-9501", timeout=10)
     ok("photo_admin_serves", pa.status_code == 200 and pa.headers.get("Content-Type", "").startswith("image/") and "no-store" in pa.headers.get("Cache-Control", ""), f"HTTP {pa.status_code}")
     ok("photo_no_file_404", requests.get(f"{BASE}/api/labor-rates/worker-photo/W-9502", timeout=10).status_code == 404)
-    # PM: card/photo ONLY for a worker with a pending queue item; 403 otherwise
-    ok("card_pm_with_pending_200", pm.get(f"{BASE}/api/labor-rates/worker-card/W-9501", timeout=10).status_code == 200)
-    ok("card_pm_no_pending_403", pm.get(f"{BASE}/api/labor-rates/worker-card/W-9502", timeout=10).status_code == 403)
-    ok("photo_pm_with_pending_200", pm.get(f"{BASE}/api/labor-rates/worker-photo/W-9501", timeout=10).status_code == 200)
-    ok("photo_pm_no_pending_403", pm.get(f"{BASE}/api/labor-rates/worker-photo/W-9502", timeout=10).status_code == 403)
+    # #257 — pm is fully blocked from rate worker-cards/photos (admin/c_suite only),
+    # even for a worker WITH a pending item (no individual-comp surface for pm).
+    ok("card_pm_403_even_with_pending", pm.get(f"{BASE}/api/labor-rates/worker-card/W-9501", timeout=10).status_code == 403)
+    ok("card_pm_403_no_pending", pm.get(f"{BASE}/api/labor-rates/worker-card/W-9502", timeout=10).status_code == 403)
+    ok("photo_pm_403_even_with_pending", pm.get(f"{BASE}/api/labor-rates/worker-photo/W-9501", timeout=10).status_code == 403)
+    ok("photo_pm_403_no_pending", pm.get(f"{BASE}/api/labor-rates/worker-photo/W-9502", timeout=10).status_code == 403)
     # super/other: 403 on both card + photo
     ok("card_super_403", sup.get(f"{BASE}/api/labor-rates/worker-card/W-9501", timeout=10).status_code == 403)
     ok("photo_super_403", sup.get(f"{BASE}/api/labor-rates/worker-photo/W-9501", timeout=10).status_code == 403)

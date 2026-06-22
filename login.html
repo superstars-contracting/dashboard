@@ -197,6 +197,17 @@
     return raw;
   }
 
+  // #257 — role home: admin -> admin console, c_suite -> company console,
+  // pm -> project dashboard. super/external have no onboarded home this phase.
+  function roleHome(role) {
+    switch (role) {
+      case 'admin': return '/admin/users';
+      case 'c_suite': return '/';
+      case 'pm': return '/dashboard';
+      default: return '/';
+    }
+  }
+
   function showErr(msg) {
     err.textContent = msg;
     err.classList.add('show');
@@ -225,7 +236,13 @@
         body: JSON.stringify({ email, password })
       });
       if (res.ok) {
-        window.location.href = safeNext();
+        const j = await res.json().catch(() => ({}));
+        const u = (j && j.user) || {};
+        // Forced first-login reset takes precedence over any destination.
+        if (u.must_reset_password) { window.location.href = '/set-password'; return; }
+        // Honor an explicit deep-link (?next=/some/page); otherwise the role home.
+        const next = safeNext();
+        window.location.href = (next && next !== '/') ? next : roleHome(u.role);
         return;
       }
       if (res.status === 401) {
