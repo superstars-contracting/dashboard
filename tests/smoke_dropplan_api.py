@@ -36,6 +36,7 @@ DB = SCRIPT_DIR / "superstars.db"
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
 PROJECT = "FR-BX-001"
 from auth import hash_password  # noqa: E402
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
 
 PASS, FAIL = 0, 0
 PW = secrets.token_urlsafe(18)   # #258 — RANDOM per run; held in-process only, never logged
@@ -63,7 +64,7 @@ def check(label, ok, note=""):
 
 
 def ensure_user(email, role):
-    conn = sqlite3.connect(str(DB), timeout=60.0)
+    conn = db_layer.connect()
     try:
         conn.execute("PRAGMA busy_timeout=60000;")
         row = conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
@@ -87,7 +88,7 @@ def session_for(role):
 
 
 def db_setup():
-    conn = sqlite3.connect(str(DB), timeout=60.0)
+    conn = db_layer.connect()
     conn.execute("PRAGMA busy_timeout=60000;")
     db_cleanup(conn)
     # synthetic drop under FR-BX-001 + its 11 stage rows (so template joins work)
@@ -118,10 +119,15 @@ def db_cleanup(conn):
 
 
 def users_cleanup():
-    conn = sqlite3.connect(str(DB), timeout=60.0)
+    conn = db_layer.connect()
     for email in TEST_USERS.values():
         uid = conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
         if uid:
+            # #260 — clear FK children (login_audit/role_change_audit/sessions) before
+            # the user row; these test users log in, so the rows exist and Postgres
+            # enforces the FK (SQLite ran with it off).
+            conn.execute("DELETE FROM login_audit WHERE user_id=?", (uid[0],))
+            conn.execute("DELETE FROM role_change_audit WHERE user_id=? OR changed_by=?", (uid[0], uid[0]))
             conn.execute("DELETE FROM sessions WHERE user_id=?", (uid[0],))
             conn.execute("DELETE FROM users WHERE id=?", (uid[0],))
     conn.commit()
@@ -130,7 +136,7 @@ def users_cleanup():
 
 def main() -> int:
     sid = db_setup()
-    _c = sqlite3.connect(str(DB))
+    _c = db_layer.connect()
     AUDIT_BASE = _c.execute("SELECT COALESCE(MAX(id),0) FROM audit_log").fetchone()[0]
     _c.close()
     try:
@@ -139,9 +145,18 @@ def main() -> int:
         sup = session_for("super")
 
         # ---- external/client unreachable by construction ----
-        conn = sqlite3.connect(str(DB))
-        users_ddl = conn.execute(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").fetchone()[0]
+        conn = db_layer.connect()
+        if db_layer.is_postgres():
+            # Postgres has no sqlite_master; read the role CHECK from the catalog.
+            # pg_get_constraintdef() renders the same role literals ('admin' etc.)
+            # the substring check below looks for.
+            rows = conn.execute(
+                "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                "WHERE conrelid = 'users'::regclass AND contype = 'c'").fetchall()
+            users_ddl = " ".join((r[0] or "") for r in rows)
+        else:
+            users_ddl = conn.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").fetchone()[0]
         conn.close()
         # #257 — the role catalog was expanded to admin/c_suite/pm/super + the external
         # tier client/architect/vendor (DEFINED, not onboarded this phase; cost-blind /
@@ -152,7 +167,7 @@ def main() -> int:
               all(r in users_ddl for r in ("'admin'", "'c_suite'", "'pm'", "'super'")))
 
         # ---- cure-gate fix (DB read) ----
-        conn = sqlite3.connect(str(DB))
+        conn = db_layer.connect()
         tid = conn.execute("SELECT template_id FROM stage_templates WHERE project_code=?", (PROJECT,)).fetchone()[0]
         s8 = conn.execute("SELECT is_cure_gate FROM stage_template_steps WHERE template_id=? AND step_no=8", (tid,)).fetchone()[0]
         s10 = conn.execute("SELECT is_cure_gate FROM stage_template_steps WHERE template_id=? AND step_no=10", (tid,)).fetchone()[0]
@@ -284,13 +299,13 @@ def main() -> int:
         check("DELETE missing entry -> 404",
               admin.delete(f"{BASE}/api/dropplan/quantity-entries/999999", timeout=10).status_code == 404)
         # audit rows written for add/edit/delete of that patch
-        cc = sqlite3.connect(str(DB))
+        cc = db_layer.connect()
         naudit = cc.execute("SELECT COUNT(*) FROM audit_log WHERE action LIKE 'dropplan_quantity_%' AND target_id=?", (str(patch_id),)).fetchone()[0]
         cc.close()
         check("audit rows written for patch add/edit/delete (>=3)", naudit >= 3, f"{naudit}")
 
         # ---- priced cost (set a synthetic rate, recompute) ----
-        conn = sqlite3.connect(str(DB))
+        conn = db_layer.connect()
         conn.execute("UPDATE sov_line_items SET unit_rate=2.0 WHERE sov_code=?", (SMK_SOV,))
         conn.commit()
         conn.close()
@@ -315,7 +330,7 @@ def main() -> int:
         check("admin POST expense -> 201", ae.status_code == 201, f"got {ae.status_code}")
 
     finally:
-        conn = sqlite3.connect(str(DB), timeout=60.0)
+        conn = db_layer.connect()
         conn.execute("PRAGMA busy_timeout=60000;")
         db_cleanup(conn)
         # belt-and-suspenders: remove every dropplan audit row this run created

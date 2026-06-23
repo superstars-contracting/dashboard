@@ -35,6 +35,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = SCRIPT_DIR / "superstars.db"
 sys.path.insert(0, str(SCRIPT_DIR))
 from auth import hash_password  # noqa: E402
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
 
 PM_EMAIL = "smk-pm-lrt@superstars.local"
 SUPER_EMAIL = "smk-super-lrt@superstars.local"
@@ -56,9 +57,7 @@ def ok(name, cond, note=""):
 
 
 def db():
-    c = sqlite3.connect(str(DB_PATH), timeout=60.0)
-    c.row_factory = sqlite3.Row
-    return c
+    return db_layer.connect()
 
 
 def make_user(email, role):
@@ -316,11 +315,21 @@ def _cleanup():
     chg = conn.execute("SELECT COUNT(*) FROM labor_rate_change WHERE worker_id LIKE 'W-9%'").fetchone()[0]
     conn.execute("DELETE FROM labor_rate_change WHERE worker_id LIKE 'W-9%'")
     conn.execute("DELETE FROM labor_worker_state WHERE worker_id LIKE 'W-9%'")
-    # synthetic employees created for the worker-card test (FAKE 'SMK ' names, E-99% eids) only
-    conn.execute("DELETE FROM employees WHERE worker_id LIKE 'W-9%' AND (name LIKE 'SMK %' OR employee_id LIKE 'E-99%')")
-    # those synthetic employees bridged a rate into worker_rates + an audit_log row — purge both (E-99% only)
+    # #260 — worker_rates references employees(employee_id), so the child rate +
+    # audit rows MUST be deleted BEFORE the employees row (Postgres enforces the FK;
+    # SQLite ran with it off, masking the order bug).
     conn.execute("DELETE FROM worker_rates WHERE employee_id LIKE 'E-99%'")
     conn.execute("DELETE FROM audit_log WHERE target_id LIKE 'E-99%'")
+    # synthetic employees created for the worker-card test (FAKE 'SMK ' names, E-99% eids) only
+    conn.execute("DELETE FROM employees WHERE worker_id LIKE 'W-9%' AND (name LIKE 'SMK %' OR employee_id LIKE 'E-99%')")
+    # #260 — clear each PM/SUPER fixture's FK children (login_audit/role_change_audit/
+    # sessions) before deleting the user; the smoke logs them in, so those rows exist.
+    for _em in (PM_EMAIL, SUPER_EMAIL):
+        _u = conn.execute("SELECT id FROM users WHERE email=?", (_em,)).fetchone()
+        if _u:
+            conn.execute("DELETE FROM login_audit WHERE user_id=?", (_u[0],))
+            conn.execute("DELETE FROM role_change_audit WHERE user_id=? OR changed_by=?", (_u[0], _u[0]))
+            conn.execute("DELETE FROM sessions WHERE user_id=?", (_u[0],))
     conn.execute("DELETE FROM users WHERE email IN (?,?)", (PM_EMAIL, SUPER_EMAIL))
     conn.commit()
     res_state = conn.execute("SELECT COUNT(*) FROM labor_worker_state WHERE worker_id LIKE 'W-9%'").fetchone()[0]

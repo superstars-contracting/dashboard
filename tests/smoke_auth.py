@@ -53,6 +53,7 @@ TEST_NAME = "Smoke Auth Test"
 # the real login path uses.
 sys.path.insert(0, str(SCRIPT_DIR))
 from auth import hash_password  # noqa: E402
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
 
 
 PASS = "PASS"
@@ -76,7 +77,7 @@ def _purge_user(conn, user_id) -> None:
 
 
 def seed_user() -> int:
-    conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
+    conn = db_layer.connect()
     conn.execute("PRAGMA foreign_keys=ON;")
     # Idempotent on the fixed email: clear any prior fixture row + its FK children
     # first so a failed teardown can't collide, then insert flagged is_system=1.
@@ -96,7 +97,7 @@ def seed_user() -> int:
 
 def cleanup_user(user_id: int) -> None:
     try:
-        conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
+        conn = db_layer.connect()
         conn.execute("PRAGMA foreign_keys=ON;")
         _purge_user(conn, user_id)
         conn.commit()

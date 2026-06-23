@@ -41,6 +41,8 @@ D = Path(__file__).resolve().parent.parent
 DB = D / "superstars.db"
 LOG = D / "tests" / "_smoke_dcr_backdated_30day_server.log"
 VENV_PY = D / "venv" / "Scripts" / "python.exe"
+sys.path.insert(0, str(D))
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
 
 PROJECT = "FR-BX-001"
 N_DAYS = 30
@@ -89,7 +91,7 @@ def refuse_if_operator_data_present():
     other tables — between them they would erase the operator's recent DCRs
     and labor history. (Same guard pattern as smoke_weekly_hours after #163.)
     """
-    with sqlite3.connect(str(DB)) as c:
+    with db_layer.connect() as c:
         n_dcr = c.execute(
             "SELECT COUNT(*) FROM report_index WHERE project_code=? AND report_type='DCR'",
             (PROJECT,),
@@ -122,7 +124,7 @@ def cleanup_dates(dates_iso):
     DANGEROUS — the report_index DELETE has no date filter. Guard before
     any call: `refuse_if_operator_data_present()` must run first.
     """
-    with sqlite3.connect(str(DB)) as c:
+    with db_layer.connect() as c:
         placeholders = ",".join("?" * len(dates_iso))
         n_si = c.execute(
             f"DELETE FROM sign_in_log WHERE project_code=? AND date IN ({placeholders})",
@@ -158,7 +160,7 @@ def main():
     refuse_if_operator_data_present()
 
     # Get the worker pool (employee_ids only — no names echoed)
-    with sqlite3.connect(str(DB)) as c:
+    with db_layer.connect() as c:
         worker_ids = [r[0] for r in c.execute(
             "SELECT employee_id FROM employees ORDER BY employee_id"
         ).fetchall()]
@@ -278,7 +280,7 @@ def main():
                     FAIL.append(f"day {day_index}: {aud}.html missing/too small")
 
             # Verify the sign_in_log writes landed (count match — no PII)
-            with sqlite3.connect(str(DB)) as c:
+            with db_layer.connect() as c:
                 actual_si = c.execute(
                     "SELECT COUNT(*) FROM sign_in_log WHERE project_code=? AND date=?",
                     (PROJECT, d)).fetchone()[0]
@@ -326,7 +328,7 @@ def main():
               f"report_index={n_r}, seq dirs={n_rmd}")
 
         # Verify baseline
-        with sqlite3.connect(str(DB)) as c:
+        with db_layer.connect() as c:
             for tbl, dates_filter in [
                 ("sign_in_log", f"date IN ({','.join('?'*len(target_dates))})"),
                 ("work_log",    f"date IN ({','.join('?'*len(target_dates))})"),

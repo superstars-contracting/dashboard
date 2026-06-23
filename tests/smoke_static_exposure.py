@@ -47,6 +47,7 @@ TEST_PASSWORD = "SmokeExp!" + uuid.uuid4().hex[:16]
 
 sys.path.insert(0, str(SCRIPT_DIR))
 from auth import hash_password  # noqa: E402
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
 
 results: list[tuple[str, bool, str]] = []
 
@@ -183,7 +184,7 @@ def stop_server(proc: subprocess.Popen | None) -> None:
 # ---------- smoke user ----------
 
 def seed_user() -> int:
-    conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
+    conn = db_layer.connect()
     conn.execute("PRAGMA foreign_keys=ON;")
     conn.execute("DELETE FROM users WHERE email = ?", (TEST_EMAIL,))   # idempotent on the fixed email
     conn.execute(
@@ -199,7 +200,7 @@ def seed_user() -> int:
 
 def cleanup_user(uid: int) -> None:
     try:
-        conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
+        conn = db_layer.connect()
         conn.execute("DELETE FROM sessions WHERE user_id = ?", (uid,))
         conn.execute("DELETE FROM users WHERE id = ?", (uid,))
         conn.commit()

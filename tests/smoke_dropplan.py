@@ -30,6 +30,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SCRIPT_DIR))  # so `import dropplan_rollups` (repo root) resolves
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
 DB = SCRIPT_DIR / "superstars.db"
 PROJECT = "FR-BX-001"
 PASS, FAIL = 0, 0
@@ -62,7 +63,7 @@ def cleanup(conn):
 
 
 def main() -> int:
-    conn = sqlite3.connect(str(DB), timeout=60.0)
+    conn = db_layer.connect()
     conn.execute("PRAGMA busy_timeout=60000;")
     try:
         cleanup(conn)

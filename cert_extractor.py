@@ -106,9 +106,15 @@ def _media_type_for(path):
     }.get(ext, "image/jpeg")
 
 
-def load_cert_types_from_db(db_path):
-    """Convenience: load the cert_types library as a list of dicts."""
-    conn = sqlite3.connect(str(db_path))
+def load_cert_types_from_db(db_path=None):
+    """Convenience: load the cert_types library as a list of dicts.
+
+    #260 — routes through db_layer (honors SSC_DB_URL); production default = live
+    SQLite. `db_path` is accepted for backward-compat but ignored when a backend is
+    selected via SSC_DB_URL (cert_types is a static reference table, identical across
+    backends), so a test run never reads the live DB out from under itself."""
+    import db_layer
+    conn = db_layer.connect()
     rows = conn.execute(
         "SELECT cert_type_id, name, is_cof_prerequisite FROM cert_types "
         "ORDER BY cert_type_id"

@@ -90,3 +90,90 @@ ENFORCES FKs, so these were resolved on load (documented, not silently dropped):
   translate 2 subscriptions VIEWS (`round(double,int)`, `julianday`).
 
 Production remains on SQLite. Live DB real data verified identical to the snapshot.
+
+---
+
+# Phase 1 COMPLETE — full gate green on BOTH backends + isolated-DB gate — #260
+
+#260 finishes Step 4. **Production is STILL on SQLite/Tailscale, untouched — no cutover.**
+The full gate is green on Postgres AND SQLite, and the gate now runs against ISOLATED
+databases so the live `superstars.db` is never written to (confirmed byte-identical).
+
+## Full gate green — both backends (11/11 each)
+
+`design · auth · auth_roles · labor_rates · behavioral · dropplan_api · worker_lifecycle ·
+dcr214_lifecycle · CRUD · static_exposure(exposure) · meta-smoke/path-guard`
+
+Runner: **`tests/run_gate_260.py`** stands up a waitress test server on an ALT port
+(127.0.0.1:5434, away from live :5050) with `SSC_DB_URL` pointed at the isolated backend,
+runs every suite against it, then tree-kills ONLY its own server PID. It REFUSES to run if
+`SSC_DB_URL` is unset (that would target live). Static-exposure launches its own server on
+`SMOKE_STATIC_PORT` (default 5152), inheriting `SSC_DB_URL`.
+
+```powershell
+# Postgres test db
+$env:SSC_DB_URL="postgresql://postgres@127.0.0.1:5433/ssc_test"; venv\Scripts\python.exe tests\run_gate_260.py
+# SQLite isolated copy
+$env:SSC_DB_URL="sqlite:///C:/Users/SSC-Admin/Superstars/snapshots/ssc_gate_sqlite.db"; venv\Scripts\python.exe tests\run_gate_260.py
+```
+
+## What #260 changed
+
+**1. Routed ALL remaining direct DB access through `db_layer`.**
+- Every test smoke (25 files: the 8 gate smokes + 17 non-gate/stress) now calls
+  `db_layer.connect()` instead of `sqlite3.connect(superstars.db)`. Zero `sqlite3.connect`
+  remain in `tests/`.
+- **Server-side runtime modules** that #259 missed (they had their OWN hardcoded
+  `sqlite3.connect(DB_PATH)`): `cof_issuer`, `company_id_issuer`, `dcr_aggregator`,
+  `nyc_compliance`, `worker_id`, `cert_extractor`. These were a real isolation hole — on
+  Postgres/an isolated copy, credential issuance etc. would have silently read/written the
+  LIVE db. Now routed (production default = live SQLite, unchanged). Surfaced by
+  `smoke_card_propagation` ("Issuance failed: Worker not found" — the issuer read live
+  while the worker was created in the copy).
+- CLI/maintenance scripts (`apply_*`, `seed_*`, `import_*`, the migrator itself) are
+  intentionally left on direct SQLite — they're operator-run tools, not app runtime/gate.
+
+**2. FK-correct test data (Postgres ENFORCES FKs; SQLite ran with them OFF).**
+- `smoke_labor_rates._cleanup`: delete `worker_rates` (child) BEFORE `employees`; clear each
+  PM/SUPER fixture's `login_audit`/`role_change_audit`/`sessions` before the `users` row.
+- `smoke_dropplan_api.users_cleanup`: clear `login_audit`/`role_change_audit`/`sessions`
+  before deleting the test users.
+- `smoke_behavior_conventions` look-ahead: create the synthetic `ZZ-SMOKE-LA` project (the
+  `lookahead_activity.project_code → projects` FK) before inserting, and delete it (child
+  rows first) in teardown.
+
+**3. Subscriptions views translated (now create + query on Postgres).**
+- `subscriptions_monthly_burn`: `ROUND(SUM(<double>), 2)` → cast the SUM `::numeric`
+  (Postgres has no `round(double precision, int)`).
+- `subscriptions_upcoming_renewals`: `julianday(x) - julianday('now')` → `x::date -
+  CURRENT_DATE` (integer days, LOCAL date). The cast is wrapped in `CASE WHEN <iso-regex>
+  THEN ...` because the live data has non-date placeholders (`PENDING`, `N/A`,
+  `2026-05-XX`) that SQLite's `julianday` silently drops but Postgres `::date` throws on —
+  and a WHERE guard isn't enough (Postgres may evaluate the cast before the filter; CASE is
+  guaranteed to short-circuit). Both as explicit `PG_VIEW_OVERRIDES` in the migrator.
+
+**4. Migrator dialect fix — `REAL` → `DOUBLE PRECISION`.**
+SQLite `REAL` is 8-byte IEEE double; Postgres `REAL` is 4-byte float4, which silently
+truncated stored values (`0.3333333333333333` → `0.33333334`) and broke
+`smoke_dropplan_api`'s volume-math assertions. Column type `REAL` now maps to
+`DOUBLE PRECISION` so values round-trip bit-for-bit (incl. the `volume_cf` generated column).
+
+**5. Server-side SQL portability fixes (SQLite-isms that 500'd on Postgres).**
+- `SELECT DISTINCT ... ORDER BY <expr>` where `<expr>` isn't in the select list — Postgres
+  rejects it. Added the sort key to the select list in `eligible-workers` + the labor-rates
+  worker list (`server.py`) and `payroll_hours.build_week_grid`.
+- `ROUND(SUM(amount), 2)` in `dropplan_rollups` (drop/project expense totals) → `SUM` then
+  Python `round()` (dialect-neutral).
+- `IFNULL(...)` → `COALESCE(...)` in the cert dedup path (`server.py`).
+- `dropplan_api`'s `sqlite_master` role-catalog probe → backend-aware
+  (`pg_get_constraintdef` on Postgres).
+
+## Test isolation — live DB never touched
+
+The gate runs against `ssc_test` (Postgres) or a COPY of the snapshot
+(`snapshots/ssc_gate_sqlite.db`), via the alt-port test server. After full gate runs on
+both backends (plus non-gate spot-checks), the live `superstars.db` SHA-256 is **identical
+to its pre-#260 snapshot** (`22CBF334…`, 1 851 392 bytes). No synthetic writes to prod, ever.
+
+Snapshot used: `snapshots/superstars-pre-260-20260622-213950.db` (read-only copy; source of
+both the Postgres reload and the SQLite isolated copy). Production unchanged on SQLite.

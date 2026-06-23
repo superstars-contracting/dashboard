@@ -46,6 +46,7 @@ BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
 SCRIPT_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = SCRIPT_DIR / "superstars.db"
 sys.path.insert(0, str(SCRIPT_DIR))
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
 
 PROJECT = "FR-BX-001"
 N_DCRS = 300                                    # volume tier
@@ -64,7 +65,7 @@ JPG_TINY = base64.b64decode(
 
 
 def db():
-    conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
+    conn = db_layer.connect()
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL;")
     return conn

@@ -48,6 +48,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import sqlite3  # noqa: E402
+import db_layer  # noqa: E402  # #260 — snapshot whatever SSC_DB_URL targets (isolated copy or PG test db)
 
 DB = SCRIPT_DIR / "superstars.db"
 # #241 — the standard gate runs BOTH suites inside the snapshot window:
@@ -215,7 +216,7 @@ def snapshot_table(
 
 def snapshot_all() -> Dict[str, Dict[Tuple, str]]:
     """Snapshot every monitored table. Returns {table: {id: hash}}."""
-    conn = sqlite3.connect(str(DB))
+    conn = db_layer.connect()
     try:
         return {
             t: snapshot_table(conn, t, id_cols, val_cols)

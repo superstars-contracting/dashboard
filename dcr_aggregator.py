@@ -23,9 +23,9 @@ DEFAULT_LNG = -73.9162
 
 
 def _db():
-    conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
-    conn.row_factory = sqlite3.Row
-    return conn
+    # #260 — route through the env-driven layer (SSC_DB_URL); production default = live SQLite.
+    import db_layer
+    return db_layer.connect()
 
 
 def _day_of_week(date_str):

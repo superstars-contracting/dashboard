@@ -34,15 +34,16 @@ def worker_id_for_display(employee_id):
     if not employee_id:
         return None
     try:
-        conn = sqlite3.connect(str(_DB_PATH), timeout=10.0)
-    except sqlite3.Error:
+        import db_layer  # #260 — honor SSC_DB_URL; production default = live SQLite.
+        conn = db_layer.connect()
+    except Exception:
         return None
     try:
         row = conn.execute(
             "SELECT worker_id FROM employees WHERE employee_id = ?",
             (employee_id,)
         ).fetchone()
-    except sqlite3.Error:
+    except Exception:
         return None
     finally:
         conn.close()

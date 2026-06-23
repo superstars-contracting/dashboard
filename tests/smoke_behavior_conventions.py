@@ -45,6 +45,7 @@ _smoke_auth.setup()
 
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
 DB_PATH = _smoke_auth.DB_PATH
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
 PASS, FAIL = [], []
 
 
@@ -149,7 +150,7 @@ _PROP_EID, _PROP_WID = "E-99254", "W-9954"
 
 
 def _prop_teardown():
-    conn = sqlite3.connect(str(DB_PATH), timeout=60)
+    conn = db_layer.connect()
     try:
         for tbl in ("labor_rate_change", "labor_worker_state"):
             conn.execute(f"DELETE FROM {tbl} WHERE worker_id=?", (_PROP_WID,))
@@ -170,7 +171,7 @@ def behavioral_propagation_check():
     from worker_rates import get_rate_effective_on
     _prop_teardown()
     # synthetic active worker + active project assignment (eligible to add a rate)
-    conn = sqlite3.connect(str(DB_PATH), timeout=60)
+    conn = db_layer.connect()
     try:
         conn.execute("INSERT INTO employees (employee_id, worker_id, name, trade, intake_status) "
                      "VALUES (?,?,?,?, 'active')",
@@ -207,7 +208,7 @@ def behavioral_propagation_check():
             return False, f"approve failed ({r3.status_code})"
         # 4) cross-view: does the canonical source the tracker resolves now reflect
         #    the approved rate for the BACKDATED week? (boolean; never the value)
-        rconn = sqlite3.connect(str(DB_PATH), timeout=60)
+        rconn = db_layer.connect()
         rconn.row_factory = sqlite3.Row
         try:
             resolved = get_rate_effective_on(rconn, _PROP_EID, last_mon.isoformat())
@@ -226,9 +227,25 @@ _LA_PROJ = "ZZ-SMOKE-LA"
 
 
 def _la_teardown():
-    conn = sqlite3.connect(str(DB_PATH), timeout=60)
+    conn = db_layer.connect()
     try:
         conn.execute("DELETE FROM lookahead_activity WHERE project_code=?", (_LA_PROJ,))
+        # #260 — lookahead_activity.project_code REFERENCES projects(project_code).
+        # Remove the activity rows (child) first, then the synthetic project, or
+        # Postgres' enforced FK blocks the delete (SQLite ran with it off).
+        conn.execute("DELETE FROM projects WHERE project_code=?", (_LA_PROJ,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _la_setup():
+    # #260 — create the synthetic project so the lookahead INSERT satisfies the
+    # project_code -> projects FK that Postgres enforces.
+    conn = db_layer.connect()
+    try:
+        conn.execute("INSERT INTO projects(project_code, name) VALUES(?, 'ZZ Smoke Look-Ahead')",
+                     (_LA_PROJ,))
         conn.commit()
     finally:
         conn.close()
@@ -245,6 +262,7 @@ def behavioral_lookahead_check():
     gone. Drives add -> drag(PATCH) -> remove(DELETE) on a synthetic project and
     asserts each round-trips through a fresh GET. Returns (ok_bool, note)."""
     _la_teardown()
+    _la_setup()
     base = f"{BASE}/api/projects/{_LA_PROJ}/lookahead"
     try:
         r = requests.post(base + "/activities", json={
@@ -290,7 +308,7 @@ _SC_STEPS = 5
 
 
 def _sc_teardown():
-    conn = sqlite3.connect(str(DB_PATH), timeout=60)
+    conn = db_layer.connect()
     try:
         conn.execute("PRAGMA busy_timeout=60000;")
         conn.execute("DELETE FROM audit_log WHERE action LIKE 'dropplan_%' AND target_id LIKE ?", (_SC_DROP + "#%",))
@@ -306,7 +324,7 @@ def _sc_teardown():
 
 
 def _sc_setup():
-    conn = sqlite3.connect(str(DB_PATH), timeout=60)
+    conn = db_layer.connect()
     try:
         conn.execute("PRAGMA busy_timeout=60000;")
         conn.execute("INSERT INTO projects(project_code,name) VALUES(?, 'ZZ Smoke 256 Progress')", (_SC_PROJ,))
@@ -385,7 +403,7 @@ def behavioral_stage_completion_check():
             return False, f"% did not rise to {per} on complete (drop={j.get('drop_pct')} overall={j.get('overall_pct')})"
 
         # (3) SINGLE SOURCE — card, report, widget endpoints + helper all agree
-        hconn = sqlite3.connect(str(DB_PATH), timeout=60)
+        hconn = db_layer.connect()
         hconn.row_factory = sqlite3.Row
         try:
             helper_drop = R.drop_progress(hconn, _SC_DROP)["pct"]

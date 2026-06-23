@@ -58,11 +58,11 @@ COF_OVERRIDE_VALIDITY_DAYS = 365
 # =====================================================================
 
 def db_conn():
-    conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA busy_timeout=60000;")
-    return conn
+    # #260 — route through the env-driven layer (SSC_DB_URL). Production default is
+    # the live SQLite file (unchanged); a test backend (isolated copy / Postgres) is
+    # used only when SSC_DB_URL is set, so credential issuance honors test isolation.
+    import db_layer
+    return db_layer.connect()
 
 
 def get_setting(key, default=None):

@@ -45,6 +45,7 @@ import requests
 
 # Auth gate (#48): login the smoke admin + patch requests so cookies ride along.
 import _smoke_auth  # noqa: E402
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
 _smoke_auth.setup()
 
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
@@ -69,11 +70,7 @@ def ok(name, cond, note=""):
 
 
 def db():
-    conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA foreign_keys=ON;")
-    return conn
+    return db_layer.connect(pragma_fk=True)
 
 
 def snapshot_db(label):

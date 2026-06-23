@@ -180,9 +180,11 @@ def drop_cost(conn: sqlite3.Connection, drop_id: str) -> Union[float, str]:
 
 
 def drop_expense_total(conn: sqlite3.Connection, drop_id: str) -> float:
+    # #260 — round in Python, not SQL: Postgres has no round(double precision, int)
+    # (amount is REAL), only round(numeric, int). SUM then Python round() is dialect-neutral.
     r = conn.execute(
-        "SELECT ROUND(SUM(amount), 2) FROM expense_entries WHERE drop_id=?", (drop_id,)).fetchone()
-    return r[0] if r and r[0] is not None else 0.0
+        "SELECT SUM(amount) FROM expense_entries WHERE drop_id=?", (drop_id,)).fetchone()
+    return round(r[0], 2) if r and r[0] is not None else 0.0
 
 
 # ---------------- assemblers (omit-not-zero) ----------------
@@ -275,10 +277,11 @@ def project_rollup(conn: sqlite3.Connection, project_code: str, include_cost: bo
             out["total_spend"] = PENDING_RATES
         else:
             out["total_spend"] = round(sum(c for c in costs), 2)
+        # #260 — round in Python (see drop_expense_total): no round(double, int) on Postgres.
         exp = conn.execute(
-            "SELECT ROUND(SUM(amount),2) FROM expense_entries WHERE project_code=?",
+            "SELECT SUM(amount) FROM expense_entries WHERE project_code=?",
             (project_code,)).fetchone()[0]
-        out["total_expenses"] = exp if exp is not None else 0.0
+        out["total_expenses"] = round(exp, 2) if exp is not None else 0.0
     return out
 
 

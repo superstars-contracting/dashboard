@@ -4644,11 +4644,14 @@ def api_labor_rates_workers():
         conn = db()
         try:
             rows = conn.execute(
-                """SELECT DISTINCT e.employee_id, e.worker_id, e.name, e.trade
+                # #260 — sort key in the SELECT list: Postgres requires SELECT
+                # DISTINCT ORDER BY expressions to be selected (SQLite did not).
+                """SELECT DISTINCT e.employee_id, e.worker_id, e.name, e.trade,
+                          CAST(SUBSTR(e.employee_id, 3) AS INTEGER) AS sort_key
                    FROM employees e
                    JOIN project_assignments pa ON pa.employee_id = e.employee_id
                    WHERE pa.status = 'active'
-                   ORDER BY CAST(SUBSTR(e.employee_id, 3) AS INTEGER)"""
+                   ORDER BY sort_key"""
             ).fetchall()
             out = []
             for w in rows:
@@ -5362,13 +5365,18 @@ def api_lr_eligible_workers():
     conn = db()
     try:
         rows = conn.execute(
-            """SELECT DISTINCT e.worker_id, e.name
+            # #260 — the numeric sort key is in the SELECT list because Postgres
+            # requires every SELECT DISTINCT ORDER BY expression to appear there
+            # (SQLite did not). It's functionally dependent on worker_id, so it
+            # does not change the distinct set; the response ignores it.
+            """SELECT DISTINCT e.worker_id, e.name,
+                      CAST(SUBSTR(e.worker_id, 3) AS INTEGER) AS sort_key
                FROM employees e
                JOIN project_assignments pa ON pa.employee_id = e.employee_id
                LEFT JOIN labor_worker_state ls ON ls.worker_id = e.worker_id
                WHERE pa.status = 'active' AND e.archived_at IS NULL
                  AND ls.worker_id IS NULL
-               ORDER BY CAST(SUBSTR(e.worker_id, 3) AS INTEGER)""").fetchall()
+               ORDER BY sort_key""").fetchall()
         out = [{"worker_id": r["worker_id"], "name": r["name"]} for r in rows]
         resp = response_wrapper(out, count=len(out))
         resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
@@ -6637,8 +6645,8 @@ def api_certification_save(employee_id):
         existing = conn.execute(
             "SELECT id FROM certifications "
             "WHERE employee_id = ? AND cert_type_id = ? "
-            "AND IFNULL(card_number, '') = IFNULL(?, '') "
-            "AND IFNULL(date_obtained, '') = IFNULL(?, '')",
+            "AND COALESCE(card_number, '') = COALESCE(?, '') "
+            "AND COALESCE(date_obtained, '') = COALESCE(?, '')",
             (employee_id, cert_type_id, card_number, date_obtained)
         ).fetchone()
         if existing:

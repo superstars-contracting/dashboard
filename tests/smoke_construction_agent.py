@@ -33,6 +33,8 @@ sys.path.insert(0, str(SCRIPT_DIR / "agents" / "construction_specialist"))
 
 DB = SCRIPT_DIR / "superstars.db"
 import provenance as prov  # noqa: E402
+sys.path.insert(0, str(SCRIPT_DIR))
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
 
 SMK = "SMK-"
 PASS, FAIL = 0, 0
@@ -70,7 +72,7 @@ def cleanup(conn):
 
 
 def main() -> int:
-    conn = sqlite3.connect(str(DB))
+    conn = db_layer.connect()
     try:
         cleanup(conn)
         base = count_smk(conn)

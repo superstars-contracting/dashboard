@@ -48,6 +48,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = SCRIPT_DIR / "superstars.db"
 sys.path.insert(0, str(SCRIPT_DIR))
 from auth import hash_password  # noqa: E402
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
 
 PROJECT = "FR-BX-001"
 RECEIPTS_BASE = SCRIPT_DIR / "data_room" / "receipts"
@@ -68,7 +69,7 @@ def ok(name, cond, note=""):
 
 
 def db():
-    c = sqlite3.connect(str(DB_PATH), timeout=60.0)
+    c = db_layer.connect()
     c.row_factory = sqlite3.Row
     c.execute("PRAGMA journal_mode=WAL;")
     return c

@@ -83,13 +83,10 @@ def get_app_token():
 # =====================================================================
 
 def db_conn():
-    # 60-second wait if another process holds the write lock (server.py).
-    # WAL mode lets the Flask server keep reading while we write — no more lockouts.
-    conn = sqlite3.connect(str(DB_PATH), timeout=60.0)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA busy_timeout=60000;")
-    return conn
+    # #260 — route through the env-driven layer (SSC_DB_URL); production default = live
+    # SQLite (60s busy-timeout + WAL preserved by db_layer). Honors test isolation when set.
+    import db_layer
+    return db_layer.connect()
 
 
 def log_pulse(project_code, dataset, bin_queried, records, status_code, duration_ms, error=None):

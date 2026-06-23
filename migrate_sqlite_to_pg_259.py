@@ -28,6 +28,61 @@ import sys
 import psycopg
 
 
+# ---------- explicit Postgres view overrides (#260) ----------
+# Two subscriptions views use SQLite-only constructs the best-effort regex
+# translator (step 4b) can't handle, so we supply hand-written Postgres SQL with
+# IDENTICAL semantics + column names — only the dialect differs:
+#   * subscriptions_monthly_burn: ROUND(SUM(<double precision>), 2). Postgres has
+#     no round(double precision, int) (only round(numeric, int)), so the SUM is
+#     cast ::numeric before rounding.
+#   * subscriptions_upcoming_renewals: julianday(x) - julianday('now'). Postgres
+#     has no julianday(); renewal_date is TEXT 'YYYY-MM-DD', so cast ::date and
+#     subtract CURRENT_DATE — integer days, LOCAL date (never UTC), per the
+#     CLAUDE.md dates rule.
+PG_VIEW_OVERRIDES = {
+    "subscriptions_monthly_burn": """
+CREATE VIEW subscriptions_monthly_burn AS
+SELECT
+  category,
+  COUNT(*) AS active_count,
+  ROUND(SUM(
+    CASE
+      WHEN billing_cycle = 'monthly' THEN unit_cost_usd * seats
+      WHEN billing_cycle = 'annual' THEN (unit_cost_usd * seats) / 12.0
+      WHEN billing_cycle = 'quarterly' THEN (unit_cost_usd * seats) / 3.0
+      ELSE 0
+    END
+  )::numeric, 2) AS monthly_usd
+FROM subscriptions
+WHERE status = 'active'
+GROUP BY category
+ORDER BY monthly_usd DESC
+""",
+    # The cast is wrapped in CASE WHEN <iso-regex> THEN ... so it ONLY runs on
+    # 'YYYY-MM-DD' strings. SQLite's julianday() returns NULL for unparseable
+    # dates (the live data has 'PENDING', 'N/A', '2026-05-XX' placeholders) and
+    # silently drops them; Postgres ::date THROWS on those. A WHERE guard is not
+    # enough — Postgres may evaluate the cast before the regex filter — but CASE
+    # is guaranteed to short-circuit, so the cast never sees a non-date string.
+    "subscriptions_upcoming_renewals": """
+CREATE VIEW subscriptions_upcoming_renewals AS
+SELECT
+  service_name, provider, plan_tier, seats, unit_cost_usd,
+  billing_cycle, renewal_date,
+  CASE WHEN renewal_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+       THEN (renewal_date::date - CURRENT_DATE) END AS days_until_renewal
+FROM subscriptions
+WHERE status = 'active'
+  AND renewal_date IS NOT NULL
+  AND renewal_date != 'PENDING'
+  AND CASE WHEN renewal_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+           THEN (renewal_date::date - CURRENT_DATE) BETWEEN 0 AND 30
+           ELSE FALSE END
+ORDER BY renewal_date
+""",
+}
+
+
 # ---------- DDL translation ----------
 
 def _strip_line_comments(text: str) -> str:
@@ -102,6 +157,12 @@ def _translate_create(sql: str):
         # datetime objects and break those string comparisons. So a column TYPE of
         # TIMESTAMP/DATETIME/DATE becomes TEXT, and DEFAULT CURRENT_TIMESTAMP yields text.
         s = re.sub(r'^("?\w+"?\s+)(?:TIMESTAMP|DATETIME|DATE)\b', r"\1TEXT", s, flags=re.IGNORECASE)
+        # #260 — SQLite REAL is 8-byte IEEE double; Postgres REAL is 4-byte float4, which
+        # silently truncates precision (0.3333333333333333 -> 0.33333334) and makes stored
+        # values diverge from the app's Python doubles. Map the column TYPE REAL ->
+        # DOUBLE PRECISION (float8) so values round-trip bit-for-bit as on SQLite. Anchored
+        # to the column-name + type position so a literal 'real' elsewhere is untouched.
+        s = re.sub(r'^("?\w+"?\s+)REAL\b', r"\1DOUBLE PRECISION", s, flags=re.IGNORECASE)
         s = re.sub(r"DEFAULT\s+CURRENT_TIMESTAMP", "DEFAULT (now())::text", s, flags=re.IGNORECASE)
         out_items.append(s)
     pg = f"CREATE TABLE {tname} (\n  " + ",\n  ".join(out_items) + "\n)"
@@ -207,6 +268,16 @@ def main() -> int:
     views = scon.execute("SELECT name, sql FROM sqlite_master WHERE type='view' ORDER BY rowid").fetchall()
     vok, vfail = 0, []
     for vname, vsql in views:
+        if vname in PG_VIEW_OVERRIDES:
+            v = PG_VIEW_OVERRIDES[vname].strip()
+            try:
+                pcur.execute(v)
+                pg.commit()
+                vok += 1
+            except Exception as e:
+                pg.rollback()
+                vfail.append(f"{vname}: {str(e).splitlines()[0][:90]}")
+            continue
         v = _strip_line_comments(vsql)
         v = re.sub(r"GROUP_CONCAT\s*\(\s*([^,)]+?)\s*,\s*([^)]+?)\)", r"string_agg(\1::text, \2)", v, flags=re.IGNORECASE)
         v = re.sub(r"GROUP_CONCAT\s*\(\s*([^,)]+?)\s*\)", r"string_agg(\1::text, ',')", v, flags=re.IGNORECASE)

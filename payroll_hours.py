@@ -147,12 +147,15 @@ def build_week_grid(conn, monday):
     # labor_status with the #241 LEFT-JOIN semantics defined in ONE place);
     # this module applies its own inclusion rule (active OR has-hours) on top.
     workers = conn.execute(
+        # #260 — sort key in the SELECT list: Postgres requires SELECT DISTINCT
+        # ORDER BY expressions to be selected (SQLite did not). Dependent on
+        # worker_id, so the distinct set is unchanged; callers ignore it.
         """SELECT DISTINCT e.employee_id, e.worker_id, e.name, e.trade,
-                  e.labor_status
+                  e.labor_status, CAST(SUBSTR(e.worker_id, 3) AS INTEGER) AS sort_key
            FROM v_worker_roster e
            JOIN project_assignments pa ON pa.employee_id = e.employee_id
            WHERE pa.status = 'active'
-           ORDER BY CAST(SUBSTR(e.worker_id, 3) AS INTEGER)"""
+           ORDER BY sort_key"""
     ).fetchall()
 
     # One query for the whole week — index on (date, project_code) covers this.

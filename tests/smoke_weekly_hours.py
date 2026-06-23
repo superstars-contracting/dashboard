@@ -57,6 +57,7 @@ PORT = "5152"  # private port — NEVER 5050 (see module docstring)
 # #245 — the target week is computed, not pinned: the old hardcoded
 # 2026-05-11 made every assertion stale after that week passed.
 sys.path.insert(0, str(D))
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
 from payroll_hours import last_completed_week, compute_worked_hours  # noqa: E402
 
 _mon, _fri = last_completed_week(date.today())
@@ -119,7 +120,7 @@ def clean_test_data():
       The smoke is intended for a dev-only DB; once the operator has
       issued real DCRs, run it on a separate dev DB instead.
     """
-    with sqlite3.connect(str(DB)) as c:
+    with db_layer.connect() as c:
         c.row_factory = sqlite3.Row
         n_reports = c.execute(
             "SELECT COUNT(*) FROM report_index "
@@ -376,7 +377,7 @@ finally:
     f.close()
     clean_test_data()
     # Verify clean
-    with sqlite3.connect(str(DB)) as c:
+    with db_layer.connect() as c:
         placeholders = ",".join("?" * len(WEEK_DATES))
         n = c.execute(
             f"SELECT COUNT(*) FROM sign_in_log WHERE employee_id IN (?, ?) AND date IN ({placeholders})",

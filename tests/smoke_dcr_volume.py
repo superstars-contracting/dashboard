@@ -43,6 +43,8 @@ DASHBOARD_DIR = Path(__file__).resolve().parent.parent
 DB = DASHBOARD_DIR / "superstars.db"
 LOG = DASHBOARD_DIR / "tests" / "_smoke_dcr_volume_server.log"
 VENV_PY = DASHBOARD_DIR / "venv" / "Scripts" / "python.exe"
+sys.path.insert(0, str(DASHBOARD_DIR))
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
 PROJECT = "FR-BX-001"
 N_DCRS = 200
 N_DELETE_REISSUE = 30
@@ -87,7 +89,7 @@ def refuse_if_operator_data_present():
     state; if real operator data exists, the operator must run on a separate
     dev DB instead. (Same guard pattern as smoke_weekly_hours after #163.)
     """
-    with sqlite3.connect(str(DB)) as c:
+    with db_layer.connect() as c:
         n_dcr = c.execute(
             "SELECT COUNT(*) FROM report_index WHERE project_code=? AND report_type='DCR'",
             (PROJECT,),
@@ -118,7 +120,7 @@ def wipe_fr_bx_001():
     DANGEROUS — wipes every row for the project. Guard before any call:
     `refuse_if_operator_data_present()` must run first.
     """
-    with sqlite3.connect(str(DB)) as c:
+    with db_layer.connect() as c:
         c.execute("DELETE FROM report_index WHERE project_code=?", (PROJECT,))
         c.execute("DELETE FROM work_log WHERE project_code=?", (PROJECT,))
         c.execute("DELETE FROM deliveries WHERE project_code=?", (PROJECT,))
@@ -287,7 +289,7 @@ def main():
                extra=f"failures={[x for x in FAIL if 'phase2' in x][:5]}")
 
         # Final size check: should still have N_DCRS distinct sequences (each delete was followed by an issue)
-        with sqlite3.connect(str(DB)) as c:
+        with db_layer.connect() as c:
             distinct_seqs = c.execute(
                 "SELECT COUNT(DISTINCT dcr_sequence) FROM report_index WHERE project_code=?",
                 (PROJECT,)).fetchone()[0]
@@ -313,7 +315,7 @@ def main():
         f.close()
         print(f"  server rc={proc.returncode}")
         wipe_fr_bx_001()
-        with sqlite3.connect(str(DB)) as c:
+        with db_layer.connect() as c:
             n_rep = c.execute("SELECT COUNT(*) FROM report_index WHERE project_code=?", (PROJECT,)).fetchone()[0]
             n_work = c.execute("SELECT COUNT(*) FROM work_log WHERE project_code=?", (PROJECT,)).fetchone()[0]
             n_del = c.execute("SELECT COUNT(*) FROM deliveries WHERE project_code=?", (PROJECT,)).fetchone()[0]

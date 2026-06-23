@@ -26,6 +26,7 @@ from pathlib import Path
 import requests
 
 import _smoke_auth  # noqa: E402
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
 _smoke_auth.setup()
 
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
@@ -42,7 +43,7 @@ def ok(name, cond, note=""):
 
 
 def db():
-    c = sqlite3.connect(str(DB_PATH), timeout=60.0)
+    c = db_layer.connect()
     c.row_factory = sqlite3.Row
     return c
 

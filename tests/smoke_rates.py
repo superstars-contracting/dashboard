@@ -37,6 +37,7 @@ import _smoke_auth  # noqa: E402  (also seeds + logs in the smoke admin)
 _smoke_auth.setup()  # idempotent — installs admin cookie on module-level requests
 
 from auth import hash_password  # noqa: E402
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
 
 DB_PATH = SCRIPT_DIR / "superstars.db"
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
@@ -65,7 +66,7 @@ def expect(label: str, ok: bool, detail: str = "") -> None:
 
 
 def _ensure_pm_user() -> None:
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = db_layer.connect()
     conn.execute("PRAGMA foreign_keys=ON;")
     row = conn.execute("SELECT id FROM users WHERE email = ?", (PM_EMAIL,)).fetchone()
     if row is None:
@@ -85,7 +86,7 @@ def _ensure_pm_user() -> None:
 
 
 def _remove_pm_user() -> None:
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = db_layer.connect()
     conn.execute("DELETE FROM users WHERE email = ?", (PM_EMAIL,))
     conn.commit()
     conn.close()
@@ -118,7 +119,7 @@ def _pick_test_worker() -> str:
     """
     import uuid
     syn_id = "SMK-" + uuid.uuid4().hex[:6].upper()
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = db_layer.connect()
     try:
         conn.execute(
             "INSERT INTO employees (employee_id, name, trade, intake_status, language) "
@@ -141,7 +142,7 @@ def _cleanup_rate_rows(employee_id: str) -> int:
     worker (employees + project_assignments rows). Idempotent — safe to
     call from a final block even when no rows were inserted.
     """
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = db_layer.connect()
     n_rates_before = conn.execute(
         "SELECT COUNT(*) FROM worker_rates WHERE employee_id=?", (employee_id,)
     ).fetchone()[0]
@@ -239,7 +240,7 @@ def main() -> int:
     expect("admin POST rate B == 201", r.status_code == 201, f"got {r.status_code}")
 
     # Inspect DB directly (counts + structure, NEVER print rate values)
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = db_layer.connect()
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
         "SELECT id, effective_from, effective_to FROM worker_rates "
@@ -275,7 +276,7 @@ def main() -> int:
 
     # Lookup before transition: should return rate A
     from worker_rates import get_rate_effective_on  # noqa: E402
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = db_layer.connect()
     conn.row_factory = sqlite3.Row
     rate_pre = get_rate_effective_on(conn, test_emp, "2026-03-15")
     rate_post = get_rate_effective_on(conn, test_emp, "2026-09-15")

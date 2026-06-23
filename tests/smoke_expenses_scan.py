@@ -41,6 +41,7 @@ FX = Path(__file__).resolve().parent / "fixtures"
 sys.path.insert(0, str(SCRIPT_DIR))
 import expense_scanner as scanner  # noqa: E402
 from auth import hash_password  # noqa: E402
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
 
 PROJECT = "FR-BX-001"
 PM_EMAIL = "smk-pm-scan@superstars.local"
@@ -66,7 +67,7 @@ def ok(name, cond, note=""):
 
 
 def db():
-    c = sqlite3.connect(str(DB_PATH), timeout=60.0)
+    c = db_layer.connect()
     c.row_factory = sqlite3.Row
     return c
 
