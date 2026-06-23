@@ -177,3 +177,87 @@ to its pre-#260 snapshot** (`22CBF334…`, 1 851 392 bytes). No synthetic writes
 
 Snapshot used: `snapshots/superstars-pre-260-20260622-213950.db` (read-only copy; source of
 both the Postgres reload and the SQLite isolated copy). Production unchanged on SQLite.
+
+---
+
+# Phase 2 — "Sign in with Google" (OIDC SSO) for internal staff — #261
+
+Google Workspace SSO for the internal team, mapped onto the existing #257 role/session/audit
+system. Email/password is UNCHANGED and stays the path for external clients. **Production still
+on SQLite/Tailscale — no cutover; the feature ships OFF until the operator sets the env vars.**
+
+## Modules
+
+- **`auth_google.py`** — the whole OIDC flow (feature-flagged). Routes: `GET /auth/google/login`
+  (CSRF `state` cookie → redirect to Google), `GET /auth/google/callback` (verify → session),
+  `GET /api/auth/sso/config` (public; the login page reads it to show/hide the button).
+- **`apply_google_sso_261.py`** — db_layer-aware, idempotent, dual-backend migration. Adds
+  `users.google_sub` (TEXT, nullable, UNIQUE) + `login_audit.method` (TEXT, nullable). Exposes
+  `ensure_google_sso_schema(conn)` (the smoke calls it; the operator runs `__main__`).
+- **`login.html`** — adds a "Sign in with Google" button (shared design tokens), shown only when
+  SSO is enabled; keeps the email/password form for clients; relabelled
+  "Staff: sign in with Google · Clients: email & password".
+- **`tests/smoke_auth_sso.py`** — wired into the gate; Google verification MOCKED (never calls
+  real Google).
+
+## Security model (all enforced server-side in auth_google.py)
+
+- **Domain restriction** — only a VERIFIED `@superstarscontracting.com` Google identity may sign
+  in, decided on the verified ID-token CLAIMS: `email_verified == True` AND the email's domain ==
+  allowed AND the `hd` CLAIM == allowed. The `hd` URL *param* is only a hint to Google's chooser —
+  never trusted for the decision.
+- **No auto-provisioning** — a valid Google login whose (lowercased) email is not already an
+  `status='active'` row in `users` is REJECTED ("not authorized — ask your admin"). SSO
+  authenticates identity; authorization/role still comes only from the admin-managed users table
+  (#257). Disabled/pending accounts are rejected on BOTH login paths.
+- **Vetted library** — the ID-token signature/iss/aud/exp is verified by **google-auth**
+  (`verify_oauth2_token`) against Google's published keys. No hand-rolled JWT.
+- **Secret hygiene** — `GOOGLE_OAUTH_CLIENT_SECRET` is read from the env ONLY (1Password-vaulted in
+  `.env.template`), used only for the server-to-server token exchange; never in code/logs/commits.
+  CSRF `state` is required (random, httponly Lax cookie, compared with `secrets.compare_digest`).
+- On success: store `google_sub` on first link (harden the email→account link), clear
+  `must_reset_password` (a verified Google identity replaces the temp-password rotation — must_reset
+  does not apply to SSO), create the #257 session, write `login_audit (login_success, method=google)`,
+  redirect to the role home (admin→/admin/users, c_suite→/, pm→/dashboard). A linked account that
+  presents a DIFFERENT `sub` is rejected.
+
+## Feature flag — graceful disable (production isn't broken before creds exist)
+
+`sso_enabled()` is True only when CLIENT_ID + CLIENT_SECRET + REDIRECT_URI are all set. When unset:
+the button is hidden (sso/config → `enabled:false`), `/auth/google/*` return **404**, and the app
+runs exactly as today. The env vars (read at request time):
+
+| var | secret? | notes |
+|---|---|---|
+| `GOOGLE_OAUTH_CLIENT_ID` | no | the OAuth Web-application client id |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | **yes** | 1Password-vaulted; token exchange only |
+| `GOOGLE_OAUTH_REDIRECT_URI` | no | must equal the Authorized redirect URI in Google Cloud (prod: `https://ssc-bkbase.tail55067c.ts.net/auth/google/callback`) |
+| `GOOGLE_OAUTH_ALLOWED_DOMAIN` | no | optional; defaults to `superstarscontracting.com` |
+
+`password_hash` stays NOT NULL: an SSO-only account keeps its admin-issued (unused) password; the
+SSO path never reads it. Making `password_hash` nullable for true passwordless accounts is a future
+schema change (a users-table rebuild) — deliberately not done here.
+
+## Tests + state
+
+- **`tests/smoke_auth_sso.py`** (27 checks, both backends) mocks verification via
+  `GOOGLE_OAUTH_FAKE_VERIFY=1` (test-only seam, NEVER set in prod; the callback decodes `code` as
+  base64url(JSON claims)). Covers: active company user → session+role+audit(method=google)+google_sub
+  stored+must_reset cleared; wrong-domain / unverified / missing-hd reject; no-account reject (no
+  provision); disabled/pending reject; CSRF state mismatch/no-cookie reject; SSO-disabled → config
+  off + routes 404; and email/password still works with SSO both enabled and disabled. Self-contained
+  (own server, synthetic is_system=1 fixtures, scoped cleanup, isolated DB).
+- **Full gate green on BOTH backends — 12/12** (the 11 from #260 + `smoke_auth_sso`), via
+  `tests/run_gate_260.py` against the isolated DBs. `smoke_auth` + `smoke_auth_roles` (email/password)
+  stay green — the password path is unchanged.
+
+## Operator deploy (DONE BY OPERATOR — not attempted here)
+
+1. Register the OAuth client in Google Cloud; set the four `GOOGLE_OAUTH_*` env vars (secret from
+   1Password). 2. Snapshot live, then `python apply_google_sso_261.py` (adds the columns to live).
+3. Restart the scheduled task. 4. The real end-to-end test — clicking "Sign in with Google" and
+   authenticating with a real Workspace account + 2-step — is the operator's lived-flow test (Claude
+   Code can't perform a real Google login; the smoke covers the callback logic with mocks).
+
+Snapshot used: `snapshots/superstars-pre-261-20260623-152342.db`. Live `superstars.db` byte-identical
+to it (SHA `C202158A…`) through the whole task. Production unchanged on SQLite — no cutover.

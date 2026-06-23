@@ -50,6 +50,9 @@ apply_auth_gate(app)
 import auth_admin  # noqa: E402
 auth_admin.register(app)
 
+import auth_google  # noqa: E402  # #261 — Google OIDC SSO (feature-flagged; 404 when unconfigured)
+auth_google.register(app)
+
 # Security: cap upload size. Raised to 256 MB (#235) so a field-photo BATCH POST
 # (many images, several 8-12 MB) isn't rejected at the WSGI layer; the Field
 # Photos UI also uploads in chunks. A request over the cap returns a clean 413

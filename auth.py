@@ -62,9 +62,12 @@ _RESET_ALLOWED_EXACT = {"/set-password", "/login"}
 # other operator surface. Generated artifacts are served by the gated
 # /project-files/ route, which is intentionally NOT exempt.
 _PUBLIC_PREFIXES = (
-    "/api/auth/",         # login, logout, me — see below for /me caveat
+    "/api/auth/",         # login, logout, me, sso/config — see below for /me caveat
     "/api/worker/",       # worker-app PIN flow — unchanged
     "/files/static/",     # vendored shell assets ONLY (css/js/fonts/vendor)
+    "/auth/google/",      # #261 — Google OIDC login/callback must be reachable while
+                          # logged OUT (that IS the login). When SSO is disabled (no
+                          # GOOGLE_OAUTH_* env) the handlers themselves return 404.
 )
 _PUBLIC_EXACT = {
     "/login",
@@ -129,19 +132,22 @@ def _client_ip() -> Optional[str]:
     return (request.remote_addr or "")[:64] or None
 
 
-def _login_audit(user_id: Optional[int], event: str, ip: Optional[str]) -> None:
+def _login_audit(user_id: Optional[int], event: str, ip: Optional[str],
+                 method: Optional[str] = None) -> None:
     """Append a login_audit row (LOCAL timestamp). NEVER records the password, the
     hash, or which non-existent email was tried (user_id is NULL when unknown).
-    Auth must never fail because the audit write failed."""
+    `method` distinguishes the login path — 'google' for SSO (#261), NULL for the
+    email/password path. Auth must never fail because the audit write failed (any
+    backend error — incl. a not-yet-migrated method column — is swallowed)."""
     conn = _db()
     try:
         conn.execute(
-            "INSERT INTO login_audit (user_id, event, at, ip) VALUES (?, ?, ?, ?)",
-            (user_id, event, _now_iso(), ip),
+            "INSERT INTO login_audit (user_id, event, at, ip, method) VALUES (?, ?, ?, ?, ?)",
+            (user_id, event, _now_iso(), ip, method),
         )
         conn.commit()
-    except sqlite3.OperationalError:
-        pass  # audit table not migrated yet — do not block auth
+    except Exception:
+        pass  # audit table/column not migrated yet — do not block auth (SQLite or PG)
     finally:
         conn.close()
 
@@ -156,7 +162,7 @@ def _recent_login_fails(user_id: int) -> int:
             (user_id, since),
         ).fetchone()
         return row[0] if row else 0
-    except sqlite3.OperationalError:
+    except Exception:   # not-yet-migrated table, or any backend error — fail open (no lockout)
         return 0
     finally:
         conn.close()
