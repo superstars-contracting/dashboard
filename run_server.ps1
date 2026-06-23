@@ -41,6 +41,28 @@ if (-not (Test-Path $LogDir)) {
 $bootStamp = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  [launcher] cwd=$DashboardDir  bind=${BindHost}:${BindPort}"
 Add-Content -Path $LogFile -Value $bootStamp
 
+# Load runtime secrets from the gitignored .env (KEY=VALUE per line) into the process
+# environment, so the app (os.environ) picks them up — e.g. GOOGLE_OAUTH_* for the
+# "Sign in with Google" flow (#261). The .env is NEVER committed (gitignored). Values
+# are NEVER written to the log — only the count of keys loaded. Lines starting with #
+# and blank lines are ignored; surrounding single/double quotes on a value are stripped.
+$EnvFile = Join-Path $DashboardDir '.env'
+if (Test-Path $EnvFile) {
+    $loaded = 0
+    foreach ($raw in Get-Content -Path $EnvFile) {
+        $line = $raw.Trim()
+        if (-not $line -or $line.StartsWith('#') -or -not $line.Contains('=')) { continue }
+        $i = $line.IndexOf('=')
+        $k = $line.Substring(0, $i).Trim()
+        $v = $line.Substring($i + 1).Trim()
+        if ($v.Length -ge 2 -and (($v.StartsWith('"') -and $v.EndsWith('"')) -or ($v.StartsWith("'") -and $v.EndsWith("'")))) {
+            $v = $v.Substring(1, $v.Length - 2)
+        }
+        if ($k) { Set-Item -Path ("Env:" + $k) -Value $v; $loaded++ }
+    }
+    Add-Content -Path $LogFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  [launcher] loaded $loaded env key(s) from .env (values not logged)"
+}
+
 # Detect waitress in the venv. If present, run via waitress-serve. If
 # missing (clean install, or removed), fall back to Flask's dev server.
 # Both paths bind to $BindHost / $BindPort and redirect stdout/stderr
