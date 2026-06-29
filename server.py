@@ -42,7 +42,8 @@ app.register_blueprint(preview_bp)
 # is untouched. /preview/* lost its exemption in #248: it serves rendered
 # project documents (internal DCRs etc.), so it requires a session like any
 # other operator surface. Per-route role gating uses @requires_role from auth.py.
-from auth import apply_auth_gate, requires_role, current_user  # noqa: F401 (requires_role re-exported for future use)
+from auth import apply_auth_gate, requires_role, requires_section, current_user  # noqa: F401
+import access  # #262 — central section→roles map (RBAC single source of truth)
 apply_auth_gate(app)
 
 # Admin account management — multi-user accounts & roles, Phase 1 (#257). Every
@@ -170,8 +171,21 @@ def _serve_html_no_store(path):
 
 
 def _serve_dashboard_no_store():
-    """Project Health surface (per-project dashboard), served no-store."""
-    return _serve_html_no_store(DASHBOARD_PATH)
+    """Project Health surface (per-project dashboard), served no-store. #262 — the
+    sidebar is RENDERED PER ROLE here: gated SECTION blocks (Financial) the current
+    user's role can't access (per the central access.SECTION_ACCESS map) are STRIPPED
+    from the served HTML server-side, so a disallowed role never receives that markup
+    at all. Hiding a menu item is not access control — the Financial endpoints 403 too;
+    this just makes the menu match. admin/c_suite take the unchanged send_file path."""
+    role = (current_user() or {}).get("role")
+    if access.can_access_all_gated(role):
+        return _serve_html_no_store(DASHBOARD_PATH)
+    html = access.render_sections(DASHBOARD_PATH.read_text(encoding="utf-8"), role)
+    resp = Response(html, mimetype="text/html")
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 @app.route('/projects/<project_code>')
@@ -4635,7 +4649,7 @@ def api_credentials_batch_print():
 
 
 @app.route('/api/labor-rates/workers', methods=['GET'])
-@requires_role('admin', 'c_suite')
+@requires_section('financial')
 def api_labor_rates_workers():
     """Per-worker overview: every active worker with their current rate
     (or null if no rate set yet) + a count of historical rate rows.
@@ -4686,7 +4700,7 @@ def api_labor_rates_workers():
 
 
 @app.route('/api/labor-rates/workers/<employee_id>/history', methods=['GET'])
-@requires_role('admin', 'c_suite')
+@requires_section('financial')
 def api_labor_rates_history(employee_id):
     """Full rate history for one worker, newest first."""
     from worker_rates import get_rate_history
@@ -4707,7 +4721,7 @@ def api_labor_rates_history(employee_id):
 
 
 @app.route('/api/labor-rates/workers/<employee_id>', methods=['POST'])
-@requires_role('admin', 'c_suite')
+@requires_section('financial')
 def api_labor_rates_set(employee_id):
     """Create a new rate row, atomically end-dating the prior active one.
 
@@ -4890,11 +4904,14 @@ def api_signin_dcr_reconcile(project_code):
 # (PMs get ONLY the queue, never the roster). Money via _exp_money (Decimal, 2dp);
 # dates LOCAL; history is role-stamped (no names — PII-safe).
 LABOR_TRADES = ('Mechanic', 'Laborer', 'Rope Access', 'Superintendent')
-_LR_FULL_ROLES = ('admin', 'c_suite')
+# #262 — sourced from the central section map (access.SECTION_ACCESS['financial']) so the
+# Financial role set lives in ONE place: change it in access.py and BOTH the sidebar and
+# these endpoints follow. Still admin/c_suite (#257: pm BLOCKED from individual rates).
+_LR_FULL_ROLES = tuple(sorted(access.roles_for('financial')))
 # #257 — individual worker rates/comp are admin/c_suite ONLY. pm was removed from
 # rate approval here (catalog: c_suite/admin approve; pm must NOT see individual
 # rates). Server-side enforced on every rates endpoint; the page is gated too.
-_LR_APPROVE_ROLES = ('admin', 'c_suite')
+_LR_APPROVE_ROLES = tuple(sorted(access.roles_for('financial')))
 
 # #241 — canonical Worker ID shape (CLAUDE.md terminology rule: literal 'W-' +
 # zero-padded 4-digit sequence). EVERY endpoint that accepts a worker id from a
@@ -8755,6 +8772,25 @@ def api_dropplan_sov_lines(project_code):
     except Exception as e:
         logging.error(f"GET /api/dropplan/projects/{project_code}/sov-lines: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/projects/<project_code>/sov', methods=['GET'])
+@requires_section('financial')
+def api_project_sov(project_code):
+    """#262 — Schedule of Values (FINANCIAL section). Server-enforced to admin/c_suite
+    via the central access.SECTION_ACCESS map (pm/super -> 403, even on a direct call).
+    Returns the project's SOV line items WITH unit_rate (the billing breakdown — that's
+    why it's gated; the drop-plan picker /sov-lines omits dollars and stays pm-visible)."""
+    conn = db()
+    try:
+        rows = conn.execute(
+            "SELECT sov_code, description, unit, unit_rate FROM sov_line_items "
+            "WHERE project_code=? ORDER BY sov_code", (project_code,)).fetchall()
+        out = [{"sov_code": r["sov_code"], "description": r["description"],
+                "unit": r["unit"], "unit_rate": r["unit_rate"]} for r in rows]
+        return response_wrapper(out, count=len(out))
+    finally:
+        conn.close()
 
 
 @app.route('/dropplan', methods=['GET'])

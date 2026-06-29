@@ -34,6 +34,7 @@ data untouched; comp-data discipline — prints booleans only, never a rate valu
 """
 import os
 import re
+import secrets
 import sqlite3
 import sys
 from datetime import date, timedelta
@@ -439,6 +440,109 @@ def behavioral_stage_completion_check():
         _sc_teardown()
 
 
+# ---- (#262) RBAC: Financial section gated to admin/c_suite, server-enforced --------
+_RBAC_USERS = {
+    "pm": "smk262-pm@superstars.local",
+    "c_suite": "smk262-csuite@superstars.local",
+}
+# #258 — RANDOM per-run password; synthetic is_system=1 users, cleaned up in finally.
+_RBAC_PW = secrets.token_urlsafe(18)
+
+
+def _rbac_ensure_user(email, role):
+    from auth import hash_password
+    conn = db_layer.connect(pragma_fk=True)
+    try:
+        row = conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
+        if row:
+            conn.execute("UPDATE users SET password_hash=?, role=?, is_active=1, status='active', "
+                         "must_reset_password=0, is_system=1 WHERE email=?",
+                         (hash_password(_RBAC_PW), role, email))
+        else:
+            conn.execute("INSERT INTO users (email,password_hash,role,full_name,is_active,status,"
+                         "must_reset_password,is_system,created_at) VALUES (?,?,?,?,1,'active',0,1,?)",
+                         (email, hash_password(_RBAC_PW), role, f"SMK262 {role}", date.today().isoformat()))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _rbac_login(email):
+    s = requests.Session()   # fresh session (NOT the _smoke_auth-patched admin one)
+    r = s.post(f"{BASE}/api/auth/login", json={"email": email, "password": _RBAC_PW}, timeout=10)
+    return s if (r.status_code == 200 and s.cookies.get("ssc_session")) else None
+
+
+def _rbac_cleanup():
+    conn = db_layer.connect(pragma_fk=True)
+    try:
+        for email in _RBAC_USERS.values():
+            u = conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
+            if u:
+                conn.execute("DELETE FROM login_audit WHERE user_id=?", (u[0],))
+                conn.execute("DELETE FROM role_change_audit WHERE user_id=? OR changed_by=?", (u[0], u[0]))
+                conn.execute("DELETE FROM sessions WHERE user_id=?", (u[0],))
+                conn.execute("DELETE FROM users WHERE id=?", (u[0],))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def behavioral_rbac_financial_check():
+    """#262 — Financial section (Schedule of Values + Labor Rate Tracker) gated to
+    admin/c_suite, enforced in BOTH the server-rendered sidebar AND the endpoints.
+    Drives real pm + c_suite sessions and asserts (fails on the pre-#262 server, where
+    the Financial group is not stripped and there is no gated SoV endpoint):
+      (a) the served dashboard for a PM has NO Financial group / SoV view, but DOES have
+          Compliance; for c_suite both groups are present (the split);
+      (b) a PM request to a Financial endpoint -> 403 while c_suite -> 200 (SoV data API
+          + the labor-rates roster); and PM still reaches a non-Financial operational
+          endpoint (not over-blocked).
+    Synthetic is_system=1 users, scoped cleanup; never prints a rate value (comp/PII)."""
+    for role, email in _RBAC_USERS.items():
+        _rbac_ensure_user(email, role)
+    try:
+        pm = _rbac_login(_RBAC_USERS["pm"])
+        cs = _rbac_login(_RBAC_USERS["c_suite"])
+        if not (pm and cs):
+            ok("rbac_role_logins", False, "could not log in synthetic pm/c_suite")
+            return
+        ok("rbac_role_logins", True)
+
+        pm_html = pm.get(f"{BASE}/dashboard", timeout=15).text
+        cs_html = cs.get(f"{BASE}/dashboard", timeout=15).text
+
+        # (a) sidebar — server-rendered per role
+        ok("rbac_pm_sidebar_no_financial",
+           ('data-group="financial"' not in pm_html) and ('data-view="sov"' not in pm_html),
+           "pm served dashboard must OMIT the Financial group + SoV view (absent, not hidden)")
+        ok("rbac_pm_sidebar_has_compliance",
+           'data-group="compliance"' in pm_html, "pm keeps the Compliance group")
+        ok("rbac_csuite_sidebar_has_financial",
+           ('data-group="financial"' in cs_html) and ('data-view="sov"' in cs_html),
+           "c_suite sees the Financial group + SoV view")
+        ok("rbac_sidebar_split_two_groups",
+           all(t in cs_html for t in ('data-group="financial"', 'data-group="compliance"',
+                                      '>Financial<', '>Compliance<')),
+           "split into distinct Financial + Compliance groups")
+
+        # (b) endpoints — pm 403, c_suite 200
+        pm_sov = pm.get(f"{BASE}/api/projects/FR-BX-001/sov", timeout=15).status_code
+        cs_sov = cs.get(f"{BASE}/api/projects/FR-BX-001/sov", timeout=15).status_code
+        ok("rbac_sov_endpoint_pm403_csuite200", pm_sov == 403 and cs_sov == 200,
+           f"pm={pm_sov} c_suite={cs_sov}")
+        pm_lr = pm.get(f"{BASE}/api/labor-rates/roster", timeout=15).status_code
+        cs_lr = cs.get(f"{BASE}/api/labor-rates/roster", timeout=15).status_code
+        ok("rbac_laborrates_endpoint_pm403_csuite200", pm_lr == 403 and cs_lr == 200,
+           f"pm={pm_lr} c_suite={cs_lr}")
+        # pm NOT over-blocked: keeps a non-Financial operational endpoint (drop plan)
+        pm_dp = pm.get(f"{BASE}/api/dropplan/projects/FR-BX-001/sov-lines", timeout=15).status_code
+        ok("rbac_pm_keeps_operational", pm_dp == 200,
+           f"pm dropplan sov-lines={pm_dp} (pm keeps everything except Financial)")
+    finally:
+        _rbac_cleanup()
+
+
 def main():
     # ---- self-test: prove the matchers discriminate broken vs fixed ----------
     print("== self-test (prove each matcher fails on the broken pattern) ==")
@@ -557,6 +661,13 @@ def main():
     except Exception as e:
         sc_ok, sc_note = False, f"check errored: {type(e).__name__}: {e}"
     ok("stage_complete_moves_pct_single_source_persists", sc_ok, sc_note)
+
+    # ---- (#262) RBAC: Financial section gated to admin/c_suite (sidebar + endpoints) -
+    print("\n== RBAC: Financial gated to admin/c_suite (server-rendered sidebar + endpoints) ==")
+    try:
+        behavioral_rbac_financial_check()
+    except Exception as e:
+        ok("rbac_financial_gating", False, f"check errored: {type(e).__name__}: {e}")
 
     print(f"\n== RESULT: {len(PASS)} PASS / {len(FAIL)} FAIL ==")
     if FAIL:

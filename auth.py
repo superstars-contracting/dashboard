@@ -33,6 +33,7 @@ import bcrypt
 from flask import g, jsonify, make_response, redirect, request, send_file
 
 import db_layer  # #259 — env-driven SQLite/Postgres layer (SQLite default)
+import access  # #262 — central role→section access map (the RBAC single source of truth)
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DB_PATH = SCRIPT_DIR / "superstars.db"
@@ -492,6 +493,9 @@ def _api_me():
         "role": user["role"],
         "status": user.get("status"),
         "must_reset_password": bool(user.get("must_reset_password")),
+        # #262 — gated-section visibility for this role (same source the
+        # server-rendered sidebar uses); the client may reflect it.
+        "sections": access.section_visibility(user["role"]),
     }})
 
 
@@ -567,6 +571,30 @@ def requires_role(*allowed_roles: str):
                 logging.info(
                     f"auth: role denied role={user.get('role')} "
                     f"path={request.path} required={sorted(allowed)}"
+                )
+                return jsonify({"error": "forbidden"}), 403
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def requires_section(section: str):
+    """Per-route gate by SECTION — reads the SAME `access.SECTION_ACCESS` map the
+    server-rendered sidebar uses, so a section's access lives in ONE place (change it
+    in access.py and both the menu and the endpoints follow). Returns 403 JSON if the
+    authenticated user's role can't access `section`; the blanket before_request gate
+    has already enforced that the request is authenticated."""
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            user = current_user()
+            if not user:
+                # before_request should have caught this — defense in depth.
+                return jsonify({"error": "auth required"}), 401
+            if not access.can_access(section, user.get("role")):
+                logging.info(
+                    f"auth: section denied section={section} role={user.get('role')} "
+                    f"path={request.path}"
                 )
                 return jsonify({"error": "forbidden"}), 403
             return fn(*args, **kwargs)
