@@ -106,6 +106,13 @@ def _cleanup():
                 conn.execute("DELETE FROM login_audit WHERE user_id=?", (uid,))
                 conn.execute("DELETE FROM role_change_audit WHERE user_id=? OR changed_by=?", (uid, uid))
                 conn.execute("DELETE FROM sessions WHERE user_id=?", (uid,))
+                # EVERY remaining users(id) child must go before the user, else FK fails on the
+                # delete. The #263 assign/close actions write an audit_log row (actor_user_id);
+                # dashboard_layouts / worker_rates are scoped to the synthetic uid (no real-data
+                # rows match), so this only removes what these fixtures created.
+                conn.execute("DELETE FROM audit_log WHERE actor_user_id=?", (uid,))
+                conn.execute("DELETE FROM dashboard_layouts WHERE user_id=?", (uid,))
+                conn.execute("DELETE FROM worker_rates WHERE created_by=?", (uid,))
                 conn.execute("DELETE FROM users WHERE id=?", (uid,))
         for code in (PROJ_A, PROJ_B):
             conn.execute("DELETE FROM pm_project_assignment WHERE project_code=?", (code,))
