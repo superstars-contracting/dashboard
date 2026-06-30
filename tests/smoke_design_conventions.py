@@ -458,9 +458,10 @@ def main():
        ("REGISTER OR EXEMPT: " + ", ".join(unregistered)) if unregistered
        else f"{len(REGISTERED)} registered / {len(EXEMPT)} exempt")
 
-    # ---- #265 — CANONICAL LOGO: one filled-star lockup; the hollow/outline star is banned ----
-    print("\n-- canonical brand logo (filled star, no hollow/outline variant) --")
-    CANON = "38.78,34.55"   # a distinctive vertex of the canonical faceted star (brand.py)
+    # ---- #265 — SWAPPABLE CANONICAL LOGO: ONE asset slot, filled star; hollow star banned ----
+    print("\n-- swappable canonical brand logo (asset slot, filled star, no hollow variant) --")
+    CANON = "38.78,34.55"   # a distinctive vertex of the canonical faceted star (the asset)
+    ASSET = "/files/static/brand/"   # the single swap slot every page references
     # the banned "rinky dink" signatures: the outline-star strokes + the hollow star path
     HOLLOW = ('fill="none" stroke="#B11E2E"', 'fill="none" stroke="#C8102E"', 'M12 2L15.09')
     # self-test: the matcher catches a hollow star and passes the canonical one
@@ -470,15 +471,54 @@ def main():
        any(h in _hollow for h in HOLLOW) and CANON not in _hollow)
     ok("selftest_canonical_star_passes",
        CANON in _canon and not any(h in _canon for h in HOLLOW))
-    # every logo-bearing live surface: canonical present, NO hollow variant anywhere
+    # the swappable asset file IS the canonical mark (filled, no hollow, transparent bg)
+    mark = (root_dir / "static" / "brand" / "mark.svg").read_text(encoding="utf-8", errors="replace")
+    ok("logo_asset_is_canonical", CANON in mark and not any(h in mark for h in HOLLOW),
+       "static/brand/mark.svg must be the canonical filled star")
+    ok("logo_asset_transparent_bg", "<rect" not in mark, "logo asset must have a transparent background")
+    # every logo-bearing live surface: references the ONE asset slot (swap = swap everywhere),
+    # carries NO inline star + NO hollow, and reserves swap-safe space (object-fit:contain)
     LOGO_SURFACES = ["company-dashboard.html", "dashboard-static.html", "projects.html",
                      "client_portal.html", "login.html", "set_password.html", "admin_users.html",
                      "admin_projects.html", "admin_labor_rates.html", "dropplan.html"]
+
+    # A swapped logo must NEVER shift surrounding layout. object-fit:contain alone is NOT
+    # enough — the img also needs a RESERVED width+height box, else a bare <img> renders at
+    # the SVG file's intrinsic size and a differently-proportioned replacement resizes the
+    # slot (the #265-ADD swap-test caught exactly this on the sidebar + portal: a CSS rule
+    # that sized the old inline <svg> stopped applying once it became an <img>).
+    def _classes_with_reserved_box(text):
+        """Logo classes the page gives BOTH a width and a height (a fixed box)."""
+        have = set()
+        for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', text):
+            if "width" in body and "height" in body:
+                for cls in ("brand-mark", "mark"):
+                    if re.search(r'\.' + cls + r'\b', sel):
+                        have.add(cls)
+        return have
+    def _logo_img_boxed(tag, reserved):
+        """A logo <img> reserves a box via inline width+height attrs OR a sized CSS class."""
+        if re.search(r'\bwidth=', tag) and re.search(r'\bheight=', tag):
+            return True
+        m = re.search(r'class="([^"]*)"', tag)
+        return any(c in reserved for c in (m.group(1).split() if m else []))
+
     for fn in LOGO_SURFACES:
         t = (root_dir / fn).read_text(encoding="utf-8", errors="replace")
+        ok(f"logo_asset_ref_{fn}", ASSET in t, "page must reference the swappable brand asset slot")
         ok(f"logo_no_hollow_{fn}", not any(h in t for h in HOLLOW), "hollow/outline star present")
-        ok(f"logo_canonical_{fn}", CANON in t, "canonical filled-star lockup missing")
-    # report/print renderers emit the canonical star (brand.star_svg) + no hollow + no glyph logo
+        ok(f"logo_no_inline_star_{fn}", CANON not in t, "logo must be the asset, not inline-duplicated")
+        ok(f"logo_swapsafe_{fn}", "object-fit:contain" in t.replace(" ", ""),
+           "logo container must be aspect-safe (object-fit:contain)")
+        # reserved-box: every brand-asset <img> must have a fixed width+height (no swap-time shift)
+        reserved = _classes_with_reserved_box(t)
+        logo_imgs = [g for g in re.findall(r'<img\b[^>]*>', t) if "/files/static/brand/" in g]
+        ok(f"logo_reserved_box_{fn}", bool(logo_imgs) and all(_logo_img_boxed(g, reserved) for g in logo_imgs),
+           "every logo img must reserve a fixed width+height box (a swapped logo must not resize the slot)")
+    # brand colourway tokens are :root (the colourway source) — not scattered-only
+    wcss = requests.get(f"{BASE}/files/static/css/widgets.css", timeout=15).text
+    ok("brand_red_is_root_token", "--brand-red:" in wcss, "--brand-red must be a :root token")
+    # report/print renderers emit the canonical star via brand.star_svg (reads the asset) + no hollow
     RENDERERS = ["render_dcr_html.py", "render_drop_plan_html.py", "render_weekly_summary_html.py",
                  "render_closure_html.py", "render_meeting_minutes_html.py",
                  "render_lookahead_html.py", "render_toolbox_talk_html.py"]

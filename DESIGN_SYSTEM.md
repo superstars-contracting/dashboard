@@ -75,25 +75,45 @@ run in the gate):**
 When you add a surface that submits a value, persists a date, or shows a value
 that's set elsewhere, extend the behavioral guard with the matching class.
 
-## 9. Canonical brand logo — ONE filled-star lockup (#265)
+## 9. Branding & theming — ONE swappable logo + colourway tokens (#265)
 
-There is exactly ONE company logo lockup, used on every surface (app headers + every
-generated report): a **SOLID, FILLED, faceted brand-red star** (the Office Console
-treatment) + the **"Superstars Contracting"** wordmark + an optional section subtitle.
+The brand is **swappable** (rebrand / merge / white-label ready). There is exactly ONE logo
+lockup everywhere (app headers + every generated report): a **SOLID, FILLED, faceted
+brand-red star** + the **"Superstars Contracting"** wordmark + an optional section subtitle.
 
-- **Single source of truth:** `brand.py` — `brand.star_svg(px, cls)` returns the canonical
-  star; `brand.lockup_html(subtitle, dark)` returns the full lockup. The report renderers
-  (`render_*.py`) import it. HTML pages inline the SAME star markup (the guard enforces it).
-- **The star is identical everywhere** (red faceted, cream inner star, `viewBox 0 0 100 100`,
-  the `topRL`/`topRD` gradients). It NEVER changes between light and dark sections.
-- **Only the WORDMARK TEXT colour adapts to the section background:** ink on light/white
-  sections, white on dark/black sections (e.g. the Drop Report / DCR headers).
+### Where branding lives (the single source)
+- **Logo = a swappable ASSET FILE.** `static/brand/mark.svg` (+ `logo-light.svg` /
+  `logo-dark.svg` slots). **To rebrand the whole app + all reports: replace the file — no
+  code change.** App pages reference it via `<img src="/files/static/brand/mark.svg">`;
+  standalone reports inline it (brand.py reads the file → self-contained PDF). `static/brand/
+  README.txt` documents the slot + the file requirements.
+- **`brand.py` = the branding config.** `COMPANY_NAME`, the `BRAND` colour dict, the asset
+  slot paths, and helpers: `mark_img()` (pages), `star_svg()` (reports, reads the file),
+  `lockup_html()`, `tokens_css()`. A future admin "Branding" settings surface (upload logo +
+  set colours) plugs into this with no rework.
+- **Colours = `:root` tokens.** `--brand-red` / `--brand-red-deep` / `--accent` / … live in
+  `static/css/widgets.css :root` (source of record: `brand.py BRAND`). A colourway change
+  updates these tokens and propagates site-wide + to report letterheads. **Never hardcode a
+  brand hex that should be a token.**
+
+### Logo-file requirements (so a swapped logo always renders legibly + never distorts)
+- **SVG preferred** (clean scaling). **PNG with a TRANSPARENT background** also acceptable.
+- **Transparent background** — no opaque rectangle.
+- **Any aspect ratio is fine.** Every header renders the logo in a FIXED-SPACE, aspect-safe
+  container — SVG `preserveAspectRatio` + `object-fit:contain` + a reserved height/box — so a
+  swapped logo scales to fit **without stretching/squishing** and **without shifting**
+  surrounding layout. Each header reserves consistent logo space.
+- Light vs dark: the wordmark TEXT colour adapts (ink on light, white on dark); supply
+  `logo-light.svg` / `logo-dark.svg` only if the mark itself must differ by background.
+
+### Banned + guarded
 - **BANNED: the hollow / outline star** (`fill="none" stroke="#B11E2E"` / `#C8102E`, or the
-  `M12 2L15.09…` path) — the "rinky dink" variant. Also banned: a bare unicode `★` glyph as
-  the logo. Use the canonical SVG.
-- **Guarded:** `smoke_design_conventions.py` FAILS the build if any logo-bearing surface
-  carries a hollow/outline star or is missing the canonical lockup, and if a report renderer
-  stops emitting `brand.star_svg`. A self-test proves the matcher catches a hollow star.
+  `M12 2L15.09…` path) — the "rinky dink" variant — and a bare unicode `★` glyph as the logo.
+- **Guarded** (`smoke_design_conventions.py`, in the gate): every logo surface references the
+  asset slot, carries NO inline-duplicated star and NO hollow variant, and reserves swap-safe
+  space (`object-fit:contain`); the asset file is the canonical mark with a transparent
+  background; `--brand-red` is a `:root` token; each report renderer emits `brand.star_svg`.
+  A self-test proves the matcher catches a hollow star.
 
 ## Recurring-bug log (fixed at root)
 - **Invisible primary button** (module-scoped tokens; modal renders outside) — #230 (Docs), recurred #235 (Field Photos) → root fix #236 (tokens globalized + guard).
