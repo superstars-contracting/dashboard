@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_from_directory, send_file, Response
+from flask import Flask, jsonify, request, send_from_directory, send_file, Response, redirect
 from flask_cors import CORS
 import sqlite3
 from pathlib import Path
@@ -19,6 +19,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 DB_PATH = SCRIPT_DIR / "superstars.db"
 COMPANY_DASHBOARD_PATH = SCRIPT_DIR / "company-dashboard.html"
 DASHBOARD_PATH = SCRIPT_DIR / "dashboard-static.html"
+PM_PROJECTS_PATH = SCRIPT_DIR / "projects.html"  # #263 — pm projects-only landing
 
 # #248 — PUBLIC static serving is the vendored-asset subtree ONLY. The
 # pre-#248 mount was the ENTIRE project dir at /files, which made the DB,
@@ -42,7 +43,8 @@ app.register_blueprint(preview_bp)
 # is untouched. /preview/* lost its exemption in #248: it serves rendered
 # project documents (internal DCRs etc.), so it requires a session like any
 # other operator surface. Per-route role gating uses @requires_role from auth.py.
-from auth import apply_auth_gate, requires_role, requires_section, current_user  # noqa: F401
+from auth import (apply_auth_gate, requires_role, requires_section,  # noqa: F401
+                  requires_company, current_user)
 import access  # #262 — central section→roles map (RBAC single source of truth)
 apply_auth_gate(app)
 
@@ -53,6 +55,13 @@ auth_admin.register(app)
 
 import auth_google  # noqa: E402  # #261 — Google OIDC SSO (feature-flagged; 404 when unconfigured)
 auth_google.register(app)
+
+# #263 — PM project-scoping: registers the project-ASSIGNMENT before_request hook
+# (rejects any /projects/<code> the user can't access) + the admin/c_suite-only
+# assignment + project-close endpoints. MUST follow apply_auth_gate so g.auth_user
+# is set before the scoping hook runs.
+import pm_scoping  # noqa: E402
+pm_scoping.register(app)
 
 # Security: cap upload size. Raised to 256 MB (#235) so a field-photo BATCH POST
 # (many images, several 8-12 MB) isn't rejected at the WSGI layer; the Field
@@ -151,9 +160,41 @@ def _file_url_for(rel_path):
 
 @app.route('/')
 def index():
-    """Company Overview Console — top-level entry point (#210 redesign)."""
+    """Company Overview Console — admin/c_suite ONLY (#263). A `pm` is scoped to assigned
+    projects and lands on /projects instead; hitting the company console directly returns
+    403 (server-enforced — hiding nav is not access control). The before_request login gate
+    has already ensured the request is authenticated."""
+    role = (current_user() or {}).get("role")
+    if not access.can_access_company(role):
+        return Response(_COMPANY_FORBIDDEN_HTML, status=403, mimetype="text/html")
     page = COMPANY_DASHBOARD_PATH if COMPANY_DASHBOARD_PATH.exists() else DASHBOARD_PATH
     return _serve_html_no_store(page)
+
+
+# #263 — a pm/super (non-company role) that reaches the company console gets this 403,
+# with a one-click path back to where they belong (their projects), never a dead end.
+_COMPANY_FORBIDDEN_HTML = (
+    "<!doctype html><meta charset=utf-8><title>Not authorized</title>"
+    "<div style=\"font-family:Inter,system-ui,sans-serif;max-width:520px;margin:18vh auto;"
+    "text-align:center;color:#222633\">"
+    "<div style=\"font-size:15px;font-weight:700;color:#B11E2E;letter-spacing:.5px\">NOT AUTHORIZED</div>"
+    "<p style=\"color:#76777E;font-size:14px;line-height:1.6;margin:14px 0 22px\">"
+    "The company console is limited to admin and C-suite. Your projects are over here.</p>"
+    "<a href=\"/projects\" style=\"display:inline-block;background:#B11E2E;color:#fff;"
+    "text-decoration:none;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600\">"
+    "&rarr; Go to Projects</a></div>"
+)
+
+
+@app.route('/projects')
+def pm_projects_landing():
+    """#263 — projects-only landing. A `pm` lands here (assigned ACTIVE projects only,
+    closed excluded; scoping enforced in /api/projects). admin/c_suite normally land on
+    the company console but may view this too. The list itself is server-scoped, so a pm
+    never sees a project they aren't assigned."""
+    if PM_PROJECTS_PATH.exists():
+        return _serve_html_no_store(PM_PROJECTS_PATH)
+    return ("projects page missing", 500)
 
 
 def _serve_html_no_store(path):
@@ -171,16 +212,20 @@ def _serve_html_no_store(path):
 
 
 def _serve_dashboard_no_store():
-    """Project Health surface (per-project dashboard), served no-store. #262 — the
-    sidebar is RENDERED PER ROLE here: gated SECTION blocks (Financial) the current
-    user's role can't access (per the central access.SECTION_ACCESS map) are STRIPPED
-    from the served HTML server-side, so a disallowed role never receives that markup
-    at all. Hiding a menu item is not access control — the Financial endpoints 403 too;
-    this just makes the menu match. admin/c_suite take the unchanged send_file path."""
+    """Project Health surface (per-project dashboard), served no-store. The sidebar is
+    RENDERED PER ROLE here:
+      * #262 — gated SECTION blocks (Financial) the role can't access are STRIPPED, so a
+        disallowed role never receives that markup (the Financial endpoints 403 too).
+      * #263 — the "← Back to …" link + in-view "Company Console →" deep links are chosen
+        by role: company roles get the company back-link, a pm gets "← Back to Projects"
+        and every company deep link is stripped (a pm never sees a path to the console,
+        which would 403 anyway).
+    Hiding a menu item is not access control — the project-ASSIGNMENT before_request hook
+    rejects an unassigned /projects/<code> regardless; this just makes the menu match."""
     role = (current_user() or {}).get("role")
-    if access.can_access_all_gated(role):
-        return _serve_html_no_store(DASHBOARD_PATH)
-    html = access.render_sections(DASHBOARD_PATH.read_text(encoding="utf-8"), role)
+    html = DASHBOARD_PATH.read_text(encoding="utf-8")
+    html = access.render_sections(html, role)   # #262 — strip gated SECTION blocks
+    html = access.render_role_nav(html, role)   # #263 — role-correct sidebar nav
     resp = Response(html, mimetype="text/html")
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
@@ -190,13 +235,19 @@ def _serve_dashboard_no_store():
 
 @app.route('/projects/<project_code>')
 def project_dashboard(project_code):
-    """Project-specific dashboard. Project context passed via URL → JS reads it from location.pathname."""
+    """Project-specific dashboard. Project context passed via URL → JS reads it from
+    location.pathname. Access is enforced by the #263 before_request scoping hook: a pm
+    opening an unassigned or closed project gets 403 here, server-side."""
     return _serve_dashboard_no_store()
 
 
 @app.route('/dashboard')
 def legacy_dashboard():
-    """Legacy redirect — old URLs land on the project dashboard for the default project."""
+    """Legacy entry. Company roles land on the default project dashboard (unchanged); a
+    pm has no 'default project', so route them to their projects list (#263)."""
+    role = (current_user() or {}).get("role")
+    if not access.can_access_company(role):
+        return redirect('/projects')
     return _serve_dashboard_no_store()
 
 
@@ -3159,6 +3210,10 @@ def create_certification():
 def get_projects():
     conn = db()
     rows = conn.execute("SELECT * FROM projects").fetchall()
+    # #263 — scope by role: a pm sees only assigned ACTIVE projects (closed excluded);
+    # admin/c_suite see all. Server-side, so a pm can't enumerate other projects.
+    user = current_user() or {}
+    rows = pm_scoping.filter_visible_projects(rows, user.get("role"), user.get("id"), conn)
     conn.close()
     return response_wrapper(rows_to_dicts(rows), len(rows))
 
@@ -3812,12 +3867,15 @@ def get_photos():
 
 @app.route('/api/projects', methods=['GET'])
 def api_projects_list():
-    """All projects + counts for the Company Console grid."""
+    """All projects + counts for the Company Console grid. #263 — role-scoped: a pm sees
+    only assigned ACTIVE projects (closed excluded), admin/c_suite see all."""
     try:
         conn = db()
         rows = conn.execute(
             "SELECT * FROM projects ORDER BY status, name"
         ).fetchall()
+        user = current_user() or {}
+        rows = pm_scoping.filter_visible_projects(rows, user.get("role"), user.get("id"), conn)
         out = []
         for r in rows:
             project_code = r["project_code"]
@@ -5505,6 +5563,7 @@ def api_signage_templates():
 
 
 @app.route('/api/spec-products', methods=['GET'])
+@requires_company  # #263 — company Specs Library tab (admin/c_suite only; pm 403)
 def api_spec_products():
     """Browse / search the manufacturer-agnostic specifications catalog.
 
@@ -5928,6 +5987,7 @@ def api_project_assign(project_code):
 
 
 @app.route('/api/company/summary', methods=['GET'])
+@requires_company  # #263 — company overview metrics (admin/c_suite only; pm 403)
 def api_company_summary():
     """Roll-up metrics for the Company Overview top-of-page banner."""
     try:
@@ -6992,6 +7052,7 @@ def api_employee_face_photo_get(employee_id):
 
 
 @app.route('/api/cert-types', methods=['GET'])
+@requires_company  # #263 — company Cert Library tab (admin/c_suite only; pm 403)
 def api_cert_types():
     """List all cert types for autocomplete + the Cert Library UI.
 
@@ -7018,6 +7079,7 @@ def api_cert_types():
 
 
 @app.route('/api/workers/intake-summary', methods=['GET'])
+@requires_company  # #263 — the company-wide Workforce roster (admin/c_suite only; pm 403)
 def api_workers_intake_summary():
     """List of all workers with intake status + cert health + doc count
     + credential eligibility + current_credential state. The two new

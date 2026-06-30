@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/files/static/fonts/typography.css">
+<link rel="stylesheet" href="/files/static/css/widgets.css?v=263">
+<title>Project Assignments · Superstars Contracting</title>
+<!-- #263 — admin/c_suite project-assignment + project-close screen. Two axes wired here:
+     who manages which projects (pm_project_assignment) and which projects are active vs
+     closed (projects.status). Every endpoint it calls is admin/c_suite-only, server-side. -->
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--canvas);color:var(--ink);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;}
+  .top{display:flex;align-items:center;gap:12px;padding:16px 26px;background:#fff;border-bottom:1px solid var(--line);}
+  .top .mark{width:30px;height:30px;display:block;}
+  .top .brand-home{display:inline-flex;text-decoration:none;}
+  .top h1{font-size:16px;font-weight:800;letter-spacing:.3px;}
+  .top .nav-back{font-size:12px;font-weight:700;color:var(--accent-ink);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:5px 11px;}
+  .top .nav-back:hover{border-color:var(--accent-edge);background:var(--accent-soft);}
+  .top .who{margin-left:auto;font-size:12px;color:var(--muted);text-align:right;}
+  .top .who b{color:var(--ink);font-weight:700;}
+  .top .who a{color:var(--accent);text-decoration:none;font-weight:700;margin-left:10px;cursor:pointer;}
+  .wrap{max-width:1040px;margin:0 auto;padding:26px;}
+  .head-row{margin:6px 0 14px;}
+  .head-row h2{font-size:20px;font-weight:800;}
+  .head-row .sub{font-size:12.5px;color:var(--muted);margin-top:3px;}
+  section{margin-bottom:34px;}
+  table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+  th,td{text-align:left;padding:12px 14px;font-size:13px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700;background:#fcfcfd;}
+  tr:last-child td{border-bottom:none;}
+  td .nm{font-weight:700;}
+  td .code{color:var(--muted);font-size:12px;font-weight:600;}
+  .pill{display:inline-block;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.4px;}
+  .pill.active{color:#0c7a5f;background:var(--status-complete-soft,#e7f6f0);}
+  .pill.closed{color:#5b6270;background:#eef0f4;}
+  .acts{text-align:right;}
+  .btn-sm{font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;}
+  .btn-sm:hover{border-color:var(--accent-edge);}
+  .btn-sm.danger:hover{border-color:var(--status-behind);color:#a23b30;background:var(--status-behind-soft);}
+  .btn-primary{font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;}
+  .btn-primary:hover{background:var(--accent-ink);}
+  .btn-primary:disabled{opacity:.55;cursor:not-allowed;}
+  .err-bar{background:#fceeec;color:#a23b30;border:1px solid #f3c9c4;border-radius:9px;padding:9px 13px;font-size:13px;margin-bottom:14px;display:none;}
+  .err-bar.show{display:block;}
+  .ok-bar{background:#e7f6f0;color:#0c7a5f;border:1px solid #b9e6d5;border-radius:9px;padding:9px 13px;font-size:13px;margin-bottom:14px;display:none;}
+  .ok-bar.show{display:block;}
+  .empty{padding:26px;text-align:center;color:var(--muted);background:#fff;border:1px solid var(--line);border-radius:14px;}
+  .pm-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;}
+  .pm-card .pm-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+  .pm-card .pm-nm{font-weight:800;font-size:14px;}
+  .pm-card .pm-em{font-size:12px;color:var(--muted);}
+  .pm-card .pm-save{margin-left:auto;}
+  .proj-checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px 18px;}
+  .proj-checks label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);cursor:pointer;}
+  .proj-checks label.is-closed{color:var(--muted);}
+  .proj-checks .clbl{font-size:10.5px;color:var(--muted);margin-left:4px;}
+  .ph-build{text-align:center;color:#9aa3ae;font-size:11px;margin-top:30px;}
+</style>
+</head>
+<body>
+<div class="top">
+  <a class="brand-home" href="/" title="Company home"><svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><polygon points="50,30 55.61,44.27 70.39,44.27 58.39,53.46 63,67.73 50,59.05 37,67.73 41.61,53.46 29.61,44.27 44.39,44.27" fill="#B11E2E"/></svg></a>
+  <h1>Superstars Contracting · Project Assignments</h1>
+  <a class="nav-back" href="/">Company home</a>
+  <a class="nav-back" href="/admin/users">Users</a>
+  <div class="who" id="who">—</div>
+</div>
+
+<div class="wrap">
+  <div class="err-bar" id="err"></div>
+  <div class="ok-bar" id="ok"></div>
+
+  <section>
+    <div class="head-row">
+      <h2>Projects</h2>
+      <div class="sub">Close a finished project to drop it off assigned PMs' lists (they can no longer open it). Reopen anytime — closed projects stay visible to admin / C-suite for records.</div>
+    </div>
+    <table id="proj-table">
+      <thead><tr><th>Project</th><th>Code</th><th>Status</th><th class="acts">Action</th></tr></thead>
+      <tbody id="proj-tbody"><tr><td colspan="4" class="muted" style="text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
+    </table>
+  </section>
+
+  <section>
+    <div class="head-row">
+      <h2>PM Project Assignments</h2>
+      <div class="sub">Assign each project manager the projects they manage. A PM only sees and can open the projects checked here — and only while they're active.</div>
+    </div>
+    <div id="pm-list"><div class="empty">Loading…</div></div>
+  </section>
+
+  <div class="ph-build" id="ap-build-stamp">build #263 · 2026-06-29 · PM project-scoping — assignment + project-close lifecycle (admin/c_suite)</div>
+</div>
+
+<script>
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  var ROLE_LABEL = { admin:'Admin', c_suite:'C-Suite', pm:'PM', super:'Super' };
+  function showErr(m){ var e=$('err'); e.textContent=m; e.classList.add('show'); $('ok').classList.remove('show'); }
+  function showOk(m){ var e=$('ok'); e.textContent=m; e.classList.add('show'); setTimeout(function(){e.classList.remove('show');},2600); }
+  function clearBars(){ $('err').classList.remove('show'); $('ok').classList.remove('show'); }
+
+  // Header identity (mirrors auth_menu) — also bounce non-admin/c_suite (defense in depth;
+  // the route is already @requires_company server-side).
+  fetch('/api/auth/me').then(function(r){ return r.ok ? r.json() : null; }).then(function(j){
+    if(!j || !j.user){ window.location.href='/login'; return; }
+    var u=j.user;
+    $('who').innerHTML='<b>'+esc(u.display_name||u.full_name||u.email)+'</b> · '+esc(ROLE_LABEL[u.role]||u.role)+' <a id="logout">Sign out</a>';
+    $('logout').onclick=function(){ fetch('/api/auth/logout',{method:'POST'}).then(function(){ window.location.href='/login'; }); };
+    if(u.role!=='admin' && u.role!=='c_suite'){ document.body.innerHTML='<div style="max-width:520px;margin:18vh auto;text-align:center;font-family:Inter,sans-serif;color:#76777E">This screen is limited to admin and C-suite.</div>'; }
+  });
+
+  var STATE = { projects: [], pms: [] };
+
+  async function load(){
+    clearBars();
+    try{
+      var resp = await fetch('/api/admin/pm-assignments').then(function(r){ return r.json(); });
+      if(resp.error){ showErr(resp.error); return; }
+      STATE = resp.data || { projects:[], pms:[] };
+      renderProjects();
+      renderPMs();
+    }catch(e){ showErr('Could not load: '+e.message); }
+  }
+
+  function statusPill(st){
+    var s=(st||'active').toLowerCase();
+    var cls = s==='closed' ? 'closed' : 'active';
+    return '<span class="pill '+cls+'">'+esc(s)+'</span>';
+  }
+
+  function renderProjects(){
+    var tb=$('proj-tbody');
+    if(!STATE.projects.length){ tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);">No projects yet.</td></tr>'; return; }
+    tb.innerHTML = STATE.projects.map(function(p){
+      var st=(p.status||'active').toLowerCase();
+      var isClosed = st==='closed';
+      var btn = isClosed
+        ? '<button class="btn-sm" onclick="setStatus(\''+esc(p.project_code)+'\',\'active\')">Reopen</button>'
+        : '<button class="btn-sm danger" onclick="setStatus(\''+esc(p.project_code)+'\',\'closed\')">Close</button>';
+      return '<tr><td class="nm">'+esc(p.name||p.project_code)+'</td>'
+        + '<td class="code">'+esc(p.project_code)+'</td>'
+        + '<td>'+statusPill(st)+'</td>'
+        + '<td class="acts">'+btn+'</td></tr>';
+    }).join('');
+  }
+
+  function renderPMs(){
+    var host=$('pm-list');
+    if(!STATE.pms.length){ host.innerHTML='<div class="empty">No active PM users yet. Create one in <a href="/admin/users" style="color:var(--accent);font-weight:700;text-decoration:none;">User Management</a>, then assign projects here.</div>'; return; }
+    host.innerHTML = STATE.pms.map(function(pm){
+      var assigned = pm.project_codes || [];
+      var checks = STATE.projects.map(function(p){
+        var st=(p.status||'active').toLowerCase();
+        var on = assigned.indexOf(p.project_code)>=0;
+        return '<label class="'+(st==='closed'?'is-closed':'')+'">'
+          + '<input type="checkbox" data-uid="'+pm.user_id+'" value="'+esc(p.project_code)+'" '+(on?'checked':'')+'>'
+          + esc(p.name||p.project_code)
+          + (st==='closed'?'<span class="clbl">(closed)</span>':'')
+          + '</label>';
+      }).join('');
+      return '<div class="pm-card">'
+        + '<div class="pm-head"><div><div class="pm-nm">'+esc(pm.display_name||pm.email)+'</div>'
+        + '<div class="pm-em">'+esc(pm.email)+'</div></div>'
+        + '<div class="pm-save"><button class="btn-primary" onclick="saveAssignments('+pm.user_id+', this)">Save assignments</button></div></div>'
+        + '<div class="proj-checks">'+(checks || '<span class="pm-em">No projects exist yet.</span>')+'</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  window.setStatus = async function(code, status){
+    clearBars();
+    try{
+      var resp = await fetch('/api/projects/'+encodeURIComponent(code)+'/status', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({status: status})
+      }).then(function(r){ return r.json(); });
+      if(resp.error){ showErr(resp.error); return; }
+      showOk('Project '+code+' is now '+status+'.');
+      await load();
+    }catch(e){ showErr('Network error: '+e.message); }
+  };
+
+  window.saveAssignments = async function(user_id, btn){
+    clearBars();
+    var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox][data-uid="'+user_id+'"]'));
+    var codes = boxes.filter(function(b){ return b.checked; }).map(function(b){ return b.value; });
+    if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+    try{
+      var resp = await fetch('/api/admin/pm-assignments', {
+        method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ user_id: user_id, project_codes: codes })
+      }).then(function(r){ return r.json(); });
+      if(resp.error){ showErr(resp.error); return; }
+      showOk('Saved — '+codes.length+' project'+(codes.length===1?'':'s')+' assigned.');
+      await load();
+    }catch(e){ showErr('Network error: '+e.message); }
+    finally{ if(btn){ btn.disabled=false; btn.textContent='Save assignments'; } }
+  };
+
+  load();
+</script>
+</body>
+</html>

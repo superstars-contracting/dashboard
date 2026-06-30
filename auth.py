@@ -600,3 +600,23 @@ def requires_section(section: str):
             return fn(*args, **kwargs)
         return wrapper
     return decorator
+
+
+def requires_company(fn):
+    """Per-route gate for company-level surfaces (#263) — the company overview console
+    and its company-wide tabs/endpoints (Workforce, Cert Health/Library, Specs, Settings,
+    …) are admin/c_suite ONLY. Reads `access.can_access_company` so the company-vs-project
+    role line lives in ONE place. A `pm` (scoped to assigned projects) gets 403, even on a
+    direct URL/API call — hiding the nav is not access control. The blanket before_request
+    login gate runs first; this adds the role check."""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        user = current_user()
+        if not user:
+            return jsonify({"error": "auth required"}), 401
+        if not access.can_access_company(user.get("role")):
+            logging.info(
+                f"auth: company denied role={user.get('role')} path={request.path}")
+            return jsonify({"error": "forbidden"}), 403
+        return fn(*args, **kwargs)
+    return wrapper

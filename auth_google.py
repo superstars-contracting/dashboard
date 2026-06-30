@@ -81,7 +81,9 @@ def sso_enabled() -> bool:
 # ============= ROLE HOME (mirrors login.html roleHome) =============
 
 def _role_home(role: str) -> str:
-    return {"admin": "/admin/users", "c_suite": "/", "pm": "/dashboard"}.get(role, "/")
+    # #263 — pm lands on the assigned-projects-only view; non-company roles never land on
+    # the company console (it 403s for them), so default also routes to /projects.
+    return {"admin": "/admin/users", "c_suite": "/", "pm": "/projects"}.get(role, "/projects")
 
 
 # ============= STATE COOKIE (CSRF) =============

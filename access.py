@@ -22,6 +22,20 @@ SECTION_ACCESS = {
     "financial": frozenset({"admin", "c_suite"}),
 }
 
+# #263 — COMPANY axis. The company overview console (`/`) and its company-level tabs
+# (Workforce, Cert Health/Library, Bid Tracker, Specs, Settings) + their data endpoints
+# are admin/c_suite ONLY. A `pm` is scoped to assigned PROJECTS instead (see pm_scoping)
+# and lands on a projects-only view; it never reaches the company console. This is the
+# ROLE axis for "company vs project" — independent of the project-ASSIGNMENT axis.
+COMPANY_ROLES = frozenset({"admin", "c_suite"})
+
+
+def can_access_company(role) -> bool:
+    """True iff `role` may reach the company overview console + company-level surfaces.
+    The single source of truth for both the `/` gate, the @requires_company endpoints,
+    and the role-aware back-link in the project sidebar."""
+    return role in COMPANY_ROLES
+
 
 def roles_for(section: str) -> frozenset:
     """The set of roles allowed in `section` (defaults to all dashboard roles)."""
@@ -59,3 +73,41 @@ def render_sections(html: str, role) -> str:
     """Return `html` with every SECTION block the role can't access removed."""
     return _SECTION_RE.sub(
         lambda m: m.group(0) if can_access(m.group(1), role) else "", html)
+
+
+# ===================== #263 — role-aware project-sidebar nav =====================
+# Named-block markers, same idea as SECTION but with an explicit keep/strip predicate
+# (SECTION only ever STRIPS what a role can't see; these pick BETWEEN two variants).
+#
+#   <!-- BACKLINK_COMPANY:start --> ... <!-- BACKLINK_COMPANY:end -->   (admin/c_suite)
+#   <!-- BACKLINK_PROJECTS:start --> ... <!-- BACKLINK_PROJECTS:end --> (pm/super)
+#   <!-- COMPANYLINK:start --> ... <!-- COMPANYLINK:end -->            (in-view deep links)
+#
+# The project dashboard's "← Back to …" link and its in-view "Company Console →" deep
+# links must NEVER hand a pm a path to the company console (which 403s for them). So the
+# served HTML is rendered per role: keep the company back-link for company roles, the
+# projects back-link otherwise, and strip every COMPANYLINK block for non-company roles.
+
+def _named_block_re(name: str):
+    return re.compile(
+        r"<!--\s*" + re.escape(name) + r":start\s*-->.*?<!--\s*" + re.escape(name) + r":end\s*-->",
+        re.DOTALL,
+    )
+
+
+def _strip_named_block(html: str, name: str, keep: bool) -> str:
+    """Remove EVERY `name` block if `keep` is False; leave the html untouched if True."""
+    if keep:
+        return html
+    return _named_block_re(name).sub("", html)
+
+
+def render_role_nav(html: str, role) -> str:
+    """Pick the role-correct project-sidebar nav: the company back-link for company roles
+    or the projects back-link otherwise, and drop in-view company deep links for non-company
+    roles. Idempotent and order-independent; a no-op if the markers are absent."""
+    company = can_access_company(role)
+    html = _strip_named_block(html, "BACKLINK_COMPANY", keep=company)
+    html = _strip_named_block(html, "BACKLINK_PROJECTS", keep=not company)
+    html = _strip_named_block(html, "COMPANYLINK", keep=company)
+    return html

@@ -354,8 +354,14 @@
        the strip, so the grid hides with the panel. -->
   <div class="panel active" data-panel="projects">
     <div class="section">
-      <h2 data-i18n="p-active-projects-title">Active Projects</h2>
-      <div class="h2-sub" data-i18n="p-active-projects-sub">Click any project to drill into its dashboard.</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;">
+        <div>
+          <h2 data-i18n="p-active-projects-title">Active Projects</h2>
+          <div class="h2-sub" data-i18n="p-active-projects-sub">Click any project to drill into its dashboard.</div>
+        </div>
+        <!-- #263 — admin/c_suite: assign PMs to projects + close/reopen projects. -->
+        <a href="/admin/projects" style="flex:none;font-size:12px;font-weight:700;color:var(--brand-red);text-decoration:none;border:1px solid var(--hairline);border-radius:8px;padding:7px 13px;white-space:nowrap;" onmouseover="this.style.borderColor='var(--brand-red)'" onmouseout="this.style.borderColor='var(--hairline)'">Assignments &amp; status →</a>
+      </div>
       <div class="project-grid" id="project-grid">
         <div class="placeholder" data-i18n="loading-projects">Loading projects…</div>
       </div>

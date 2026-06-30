@@ -836,9 +836,20 @@
         <div class="brand-sub">CONTRACTING · INC</div>
       </div>
     </div>
+    <!-- #263 — role-aware back-link. The server (access.render_role_nav) keeps exactly
+         ONE of the two blocks below per role: company roles keep the company link (to /),
+         a pm keeps the projects link (to /projects, their assigned list). A pm is never
+         served a path to the company console (which 403s for them anyway). -->
+    <!-- BACKLINK_COMPANY:start -->
     <a href="/" style="display:flex;align-items:center;gap:8px;padding:10px 18px;color:#76777E;font-size:12px;text-decoration:none;border-bottom:1px solid #E8E4DD;letter-spacing:0.5px;text-transform:uppercase;font-weight:600;transition:color 0.15s;" onmouseover="this.style.color='#B11E2E'" onmouseout="this.style.color='#76777E'">
       ← Back to Company
     </a>
+    <!-- BACKLINK_COMPANY:end -->
+    <!-- BACKLINK_PROJECTS:start -->
+    <a href="/projects" style="display:flex;align-items:center;gap:8px;padding:10px 18px;color:#76777E;font-size:12px;text-decoration:none;border-bottom:1px solid #E8E4DD;letter-spacing:0.5px;text-transform:uppercase;font-weight:600;transition:color 0.15s;" onmouseover="this.style.color='#B11E2E'" onmouseout="this.style.color='#76777E'">
+      ← Back to Projects
+    </a>
+    <!-- BACKLINK_PROJECTS:end -->
     <!-- #212 — collapsible groups (click header to toggle, persisted per browser)
          + inline-SVG icons (always render, no CDN). Active item = soft blue
          highlight + blue left bar (Option 1). Legacy "Drop Plans" nav entry
@@ -1100,7 +1111,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #262 · 2026-06-29 · RBAC — split sidebar into Financial + Compliance groups; Financial (Schedule of Values + Labor Rate Tracker) gated to admin/c_suite from ONE central section→roles map (access.py), enforced BOTH in the server-rendered sidebar (gated block stripped for pm/super, not just hidden) AND on the endpoints (403); pm keeps everything else incl. Compliance. Full gate green on SQLite AND Postgres</div>
+          <div class="ph-build" id="ph-build-stamp">build #263 · 2026-06-29 · PM project-scoping — admin/c_suite assign projects to PMs (pm_project_assignment); a pm lands on an assigned-projects-only view with "← Back to Projects" (never the company console, which 403s), opens only assigned ACTIVE projects (unassigned/closed → 403, server-enforced via a central before_request hook), and is blocked from Financial + the company Workforce + Labor Rates; admin/c_suite can close/reopen a project (closed drops off the PM view, stays for records). Full gate green on SQLite AND Postgres</div>
         </div>
       </section>
 
@@ -1183,10 +1194,10 @@
           .ec-hide{display:none!important}
         </style>
         <div class="ec-wrap">
-          <div class="ec-note"><strong style="color:#14161C;">📋 Office-managed:</strong> New workers, cert intake, and renewals happen in the <a href="/" style="color:#B11E2E;font-weight:600;text-decoration:none;">Company Console →</a>. This view is read-only crew compliance for <em>this</em> project.</div>
+          <div class="ec-note"><strong style="color:#14161C;">📋 Office-managed:</strong> New workers, cert intake, and renewals happen<!-- COMPANYLINK:start --> in the <a href="/" style="color:#B11E2E;font-weight:600;text-decoration:none;">Company Console →</a><!-- COMPANYLINK:end -->. This view is read-only crew compliance for <em>this</em> project.</div>
           <div class="ec-head">
             <div><h2>Employees &amp; Certifications</h2><div class="ec-sub" id="ec-sub">Crew credential readiness · live cert-health tracking</div></div>
-            <a class="ec-scan" href="/" title="Add or scan certifications in the Company Console (camera → AI read → review → save)"><svg class="ec-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 012-2h3M16 3h3a2 2 0 012 2v3M21 16v3a2 2 0 01-2 2h-3M8 21H5a2 2 0 01-2-2v-3"/><rect x="7" y="9" width="10" height="6" rx="1"/></svg>Scan / add cert</a>
+            <!-- COMPANYLINK:start --><a class="ec-scan" href="/" title="Add or scan certifications in the Company Console (camera → AI read → review → save)"><svg class="ec-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 012-2h3M16 3h3a2 2 0 012 2v3M21 16v3a2 2 0 01-2 2h-3M8 21H5a2 2 0 01-2-2v-3"/><rect x="7" y="9" width="10" height="6" rx="1"/></svg>Scan / add cert</a><!-- COMPANYLINK:end -->
           </div>
           <div class="ec-hero" id="ec-hero"><div class="ec-empty" style="margin:0">Loading crew readiness…</div></div>
           <div class="ec-tools">
@@ -1352,7 +1363,7 @@
           <div style="margin-bottom:18px;">
             <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;">
               <h3 style="font-size:13px;font-weight:700;color:#B11E2E;text-transform:uppercase;letter-spacing:0.08em;margin:0;">Specifications</h3>
-              <a href="/#specs" onclick="window.location='/';return false;" style="font-size:11px;color:#76777E;text-decoration:none;">Manage in Specs Library →</a>
+              <!-- COMPANYLINK:start --><a href="/#specs" onclick="window.location='/';return false;" style="font-size:11px;color:#76777E;text-decoration:none;">Manage in Specs Library →</a><!-- COMPANYLINK:end -->
             </div>
             <table style="width:100%;border-collapse:collapse;font-size:12px;background:white;border:1px solid #E8E4DD;border-radius:4px;">
               <thead>

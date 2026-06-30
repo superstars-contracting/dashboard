@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Superstars Contracting · My Projects</title>
+<link rel="stylesheet" href="/files/static/fonts/typography.css">
+<link rel="stylesheet" href="/files/static/css/widgets.css?v=245">
+<!-- #263 — PM projects-only landing. A pm lands here (assigned ACTIVE projects only;
+     scoping + closed-exclusion enforced server-side in /api/projects). Brand + card
+     language mirrors the company console Projects tab, minus every company-level tab. -->
+<script src="/files/static/js/auth_menu.js" defer></script>
+<style>
+  :root {
+    --brand-red: #B11E2E;
+    --brand-red-deep: #8B1623;
+    --ink: #14161C;
+    --hairline: #E8E4DD;
+    --mute: #76777E;
+    --ok: #2F7C57;
+    --warn: #B68838;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #fff; color: var(--ink); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  body { min-height: 100vh; }
+
+  .topbar { background: white; border-bottom: 1px solid var(--hairline); padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand-mark { width: 42px; height: 42px; }
+  .brand-text { line-height: 1.1; }
+  .brand-name { font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 0.5px; color: var(--ink); text-transform: uppercase; }
+  .brand-sub { font-size: 10px; color: var(--mute); letter-spacing: 1px; text-transform: uppercase; font-weight: 600; margin-top: 2px; }
+  .topbar-right { display: flex; align-items: center; gap: 16px; }
+  .console-pill { background: var(--ink); color: white; font-size: 10px; padding: 6px 12px; border-radius: 99px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 700; }
+
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 32px; }
+  h1 { font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 24px; font-weight: 700; letter-spacing: 0.3px; }
+  .sub { font-size: 13px; color: var(--mute); margin-top: 6px; margin-bottom: 24px; }
+
+  .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+  .project-card { background: white; border: 1px solid var(--hairline); border-radius: 10px; padding: 18px 20px 16px; cursor: pointer; transition: all 0.15s; position: relative; text-decoration: none; color: var(--ink); display: block; }
+  .project-card:hover { border-color: var(--brand-red); box-shadow: 0 4px 14px rgba(177,30,46,0.08); transform: translateY(-1px); }
+  .project-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .project-card-name { font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 17px; font-weight: 700; line-height: 1.2; }
+  .project-card-code { font-size: 11px; color: var(--mute); margin-top: 3px; font-weight: 600; }
+  .project-card-addr { font-size: 12px; color: var(--mute); margin-top: 6px; line-height: 1.4; min-height: 17px; }
+  .project-card-stats { display: flex; gap: 18px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hairline); font-size: 11px; color: var(--mute); }
+  .project-card-stats strong { color: var(--ink); font-weight: 700; }
+  .status-pill { font-size: 9px; padding: 3px 8px; border-radius: 99px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+  .status-active { background: var(--ok); color: white; }
+  .status-closed { background: var(--mute); color: white; }
+  .status-completed { background: var(--mute); color: white; }
+  .status-bidding { background: var(--warn); color: white; }
+
+  .placeholder { border: 1px dashed var(--hairline); border-radius: 10px; padding: 48px 24px; text-align: center; color: var(--mute); font-size: 14px; line-height: 1.6; }
+  .placeholder strong { color: var(--ink); display: block; font-size: 15px; margin-bottom: 6px; }
+  .ph-build { text-align: center; color: #9aa3ae; font-size: 11px; margin-top: 40px; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2L15.09 10.26H24L17.55 15.7L20.64 24L12 18.56L3.36 24L6.45 15.7L0 10.26H8.91L12 2Z" fill="none" stroke="#B11E2E" stroke-width="1.5"/>
+      </svg>
+      <div class="brand-text">
+        <div class="brand-name">Superstars</div>
+        <div class="brand-sub">Contracting · Inc</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="console-pill">Projects</span>
+      <div id="user-menu"></div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <h1>My Projects</h1>
+    <div class="sub">The projects you're assigned to. Click any project to open its dashboard.</div>
+    <div class="project-grid" id="project-grid">
+      <div class="placeholder">Loading projects…</div>
+    </div>
+    <div class="ph-build" id="proj-build-stamp">build #263 · 2026-06-29 · PM project-scoping — assigned-projects-only landing</div>
+  </div>
+
+<script>
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  async function loadProjects() {
+    var grid = document.getElementById('project-grid');
+    try {
+      var resp = await fetch('/api/projects').then(function (r) { return r.json(); });
+      var projects = (resp && resp.data) || [];
+      if (!projects.length) {
+        grid.innerHTML = '<div class="placeholder"><strong>No projects assigned yet</strong>'
+          + 'When an admin assigns you to a project, it will appear here.</div>';
+        return;
+      }
+      grid.innerHTML = projects.map(function (p) {
+        var status = (p.status || 'active').toLowerCase();
+        var cls = status === 'closed' ? 'status-closed'
+                : status === 'completed' ? 'status-completed'
+                : status === 'bidding' ? 'status-bidding' : 'status-active';
+        var addr = (p.address ? esc(p.address) : '') + (p.city_zip ? ', ' + esc(p.city_zip) : '');
+        return '<a class="project-card" href="/projects/' + encodeURIComponent(p.project_code) + '">'
+          + '<div class="project-card-header"><div>'
+          + '<div class="project-card-name">' + esc(p.name || p.project_code) + '</div>'
+          + '<div class="project-card-code">' + esc(p.project_code) + '</div>'
+          + '</div><span class="status-pill ' + cls + '">' + esc(status) + '</span></div>'
+          + '<div class="project-card-addr">' + addr + '</div>'
+          + '<div class="project-card-stats">'
+          + '<span>' + (p.start_date ? 'Started ' + esc(p.start_date) : '&nbsp;') + '</span>'
+          + '</div></a>';
+      }).join('');
+    } catch (e) {
+      grid.innerHTML = '<div class="placeholder">Could not load projects. Please refresh.</div>';
+    }
+  }
+  loadProjects();
+</script>
+</body>
+</html>

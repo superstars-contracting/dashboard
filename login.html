@@ -231,14 +231,15 @@
     return raw;
   }
 
-  // #257 — role home: admin -> admin console, c_suite -> company console,
-  // pm -> project dashboard. super/external have no onboarded home this phase.
+  // #257/#263 — role home: admin -> admin console, c_suite -> company console,
+  // pm -> assigned-projects-only landing. Non-company roles (pm/super/…) never land
+  // on the company console (it 403s for them); they go to /projects.
   function roleHome(role) {
     switch (role) {
       case 'admin': return '/admin/users';
       case 'c_suite': return '/';
-      case 'pm': return '/dashboard';
-      default: return '/';
+      case 'pm': return '/projects';
+      default: return '/projects';
     }
   }
 
