@@ -104,6 +104,7 @@
   .grid-stack-item.ui-draggable-dragging { opacity:.9; }
   .grid-stack-item.ui-draggable-dragging .ph-grip { cursor:grabbing; }
   .grid-stack-item > .ui-resizable-handle { z-index:6; }
+  .brand-mark,.mark{object-fit:contain;}  /* #265 swap-safe logo */
 </style>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Superstars Contracting - Project Console</title>
@@ -362,7 +363,7 @@
       border-bottom: 1px solid #E8E4DD;
       margin-bottom: 8px;
     }
-    .sidebar-header svg { width: 24px; height: 24px; }
+    .sidebar-header svg, .sidebar-header img.brand-mark { width: 24px; height: 24px; }  /* #265 — reserved box so a swapped logo can't shift layout */
     .brand-name {
       font-family: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
       font-weight: 700;
@@ -828,7 +829,7 @@
   <aside class="sidebar">
     <div class="sidebar-header">
       <!-- #265 — canonical filled-star lockup (single source: brand.py) -->
-      <svg class="brand-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="topRL" x1="0%" y1="0%" x2="70%" y2="100%"><stop offset="0%" stop-color="#E0394E"/><stop offset="100%" stop-color="#A01829"/></linearGradient><linearGradient id="topRD" x1="100%" y1="0%" x2="30%" y2="100%"><stop offset="0%" stop-color="#831321"/><stop offset="100%" stop-color="#4A0A12"/></linearGradient></defs><polygon fill="url(#topRL)" points="50,50 38.78,34.55 50,0"/><polygon fill="url(#topRD)" points="50,50 50,0 61.22,34.55"/><polygon fill="url(#topRL)" points="50,50 61.22,34.55 97.55,34.55"/><polygon fill="url(#topRD)" points="50,50 97.55,34.55 68.16,55.91"/><polygon fill="url(#topRL)" points="50,50 68.16,55.91 79.39,90.45"/><polygon fill="url(#topRD)" points="50,50 79.39,90.45 50,69.1"/><polygon fill="url(#topRL)" points="50,50 50,69.1 20.61,90.45"/><polygon fill="url(#topRD)" points="50,50 20.61,90.45 31.84,55.91"/><polygon fill="url(#topRL)" points="50,50 31.84,55.91 2.45,34.55"/><polygon fill="url(#topRD)" points="50,50 2.45,34.55 38.78,34.55"/><polygon fill="#FAF7F1" points="50,30 55.61,44.27 70.39,44.27 58.39,53.46 63,67.73 50,59.05 37,67.73 41.61,53.46 29.61,44.27 44.39,44.27"/></svg>
+      <img class="brand-mark" src="/files/static/brand/mark.svg" alt="Superstars Contracting">
       <div>
         <div class="brand-name">Superstars Contracting</div>
         <div class="brand-sub">Project Dashboard</div>
@@ -6413,7 +6414,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     var patchRows=patches.length ? patches.map(function(p,i){ return '<tr><td>'+(i+1)+'</td><td>'+esc(p.length)+' '+esc(p.length_unit)+'</td><td>'+esc(p.width)+' '+esc(p.width_unit)+'</td><td>'+esc(p.depth)+' '+esc(p.depth_unit)+'</td><td style="text-align:right">'+ceilTenth(p.volume_cf).toFixed(1)+' CF</td></tr>'; }).join('') + '<tr><td class="dr-tot" colspan="4">Total · '+patches.length+' patch'+(patches.length===1?'':'es')+'</td><td class="dr-tot" style="text-align:right">'+totDisp+' CF</td></tr>'
       : '<tr><td colspan="5" style="color:#76777E;padding:10px 8px;">No concrete patches logged yet.</td></tr>';
     return '<div class="dr-sheet">'
-      +'<div class="dr-head"><div class="dr-brand"><svg width="24" height="24" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="topRL" x1="0%" y1="0%" x2="70%" y2="100%"><stop offset="0%" stop-color="#E0394E"/><stop offset="100%" stop-color="#A01829"/></linearGradient><linearGradient id="topRD" x1="100%" y1="0%" x2="30%" y2="100%"><stop offset="0%" stop-color="#831321"/><stop offset="100%" stop-color="#4A0A12"/></linearGradient></defs><polygon fill="url(#topRL)" points="50,50 38.78,34.55 50,0"/><polygon fill="url(#topRD)" points="50,50 50,0 61.22,34.55"/><polygon fill="url(#topRL)" points="50,50 61.22,34.55 97.55,34.55"/><polygon fill="url(#topRD)" points="50,50 97.55,34.55 68.16,55.91"/><polygon fill="url(#topRL)" points="50,50 68.16,55.91 79.39,90.45"/><polygon fill="url(#topRD)" points="50,50 79.39,90.45 50,69.1"/><polygon fill="url(#topRL)" points="50,50 50,69.1 20.61,90.45"/><polygon fill="url(#topRD)" points="50,50 20.61,90.45 31.84,55.91"/><polygon fill="url(#topRL)" points="50,50 31.84,55.91 2.45,34.55"/><polygon fill="url(#topRD)" points="50,50 2.45,34.55 38.78,34.55"/><polygon fill="#FAF7F1" points="50,30 55.61,44.27 70.39,44.27 58.39,53.46 63,67.73 50,59.05 37,67.73 41.61,53.46 29.61,44.27 44.39,44.27"/></svg>'
+      +'<div class="dr-head"><div class="dr-brand"><img width="24" height="24" src="/files/static/brand/logo-dark.svg" alt="" style="object-fit:contain;vertical-align:middle">'
         +'<div><div class="dr-co">SUPERSTARS <span class="s">CONTRACTING INC.</span></div><div class="dr-title">DROP REPORT</div></div></div>'
         +'<div class="dr-meta">Report #'+esc(d.drop_id)+'<br>As of <b>'+todayMDY()+'</b><br>Auto-generated</div></div>'
       +'<div class="dr-band">'

@@ -18,7 +18,7 @@
   body{min-height:100vh;}
   .topbar{background:#fff;border-bottom:1px solid var(--hairline);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:5;}
   .brand{display:flex;align-items:center;gap:11px;min-width:0;}
-  .brand svg{width:34px;height:34px;flex:none;}
+  .brand svg, .brand img.brand-mark{width:34px;height:34px;flex:none;}  /* #265 — reserved box so a swapped logo can't shift layout */
   .brand-name{font-family:'Archivo',-apple-system,sans-serif;font-size:15px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;line-height:1;}
   .brand-sub{font-size:9px;color:var(--mute);letter-spacing:1px;text-transform:uppercase;font-weight:600;margin-top:3px;}
   .chip{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--mute);flex:none;}
@@ -65,13 +65,14 @@
   .lb img{max-width:100%;max-height:82vh;border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.5);}
   .lb .cap{position:absolute;bottom:18px;left:0;right:0;text-align:center;color:#fff;font-size:14px;padding:0 20px;text-shadow:0 1px 4px rgba(0,0,0,.6);}
   .lb .x{position:absolute;top:16px;right:18px;color:#fff;font-size:30px;line-height:1;cursor:pointer;opacity:.85;background:none;border:none;}
+  .brand-mark,.mark{object-fit:contain;}  /* #265 swap-safe logo */
 </style>
 </head>
 <body>
   <div class="topbar">
     <div class="brand">
       <!-- #265 — canonical filled-star lockup (single source: brand.py) -->
-      <svg class="brand-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="topRL" x1="0%" y1="0%" x2="70%" y2="100%"><stop offset="0%" stop-color="#E0394E"/><stop offset="100%" stop-color="#A01829"/></linearGradient><linearGradient id="topRD" x1="100%" y1="0%" x2="30%" y2="100%"><stop offset="0%" stop-color="#831321"/><stop offset="100%" stop-color="#4A0A12"/></linearGradient></defs><polygon fill="url(#topRL)" points="50,50 38.78,34.55 50,0"/><polygon fill="url(#topRD)" points="50,50 50,0 61.22,34.55"/><polygon fill="url(#topRL)" points="50,50 61.22,34.55 97.55,34.55"/><polygon fill="url(#topRD)" points="50,50 97.55,34.55 68.16,55.91"/><polygon fill="url(#topRL)" points="50,50 68.16,55.91 79.39,90.45"/><polygon fill="url(#topRD)" points="50,50 79.39,90.45 50,69.1"/><polygon fill="url(#topRL)" points="50,50 50,69.1 20.61,90.45"/><polygon fill="url(#topRD)" points="50,50 20.61,90.45 31.84,55.91"/><polygon fill="url(#topRL)" points="50,50 31.84,55.91 2.45,34.55"/><polygon fill="url(#topRD)" points="50,50 2.45,34.55 38.78,34.55"/><polygon fill="#FAF7F1" points="50,30 55.61,44.27 70.39,44.27 58.39,53.46 63,67.73 50,59.05 37,67.73 41.61,53.46 29.61,44.27 44.39,44.27"/></svg>
+      <img class="brand-mark" src="/files/static/brand/mark.svg" alt="Superstars Contracting">
       <div><div class="brand-name">Superstars Contracting</div><div class="brand-sub">Project Portal</div></div>
     </div>
     <div class="chip"><span id="who">—</span><button id="signout">Sign out</button></div>

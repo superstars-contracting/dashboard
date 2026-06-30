@@ -17,6 +17,10 @@
   --accent:#4364dc; --accent-ink:#3a5fd0; --accent-soft:#ebf0fe; --accent-edge:rgba(67,100,220,.30);
   --accent-in:rgba(67,100,220,.14);          /* ph- inward vignette */
   --ink:#222633; --muted:#8c92a0; --line:#eceef3; --canvas:#fafbfd;
+  /* ===== BRAND colourway tokens (#265) — source of record is brand.py BRAND. A
+     colourway change updates brand.py + these tokens and propagates everywhere
+     (UI chrome + report letterheads). The LOGO is a swappable asset (static/brand/). */
+  --brand-red:#B11E2E; --brand-red-deep:#8B1623; --cream:#FAF7F1;
   /* Lumen+Oat STATUS tokens — status meaning ONLY (never decoration) */
   --status-complete:#15a07e; --status-complete-soft:#e7f6f0;
   --status-active:#4364dc;   --status-active-soft:#ebf0fe;
