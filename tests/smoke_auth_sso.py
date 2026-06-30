@@ -259,10 +259,11 @@ def main():
         claims_a = {"email": ACTIVE, "email_verified": True, "hd": DOMAIN, "sub": SUB_ACTIVE, "name": "A"}
         r, _ = sso_flow(claims_a)
         ok("active_user_session_created",
-           r.status_code == 302 and "/dashboard" in _loc(r) and bool(r.cookies.get("ssc_session")),
+           r.status_code == 302 and "/projects" in _loc(r) and bool(r.cookies.get("ssc_session")),
            f"status={r.status_code} loc={_loc(r)}")
         row = user_row(ACTIVE)
-        ok("active_user_role_home_pm_dashboard", "/dashboard" in _loc(r))
+        # #263 — a pm's role home is the assigned-projects-only landing (/projects), not /dashboard
+        ok("active_user_role_home_pm_projects", "/projects" in _loc(r))
         ok("active_user_google_sub_stored", bool(row) and row["google_sub"] == SUB_ACTIVE)
         ok("active_user_must_reset_cleared", bool(row) and row["must_reset_password"] in (0, False))
         ok("active_user_audit_login_success_method_google", audit_has(ACTIVE, "login_success", "google"))
@@ -270,7 +271,7 @@ def main():
 
         # re-sign-in with the SAME (now-linked) sub still works; a DIFFERENT sub is rejected
         r, _ = sso_flow(claims_a)
-        ok("relink_same_sub_ok", r.status_code == 302 and "/dashboard" in _loc(r))
+        ok("relink_same_sub_ok", r.status_code == 302 and "/projects" in _loc(r))
         r, _ = sso_flow({**claims_a, "sub": "different-" + SUB_ACTIVE})
         ok("linked_sub_mismatch_rejected", "sso_error=notauthorized" in _loc(r))
 

@@ -183,9 +183,22 @@ def stop_server(proc: subprocess.Popen | None) -> None:
 
 # ---------- smoke user ----------
 
+def _delete_user_children(conn, where_sql: str, params) -> None:
+    """Delete every FK-blocking CHILD row for the user(s) matched by `where_sql` BEFORE
+    the user is deleted — the #260 "children before users" rule. Postgres enforces these
+    FKs (SQLite with PRAGMA fk=ON does too), so the user delete must never fire first.
+    Covers the audit/session children that reference users.id."""
+    uids_sql = f"(SELECT id FROM users WHERE {where_sql})"
+    conn.execute(f"DELETE FROM sessions WHERE user_id IN {uids_sql}", params)
+    conn.execute(f"DELETE FROM login_audit WHERE user_id IN {uids_sql}", params)
+    conn.execute(f"DELETE FROM role_change_audit WHERE user_id IN {uids_sql} "
+                 f"OR changed_by IN {uids_sql}", params + params)
+
+
 def seed_user() -> int:
     conn = db_layer.connect()
     conn.execute("PRAGMA foreign_keys=ON;")
+    _delete_user_children(conn, "email = ?", (TEST_EMAIL,))
     conn.execute("DELETE FROM users WHERE email = ?", (TEST_EMAIL,))   # idempotent on the fixed email
     conn.execute(
         "INSERT INTO users (email, password_hash, role, full_name, is_active, is_system) "
@@ -201,7 +214,9 @@ def seed_user() -> int:
 def cleanup_user(uid: int) -> None:
     try:
         conn = db_layer.connect()
-        conn.execute("DELETE FROM sessions WHERE user_id = ?", (uid,))
+        # children first (FK-safe on Postgres), then the user — so the fixture never
+        # accumulates orphaned audit/session rows across runs.
+        _delete_user_children(conn, "id = ?", (uid,))
         conn.execute("DELETE FROM users WHERE id = ?", (uid,))
         conn.commit()
         conn.close()

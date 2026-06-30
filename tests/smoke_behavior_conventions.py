@@ -473,12 +473,32 @@ def _rbac_login(email):
     return s if (r.status_code == 200 and s.cookies.get("ssc_session")) else None
 
 
+def _rbac_assign_pm(email, project_code):
+    """#263 — a pm is now scoped to ASSIGNED projects, so the RBAC check assigns the
+    synthetic pm to FR-BX-001 before probing that project's (role-gated) surfaces;
+    otherwise the project-assignment axis 403s before the Financial role gate is even
+    reached. Ensures the pm_project_assignment schema (idempotent, both backends)."""
+    from apply_pm_assignment_263 import ensure_pm_assignment_schema
+    conn = db_layer.connect(pragma_fk=True)
+    try:
+        ensure_pm_assignment_schema(conn)
+        uid = conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()[0]
+        conn.execute("DELETE FROM pm_project_assignment WHERE user_id=? AND project_code=?",
+                     (uid, project_code))
+        conn.execute("INSERT INTO pm_project_assignment (user_id, project_code, assigned_by, assigned_at) "
+                     "VALUES (?, ?, ?, ?)", (uid, project_code, uid, date.today().isoformat()))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def _rbac_cleanup():
     conn = db_layer.connect(pragma_fk=True)
     try:
         for email in _RBAC_USERS.values():
             u = conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
             if u:
+                conn.execute("DELETE FROM pm_project_assignment WHERE user_id=? OR assigned_by=?", (u[0], u[0]))
                 conn.execute("DELETE FROM login_audit WHERE user_id=?", (u[0],))
                 conn.execute("DELETE FROM role_change_audit WHERE user_id=? OR changed_by=?", (u[0], u[0]))
                 conn.execute("DELETE FROM sessions WHERE user_id=?", (u[0],))
@@ -509,8 +529,13 @@ def behavioral_rbac_financial_check():
             return
         ok("rbac_role_logins", True)
 
-        pm_html = pm.get(f"{BASE}/dashboard", timeout=15).text
-        cs_html = cs.get(f"{BASE}/dashboard", timeout=15).text
+        # #263 — assign the pm to FR-BX-001 so it can OPEN that project (the role axis,
+        # not the assignment axis, is what this #262 check exercises). The project
+        # dashboard for a pm is reached at /projects/<code> (a pm's /dashboard now
+        # redirects to its projects list).
+        _rbac_assign_pm(_RBAC_USERS["pm"], "FR-BX-001")
+        pm_html = pm.get(f"{BASE}/projects/FR-BX-001", timeout=15).text
+        cs_html = cs.get(f"{BASE}/projects/FR-BX-001", timeout=15).text
 
         # (a) sidebar — server-rendered per role
         ok("rbac_pm_sidebar_no_financial",

@@ -220,12 +220,15 @@ def main() -> int:
             nu, nlog = login(NEW_EMAIL, temp_pw)
             check("new user can log in with temp password", nlog.status_code == 200, f"got {nlog.status_code}")
             check("login response signals must_reset_password", bool((jbody(nlog).get("user") or {}).get("must_reset_password")))
-            blocked = nu.get(f"{BASE}/api/dropplan/projects/FR-BX-001/rollup", timeout=15)
+            # #263 — the created user is a pm scoped to ASSIGNED projects, so probe a
+            # pm-accessible endpoint (/api/projects, their scoped list) — an unassigned
+            # project endpoint would 403 on the assignment axis, not the must_reset gate.
+            blocked = nu.get(f"{BASE}/api/projects", timeout=15)
             check("must_reset session BLOCKED from data (403 must_reset, not served)",
                   blocked.status_code == 403 and bool(jbody(blocked).get("must_reset")), f"got {blocked.status_code}")
             sp = nu.post(f"{BASE}/api/auth/set-password", json={"new_password": NEW_PW}, timeout=15)
             check("set-password succeeds (200)", sp.status_code == 200, f"got {sp.status_code}")
-            after = nu.get(f"{BASE}/api/dropplan/projects/FR-BX-001/rollup", timeout=15)
+            after = nu.get(f"{BASE}/api/projects", timeout=15)
             check("data loads after password set (200)", after.status_code == 200, f"got {after.status_code}")
             # weak password rejected (strength rule)
             cu2 = admin.post(f"{BASE}/api/admin/users",

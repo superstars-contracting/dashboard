@@ -445,7 +445,8 @@ def main():
     # "guard never looked here" gap for good.
     REGISTERED = {"company-dashboard.html", "dashboard-static.html", "admin_labor_rates.html",
                   "login.html", "worker-app.html", "dropplan.html", "rfi_submission_form.html",
-                  "admin_users.html", "set_password.html"}   # #257 multi-user accounts & roles
+                  "admin_users.html", "set_password.html",   # #257 multi-user accounts & roles
+                  "admin_projects.html"}   # #263 PM project-scoping (assignment + close screen)
     EXEMPT = {"facade-dashboard.html", "facade-dashboard-presentation.html"}  # pre-rebuild legacy
     unregistered = []
     for page in sorted(root_dir.glob("*.html")):

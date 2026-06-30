@@ -43,6 +43,7 @@ GATE = [
     "smoke_auth_sso.py",          # #261 — Google SSO (mocked verification, own server)
     "smoke_labor_rates.py",
     "smoke_behavior_conventions.py",
+    "smoke_pm_scoping_263.py",    # #263 — PM project-scoping (assignment + close lifecycle)
     "smoke_dropplan_api.py",
     "smoke_worker_lifecycle.py",
     "smoke_dcr214_lifecycle.py",
