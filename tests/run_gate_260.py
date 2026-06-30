@@ -44,6 +44,7 @@ GATE = [
     "smoke_labor_rates.py",
     "smoke_behavior_conventions.py",
     "smoke_pm_scoping_263.py",    # #263 — PM project-scoping (assignment + close lifecycle)
+    "smoke_client_portal_264.py", # #264 — client portal + default-deny visibility engine
     "smoke_dropplan_api.py",
     "smoke_worker_lifecycle.py",
     "smoke_dcr214_lifecycle.py",
