@@ -3,6 +3,7 @@ import json
 import sys
 from datetime import datetime
 from typography import get_inlined_style_tag
+import brand  # #265 — canonical logo
 
 def render_lookahead_html(json_path, output_path):
     with open(json_path, 'r') as f:
@@ -600,7 +601,7 @@ def build_html(data, prepared_by, prepared_role, reviewed_by, reviewed_role, sig
     body_html = f"""    <div class="page">
         <div class="letterhead">
             <div class="letterhead-left">
-                <div class="letterhead-brand">SUPERSTARS</div>
+                <div class="letterhead-brand" style="display:flex;align-items:center;gap:7px;">{brand.star_svg(px=22)}<span>SUPERSTARS</span></div>
                 <div class="letterhead-address">Superstars Contracting, Inc.<br>{data['project']['address']}</div>
             </div>
             <div class="letterhead-right">

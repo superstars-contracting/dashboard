@@ -3,6 +3,7 @@ import json
 import sys
 from datetime import datetime
 from typography import get_inlined_style_tag
+import brand  # #265 — canonical logo
 
 def render_html(data):
     attendees_html = '\n'.join([
@@ -255,7 +256,7 @@ def render_html(data):
 <body>
     <div class='letterhead'>
         <div class='letterhead-left'>
-            <span class='star'>★</span> SUPERSTARS<br>
+            <span class='star'>{brand.star_svg(px=18)}</span> SUPERSTARS<br>
             <small>Contracting</small>
         </div>
         <div class='letterhead-right'>

@@ -7,6 +7,7 @@ import json
 import sys
 from datetime import datetime
 from typography import get_inlined_style_tag
+import brand  # #265 — canonical logo
 
 def render_html(json_path, output_path):
     with open(json_path) as f:
@@ -344,7 +345,7 @@ def render_html(json_path, output_path):
         <div class="content">
             <div class="letterhead">
                 <div class="letterhead-left">
-                    <div class="star-logo">★</div>
+                    <div class="star-logo">{brand.star_svg(px=34)}</div>
                     <div class="letterhead-text">
                         <h1>SUPERSTARS</h1>
                         <p>Contracting & Restoration</p>

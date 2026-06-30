@@ -23,40 +23,10 @@ import sys
 from datetime import datetime
 from typing import Any, Dict, List
 from typography import get_inlined_style_tag
+import brand  # #265 — canonical logo (single source; rfi shares this)
 
-# Placeholder star — inlined as a Python constant so the DCR HTML is fully
-# self-contained (the PDF render doesn't depend on a file path). Swap this
-# block when the official brand logo arrives.
-# Source: Superstars Logo Kit/svg/superstars-star.svg.
-SUPERSTARS_STAR_SVG = (
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" '
-    'width="40" height="40" aria-label="Superstars Contracting" role="img">'
-    '<polygon points="500.0,40.0 608.2,351.1 579.8,390.2 500.0,155.0" fill="#e23d3f"/>'
-    '<polygon points="500.0,155.0 579.8,390.2 551.4,429.3 500.0,270.0" fill="#99151d"/>'
-    '<polygon points="608.2,351.1 937.5,357.9 828.1,393.4 579.8,390.2" fill="#6d0d14"/>'
-    '<polygon points="579.8,390.2 828.1,393.4 718.7,428.9 551.4,429.3" fill="#99151d"/>'
-    '<polygon points="937.5,357.9 675.0,556.9 629.1,541.9 828.1,393.4" fill="#5d0b11"/>'
-    '<polygon points="828.1,393.4 629.1,541.9 583.1,527.0 718.7,428.9" fill="#99151d"/>'
-    '<polygon points="675.0,556.9 770.4,872.1 702.8,779.1 629.1,541.9" fill="#5d0b11"/>'
-    '<polygon points="629.1,541.9 702.8,779.1 635.2,686.1 583.1,527.0" fill="#99151d"/>'
-    '<polygon points="770.4,872.1 500.0,684.0 500.0,635.7 702.8,779.1" fill="#5d0b11"/>'
-    '<polygon points="702.8,779.1 500.0,635.7 500.0,587.4 635.2,686.1" fill="#99151d"/>'
-    '<polygon points="500.0,684.0 229.6,872.1 297.2,779.1 500.0,635.7" fill="#5d0b11"/>'
-    '<polygon points="500.0,635.7 297.2,779.1 364.8,686.1 500.0,587.4" fill="#99151d"/>'
-    '<polygon points="229.6,872.1 325.0,556.9 370.9,541.9 297.2,779.1" fill="#92131c"/>'
-    '<polygon points="297.2,779.1 370.9,541.9 416.9,527.0 364.8,686.1" fill="#99151d"/>'
-    '<polygon points="325.0,556.9 62.5,357.9 171.9,393.4 370.9,541.9" fill="#ed4b49"/>'
-    '<polygon points="370.9,541.9 171.9,393.4 281.3,428.9 416.9,527.0" fill="#99151d"/>'
-    '<polygon points="62.5,357.9 391.8,351.1 420.2,390.2 171.9,393.4" fill="#ee4c4a"/>'
-    '<polygon points="171.9,393.4 420.2,390.2 448.6,429.3 281.3,428.9" fill="#99151d"/>'
-    '<polygon points="391.8,351.1 500.0,40.0 500.0,155.0 420.2,390.2" fill="#ee4c4a"/>'
-    '<polygon points="420.2,390.2 500.0,155.0 500.0,270.0 448.6,429.3" fill="#99151d"/>'
-    '<polygon points="500.0,40.0 608.2,351.1 937.5,357.9 675.0,556.9 770.4,872.1 500.0,684.0 229.6,872.1 325.0,556.9 62.5,357.9 391.8,351.1" '
-    'fill="none" stroke="#280408" stroke-width="4.1" stroke-linejoin="round"/>'
-    '<polygon points="500.0,270.0 551.4,429.3 718.7,428.9 583.1,527.0 635.2,686.1 500.0,587.4 364.8,686.1 416.9,527.0 281.3,428.9 448.6,429.3" '
-    'fill="none" stroke="#280408" stroke-width="4.1" stroke-linejoin="round"/>'
-    '</svg>'
-)
+# #265 — the canonical brand star comes from brand.py (one source for app + reports).
+SUPERSTARS_STAR_SVG = brand.star_svg(px=40, cls="ssc-star")  # #265 — the ONE canonical filled star (brand.py). render_rfi imports this.
 
 # Day-of-week + long form date helper. Aggregator already returns project.date
 # and project.day_of_week separately; we use both for the header line.

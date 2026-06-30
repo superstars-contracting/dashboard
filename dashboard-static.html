@@ -827,13 +827,11 @@
   <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="sidebar-header">
-      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2L15.09 10.26H24L17.55 15.7L20.64 24L12 18.56L3.36 24L6.45 15.7L0 10.26H8.91L12 2Z"
-              fill="none" stroke="#B11E2E" stroke-width="1.5"/>
-      </svg>
+      <!-- #265 — canonical filled-star lockup (single source: brand.py) -->
+      <svg class="brand-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="topRL" x1="0%" y1="0%" x2="70%" y2="100%"><stop offset="0%" stop-color="#E0394E"/><stop offset="100%" stop-color="#A01829"/></linearGradient><linearGradient id="topRD" x1="100%" y1="0%" x2="30%" y2="100%"><stop offset="0%" stop-color="#831321"/><stop offset="100%" stop-color="#4A0A12"/></linearGradient></defs><polygon fill="url(#topRL)" points="50,50 38.78,34.55 50,0"/><polygon fill="url(#topRD)" points="50,50 50,0 61.22,34.55"/><polygon fill="url(#topRL)" points="50,50 61.22,34.55 97.55,34.55"/><polygon fill="url(#topRD)" points="50,50 97.55,34.55 68.16,55.91"/><polygon fill="url(#topRL)" points="50,50 68.16,55.91 79.39,90.45"/><polygon fill="url(#topRD)" points="50,50 79.39,90.45 50,69.1"/><polygon fill="url(#topRL)" points="50,50 50,69.1 20.61,90.45"/><polygon fill="url(#topRD)" points="50,50 20.61,90.45 31.84,55.91"/><polygon fill="url(#topRL)" points="50,50 31.84,55.91 2.45,34.55"/><polygon fill="url(#topRD)" points="50,50 2.45,34.55 38.78,34.55"/><polygon fill="#FAF7F1" points="50,30 55.61,44.27 70.39,44.27 58.39,53.46 63,67.73 50,59.05 37,67.73 41.61,53.46 29.61,44.27 44.39,44.27"/></svg>
       <div>
-        <div class="brand-name">SUPERSTARS</div>
-        <div class="brand-sub">CONTRACTING · INC</div>
+        <div class="brand-name">Superstars Contracting</div>
+        <div class="brand-sub">Project Dashboard</div>
       </div>
     </div>
     <!-- #263 — role-aware back-link. The server (access.render_role_nav) keeps exactly
@@ -1111,7 +1109,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #264 · 2026-06-30 · Client portal + visibility engine — a read-only external CLIENT sees a curated portal (/portal) for their ONE assigned project: progress + ONLY the photos we explicitly shared + a summary, NO money/internal nav. Default-deny per-item visibility (item_visibility + sticky red-flag/take-offline, audited): a photo is internal-only until "Share with client"; per-photo Share + Red-flag in Field Photos. Server-enforced per-resource isolation closes the #263 by-ID gap (a client by-ID fetch verifies the item belongs to their project AND is shared AND not flagged → else 404); a client default-deny gate blocks every internal endpoint. Full gate green on SQLite AND Postgres</div>
+          <div class="ph-build" id="ph-build-stamp">build #265 · 2026-06-30 · Brand consistency — ONE canonical filled-star logo lockup (brand.py) across every surface + all NEW report templates; the "rinky dink" hollow/outline star is removed everywhere and banned by the design guard; the star is identical light/dark, only the wordmark text colour adapts</div>
         </div>
       </section>
 
@@ -6415,7 +6413,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     var patchRows=patches.length ? patches.map(function(p,i){ return '<tr><td>'+(i+1)+'</td><td>'+esc(p.length)+' '+esc(p.length_unit)+'</td><td>'+esc(p.width)+' '+esc(p.width_unit)+'</td><td>'+esc(p.depth)+' '+esc(p.depth_unit)+'</td><td style="text-align:right">'+ceilTenth(p.volume_cf).toFixed(1)+' CF</td></tr>'; }).join('') + '<tr><td class="dr-tot" colspan="4">Total · '+patches.length+' patch'+(patches.length===1?'':'es')+'</td><td class="dr-tot" style="text-align:right">'+totDisp+' CF</td></tr>'
       : '<tr><td colspan="5" style="color:#76777E;padding:10px 8px;">No concrete patches logged yet.</td></tr>';
     return '<div class="dr-sheet">'
-      +'<div class="dr-head"><div class="dr-brand"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><polygon points="12,1 15,9 23,9 16.5,14 19,22 12,17 5,22 7.5,14 1,9 9,9" fill="#B11E2E"/></svg>'
+      +'<div class="dr-head"><div class="dr-brand"><svg width="24" height="24" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="topRL" x1="0%" y1="0%" x2="70%" y2="100%"><stop offset="0%" stop-color="#E0394E"/><stop offset="100%" stop-color="#A01829"/></linearGradient><linearGradient id="topRD" x1="100%" y1="0%" x2="30%" y2="100%"><stop offset="0%" stop-color="#831321"/><stop offset="100%" stop-color="#4A0A12"/></linearGradient></defs><polygon fill="url(#topRL)" points="50,50 38.78,34.55 50,0"/><polygon fill="url(#topRD)" points="50,50 50,0 61.22,34.55"/><polygon fill="url(#topRL)" points="50,50 61.22,34.55 97.55,34.55"/><polygon fill="url(#topRD)" points="50,50 97.55,34.55 68.16,55.91"/><polygon fill="url(#topRL)" points="50,50 68.16,55.91 79.39,90.45"/><polygon fill="url(#topRD)" points="50,50 79.39,90.45 50,69.1"/><polygon fill="url(#topRL)" points="50,50 50,69.1 20.61,90.45"/><polygon fill="url(#topRD)" points="50,50 20.61,90.45 31.84,55.91"/><polygon fill="url(#topRL)" points="50,50 31.84,55.91 2.45,34.55"/><polygon fill="url(#topRD)" points="50,50 2.45,34.55 38.78,34.55"/><polygon fill="#FAF7F1" points="50,30 55.61,44.27 70.39,44.27 58.39,53.46 63,67.73 50,59.05 37,67.73 41.61,53.46 29.61,44.27 44.39,44.27"/></svg>'
         +'<div><div class="dr-co">SUPERSTARS <span class="s">CONTRACTING INC.</span></div><div class="dr-title">DROP REPORT</div></div></div>'
         +'<div class="dr-meta">Report #'+esc(d.drop_id)+'<br>As of <b>'+todayMDY()+'</b><br>Auto-generated</div></div>'
       +'<div class="dr-band">'

@@ -4,6 +4,7 @@ import argparse, json, sys
 from pathlib import Path
 from typing import Any, Dict, List
 from typography import get_inlined_style_tag
+import brand  # #265 — canonical logo
 
 class ClosureHTMLRenderer:
     BRAND_RED = "#B11E2E"
@@ -94,7 +95,7 @@ class ClosureHTMLRenderer:
         closure = self.data.get('closure', {})
         return f"""<div class="letterhead">
     <div class="letterhead-left">
-        <div class="star">★</div>
+        <div class="star">{brand.star_svg(px=28)}</div>
         <div class="brand-name">SUPERSTARS CONTRACTING</div>
     </div>
     <div class="letterhead-right">

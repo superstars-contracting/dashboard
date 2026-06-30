@@ -2,6 +2,7 @@ import json
 import sys
 from datetime import datetime
 from typography import get_inlined_style_tag
+import brand  # #265 — canonical logo
 
 def render_html(talk):
     category_colors = {
@@ -75,7 +76,7 @@ def render_html(talk):
 <body>
     <div class="page">
         <div class="letterhead">
-            <div class="letterhead-left">SUPERSTARS CONTRACTING · TOOLBOX TALK</div>
+            <div class="letterhead-left" style="display:flex;align-items:center;gap:7px;">{brand.star_svg(px=18)}<span>SUPERSTARS CONTRACTING · TOOLBOX TALK</span></div>
             <div class="letterhead-right">
                 {talk['talk_id']} · {talk['scheduled_for']}<br/>Duration: {talk['duration_estimated']} min
             </div>
