@@ -458,6 +458,35 @@ def main():
        ("REGISTER OR EXEMPT: " + ", ".join(unregistered)) if unregistered
        else f"{len(REGISTERED)} registered / {len(EXEMPT)} exempt")
 
+    # ---- #265 — CANONICAL LOGO: one filled-star lockup; the hollow/outline star is banned ----
+    print("\n-- canonical brand logo (filled star, no hollow/outline variant) --")
+    CANON = "38.78,34.55"   # a distinctive vertex of the canonical faceted star (brand.py)
+    # the banned "rinky dink" signatures: the outline-star strokes + the hollow star path
+    HOLLOW = ('fill="none" stroke="#B11E2E"', 'fill="none" stroke="#C8102E"', 'M12 2L15.09')
+    # self-test: the matcher catches a hollow star and passes the canonical one
+    _hollow = '<svg><path d="M12 2L15.09 10.26Z" fill="none" stroke="#B11E2E" stroke-width="1.5"/></svg>'
+    _canon = '<svg><polygon fill="url(#topRL)" points="50,50 38.78,34.55 50,0"/></svg>'
+    ok("selftest_hollow_star_caught",
+       any(h in _hollow for h in HOLLOW) and CANON not in _hollow)
+    ok("selftest_canonical_star_passes",
+       CANON in _canon and not any(h in _canon for h in HOLLOW))
+    # every logo-bearing live surface: canonical present, NO hollow variant anywhere
+    LOGO_SURFACES = ["company-dashboard.html", "dashboard-static.html", "projects.html",
+                     "client_portal.html", "login.html", "set_password.html", "admin_users.html",
+                     "admin_projects.html", "admin_labor_rates.html", "dropplan.html"]
+    for fn in LOGO_SURFACES:
+        t = (root_dir / fn).read_text(encoding="utf-8", errors="replace")
+        ok(f"logo_no_hollow_{fn}", not any(h in t for h in HOLLOW), "hollow/outline star present")
+        ok(f"logo_canonical_{fn}", CANON in t, "canonical filled-star lockup missing")
+    # report/print renderers emit the canonical star (brand.star_svg) + no hollow + no glyph logo
+    RENDERERS = ["render_dcr_html.py", "render_drop_plan_html.py", "render_weekly_summary_html.py",
+                 "render_closure_html.py", "render_meeting_minutes_html.py",
+                 "render_lookahead_html.py", "render_toolbox_talk_html.py"]
+    for fn in RENDERERS:
+        t = (root_dir / fn).read_text(encoding="utf-8", errors="replace")
+        ok(f"logo_renderer_{fn}", ("brand.star_svg" in t) and not any(h in t for h in HOLLOW),
+           "renderer must emit brand.star_svg + carry no hollow star")
+
     print(f"\n== RESULT: {len(PASS)} PASS / {len(FAIL)} FAIL ==")
     if FAIL:
         print("FAILURES: " + ", ".join(FAIL))
