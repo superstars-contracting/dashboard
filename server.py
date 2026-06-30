@@ -63,6 +63,14 @@ auth_google.register(app)
 import pm_scoping  # noqa: E402
 pm_scoping.register(app)
 
+# #264 — the per-item VISIBILITY ENGINE (default-deny) + the read-only CLIENT portal.
+# client_portal registers a default-deny before_request gate (a `client` reaches ONLY the
+# portal + auth; every internal endpoint / by-ID resource -> 403) and the curated portal
+# API. MUST follow apply_auth_gate (g.auth_user set) and the #263 hook.
+import visibility  # noqa: E402,F401  # visibility engine (share/redflag, per-resource checks)
+import client_portal  # noqa: E402
+client_portal.register(app)
+
 # Security: cap upload size. Raised to 256 MB (#235) so a field-photo BATCH POST
 # (many images, several 8-12 MB) isn't rejected at the WSGI layer; the Field
 # Photos UI also uploads in chunks. A request over the cap returns a clean 413
@@ -9142,8 +9150,18 @@ def api_field_photos_list(project_code):
             f"SELECT fp.*, d.sequence_no FROM field_photos fp LEFT JOIN drops d ON d.drop_id = fp.drop_id "
             f"WHERE {wsql} {order} LIMIT ? OFFSET ?", params + [limit, offset]).fetchall()
         label_map = _fp_drop_labels(conn, project_code)
+        # #264 — annotate each photo with its client-visibility state (one batched pair of
+        # queries) so the Field Photos UI can render the Share-with-client + Red-flag toggles.
+        vis = visibility.photo_states(conn, project_code)
+        photos = []
+        for r in rows:
+            d = _fieldphoto_public(r, label_map)
+            st = vis.get(r["id"], {"shared_client": False, "flagged": False})
+            d["shared_client"] = st["shared_client"]
+            d["flagged"] = st["flagged"]
+            photos.append(d)
         out = {
-            "photos": [_fieldphoto_public(r, label_map) for r in rows],
+            "photos": photos,
             "total": total, "limit": limit, "offset": offset,
             "has_more": (offset + len(rows)) < total, "group": group,
             "stats": _fp_stats(conn, project_code), "drops": _fp_drops_list(conn, project_code),
@@ -9316,6 +9334,68 @@ def api_field_photo_delete(photo_id):
     except Exception:
         pass
     return response_wrapper({"deleted": photo_id})
+
+
+# ============= #264 — PHOTO VISIBILITY: share-with-client + red-flag (internal) =============
+# Internal control surface for the visibility engine. Gated to _FP_ROLES (admin/c_suite/pm/
+# super) AND per-resource: the actor must be able to access THIS photo's project (resolved
+# from the row — a pm can only share photos on a project they're assigned to). The CLIENT
+# never reaches these (not in _FP_ROLES + the client default-deny gate). Both audited.
+
+def _fp_actor_can_admin_photo(conn, photo_id):
+    """Resolve the photo's project + confirm the current user may act on it. Returns the
+    project_code on success, or (None, error_response) on failure — by-ID per-resource check."""
+    row = conn.execute("SELECT project_code FROM field_photos WHERE id=?", (photo_id,)).fetchone()
+    if not row:
+        return None, (jsonify({"error": "not found"}), 404)
+    user = current_user() or {}
+    if not pm_scoping.pm_can_access_project(user.get("role"), user.get("id"), row["project_code"], conn):
+        return None, (jsonify({"error": "forbidden"}), 403)
+    return row["project_code"], None
+
+
+@app.route('/api/field-photos/<int:photo_id>/share', methods=['POST'])
+@requires_role(*_FP_ROLES)
+def api_field_photo_share(photo_id):
+    """Toggle an external audience on a photo. Body {audience:'client', on:bool}. v1 = client."""
+    body = request.get_json(silent=True) or {}
+    audience = (body.get('audience') or 'client').strip()
+    on = bool(body.get('on'))
+    if audience != 'client':
+        return jsonify({"error": "unsupported audience (v1: client only)"}), 400
+    conn = db()
+    try:
+        _code, err = _fp_actor_can_admin_photo(conn, photo_id)
+        if err:
+            return err
+        uid = (current_user() or {}).get("id")
+        res = (visibility.share(conn, 'photo', photo_id, 'client', uid) if on
+               else visibility.unshare(conn, 'photo', photo_id, 'client', uid))
+        if not res.get("ok"):
+            return jsonify({"error": res.get("reason", "cannot share")}), 409
+        conn.commit()
+        return _fp_no_store(response_wrapper(visibility.state(conn, 'photo', photo_id)))
+    finally:
+        conn.close()
+
+
+@app.route('/api/field-photos/<int:photo_id>/redflag', methods=['POST'])
+@requires_role(*_FP_ROLES)
+def api_field_photo_redflag(photo_id):
+    """Red-flag / take offline (on:true) — instantly revoke ALL external visibility + block
+    re-share; or clear it (on:false). Body {on:bool}."""
+    on = bool((request.get_json(silent=True) or {}).get('on'))
+    conn = db()
+    try:
+        _code, err = _fp_actor_can_admin_photo(conn, photo_id)
+        if err:
+            return err
+        uid = (current_user() or {}).get("id")
+        (visibility.redflag if on else visibility.unflag)(conn, 'photo', photo_id, uid)
+        conn.commit()
+        return _fp_no_store(response_wrapper(visibility.state(conn, 'photo', photo_id)))
+    finally:
+        conn.close()
 
 
 # ============= STATIC / FILE SERVING (#248 — allowlist by construction) =============

@@ -99,7 +99,12 @@ def pm_can_access_project(role, user_id, code, conn=None) -> bool:
             return False
         if role == "pm":
             return status == "active" and code in assigned_codes(user_id, own)
-        return status == "active"
+        if role in ("client", "architect", "vendor"):
+            # #264 — external roles NEVER reach internal project endpoints; they use their
+            # own curated surface (the client portal). Defense-in-depth behind the client
+            # default-deny gate. Their per-resource access is checked there, not here.
+            return False
+        return status == "active"   # super (internal field tier): active projects
     finally:
         if own is not conn:
             own.close()
@@ -178,7 +183,21 @@ def _list_assignments():
                 "display_name": u["display_name"] or u["full_name"] or u["email"],
                 "project_codes": sorted(assigned_codes(u["id"], conn)),
             })
-        return jsonify({"data": {"projects": projects, "pms": pms}})
+        # #264 — external clients (read-only portal), each scoped to ONE project.
+        clients = []
+        for u in conn.execute(
+            "SELECT id, email, display_name, full_name FROM users "
+            "WHERE role='client' AND status='active' AND is_active=1 AND COALESCE(is_system,0)=0 "
+            "ORDER BY LOWER(COALESCE(display_name, full_name, email))"
+        ).fetchall():
+            codes = sorted(assigned_codes(u["id"], conn))
+            clients.append({
+                "user_id": u["id"],
+                "email": u["email"],
+                "display_name": u["display_name"] or u["full_name"] or u["email"],
+                "project_code": codes[0] if codes else None,
+            })
+        return jsonify({"data": {"projects": projects, "pms": pms, "clients": clients}})
     finally:
         conn.close()
 
@@ -203,8 +222,11 @@ def _set_assignments():
         ).fetchone()
         if not target:
             return jsonify({"error": "user not found"}), 404
-        if target["role"] != "pm":
-            return jsonify({"error": "project assignments apply to pm users only"}), 400
+        if target["role"] not in ("pm", "client"):
+            return jsonify({"error": "project assignments apply to pm or client users only"}), 400
+        # #264 — a client is scoped to a SINGLE project (the portal shows exactly one).
+        if target["role"] == "client" and len(codes) > 1:
+            return jsonify({"error": "a client is scoped to a single project"}), 400
         for c in codes:
             if not _project_exists(conn, c):
                 return jsonify({"error": f"unknown project: {c}"}), 400

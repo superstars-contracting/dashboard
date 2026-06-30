@@ -91,7 +91,15 @@
     <div id="pm-list"><div class="empty">Loading…</div></div>
   </section>
 
-  <div class="ph-build" id="ap-build-stamp">build #263 · 2026-06-29 · PM project-scoping — assignment + project-close lifecycle (admin/c_suite)</div>
+  <section>
+    <div class="head-row">
+      <h2>Client Access <span style="font-size:12px;font-weight:600;color:var(--muted);">· read-only portal</span></h2>
+      <div class="sub">Assign each external client to ONE project. They see a read-only portal for that project — progress and only the photos you share — and nothing else. Onboard clients in <a href="/admin/users" style="color:var(--accent);font-weight:700;text-decoration:none;">User Management</a>.</div>
+    </div>
+    <div id="client-list"><div class="empty">Loading…</div></div>
+  </section>
+
+  <div class="ph-build" id="ap-build-stamp">build #264 · 2026-06-30 · PM project-scoping + client portal access (admin/c_suite)</div>
 </div>
 
 <script>
@@ -112,16 +120,17 @@
     if(u.role!=='admin' && u.role!=='c_suite'){ document.body.innerHTML='<div style="max-width:520px;margin:18vh auto;text-align:center;font-family:Inter,sans-serif;color:#76777E">This screen is limited to admin and C-suite.</div>'; }
   });
 
-  var STATE = { projects: [], pms: [] };
+  var STATE = { projects: [], pms: [], clients: [] };
 
   async function load(){
     clearBars();
     try{
       var resp = await fetch('/api/admin/pm-assignments').then(function(r){ return r.json(); });
       if(resp.error){ showErr(resp.error); return; }
-      STATE = resp.data || { projects:[], pms:[] };
+      STATE = resp.data || { projects:[], pms:[], clients:[] };
       renderProjects();
       renderPMs();
+      renderClients();
     }catch(e){ showErr('Could not load: '+e.message); }
   }
 
@@ -169,6 +178,41 @@
         + '</div>';
     }).join('');
   }
+
+  function renderClients(){
+    var host=$('client-list');
+    var clients=STATE.clients||[];
+    if(!clients.length){ host.innerHTML='<div class="empty">No active client users yet. Create one in <a href="/admin/users" style="color:var(--accent);font-weight:700;text-decoration:none;">User Management</a> (role: Client), then assign their project here.</div>'; return; }
+    var activeProjects=(STATE.projects||[]).filter(function(p){ return (p.status||'active').toLowerCase()!=='closed'; });
+    host.innerHTML = clients.map(function(c){
+      var opts='<option value="">— no project —</option>'+activeProjects.map(function(p){
+        return '<option value="'+esc(p.project_code)+'"'+(c.project_code===p.project_code?' selected':'')+'>'+esc(p.name||p.project_code)+'</option>';
+      }).join('');
+      return '<div class="pm-card"><div class="pm-head"><div><div class="pm-nm">'+esc(c.display_name||c.email)+'</div>'
+        +'<div class="pm-em">'+esc(c.email)+'</div></div>'
+        +'<div class="pm-save" style="display:flex;gap:8px;align-items:center;">'
+        +'<select id="cl-sel-'+c.user_id+'" style="height:34px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;font-size:13px;background:#fff;color:var(--ink);">'+opts+'</select>'
+        +'<button class="btn-primary" onclick="saveClientAssignment('+c.user_id+', this)">Save</button></div></div></div>';
+    }).join('');
+  }
+
+  window.saveClientAssignment = async function(user_id, btn){
+    clearBars();
+    var sel=document.getElementById('cl-sel-'+user_id);
+    var code=sel?sel.value:'';
+    var codes=code?[code]:[];
+    if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+    try{
+      var resp = await fetch('/api/admin/pm-assignments', {
+        method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ user_id: user_id, project_codes: codes })
+      }).then(function(r){ return r.json(); });
+      if(resp.error){ showErr(resp.error); return; }
+      showOk(code ? ('Client assigned to '+code+'.') : 'Client project access removed.');
+      await load();
+    }catch(e){ showErr('Network error: '+e.message); }
+    finally{ if(btn){ btn.disabled=false; btn.textContent='Save'; } }
+  };
 
   window.setStatus = async function(code, status){
     clearBars();

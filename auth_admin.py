@@ -42,8 +42,9 @@ ADMIN_USERS_PAGE = SCRIPT_DIR / "admin_users.html"
 
 ROLE_CATALOG = ('admin', 'c_suite', 'pm', 'super', 'client', 'architect', 'vendor')
 # Onboardable via the UI this phase: the internal tier minus admin (single-admin
-# invariant). super + external are defined-not-onboarded.
-ONBOARDABLE_ROLES = ('c_suite', 'pm')
+# invariant) + the external `client` (#264 — read-only portal; email/password, forced
+# first-login reset). super + architect/vendor stay defined-not-onboarded for now.
+ONBOARDABLE_ROLES = ('c_suite', 'pm', 'client')
 # Assignable as a role-change target: anything in the catalog EXCEPT admin
 # (no elevation to admin, ever).
 ASSIGNABLE_ROLES = tuple(r for r in ROLE_CATALOG if r != 'admin')

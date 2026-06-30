@@ -1111,7 +1111,7 @@
             </div>
           </div>
 
-          <div class="ph-build" id="ph-build-stamp">build #263 · 2026-06-29 · PM project-scoping — admin/c_suite assign projects to PMs (pm_project_assignment); a pm lands on an assigned-projects-only view with "← Back to Projects" (never the company console, which 403s), opens only assigned ACTIVE projects (unassigned/closed → 403, server-enforced via a central before_request hook), and is blocked from Financial + the company Workforce + Labor Rates; admin/c_suite can close/reopen a project (closed drops off the PM view, stays for records). Full gate green on SQLite AND Postgres</div>
+          <div class="ph-build" id="ph-build-stamp">build #264 · 2026-06-30 · Client portal + visibility engine — a read-only external CLIENT sees a curated portal (/portal) for their ONE assigned project: progress + ONLY the photos we explicitly shared + a summary, NO money/internal nav. Default-deny per-item visibility (item_visibility + sticky red-flag/take-offline, audited): a photo is internal-only until "Share with client"; per-photo Share + Red-flag in Field Photos. Server-enforced per-resource isolation closes the #263 by-ID gap (a client by-ID fetch verifies the item belongs to their project AND is shared AND not flagged → else 404); a client default-deny gate blocks every internal endpoint. Full gate green on SQLite AND Postgres</div>
         </div>
       </section>
 
@@ -4206,6 +4206,16 @@
           .fp-photo .fp-cap{max-width:62%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
           .fp-photo .fp-stg{position:absolute;top:7px;left:7px;background:rgba(20,22,30,.55);color:#fff;border-radius:6px;padding:2px 7px;font-size:9.5px;font-weight:700}
           .fp-photo .fp-est{position:absolute;top:7px;right:7px;background:rgba(202,191,173,.92);color:#5a5345;border-radius:6px;padding:1px 6px;font-size:9px;font-weight:700}
+          /* #264 — client-visibility controls (internal Field Photos view) */
+          .fp-photo .fp-vis-badge{position:absolute;top:7px;left:7px;border-radius:6px;padding:2px 7px;font-size:9.5px;font-weight:700;z-index:2}
+          .fp-photo .fp-vis-badge.shared{background:#15a07e;color:#fff}
+          .fp-photo .fp-vis-badge.flagged{background:#B11E2E;color:#fff}
+          .fp-photo .fp-vis{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;background:rgba(20,22,30,.62);opacity:0;transition:opacity .15s;pointer-events:none;z-index:3;padding:8px;text-align:center}
+          .fp-photo:hover .fp-vis{opacity:1;pointer-events:auto}
+          .fp-vis-msg{color:#fff;font-size:11px;font-weight:600}
+          .fp-vis-btn{font:inherit;font-size:11px;font-weight:700;border:none;border-radius:8px;padding:7px 12px;cursor:pointer;background:#fff;color:#222633;line-height:1.2}
+          .fp-vis-btn.on{background:#15a07e;color:#fff}
+          .fp-vis-flag-btn{font:inherit;font-size:11px;font-weight:700;border:1px solid rgba(255,255,255,.55);border-radius:8px;padding:6px 11px;cursor:pointer;background:rgba(177,30,46,.92);color:#fff;line-height:1.2}
           /* sort tray selection */
           .fp-photo.fp-selbl{cursor:pointer;border:2px solid transparent}
           .fp-photo.fp-sel{border-color:var(--fp-accent);box-shadow:0 0 0 3px var(--fp-accent-soft),0 2px 8px rgba(30,35,45,.12)}
@@ -7188,14 +7198,57 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     var d=FP.drops.filter(function(x){return x.drop_id===drop_id;})[0];
     return d?(EL[d.elevation]||'#9aa0a8'):'#cabfad';
   }
+  // #264 — per-photo client-visibility controls (badge + hover overlay). Default-deny:
+  // a photo is internal-only until "Share with client" is on. Red-flag takes it offline
+  // for ALL external viewers instantly. Buttons go through the fp-groups click delegation.
+  function fpVis(p){
+    var badge = p.flagged ? '<span class="fp-vis-badge flagged">⚑ Offline</span>'
+              : (p.shared_client ? '<span class="fp-vis-badge shared">✓ Shared</span>' : '');
+    var overlay;
+    if(p.flagged){
+      overlay='<div class="fp-vis"><div class="fp-vis-msg">Taken offline (red-flagged)</div>'
+        +'<button class="fp-vis-btn" data-fp-flag="'+p.id+'">Clear flag</button></div>';
+    } else {
+      overlay='<div class="fp-vis">'
+        +'<button class="fp-vis-btn'+(p.shared_client?' on':'')+'" data-fp-share="'+p.id+'">'
+        +(p.shared_client?'✓ Shared with client':'Share with client')+'</button>'
+        +'<button class="fp-vis-flag-btn" data-fp-flag="'+p.id+'">⚑ Red-flag</button></div>';
+    }
+    return badge+overlay;
+  }
   function photoCard(p){
     var cap=p.caption?String(p.caption):'';
     var capShort=cap.length>34?cap.slice(0,32)+'…':cap;
     return '<div class="fp-photo" data-pid="'+p.id+'">'
       +'<img loading="lazy" src="'+esc(p.thumb_url)+'" alt="">'
       +(p.taken_at_estimated?'<span class="fp-est">est date</span>':'')
+      +fpVis(p)
       +'<div class="fp-grad"></div><div class="fp-meta"><span>'+mdyShort(p.taken_at)+'</span>'
       +(cap?'<span class="fp-cap" title="'+esc(cap)+'">'+esc(capShort)+'</span>':'<span></span>')+'</div></div>';
+  }
+  async function fpShare(id){
+    var p=FP.byId[id]; if(!p) return;
+    try{
+      var r=await fetch('/api/field-photos/'+id+'/share',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({audience:'client',on:!p.shared_client}),credentials:'include'});
+      var j=await r.json();
+      if(j.error){ alert('Share failed: '+j.error); return; }
+      var st=j.data||{}; p.shared_client=!!st.shared_client; p.flagged=!!st.flagged;
+      renderGroups();
+    }catch(e){ alert('Network error sharing photo.'); }
+  }
+  async function fpFlag(id){
+    var p=FP.byId[id]; if(!p) return;
+    var on=!p.flagged;
+    if(on && !confirm('Take this photo OFFLINE for all external viewers (clients)? It is removed from their portal immediately. You can clear the flag later.')) return;
+    try{
+      var r=await fetch('/api/field-photos/'+id+'/redflag',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({on:on}),credentials:'include'});
+      var j=await r.json();
+      if(j.error){ alert('Failed: '+j.error); return; }
+      var st=j.data||{}; p.shared_client=!!st.shared_client; p.flagged=!!st.flagged;
+      renderGroups();
+    }catch(e){ alert('Network error.'); }
   }
   function renderGroups(){
     var host=$('fp-groups');
@@ -7351,7 +7404,11 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     $('fp-worker-filter').addEventListener('change',function(){FP.worker=this.value;loadGallery(true);});
     $('fp-loadmore-btn').addEventListener('click',function(){loadGallery(false);});
     // gallery click -> lightbox
-    $('fp-groups').addEventListener('click',function(e){var c=e.target.closest('[data-pid]');if(c)openLightbox(+c.getAttribute('data-pid'));});
+    $('fp-groups').addEventListener('click',function(e){
+      var sb=e.target.closest('[data-fp-share]'); if(sb){e.stopPropagation();fpShare(+sb.getAttribute('data-fp-share'));return;}   // #264 share toggle
+      var fb=e.target.closest('[data-fp-flag]');  if(fb){e.stopPropagation();fpFlag(+fb.getAttribute('data-fp-flag'));return;}     // #264 red-flag
+      var c=e.target.closest('[data-pid]');if(c)openLightbox(+c.getAttribute('data-pid'));
+    });
     // sort click -> select; select-group
     $('fp-clusters').addEventListener('click',function(e){
       var sa=e.target.closest('[data-cluster]');if(sa){selectGroup(+sa.getAttribute('data-cluster'));return;}
