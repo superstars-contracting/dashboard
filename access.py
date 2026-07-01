@@ -20,6 +20,11 @@ DASHBOARD_ROLES = frozenset({"admin", "c_suite", "pm", "super"})
 # templates AND the section passed to requires_section() on the endpoints.
 SECTION_ACCESS = {
     "financial": frozenset({"admin", "c_suite"}),
+    # #266 — CRM/ops core is a C-suite function: organizations, contacts, activity log,
+    # follow-up tasks + the "Needs Attention" feed. admin/c_suite ONLY; pm/super (and any
+    # external role) get 403 on every CRM endpoint and the CRM tab is absent from their nav.
+    # function-tags on the data are recorded for future role-slicing — NO new roles here.
+    "crm": frozenset({"admin", "c_suite"}),
 }
 
 # #263 — COMPANY axis. The company overview console (`/`) and its company-level tabs
