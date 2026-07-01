@@ -45,6 +45,7 @@ GATE = [
     "smoke_behavior_conventions.py",
     "smoke_pm_scoping_263.py",    # #263 — PM project-scoping (assignment + close lifecycle)
     "smoke_client_portal_264.py", # #264 — client portal + default-deny visibility engine
+    "smoke_crm_266.py",           # #266 — CRM/ops core (C-suite-gated; entities/activity/tasks/needs-attention)
     "smoke_dropplan_api.py",
     "smoke_worker_lifecycle.py",
     "smoke_dcr214_lifecycle.py",
@@ -78,6 +79,17 @@ def main() -> int:
     env = {**os.environ, "SMOKE_BASE": BASE}
     # static-exposure launches its own server; keep it off 5151 (operator preview) by default
     env.setdefault("SMOKE_STATIC_PORT", "5152")
+
+    # #262/#266 — an isolated SQLite copy of live inherits FK-OFF ORPHAN child rows
+    # (audit_log.actor_user_id, etc.) whose users.id target was long deleted. When a smoke
+    # seeds a fresh user whose auto-increment id COLLIDES with an orphan's ref, the enforced
+    # FK on the copy blocks that smoke's teardown DELETE (false FK failure). clean_user_orphans
+    # NULLs/DELETEs those orphans; it self-skips Postgres (cleaned during migration) and refuses
+    # to run against live. Self-healing here keeps the gate deterministic across DB snapshots.
+    orphan_rc = subprocess.run(
+        [str(VENV_PY), str(DASH / "clean_user_orphans.py")],
+        cwd=str(DASH), capture_output=True, text=True, env=env)
+    print((orphan_rc.stdout or "").strip() or "[orphans] (no output)")
 
     logf = open(DASH / "tests" / "_gate260_srv.log", "w", encoding="utf-8")
     srv = subprocess.Popen(
