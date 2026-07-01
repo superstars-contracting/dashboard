@@ -1,20 +1,22 @@
-"""#264 — read-only CLIENT portal + default-deny visibility engine guard. Dual-backend.
+"""#264 default-deny VISIBILITY ENGINE guard — #267 contains clients to /welcome. Dual-backend.
 
-The most security-sensitive surface in the app. Proves (fails on a pre-#264 server, where
-the portal/visibility endpoints don't exist and nothing is default-deny):
+The most security-sensitive surface in the app. #267 hard-contains a `client` to the welcome
+page (the portal is code-intact but NOT client-reachable yet), so this guard now verifies the
+default-deny ENGINE via its predicate (the exact functions the portal endpoints call) + the
+curated serializer directly, plus the client's containment:
 
-  (a) DEFAULT-DENY: a photo with no client share is NOT in the client gallery; sharing it
-      makes it appear; red-flag (take offline) removes it instantly. (literal fail->pass)
-  (b) PER-RESOURCE ISOLATION (closes the #263 by-ID gap): the client gets 200 on a SHARED
-      photo by id, but 404 on an UNSHARED one, a RED-FLAGGED one, an OTHER-PROJECT photo
-      (even one carrying a client share row), and a nonexistent id — guessing ids gets
-      nothing. The internal by-id endpoint (/api/field-photos/<id>/file) is 403 to a client.
-  (c) The client is 403 on a representative set of INTERNAL endpoints + other projects
-      (company console, internal project dashboard/API, drop plan, expenses, admin, the
-      other project) — the default-deny gate.
-  (d) CURATED-ONLY payload: the portal photos + project responses contain ONLY curated
-      fields — never cost / labor / rate / worker PII / *_path / internal fields.
-  READ-ONLY: the client cannot share, red-flag, patch, or otherwise write (403).
+  (a) DEFAULT-DENY ENGINE: a photo with no client share is NOT in the visible set; sharing it
+      flips the predicate to visible; red-flag (take offline) flips it back. (literal fail->pass)
+  (b) PER-RESOURCE ISOLATION (closes the #263 by-ID gap): visibility.photo_visible_to_client is
+      True for a SHARED in-project photo but False for an UNSHARED one, a RED-FLAGGED one, and
+      an OTHER-PROJECT photo (even one carrying a client share row).
+  (c) #267 CONTAINMENT: the client's every PAGE (/, /portal, /projects/<code>, /admin/*) → 302
+      redirect to /welcome; every DATA/API (portal, internal project, drop plan, expenses,
+      company, admin, by-id) → 403. The portal is no longer a reachable client surface.
+  (d) CURATED-ONLY serializer: client_portal._portal_photo emits ONLY curated keys — never
+      cost / labor / rate / worker PII / *_path / internal fields (the payload guarantee for
+      when the portal returns online per-section).
+  READ-ONLY: the client cannot share, red-flag, or patch (403).
   PER-RESOURCE WRITE: a pm may share a photo on an ASSIGNED project but 403 on a project
       they aren't assigned to (the share endpoint re-derives the photo's project).
 
@@ -215,6 +217,10 @@ def _scan_forbidden(obj, hits, where=""):
             _scan_forbidden(v, hits, f"{where}[{i}]")
 
 
+def _visible(conn, code):
+    return set(visibility.client_visible_photo_ids(conn, code))
+
+
 def run():
     admin = _login("admin"); pm = _login("pm"); pm2 = _login("pm2"); client = _login("client")
     if not ok("logins", all([admin, pm, pm2, client]), "could not log in synthetic users"):
@@ -222,55 +228,62 @@ def run():
 
     pS, pU, pF, pO = PHOTOS["shared"], PHOTOS["unshared"], PHOTOS["flagged"], PHOTOS["other"]
 
-    # ---- (a) default-deny gallery ----
-    ids = _portal_photo_ids(client)
-    ok("client_gallery_only_shared",
-       ids is not None and pS in ids and pU not in ids and pF not in ids and pO not in ids,
-       f"gallery must contain ONLY the shared in-project photo")
+    # ---- (a)+(b) DEFAULT-DENY ENGINE + PER-RESOURCE ISOLATION, via the predicate (#267 —
+    #      the portal is not client-reachable, so verify the exact engine the portal calls) ----
+    conn = db_layer.connect(pragma_fk=True)
+    try:
+        vis = _visible(conn, PROJ_A)
+        ok("engine_visible_only_shared",
+           pS in vis and pU not in vis and pF not in vis and pO not in vis,
+           "the client-visible set must be ONLY the shared in-project photo")
+        ok("engine_shared_visible", visibility.photo_visible_to_client(conn, pS, PROJ_A) is True)
+        ok("engine_unshared_hidden", not visibility.photo_visible_to_client(conn, pU, PROJ_A))
+        ok("engine_flagged_hidden", not visibility.photo_visible_to_client(conn, pF, PROJ_A))
+        ok("engine_other_project_hidden", not visibility.photo_visible_to_client(conn, pO, PROJ_A),
+           "an other-project photo (even shared to client) is not visible in the client's project")
+    finally:
+        conn.close()
 
-    # ---- (b) per-resource isolation (by-id) ----
-    ok("byid_shared_200", _sc(client, "GET", f"/api/portal/photos/{pS}/file") == 200)
-    ok("byid_unshared_404", _sc(client, "GET", f"/api/portal/photos/{pU}/file") == 404)
-    ok("byid_flagged_404", _sc(client, "GET", f"/api/portal/photos/{pF}/file") == 404)
-    ok("byid_other_project_404", _sc(client, "GET", f"/api/portal/photos/{pO}/file") == 404,
-       "an other-project photo (even shared to client) is 404")
-    ok("byid_nonexistent_404", _sc(client, "GET", "/api/portal/photos/99999999/file") == 404)
-    ok("byid_thumb_shared_200", _sc(client, "GET", f"/api/portal/photos/{pS}/thumb") == 200)
-    # the INTERNAL by-id endpoint is unreachable to a client (default-deny gate)
-    ok("client_internal_byid_403", _sc(client, "GET", f"/api/field-photos/{pS}/file") == 403)
-
-    # ---- (c) client 403 on internal endpoints + other projects ----
-    internal = {
-        "company_console": ("GET", "/"),
-        "internal_project_dash": ("GET", f"/projects/{PROJ_A}"),
-        "internal_project_photos": ("GET", f"/api/projects/{PROJ_A}/photos"),
-        "other_project_photos": ("GET", f"/api/projects/{PROJ_B}/photos"),
-        "dropplan_rollup": ("GET", f"/api/dropplan/projects/{PROJ_A}/rollup"),
-        "expenses": ("GET", f"/api/projects/{PROJ_A}/expenses"),
-        "company_summary": ("GET", "/api/company/summary"),
-        "workforce": ("GET", "/api/workers/intake-summary"),
-        "admin_users": ("GET", "/admin/users"),
-        "admin_pm_assignments": ("GET", "/api/admin/pm-assignments"),
-        "labor_rates": ("GET", "/api/labor-rates/workers"),
+    # ---- (c) #267 CONTAINMENT: every client PAGE -> 302 /welcome; every API -> 403 ----
+    def _page_to_welcome(path):
+        r = client.get(f"{BASE}{path}", timeout=15, allow_redirects=False)
+        return (r.status_code in (301, 302, 303, 307, 308)
+                and r.headers.get("Location", "").rstrip("/").endswith("/welcome"))
+    ok("client_portal_not_reachable", _page_to_welcome("/portal"),
+       "the #264 portal now bounces the client to /welcome")
+    ok("client_company_console_to_welcome", _page_to_welcome("/"))
+    ok("client_project_dash_to_welcome", _page_to_welcome(f"/projects/{PROJ_A}"))
+    ok("client_admin_users_to_welcome", _page_to_welcome("/admin/users"))
+    apis = {
+        "portal_photos": "/api/portal/photos",
+        "portal_photo_byid": f"/api/portal/photos/{pS}/file",
+        "internal_project_photos": f"/api/projects/{PROJ_A}/photos",
+        "other_project_photos": f"/api/projects/{PROJ_B}/photos",
+        "dropplan_rollup": f"/api/dropplan/projects/{PROJ_A}/rollup",
+        "expenses": f"/api/projects/{PROJ_A}/expenses",
+        "company_summary": "/api/company/summary",
+        "admin_pm_assignments": "/api/admin/pm-assignments",
+        "internal_byid": f"/api/field-photos/{pS}/file",
     }
-    for name, (m, p) in internal.items():
-        ok(f"client_403_{name}", _sc(client, m, p) == 403, f"{m} {p}")
+    for name, p in apis.items():
+        ok(f"client_api_403_{name}", _sc(client, "GET", p) == 403, f"GET {p}")
 
-    # ---- (d) curated-only payloads ----
-    proj = client.get(f"{BASE}/api/portal/project", timeout=15).json()
-    photos = client.get(f"{BASE}/api/portal/photos", timeout=15).json()
+    # ---- (d) CURATED-ONLY serializer (tested directly; the portal payload guarantee) ----
+    import client_portal
+    conn = db_layer.connect(pragma_fk=True)
+    try:
+        row = conn.execute("SELECT * FROM field_photos WHERE id=?", (pS,)).fetchone()
+        curated = client_portal._portal_photo(row)
+    finally:
+        conn.close()
     hits = []
-    _scan_forbidden(proj, hits, "project")
-    _scan_forbidden(photos, hits, "photos")
-    ok("payload_curated_only", not hits, f"forbidden keys in client payload: {hits}")
-    # the one shared photo carries ONLY the curated keys
-    plist = photos.get("data", {}).get("photos") or []
-    if plist:
-        keys = set(plist[0].keys())
-        ok("photo_keys_minimal", keys <= {"id", "caption", "taken_at", "thumb_url", "file_url"},
-           f"unexpected photo keys: {keys}")
+    _scan_forbidden(curated, hits, "photo")
+    ok("curated_serializer_no_pii", not hits, f"forbidden keys in curated photo: {hits}")
+    ok("curated_serializer_minimal_keys",
+       set(curated.keys()) <= {"id", "caption", "taken_at", "thumb_url", "file_url"},
+       f"unexpected curated keys: {set(curated.keys())}")
 
-    # ---- READ-ONLY: client cannot write ----
+    # ---- READ-ONLY: client cannot write (403 via the containment gate) ----
     ok("client_cannot_share", _sc(client, "POST", f"/api/field-photos/{pS}/share",
                                    json={"audience": "client", "on": False}) == 403)
     ok("client_cannot_redflag", _sc(client, "POST", f"/api/field-photos/{pS}/redflag",
@@ -278,18 +291,24 @@ def run():
     ok("client_cannot_patch_photo", _sc(client, "PATCH", f"/api/field-photos/{pS}",
                                         json={"caption": "x"}) == 403)
 
-    # ---- (a) fail->pass: share an unshared photo -> appears; red-flag -> disappears ----
+    # ---- (a) fail->pass: share flips the engine predicate to visible; red-flag flips it back ----
     ok("admin_share_unshared",
        admin.post(f"{BASE}/api/field-photos/{pU}/share", json={"audience": "client", "on": True},
                   timeout=15).status_code == 200)
-    ids2 = _portal_photo_ids(client)
-    ok("shared_now_appears", ids2 is not None and pU in ids2, "after share, photo appears in gallery")
-    ok("shared_now_byid_200", _sc(client, "GET", f"/api/portal/photos/{pU}/file") == 200)
+    conn = db_layer.connect(pragma_fk=True)
+    try:
+        ok("shared_now_visible", visibility.photo_visible_to_client(conn, pU, PROJ_A) is True,
+           "after share, the engine reports the photo visible to the client")
+    finally:
+        conn.close()
     ok("admin_redflag",
        admin.post(f"{BASE}/api/field-photos/{pU}/redflag", json={"on": True}, timeout=15).status_code == 200)
-    ids3 = _portal_photo_ids(client)
-    ok("redflag_removes_instantly", ids3 is not None and pU not in ids3, "red-flag pulls it offline")
-    ok("redflag_byid_404", _sc(client, "GET", f"/api/portal/photos/{pU}/file") == 404)
+    conn = db_layer.connect(pragma_fk=True)
+    try:
+        ok("redflag_removes_instantly", not visibility.photo_visible_to_client(conn, pU, PROJ_A),
+           "red-flag pulls it offline (engine predicate)")
+    finally:
+        conn.close()
 
     # ---- per-resource WRITE: pm assigned can share; pm NOT assigned -> 403 ----
     ok("pm_assigned_can_share",

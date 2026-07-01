@@ -45,6 +45,7 @@ GATE = [
     "smoke_behavior_conventions.py",
     "smoke_pm_scoping_263.py",    # #263 — PM project-scoping (assignment + close lifecycle)
     "smoke_client_portal_264.py", # #264 — client portal + default-deny visibility engine
+    "smoke_client_welcome_267.py",# #267 — client welcome hard-stop containment (client → /welcome only)
     "smoke_crm_266.py",           # #266 — CRM/ops core (C-suite-gated; entities/activity/tasks/needs-attention)
     "smoke_dropplan_api.py",
     "smoke_worker_lifecycle.py",
