@@ -239,6 +239,39 @@ def main() -> int:
                 wr = wsess.post(f"{BASE}/api/auth/set-password", json={"new_password": "short1"}, timeout=15)
                 check("weak password rejected (400)", wr.status_code == 400, f"got {wr.status_code}")
 
+        # ---------- (e2) #268: CLIENT onboardable via the Create-user UI -> welcome hard-stop ----------
+        print("\n== (e2) #268 create a CLIENT via the admin UI -> forced reset -> welcome ==")
+        # fail->pass: the Create-user dropdown must OFFER the client role (the UI surface)
+        admin_page = (Path(__file__).resolve().parent.parent / "admin_users.html").read_text(encoding="utf-8", errors="replace")
+        check("(e2) create-user dropdown offers the client role",
+              'value="client"' in admin_page, "admin_users.html Create-user <select> must list client")
+        CLIENT_EMAIL = "smk257-client@example.invalid"   # smk257-% => cleaned up by cleanup()
+        cc = admin.post(f"{BASE}/api/admin/users",
+                        json={"display_name": "SMK 268 Client", "email": CLIENT_EMAIL, "role": "client"}, timeout=15)
+        check("(e2) admin creates a CLIENT (201 + temp password)",
+              cc.status_code == 201 and bool(jbody(cc).get("temp_password")), f"got {cc.status_code}")
+        cdata = jbody(cc).get("data") or {}
+        check("(e2) created user role=client + must_reset",
+              cdata.get("role") == "client" and bool(cdata.get("must_reset_password")),
+              f"role={cdata.get('role')} must_reset={cdata.get('must_reset_password')}")
+        cpw = jbody(cc).get("temp_password") if cc.status_code == 201 else None
+        if cpw:
+            csess, clog = login(CLIENT_EMAIL, cpw)
+            check("(e2) client logs in with temp password (200)", clog.status_code == 200, f"got {clog.status_code}")
+            check("(e2) login signals must_reset", bool((jbody(clog).get("user") or {}).get("must_reset_password")))
+            sp = csess.post(f"{BASE}/api/auth/set-password", json={"new_password": NEW_PW}, timeout=15)
+            check("(e2) client set-password succeeds (200)", sp.status_code == 200, f"got {sp.status_code}")
+            # #267 — after reset the client is CONTAINED: /welcome serves; every other page -> /welcome; API -> 403
+            w = csess.get(f"{BASE}/welcome", timeout=15)
+            check("(e2) client /welcome serves (200)", w.status_code == 200, f"got {w.status_code}")
+            portal = csess.get(f"{BASE}/portal", timeout=15, allow_redirects=False)
+            check("(e2) client page -> redirect to /welcome (contained)",
+                  portal.status_code in (301, 302, 303, 307, 308)
+                  and portal.headers.get("Location", "").rstrip("/").endswith("/welcome"),
+                  f"got {portal.status_code} {portal.headers.get('Location')}")
+            api = csess.get(f"{BASE}/api/portal/project", timeout=15)
+            check("(e2) client API -> 403 (contained)", api.status_code == 403, f"got {api.status_code}")
+
         # ---------- (f) login_audit captured ----------
         print("\n== (f) login_audit captured ==")
         # a deliberate bad login -> login_fail
