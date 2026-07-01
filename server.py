@@ -46,6 +46,7 @@ app.register_blueprint(preview_bp)
 from auth import (apply_auth_gate, requires_role, requires_section,  # noqa: F401
                   requires_company, current_user)
 import access  # #262 — central section→roles map (RBAC single source of truth)
+import crm  # #266 — CRM/ops core logic (shared by the endpoints + the guard smoke)
 apply_auth_gate(app)
 
 # Admin account management — multi-user accounts & roles, Phase 1 (#257). Every
@@ -6038,6 +6039,332 @@ def api_company_summary():
             "certs": {"valid": valid, "expiring_30d": expiring_30, "expired": expired,
                       "total": valid + expired}
         })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+# ================= #266 — CRM / OPS CORE (C-suite function) =================
+# The four primitives — organizations, contacts, activity log, follow-up tasks — plus the
+# project->client link and the "Needs Attention" feed. EVERY route below is
+# @requires_section('crm'); access.py SECTION_ACCESS['crm'] = {admin, c_suite}, so pm /
+# super / any external role get 403 SERVER-SIDE (hiding the nav is not access control).
+# Logic lives in crm.py (shared with tests/smoke_crm_266.py). LOCAL dates only (CLAUDE.md
+# dates rule). Activity/task entities are organization|contact this build; 'project' stays
+# in the vocabulary (scale-ready) — the project<->client relationship is client_org_id.
+
+def _crm_uid():
+    return (current_user() or {}).get("id")
+
+
+def _crm_pick(d, keys):
+    return {k: d[k] for k in keys if k in d}
+
+
+# ---- organizations ----
+@app.route('/api/crm/organizations', methods=['GET'])
+@requires_section('crm')
+def api_crm_orgs_list():
+    try:
+        conn = db()
+        rows = crm.list_orgs(
+            conn, search=request.args.get('search'),
+            relationship_type=request.args.get('relationship_type'),
+            stage=request.args.get('stage'), function_tag=request.args.get('function_tag'))
+        conn.close()
+        return response_wrapper(rows, count=len(rows))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/crm/organizations', methods=['POST'])
+@requires_section('crm')
+def api_crm_org_create():
+    try:
+        d = request.get_json(silent=True) or {}
+        conn = db()
+        oid = crm.create_org(
+            conn, name=d.get('name'), relationship_type=d.get('relationship_type'),
+            status=d.get('status') or 'active', stage=d.get('stage'),
+            function_tags=d.get('function_tags'), notes=d.get('notes'), created_by=_crm_uid())
+        org = crm.get_org(conn, oid)
+        conn.close()
+        return response_wrapper({"id": oid, "organization": org})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/crm/organizations/<int:org_id>', methods=['GET'])
+@requires_section('crm')
+def api_crm_org_get(org_id):
+    """Entity detail: the org + its contacts + activity timeline + open tasks + linked projects."""
+    try:
+        conn = db()
+        org = crm.get_org(conn, org_id)
+        if not org:
+            conn.close()
+            return jsonify({"error": "not found"}), 404
+        payload = {
+            "organization": org,
+            "contacts": crm.list_contacts(conn, org_id=org_id),
+            "timeline": crm.list_activity(conn, entity_type='organization', entity_id=org_id),
+            "open_tasks": crm.list_tasks(conn, status='open', entity_type='organization', entity_id=org_id),
+            "linked_projects": crm.list_org_projects(conn, org_id),
+        }
+        conn.close()
+        return response_wrapper(payload)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/crm/organizations/<int:org_id>', methods=['PUT'])
+@requires_section('crm')
+def api_crm_org_update(org_id):
+    try:
+        d = request.get_json(silent=True) or {}
+        conn = db()
+        ok = crm.update_org(conn, org_id, actor_user_id=_crm_uid(),
+                            **_crm_pick(d, ('name', 'relationship_type', 'status', 'stage', 'notes', 'function_tags')))
+        if not ok:
+            conn.close()
+            return jsonify({"error": "not found"}), 404
+        org = crm.get_org(conn, org_id)
+        conn.close()
+        return response_wrapper({"organization": org})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+# ---- contacts ----
+@app.route('/api/crm/contacts', methods=['GET'])
+@requires_section('crm')
+def api_crm_contacts_list():
+    try:
+        conn = db()
+        rows = crm.list_contacts(conn, org_id=request.args.get('org_id', type=int))
+        conn.close()
+        return response_wrapper(rows, count=len(rows))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/crm/contacts', methods=['POST'])
+@requires_section('crm')
+def api_crm_contact_create():
+    try:
+        d = request.get_json(silent=True) or {}
+        conn = db()
+        cid = crm.create_contact(
+            conn, full_name=d.get('full_name'), org_id=d.get('org_id'), email=d.get('email'),
+            phone=d.get('phone'), title=d.get('title'), relationship_type=d.get('relationship_type'),
+            status=d.get('status') or 'active', notes=d.get('notes'), created_by=_crm_uid())
+        contact = crm.get_contact(conn, cid)
+        conn.close()
+        return response_wrapper({"id": cid, "contact": contact})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/crm/contacts/<int:contact_id>', methods=['GET'])
+@requires_section('crm')
+def api_crm_contact_get(contact_id):
+    try:
+        conn = db()
+        contact = crm.get_contact(conn, contact_id)
+        if not contact:
+            conn.close()
+            return jsonify({"error": "not found"}), 404
+        payload = {
+            "contact": contact,
+            "organization": crm.get_org(conn, contact['org_id']) if contact.get('org_id') else None,
+            "timeline": crm.list_activity(conn, entity_type='contact', entity_id=contact_id),
+            "open_tasks": crm.list_tasks(conn, status='open', entity_type='contact', entity_id=contact_id),
+        }
+        conn.close()
+        return response_wrapper(payload)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/crm/contacts/<int:contact_id>', methods=['PUT'])
+@requires_section('crm')
+def api_crm_contact_update(contact_id):
+    try:
+        d = request.get_json(silent=True) or {}
+        conn = db()
+        ok = crm.update_contact(conn, contact_id,
+                                **_crm_pick(d, ('org_id', 'full_name', 'email', 'phone', 'title',
+                                                'relationship_type', 'status', 'notes')))
+        if not ok:
+            conn.close()
+            return jsonify({"error": "not found"}), 404
+        contact = crm.get_contact(conn, contact_id)
+        conn.close()
+        return response_wrapper({"contact": contact})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+# ---- activity (the timeline) ----
+@app.route('/api/crm/activity', methods=['POST'])
+@requires_section('crm')
+def api_crm_activity_add():
+    try:
+        d = request.get_json(silent=True) or {}
+        conn = db()
+        aid = crm.add_activity(
+            conn, entity_type=d.get('entity_type'), entity_id=d.get('entity_id'),
+            activity_type=d.get('activity_type') or 'note', summary=d.get('summary'),
+            body=d.get('body'), author_user_id=_crm_uid(), occurred_at=d.get('occurred_at'))
+        conn.close()
+        return response_wrapper({"id": aid})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/crm/activity', methods=['GET'])
+@requires_section('crm')
+def api_crm_activity_list():
+    try:
+        et = request.args.get('entity_type')
+        eid = request.args.get('entity_id', type=int)
+        if not et or eid is None:
+            return jsonify({"error": "entity_type and entity_id required"}), 400
+        conn = db()
+        rows = crm.list_activity(conn, entity_type=et, entity_id=eid)
+        conn.close()
+        return response_wrapper(rows, count=len(rows))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+# ---- tasks + needs-attention ----
+@app.route('/api/crm/tasks', methods=['POST'])
+@requires_section('crm')
+def api_crm_task_create():
+    try:
+        d = request.get_json(silent=True) or {}
+        conn = db()
+        tid = crm.create_task(
+            conn, title=d.get('title'), entity_type=d.get('entity_type') or 'none',
+            entity_id=d.get('entity_id'), detail=d.get('detail'), due_date=d.get('due_date'),
+            assignee_user_id=d.get('assignee_user_id'), priority=d.get('priority') or 'normal',
+            function_tag=d.get('function_tag'), created_by=_crm_uid())
+        conn.close()
+        return response_wrapper({"id": tid})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/crm/tasks', methods=['GET'])
+@requires_section('crm')
+def api_crm_tasks_list():
+    try:
+        conn = db()
+        rows = crm.list_tasks(
+            conn, status=request.args.get('status'),
+            assignee_user_id=request.args.get('assignee_user_id', type=int),
+            function_tag=request.args.get('function_tag'))
+        conn.close()
+        return response_wrapper(rows, count=len(rows))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/crm/tasks/<int:task_id>/complete', methods=['POST'])
+@requires_section('crm')
+def api_crm_task_complete(task_id):
+    try:
+        conn = db()
+        ok = crm.complete_task(conn, task_id)
+        conn.close()
+        if not ok:
+            return jsonify({"error": "not found"}), 404
+        return response_wrapper({"id": task_id, "status": "done"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/crm/needs-attention', methods=['GET'])
+@requires_section('crm')
+def api_crm_needs_attention():
+    """Open + overdue tasks, prioritized. ?mine=1 scopes to the caller; ?function_tag= filters."""
+    try:
+        mine = request.args.get('mine') in ('1', 'true', 'yes')
+        conn = db()
+        rows = crm.needs_attention(
+            conn, assignee_user_id=_crm_uid() if mine else None,
+            function_tag=request.args.get('function_tag'))
+        conn.close()
+        return response_wrapper(rows, count=len(rows))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+# ---- project <-> client-org link ----
+@app.route('/api/crm/projects/<project_code>/link', methods=['POST'])
+@requires_section('crm')
+def api_crm_link_project(project_code):
+    """Body {org_id:<id>} to link, {org_id:null} to unlink."""
+    try:
+        d = request.get_json(silent=True) or {}
+        org_id = d.get('org_id')
+        conn = db()
+        ok = crm.link_project(conn, project_code, org_id)
+        conn.close()
+        if not ok:
+            return jsonify({"error": "project not found"}), 404
+        return response_wrapper({"project_code": project_code, "client_org_id": org_id})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+# ---- console surfacing + assignable users ----
+@app.route('/api/crm/console', methods=['GET'])
+@requires_section('crm')
+def api_crm_console():
+    """Light C-suite surfacing: needs-attention count + top items, pipeline by stage, recent feed."""
+    try:
+        conn = db()
+        na = crm.needs_attention(conn)
+        payload = {
+            "needs_attention_count": len(na),
+            "overdue_count": sum(1 for t in na if t.get('overdue')),
+            "needs_attention_top": na[:6],
+            "pipeline": crm.pipeline_by_stage(conn),
+            "recent_activity": crm.recent_activity(conn, limit=12),
+        }
+        conn.close()
+        return response_wrapper(payload)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route('/api/crm/assignable-users', methods=['GET'])
+@requires_section('crm')
+def api_crm_assignable_users():
+    """Active staff for the task-assignee dropdown (internal names only — no worker PII)."""
+    try:
+        conn = db()
+        rows = conn.execute(
+            "SELECT id, COALESCE(display_name, full_name, email) AS name, role FROM users "
+            "WHERE is_active = 1 AND COALESCE(status,'active') = 'active' "
+            "ORDER BY COALESCE(display_name, full_name, email)").fetchall()
+        conn.close()
+        return response_wrapper([dict(r) for r in rows], count=len(rows))
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
