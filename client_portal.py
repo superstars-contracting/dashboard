@@ -1,11 +1,14 @@
-"""#264 — read-only CLIENT portal + the client DEFAULT-DENY gate (North Star §5/§6/§8).
+"""#264 CLIENT portal + the client DEFAULT-DENY gate — #267 contains clients to /welcome.
 
 The most security-sensitive surface in the app. Posture:
 
-  * DEFAULT-DENY GATE. A `client` may reach ONLY the portal page, the portal API, and auth
-    (`_client_gate`). EVERY other path — company dashboard, internal project endpoints,
-    field-photos admin, drop plan, labor, expenses, admin, by-ID internal fetches, other
-    projects — returns 403 by construction. There is no internal endpoint a client can hit.
+  * DEFAULT-DENY GATE. #267 — for now a `client` has NO access grants, so `_client_gate`
+    HARD-CONTAINS them to the welcome/pending page + auth: EVERY other page redirects to
+    /welcome and every API returns 403 by construction (company dashboard, portal, crm,
+    internal project endpoints, field-photos, drop plan, admin, by-ID fetches — none
+    reachable). The #264 portal below stays code-intact but is NOT client-reachable yet;
+    per-section un-gating returns when the access-grant system is built. The remaining
+    portal design notes describe that future-reachable surface:
   * PROJECT-SCOPED. A client is assigned to exactly ONE project (pm_project_assignment,
     generalized from #263). They see only that project, and only while it is active.
   * PER-RESOURCE ISOLATION (closes the #263 by-ID gap). Every by-ID fetch re-derives
@@ -24,7 +27,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from flask import Response, jsonify, request, send_file
+from flask import Response, jsonify, redirect, request, send_file
 
 from auth import _db, current_user, requires_role
 import visibility
@@ -32,26 +35,19 @@ import dropplan_rollups as _rollups
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PORTAL_PAGE = SCRIPT_DIR / "client_portal.html"
+WELCOME_PAGE = SCRIPT_DIR / "welcome.html"   # #267 — the client hard-stop
 _FP_BASE = SCRIPT_DIR / "data_room" / "field_photos"
 
-# ============= CLIENT DEFAULT-DENY GATE =============
-# The ONLY paths a `client` may reach. Everything else -> 403. Auth endpoints stay open
-# (login / logout / me / forced set-password); the portal page + API; vendored static
-# shell assets; and the two public no-data endpoints the shells ping on load.
-_CLIENT_ALLOW_PREFIXES = ("/api/portal/", "/api/auth/", "/files/static/")
-_CLIENT_ALLOW_EXACT = {"/portal", "/set-password", "/api/health", "/api/today"}
-
-_FORBIDDEN_HTML = (
-    "<!doctype html><meta charset=utf-8><title>Not available</title>"
-    "<div style=\"font-family:Inter,system-ui,sans-serif;max-width:480px;margin:18vh auto;"
-    "text-align:center;color:#222633\">"
-    "<div style=\"font-size:15px;font-weight:700;color:#B11E2E;letter-spacing:.5px\">NOT AVAILABLE</div>"
-    "<p style=\"color:#76777E;font-size:14px;line-height:1.6;margin:14px 0 22px\">"
-    "This page isn't part of your project portal.</p>"
-    "<a href=\"/portal\" style=\"display:inline-block;background:#B11E2E;color:#fff;"
-    "text-decoration:none;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600\">"
-    "&larr; Back to your project</a></div>"
-)
+# ============= CLIENT DEFAULT-DENY GATE — #267: contain to /welcome =============
+# For now a `client` has NO access grants, so they are HARD-CONTAINED to the welcome/pending
+# page + auth. The ONLY paths a client may reach: /welcome, the forced-reset page, the auth
+# API, the two public no-data pings, and the vendored static assets the welcome page loads.
+# Every other PAGE -> redirect to /welcome; every API -> 403 — server-side, so no portal,
+# internal, admin, drop-plan, crm, or by-ID surface is reachable even by direct URL.
+# (The #264 portal endpoints below stay REGISTERED — code-intact — but are NOT client-
+# reachable yet; per-section un-gating returns when the access-grant system is built.)
+_CLIENT_ALLOW_PREFIXES = ("/api/auth/", "/files/static/")
+_CLIENT_ALLOW_EXACT = {"/welcome", "/set-password", "/api/health", "/api/today"}
 
 
 def _client_allowed(path: str) -> bool:
@@ -61,18 +57,19 @@ def _client_allowed(path: str) -> bool:
 
 
 def _client_gate():
-    """Registered AFTER the auth gate (g.auth_user set). For a `client`, default-deny:
-    reject everything outside the portal/auth allowlist — server-side, so no internal
-    surface or by-ID resource is reachable even by direct URL."""
+    """Registered AFTER the auth gate (g.auth_user set). A `client` is hard-contained to the
+    welcome page + auth (#267): default-deny everything else — every PAGE redirects to
+    /welcome, every API returns 403 — server-side, so no portal/internal/by-ID resource is
+    reachable even by direct URL. Grants (per-section un-gating) are a later build."""
     user = current_user()
     if not user or user.get("role") != "client":
         return None  # non-clients handled by their own gates
     if _client_allowed(request.path):
         return None
-    logging.info(f"client_portal: default-deny block path={request.path}")
+    logging.info(f"client_portal: contain block path={request.path}")
     if request.path.startswith("/api/"):
         return jsonify({"error": "forbidden"}), 403
-    return Response(_FORBIDDEN_HTML, status=403, mimetype="text/html")
+    return redirect("/welcome")
 
 
 # ============= CLIENT PROJECT SCOPE =============
@@ -113,6 +110,20 @@ def _progress_label(pct: float) -> str:
     if pct < 80:
         return "In progress"
     return "Nearing completion"
+
+
+# ============= WELCOME / PENDING HARD-STOP (#267) =============
+
+def _welcome_page():
+    """The client welcome/pending page — the contained dead-end. Served to any authenticated
+    user (the auth gate enforces login; the client gate routes clients here). No-store."""
+    if not WELCOME_PAGE.exists():
+        return ("welcome page missing", 500)
+    resp = send_file(str(WELCOME_PAGE))
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 # ============= PORTAL ENDPOINTS (client-only, read-only) =============
@@ -235,6 +246,7 @@ def register(app) -> None:
     default-deny for the client role, and every portal endpoint is requires_role('client')
     + project-scoped + per-resource visibility-checked."""
     app.before_request(_client_gate)
+    app.add_url_rule("/welcome", "client_welcome_page", _welcome_page, methods=["GET"])  # #267 hard-stop
     app.add_url_rule("/portal", "client_portal_page", _portal_page, methods=["GET"])
     app.add_url_rule("/api/portal/project", "client_portal_project", _portal_project, methods=["GET"])
     app.add_url_rule("/api/portal/photos", "client_portal_photos", _portal_photos, methods=["GET"])

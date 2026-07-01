@@ -138,6 +138,12 @@ def _scoping_gate():
     user = current_user()
     if not user:
         return None
+    # #267 — a `client` is governed ENTIRELY by the client containment gate (client_portal):
+    # every page -> /welcome, every API -> 403. Defer here so a project PAGE bounces to
+    # /welcome instead of showing this gate's 403 (pm_can_access_project still denies clients
+    # everywhere else, defense-in-depth intact).
+    if user.get("role") == "client":
+        return None
     code = project_code_from_path(request.path)
     if code is None:
         return None
