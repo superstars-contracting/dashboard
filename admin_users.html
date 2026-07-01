@@ -86,7 +86,7 @@
     <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Last login</th><th style="text-align:right;">Actions</th></tr></thead>
     <tbody id="rows"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
   </table>
-  <div style="text-align:center;color:var(--muted);font-size:11px;letter-spacing:.04em;margin-top:24px;padding-top:14px;border-top:1px solid var(--line);">build #258 · 2026-06-22 · Admin console nav (home/dashboard links + admin-only Users entry) · test fixtures hidden via is_system · real-only single-admin invariant · randomized fixture passwords</div>
+  <div style="text-align:center;color:var(--muted);font-size:11px;letter-spacing:.04em;margin-top:24px;padding-top:14px;border-top:1px solid var(--line);">build #268 · 2026-06-30 · Create-user dropdown offers Client (external — forced first-login reset → welcome hard-stop until access is granted); admin stays non-creatable (single-admin invariant)</div>
 </div>
 
 <!-- Create-user modal -->
@@ -103,6 +103,7 @@
       <select id="c-role" class="ssc-field">
         <option value="c_suite">C-Suite — all operations + full cost &amp; rate approval</option>
         <option value="pm">PM — project ops + job cost (no individual rates)</option>
+        <option value="client">Client — external; lands on the welcome page until access is granted</option>
       </select>
       <div class="m-err" id="create-err"></div>
       <div class="modal-foot">
