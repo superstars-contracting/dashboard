@@ -267,6 +267,95 @@
     transition: opacity 0.25s, transform 0.25s; z-index: 50; white-space: nowrap; }
   .cc-layout-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .brand-mark,.mark{object-fit:contain;}  /* #265 swap-safe logo */
+
+  /* ===== #266 CRM / Ops core ===== */
+  .crm-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:16px; }
+  .crm-sub { font-size:12px; color:var(--mute); margin-top:3px; }
+  .crm-actions { display:flex; gap:8px; flex:none; }
+  .crm-strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; margin-bottom:20px; }
+  .crm-card { background:#fff; border:1px solid var(--accent-edge); border-radius:14px; padding:15px 17px;
+              box-shadow: inset 0 0 13px var(--accent-in), 0 1px 4px rgba(0,0,0,.04); min-height:120px; }
+  .crm-card h3 { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#54505A; margin:0 0 10px; }
+  .crm-bignum { font-weight:800; font-size:30px; line-height:1; color:#14161C; }
+  .crm-bignum .crm-over { color:var(--status-behind); font-size:14px; font-weight:700; margin-left:8px; }
+  .crm-chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .crm-chip { display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:600; color:#41414c;
+              background:var(--accent-soft); border:1px solid var(--accent-edge); border-radius:999px; padding:3px 9px; }
+  .crm-chip b { color:var(--accent-ink); }
+  .crm-tag { display:inline-block; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.03em;
+             color:#0F6E56; background:rgba(15,110,86,.12); border-radius:999px; padding:1px 7px; margin:1px 2px 1px 0; }
+  .crm-mini { font-size:12px; color:#54505A; }
+  .crm-mini-row { padding:5px 0; border-bottom:1px solid #F2EFE7; display:flex; gap:8px; }
+  .crm-mini-row:last-child { border-bottom:0; }
+  .crm-mini-when { margin-left:auto; color:#9a96a2; font-size:11px; white-space:nowrap; }
+  .crm-subtabs { display:flex; gap:6px; margin-bottom:14px; }
+  .crm-subtab { padding:7px 14px; font-size:12.5px; font-weight:700; color:var(--mute); cursor:pointer; border-radius:8px; }
+  .crm-subtab.active { color:#fff; background:var(--accent); }
+  .crm-filters { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:14px; }
+  .crm-filters .ssc-field { width:auto; min-width:150px; height:36px; }
+  .crm-filters input.ssc-field { min-width:220px; }
+  .crm-filters label { font-size:12px; color:#54505A; display:flex; align-items:center; gap:6px; }
+  .crm-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .crm-table th { text-align:left; background:#14161C; color:#fff; padding:8px 12px; font-size:10px;
+                  text-transform:uppercase; letter-spacing:.05em; font-weight:700; }
+  .crm-table td { padding:9px 12px; border-bottom:1px solid #F2EFE7; vertical-align:middle; }
+  .crm-table tbody tr { cursor:pointer; }
+  .crm-table tbody tr:hover { background:#FCFBF8; }
+  .crm-name { font-weight:700; color:var(--brand-red); }
+  .crm-badge { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:2px 8px;
+               border-radius:999px; background:#eef0f4; color:#54505A; }
+  .crm-badge.stage-onboarding { background:#e7eefe; color:#3a5fd0; }
+  .crm-badge.stage-active { background:#e7f6f0; color:#0c7a5f; }
+  .crm-badge.stage-closed { background:#f2efe7; color:#8a8064; }
+  .crm-overdue { color:var(--status-behind); font-weight:700; }
+  .crm-empty { text-align:center; color:#76777E; padding:26px 10px; }
+  .crm-back { display:inline-block; margin-bottom:14px; font-size:13px; font-weight:600; color:var(--accent-ink); cursor:pointer; }
+  .crm-detail-grid { display:grid; grid-template-columns:280px 1fr; gap:18px; align-items:start; }
+  @media (max-width:820px){ .crm-detail-grid{ grid-template-columns:1fr; } }
+  .crm-detail-info { background:#fff; border:1px solid var(--accent-edge); border-radius:14px; padding:16px 18px;
+                     box-shadow: inset 0 0 13px var(--accent-in), 0 1px 4px rgba(0,0,0,.04); }
+  .crm-detail-info h2 { font-size:19px; margin:0 0 4px; }
+  .crm-kv { font-size:12.5px; color:#54505A; margin:8px 0; }
+  .crm-kv .k { text-transform:uppercase; font-size:10px; letter-spacing:.05em; color:#9a96a2; display:block; }
+  .crm-box { background:#fff; border:1px solid var(--accent-edge); border-radius:14px; padding:14px 18px; margin-bottom:14px;
+             box-shadow: inset 0 0 13px var(--accent-in), 0 1px 4px rgba(0,0,0,.04); }
+  .crm-box-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .crm-box-head h3 { font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:#54505A; margin:0; }
+  .crm-tl-item { display:flex; gap:10px; padding:9px 0; border-bottom:1px solid #F2EFE7; }
+  .crm-tl-item:last-child { border-bottom:0; }
+  .crm-tl-icon { width:26px; height:26px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center;
+                 font-size:12px; background:var(--accent-soft); color:var(--accent-ink); font-weight:700; }
+  .crm-tl-body { min-width:0; flex:1; }
+  .crm-tl-sum { font-weight:600; color:#14161C; font-size:13px; }
+  .crm-tl-meta { font-size:11px; color:#9a96a2; margin-top:2px; }
+  .crm-task-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #F2EFE7; font-size:13px; }
+  .crm-task-row:last-child { border-bottom:0; }
+  .crm-task-row .t-title { font-weight:600; color:#14161C; }
+  .crm-task-due { font-size:11px; color:#76777E; }
+  .crm-prio { font-size:9.5px; font-weight:700; text-transform:uppercase; padding:1px 6px; border-radius:999px; }
+  .crm-prio.high { background:#fceeec; color:#c0392b; } .crm-prio.normal { background:#eef0f4; color:#54505A; }
+  .crm-prio.low { background:#f3f0e9; color:#8a8064; }
+  .crm-mini-btn { font-size:11px; font-weight:700; color:var(--accent-ink); background:var(--accent-soft);
+                  border:1px solid var(--accent-edge); border-radius:7px; padding:5px 10px; cursor:pointer; }
+  .crm-mini-btn:hover { background:#dde7fd; }
+  /* modal */
+  .crm-modal-bg { position:fixed; inset:0; background:rgba(20,22,28,.45); z-index:1500; display:none; align-items:center; justify-content:center; padding:20px; }
+  .crm-modal-bg.show { display:flex; }
+  .crm-modal { background:#fff; border-radius:14px; width:100%; max-width:460px; max-height:90vh; overflow:auto; box-shadow:0 18px 60px rgba(0,0,0,.28); }
+  .crm-modal-head { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--line); }
+  .crm-modal-head h3 { margin:0; font-size:15px; }
+  .crm-modal-x { cursor:pointer; color:#9a96a2; font-size:20px; line-height:1; background:none; border:0; }
+  .crm-modal-body { padding:18px 20px; }
+  .crm-modal-foot { display:flex; justify-content:flex-end; gap:10px; padding:14px 20px; border-top:1px solid var(--line); }
+  .crm-field { margin-bottom:12px; }
+  .crm-field label { display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#76777E; margin-bottom:5px; }
+  .crm-field .ssc-field { width:100%; }
+  .crm-field-row { display:flex; gap:10px; } .crm-field-row .crm-field { flex:1; }
+  .crm-tagset { display:flex; flex-wrap:wrap; gap:6px; }
+  .crm-tagset label { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; text-transform:none; letter-spacing:0;
+                      background:#f6f7fa; border:1px solid var(--line); border-radius:8px; padding:5px 9px; cursor:pointer; margin:0; }
+  .crm-err { color:var(--brand-red); font-size:12px; margin-top:8px; display:none; }
+  .crm-err.show { display:block; }
 </style>
 </head>
 <body>
@@ -331,6 +420,7 @@
        style="display:none;text-decoration:none;color:inherit;"
        title="Set & audit per-worker hourly rates (admin/c_suite only)">Labor Rates</a>
     <div class="nav-tab" data-panel="specs" data-i18n="tab-specs">Specs Library</div>
+    <div class="nav-tab" data-panel="crm">CRM</div>
     <div class="nav-tab" data-panel="settings" data-i18n="tab-settings">Settings</div>
   </div>
 
@@ -901,6 +991,108 @@
   </style>
 
   <!-- SETTINGS -->
+  <!-- #266 — CRM / OPS CORE (C-suite function; page is admin/c_suite-only, endpoints @requires_section('crm')) -->
+  <div class="panel" data-panel="crm">
+    <div class="section">
+      <div class="crm-head">
+        <div>
+          <h2>CRM &amp; Ops</h2>
+          <div class="crm-sub">Organizations, contacts, activity &amp; follow-ups — the C-suite command center.</div>
+        </div>
+        <div class="crm-actions">
+          <button type="button" class="btn-ghost" id="crm-btn-add-contact">+ Contact</button>
+          <button type="button" class="btn-primary" id="crm-btn-add-org">+ Organization</button>
+        </div>
+      </div>
+
+      <!-- console strip: light C-suite surfacing -->
+      <div class="crm-strip">
+        <div class="crm-card">
+          <h3>Needs Attention</h3>
+          <div class="crm-bignum"><span id="crm-w-na-count">0</span><span class="crm-over" id="crm-w-na-over"></span></div>
+          <div class="crm-mini" id="crm-w-na-top" style="margin-top:10px;"></div>
+        </div>
+        <div class="crm-card">
+          <h3>Pipeline</h3>
+          <div class="crm-chips" id="crm-w-pipeline"></div>
+        </div>
+        <div class="crm-card">
+          <h3>Recent Activity</h3>
+          <div id="crm-w-recent"></div>
+        </div>
+      </div>
+
+      <div class="crm-subtabs">
+        <div class="crm-subtab active" data-crmview="orgs">Organizations</div>
+        <div class="crm-subtab" data-crmview="attention">Needs Attention</div>
+      </div>
+
+      <!-- ORGANIZATIONS view -->
+      <div class="crm-view" data-crmview="orgs">
+        <div class="crm-filters">
+          <input type="text" id="crm-search" class="ssc-field" placeholder="Search name or notes…">
+          <select id="crm-f-rel" class="ssc-field"><option value="">All types</option></select>
+          <select id="crm-f-stage" class="ssc-field"><option value="">All stages</option></select>
+          <select id="crm-f-tag" class="ssc-field"><option value="">All functions</option></select>
+        </div>
+        <table class="crm-table">
+          <thead><tr><th>Organization</th><th>Type</th><th>Stage</th><th>Functions</th><th>Last activity</th></tr></thead>
+          <tbody id="crm-org-tbody"><tr><td colspan="5" class="crm-empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- NEEDS ATTENTION view -->
+      <div class="crm-view" data-crmview="attention" style="display:none;">
+        <div class="crm-filters">
+          <label><input type="checkbox" id="crm-na-mine"> Assigned to me</label>
+          <select id="crm-na-tag" class="ssc-field"><option value="">All functions</option></select>
+        </div>
+        <table class="crm-table">
+          <thead><tr><th>Task</th><th>For</th><th>Due</th><th>Priority</th><th>Function</th><th></th></tr></thead>
+          <tbody id="crm-na-tbody"><tr><td colspan="6" class="crm-empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- ENTITY DETAIL view (org or contact) -->
+      <div class="crm-view" data-crmview="detail" style="display:none;">
+        <span class="crm-back" id="crm-detail-back">← Back to list</span>
+        <div class="crm-detail-grid">
+          <div class="crm-detail-info" id="crm-detail-info"></div>
+          <div class="crm-detail-main">
+            <div class="crm-box">
+              <div class="crm-box-head"><h3>Activity timeline</h3><button type="button" class="crm-mini-btn" id="crm-detail-log">+ Log activity</button></div>
+              <div id="crm-detail-timeline"></div>
+            </div>
+            <div class="crm-box">
+              <div class="crm-box-head"><h3>Open follow-ups</h3><button type="button" class="crm-mini-btn" id="crm-detail-addtask">+ Add follow-up</button></div>
+              <div id="crm-detail-tasks"></div>
+            </div>
+            <div class="crm-box" id="crm-box-projects">
+              <div class="crm-box-head"><h3>Linked projects</h3><button type="button" class="crm-mini-btn" id="crm-detail-link">+ Link project</button></div>
+              <div id="crm-detail-projects"></div>
+            </div>
+            <div class="crm-box" id="crm-box-contacts">
+              <div class="crm-box-head"><h3>Contacts</h3><button type="button" class="crm-mini-btn" id="crm-detail-addcontact">+ Contact</button></div>
+              <div id="crm-detail-contacts"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- shared CRM modal shell -->
+  <div class="crm-modal-bg" id="crm-modal-bg">
+    <div class="crm-modal" role="dialog" aria-modal="true">
+      <div class="crm-modal-head"><h3 id="crm-modal-title">—</h3><button type="button" class="crm-modal-x" id="crm-modal-x">&times;</button></div>
+      <div class="crm-modal-body" id="crm-modal-body"></div>
+      <div class="crm-modal-foot">
+        <button type="button" class="btn-ghost" id="crm-modal-cancel">Cancel</button>
+        <button type="button" class="btn-primary" id="crm-modal-save">Save</button>
+      </div>
+    </div>
+  </div>
+
   <div class="panel" data-panel="settings">
     <div class="section">
       <h2 data-i18n="p-settings-title">Settings</h2>
@@ -1638,6 +1830,7 @@ applyLanguage();
     if (target === 'cert-library') loadCertLibrary();
     if (target === 'labor-rate' && typeof window.LRT_loadGrid === 'function') window.LRT_loadGrid(null);
     if (target === 'specs' && typeof window.SPECS_loadCatalog === 'function') window.SPECS_loadCatalog();
+    if (target === 'crm' && window.CRM) window.CRM.enter();
   }
   $$('.nav-tab').forEach(t => t.addEventListener('click', () => {
     activatePanel(t.getAttribute('data-panel'));
@@ -3942,7 +4135,7 @@ applyLanguage();
 })();
 </script>
 
-<div class="container"><div class="ph-build" id="cc-build-stamp">build #255 · 2026-06-15 · Look-Ahead — activity-row Gantt auto-drafted from the Drop Plan; drag-edit, add/remove, paginated print</div></div>
+<div class="container"><div class="ph-build" id="cc-build-stamp">build #266 · 2026-06-30 · CRM / Ops core — organizations + contacts + activity log + follow-up tasks + Needs-Attention, C-suite-gated & function-tagged (scale-ready); projects link to a client org</div></div>
 
 <script>
 /* ===== Company console widgets (#210) — live data + reused #209 drag framework.
@@ -4078,6 +4271,358 @@ applyLanguage();
     setInterval(load, 60000);
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>
+<!-- #266 — CRM / Ops core UI module -->
+<script>
+(function(){
+  var REL_TYPES = ['client','vendor','lead','architect','engineer','sub','partner','other'];
+  var STAGES = ['prospect','proposal','onboarding','active','closed'];
+  var FUNC_TAGS = ['finance','sales','compliance','ops','exec'];
+  var ACT_TYPES = ['note','call','email','meeting'];
+  var PRIORITIES = ['low','normal','high'];
+  var ACT_ICON = {note:'✎', call:'☎', email:'✉', meeting:'◫', stage_change:'⇄', system:'•'};
+
+  var q = function(id){ return document.getElementById(id); };
+  function esc(s){ if(s==null) return ''; return String(s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  function cap(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : ''; }
+  function dOnly(s){ return (s||'').slice(0,10); }
+  function fmtD(s){ s=dOnly(s); if(!s) return '—'; return (window.SSCDatePicker && SSCDatePicker.fmtMDY(s)) || s; }
+  function opt(v,label,sel){ return '<option value="'+esc(v)+'"'+(sel?' selected':'')+'>'+esc(label)+'</option>'; }
+
+  async function api(method, path, body){
+    var opts = { method: method, credentials: 'include', headers: {} };
+    if (body !== undefined){ opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify(body); }
+    var r = await fetch(path, opts);
+    var j = null; try { j = await r.json(); } catch(e){}
+    if (!r.ok) throw new Error((j && j.error) || ('HTTP '+r.status));
+    return j ? j.data : null;
+  }
+
+  var inited = false, cur = null;         // cur = {type:'organization'|'contact', id}
+  var usersCache = null, projectsCache = null;
+
+  async function assignableUsers(){ if(!usersCache) usersCache = await api('GET','/api/crm/assignable-users'); return usersCache; }
+  async function allProjects(){ if(!projectsCache){ var d = await api('GET','/api/projects'); projectsCache = d || []; } return projectsCache; }
+
+  // ---------- views ----------
+  function showView(name){
+    document.querySelectorAll('.crm-view').forEach(function(v){ v.style.display = (v.getAttribute('data-crmview')===name)?'':'none'; });
+    document.querySelectorAll('.crm-subtab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-crmview')===name); });
+  }
+
+  // ---------- console strip ----------
+  async function loadConsole(){
+    try {
+      var d = await api('GET','/api/crm/console');
+      q('crm-w-na-count').textContent = d.needs_attention_count;
+      q('crm-w-na-over').textContent = d.overdue_count ? (d.overdue_count+' overdue') : '';
+      q('crm-w-na-top').innerHTML = (d.needs_attention_top||[]).slice(0,4).map(function(t){
+        return '<div class="crm-mini-row"><span'+(t.overdue?' class="crm-overdue"':'')+'>'+esc(t.title)+'</span><span class="crm-mini-when">'+(t.due_date?fmtD(t.due_date):'—')+'</span></div>';
+      }).join('') || '<div class="crm-mini">Nothing open. 🎉</div>';
+      q('crm-w-pipeline').innerHTML = (d.pipeline||[]).map(function(p){
+        return '<span class="crm-chip">'+esc(cap(p.stage))+' <b>'+p.count+'</b></span>';
+      }).join('') || '<div class="crm-mini">No organizations yet.</div>';
+      q('crm-w-recent').innerHTML = (d.recent_activity||[]).slice(0,5).map(function(a){
+        return '<div class="crm-mini-row"><span>'+(ACT_ICON[a.activity_type]||'•')+' '+esc(a.summary||cap(a.activity_type))+'</span><span class="crm-mini-when">'+fmtD(a.occurred_at)+'</span></div>';
+      }).join('') || '<div class="crm-mini">No activity yet.</div>';
+    } catch(e){ console.warn('crm console', e); }
+  }
+
+  // ---------- organizations list ----------
+  async function loadOrgs(){
+    var tb = q('crm-org-tbody');
+    tb.innerHTML = '<tr><td colspan="5" class="crm-empty">Loading…</td></tr>';
+    var p = new URLSearchParams();
+    if (q('crm-search').value.trim()) p.set('search', q('crm-search').value.trim());
+    if (q('crm-f-rel').value) p.set('relationship_type', q('crm-f-rel').value);
+    if (q('crm-f-stage').value) p.set('stage', q('crm-f-stage').value);
+    if (q('crm-f-tag').value) p.set('function_tag', q('crm-f-tag').value);
+    try {
+      var rows = await api('GET','/api/crm/organizations?'+p.toString());
+      if (!rows.length){ tb.innerHTML = '<tr><td colspan="5" class="crm-empty">No organizations match. Add one with “+ Organization”.</td></tr>'; return; }
+      tb.innerHTML = rows.map(function(o){
+        var tags = (o.function_tags||'').split(',').filter(Boolean).map(function(t){ return '<span class="crm-tag">'+esc(t)+'</span>'; }).join('');
+        var stg = (o.stage||'').toLowerCase();
+        return '<tr data-org="'+o.id+'">'
+          + '<td><span class="crm-name">'+esc(o.name)+'</span></td>'
+          + '<td>'+esc(cap(o.relationship_type)||'—')+'</td>'
+          + '<td>'+(o.stage?'<span class="crm-badge stage-'+esc(stg)+'">'+esc(o.stage)+'</span>':'—')+'</td>'
+          + '<td>'+(tags||'—')+'</td>'
+          + '<td>'+(o.last_activity?fmtD(o.last_activity):'<span class="crm-mini">—</span>')+'</td></tr>';
+      }).join('');
+      tb.querySelectorAll('tr[data-org]').forEach(function(tr){ tr.addEventListener('click', function(){ openOrg(+tr.getAttribute('data-org')); }); });
+    } catch(e){ tb.innerHTML = '<tr><td colspan="5" class="crm-empty">'+esc(e.message)+'</td></tr>'; }
+  }
+
+  // ---------- entity detail (organization) ----------
+  async function openOrg(id){
+    cur = { type:'organization', id: id };
+    showView('detail');
+    q('crm-detail-info').innerHTML = '<div class="crm-mini">Loading…</div>';
+    q('crm-box-projects').style.display = '';
+    try {
+      var d = await api('GET','/api/crm/organizations/'+id);
+      var o = d.organization;
+      var tags = (o.function_tags||'').split(',').filter(Boolean).map(function(t){ return '<span class="crm-tag">'+esc(t)+'</span>'; }).join(' ') || '—';
+      q('crm-detail-info').innerHTML =
+        '<h2>'+esc(o.name)+'</h2>'
+        + '<div class="crm-kv"><span class="k">Relationship</span>'+esc(cap(o.relationship_type)||'—')+'</div>'
+        + '<div class="crm-kv"><span class="k">Stage</span>'+(o.stage?'<span class="crm-badge stage-'+esc((o.stage||'').toLowerCase())+'">'+esc(o.stage)+'</span>':'—')+'</div>'
+        + '<div class="crm-kv"><span class="k">Status</span>'+esc(cap(o.status)||'active')+'</div>'
+        + '<div class="crm-kv"><span class="k">Functions</span>'+tags+'</div>'
+        + '<div class="crm-kv"><span class="k">Notes</span>'+esc(o.notes||'—')+'</div>'
+        + '<div style="margin-top:12px;"><button type="button" class="crm-mini-btn" id="crm-edit-org">Edit</button></div>';
+      q('crm-edit-org').addEventListener('click', function(){ editOrgModal(o); });
+      renderTimeline(d.timeline);
+      renderTasks(d.open_tasks);
+      renderProjects(d.linked_projects);
+      renderContacts(d.contacts);
+    } catch(e){ q('crm-detail-info').innerHTML = '<div class="crm-empty">'+esc(e.message)+'</div>'; }
+  }
+
+  function renderTimeline(items){
+    var el = q('crm-detail-timeline');
+    if (!items || !items.length){ el.innerHTML = '<div class="crm-mini">No activity logged yet.</div>'; return; }
+    el.innerHTML = items.map(function(a){
+      return '<div class="crm-tl-item"><div class="crm-tl-icon">'+(ACT_ICON[a.activity_type]||'•')+'</div>'
+        + '<div class="crm-tl-body"><div class="crm-tl-sum">'+esc(a.summary||cap(a.activity_type))+'</div>'
+        + (a.body?'<div class="crm-mini" style="margin-top:2px;">'+esc(a.body)+'</div>':'')
+        + '<div class="crm-tl-meta">'+esc(cap(a.activity_type))+' · '+fmtD(a.occurred_at)+'</div></div></div>';
+    }).join('');
+  }
+
+  function renderTasks(items){
+    var el = q('crm-detail-tasks');
+    if (!items || !items.length){ el.innerHTML = '<div class="crm-mini">No open follow-ups.</div>'; return; }
+    el.innerHTML = items.map(function(t){
+      return '<div class="crm-task-row"><span class="t-title">'+esc(t.title)+'</span>'
+        + '<span class="crm-prio '+esc(t.priority||'normal')+'">'+esc(t.priority||'normal')+'</span>'
+        + (t.function_tag?'<span class="crm-tag">'+esc(t.function_tag)+'</span>':'')
+        + '<span class="crm-task-due" style="margin-left:auto;">'+(t.due_date?('Due '+fmtD(t.due_date)):'no due date')+'</span>'
+        + '<button type="button" class="crm-mini-btn" data-done="'+t.id+'">Done</button></div>';
+    }).join('');
+    el.querySelectorAll('button[data-done]').forEach(function(b){ b.addEventListener('click', function(){ completeTask(+b.getAttribute('data-done')); }); });
+  }
+
+  function renderProjects(items){
+    var el = q('crm-detail-projects');
+    if (!items || !items.length){ el.innerHTML = '<div class="crm-mini">No projects linked.</div>'; return; }
+    el.innerHTML = items.map(function(p){
+      return '<div class="crm-task-row"><a class="crm-name" href="/projects/'+encodeURIComponent(p.project_code)+'">'+esc(p.name||p.project_code)+'</a>'
+        + '<span class="crm-mini">'+esc(p.project_code)+'</span>'
+        + '<button type="button" class="crm-mini-btn" data-unlink="'+esc(p.project_code)+'" style="margin-left:auto;">Unlink</button></div>';
+    }).join('');
+    el.querySelectorAll('button[data-unlink]').forEach(function(b){ b.addEventListener('click', async function(){
+      try { await api('POST','/api/crm/projects/'+encodeURIComponent(b.getAttribute('data-unlink'))+'/link',{org_id:null}); openOrg(cur.id); } catch(e){ alert(e.message); }
+    }); });
+  }
+
+  function renderContacts(items){
+    var el = q('crm-detail-contacts');
+    if (!items || !items.length){ el.innerHTML = '<div class="crm-mini">No contacts yet.</div>'; return; }
+    el.innerHTML = items.map(function(c){
+      return '<div class="crm-task-row"><span class="t-title">'+esc(c.full_name)+'</span>'
+        + (c.title?'<span class="crm-mini">'+esc(c.title)+'</span>':'')
+        + '<span class="crm-mini" style="margin-left:auto;">'+esc(c.email||c.phone||'')+'</span></div>';
+    }).join('');
+  }
+
+  async function completeTask(id){
+    try {
+      await api('POST','/api/crm/tasks/'+id+'/complete');
+      loadConsole();
+      // refresh whichever view is showing — detail (re-open the org) or the needs-attention list
+      var detailVisible = document.querySelector('.crm-view[data-crmview="detail"]').style.display !== 'none';
+      if (detailVisible && cur) openOrg(cur.id); else loadNA();
+    } catch(e){ alert(e.message); }
+  }
+
+  // ---------- needs attention view ----------
+  async function loadNA(){
+    var tb = q('crm-na-tbody');
+    tb.innerHTML = '<tr><td colspan="6" class="crm-empty">Loading…</td></tr>';
+    var p = new URLSearchParams();
+    if (q('crm-na-mine').checked) p.set('mine','1');
+    if (q('crm-na-tag').value) p.set('function_tag', q('crm-na-tag').value);
+    try {
+      var rows = await api('GET','/api/crm/needs-attention?'+p.toString());
+      if (!rows.length){ tb.innerHTML = '<tr><td colspan="6" class="crm-empty">Nothing needs attention. 🎉</td></tr>'; return; }
+      tb.innerHTML = rows.map(function(t){
+        var due = t.due_date ? ('<span'+(t.overdue?' class="crm-overdue"':'')+'>'+fmtD(t.due_date)+(t.overdue?' · overdue':(t.due_today?' · today':''))+'</span>') : '<span class="crm-mini">—</span>';
+        return '<tr><td class="t-title">'+esc(t.title)+'</td>'
+          + '<td class="crm-mini">'+esc(cap(t.entity_type)||'—')+'</td>'
+          + '<td>'+due+'</td>'
+          + '<td><span class="crm-prio '+esc(t.priority||'normal')+'">'+esc(t.priority||'normal')+'</span></td>'
+          + '<td>'+(t.function_tag?'<span class="crm-tag">'+esc(t.function_tag)+'</span>':'—')+'</td>'
+          + '<td><button type="button" class="crm-mini-btn" data-done="'+t.id+'">Done</button></td></tr>';
+      }).join('');
+      tb.querySelectorAll('button[data-done]').forEach(function(b){ b.addEventListener('click', function(){ completeTask(+b.getAttribute('data-done')); }); });
+    } catch(e){ tb.innerHTML = '<tr><td colspan="6" class="crm-empty">'+esc(e.message)+'</td></tr>'; }
+  }
+
+  // ---------- modal shell ----------
+  var modalSave = null;
+  function openModal(title, bodyHtml, onSave, saveLabel){
+    q('crm-modal-title').textContent = title;
+    q('crm-modal-body').innerHTML = bodyHtml + '<div class="crm-err" id="crm-modal-err"></div>';
+    q('crm-modal-save').textContent = saveLabel || 'Save';
+    modalSave = onSave;
+    q('crm-modal-bg').classList.add('show');
+    // wire any SSCDatePicker date fields in this modal
+    if (window.SSCDatePicker){ q('crm-modal-body').querySelectorAll('input.ssc-date').forEach(function(el){ SSCDatePicker.wire(el); }); }
+    var first = q('crm-modal-body').querySelector('input,select,textarea'); if(first) try{ first.focus(); }catch(e){}
+  }
+  function closeModal(){ q('crm-modal-bg').classList.remove('show'); modalSave = null; }
+  function modalErr(msg){ var e=q('crm-modal-err'); if(e){ e.textContent=msg; e.classList.add('show'); } }
+  function getISO(el){ return el ? (window.SSCDatePicker ? (SSCDatePicker.getISO(el)||'') : (el.value||'').trim()) : ''; }
+
+  function tagCheckboxes(name){ return '<div class="crm-tagset">'+FUNC_TAGS.map(function(t){ return '<label><input type="checkbox" name="'+name+'" value="'+t+'"> '+cap(t)+'</label>'; }).join('')+'</div>'; }
+  function checkedTags(name){ return Array.prototype.slice.call(q('crm-modal-body').querySelectorAll('input[name="'+name+'"]:checked')).map(function(x){ return x.value; }); }
+
+  // ---------- forms ----------
+  function addOrgModal(){
+    openModal('Add organization',
+      '<div class="crm-field"><label>Name *</label><input class="ssc-field" id="f-org-name" placeholder="Organization name"></div>'
+      + '<div class="crm-field-row">'
+      +   '<div class="crm-field"><label>Relationship</label><select class="ssc-field" id="f-org-rel"><option value="">—</option>'+REL_TYPES.map(function(t){return opt(t,cap(t));}).join('')+'</select></div>'
+      +   '<div class="crm-field"><label>Stage</label><select class="ssc-field" id="f-org-stage"><option value="">—</option>'+STAGES.map(function(s){return opt(s,cap(s));}).join('')+'</select></div>'
+      + '</div>'
+      + '<div class="crm-field"><label>Function tags</label>'+tagCheckboxes('f-org-tags')+'</div>'
+      + '<div class="crm-field"><label>Notes</label><textarea class="ssc-field" id="f-org-notes" rows="2"></textarea></div>',
+      async function(){
+        var name = q('f-org-name').value.trim();
+        if (!name){ modalErr('Name is required.'); return false; }
+        await api('POST','/api/crm/organizations',{ name:name, relationship_type:q('f-org-rel').value||null,
+          stage:q('f-org-stage').value||null, function_tags:checkedTags('f-org-tags'), notes:q('f-org-notes').value.trim()||null });
+        return true;
+      }, 'Create');
+  }
+
+  function editOrgModal(o){
+    openModal('Edit organization',
+      '<div class="crm-field"><label>Name</label><input class="ssc-field" id="f-org-name" value="'+esc(o.name)+'"></div>'
+      + '<div class="crm-field-row">'
+      +   '<div class="crm-field"><label>Stage</label><select class="ssc-field" id="f-org-stage"><option value="">—</option>'+STAGES.map(function(s){return opt(s,cap(s),o.stage===s);}).join('')+'</select></div>'
+      +   '<div class="crm-field"><label>Status</label><select class="ssc-field" id="f-org-status">'+['active','inactive'].map(function(s){return opt(s,cap(s),(o.status||'active')===s);}).join('')+'</select></div>'
+      + '</div>'
+      + '<div class="crm-field"><label>Function tags</label>'+tagCheckboxes('f-org-tags').replace(/name="f-org-tags" value="([a-z]+)"/g, function(m,t){ return 'name="f-org-tags" value="'+t+'"'+(( '' + (o.function_tags||'')).split(',').indexOf(t)>=0?' checked':''); })+'</div>'
+      + '<div class="crm-field"><label>Notes</label><textarea class="ssc-field" id="f-org-notes" rows="2">'+esc(o.notes||'')+'</textarea></div>',
+      async function(){
+        await api('PUT','/api/crm/organizations/'+o.id,{ name:q('f-org-name').value.trim(), stage:q('f-org-stage').value||null,
+          status:q('f-org-status').value, function_tags:checkedTags('f-org-tags'), notes:q('f-org-notes').value.trim()||null });
+        return true;
+      }, 'Save');
+  }
+
+  async function addContactModal(prefillOrg){
+    var orgs = await api('GET','/api/crm/organizations');
+    var orgOpts = '<option value="">— none —</option>'+orgs.map(function(o){ return opt(o.id, o.name, prefillOrg && +prefillOrg===o.id); }).join('');
+    openModal('Add contact',
+      '<div class="crm-field"><label>Full name *</label><input class="ssc-field" id="f-c-name"></div>'
+      + '<div class="crm-field"><label>Organization</label><select class="ssc-field" id="f-c-org">'+orgOpts+'</select></div>'
+      + '<div class="crm-field-row"><div class="crm-field"><label>Email</label><input class="ssc-field" id="f-c-email"></div>'
+      +   '<div class="crm-field"><label>Phone</label><input class="ssc-field" id="f-c-phone"></div></div>'
+      + '<div class="crm-field"><label>Title</label><input class="ssc-field" id="f-c-title"></div>',
+      async function(){
+        var nm = q('f-c-name').value.trim(); if(!nm){ modalErr('Full name is required.'); return false; }
+        await api('POST','/api/crm/contacts',{ full_name:nm, org_id:q('f-c-org').value?+q('f-c-org').value:null,
+          email:q('f-c-email').value.trim()||null, phone:q('f-c-phone').value.trim()||null, title:q('f-c-title').value.trim()||null });
+        return true;
+      }, 'Add');
+  }
+
+  function logActivityModal(entityType, entityId){
+    openModal('Log activity',
+      '<div class="crm-field"><label>Type</label><select class="ssc-field" id="f-a-type">'+ACT_TYPES.map(function(t){return opt(t,cap(t),t==='call');}).join('')+'</select></div>'
+      + '<div class="crm-field"><label>Summary *</label><input class="ssc-field" id="f-a-sum" placeholder="e.g. Intro call with owner"></div>'
+      + '<div class="crm-field"><label>Date</label><input class="ssc-date ssc-field" id="f-a-date" placeholder="MM/DD/YYYY"></div>'
+      + '<div class="crm-field"><label>Notes</label><textarea class="ssc-field" id="f-a-body" rows="3"></textarea></div>',
+      async function(){
+        var sum = q('f-a-sum').value.trim(); if(!sum){ modalErr('Summary is required.'); return false; }
+        await api('POST','/api/crm/activity',{ entity_type:entityType, entity_id:entityId, activity_type:q('f-a-type').value,
+          summary:sum, body:q('f-a-body').value.trim()||null, occurred_at:getISO(q('f-a-date'))||null });
+        return true;
+      }, 'Log');
+  }
+
+  async function addTaskModal(entityType, entityId){
+    var users = await assignableUsers();
+    var uOpts = '<option value="">— unassigned —</option>'+users.map(function(u){ return opt(u.id, u.name+' ('+u.role+')'); }).join('');
+    openModal('Add follow-up',
+      '<div class="crm-field"><label>Title *</label><input class="ssc-field" id="f-t-title" placeholder="Next action"></div>'
+      + '<div class="crm-field-row"><div class="crm-field"><label>Due date</label><input class="ssc-date ssc-field" id="f-t-due" placeholder="MM/DD/YYYY"></div>'
+      +   '<div class="crm-field"><label>Priority</label><select class="ssc-field" id="f-t-prio">'+PRIORITIES.map(function(p){return opt(p,cap(p),p==='normal');}).join('')+'</select></div></div>'
+      + '<div class="crm-field"><label>Assignee</label><select class="ssc-field" id="f-t-assignee">'+uOpts+'</select></div>'
+      + '<div class="crm-field"><label>Function tag</label><select class="ssc-field" id="f-t-tag"><option value="">—</option>'+FUNC_TAGS.map(function(t){return opt(t,cap(t));}).join('')+'</select></div>'
+      + '<div class="crm-field"><label>Detail</label><textarea class="ssc-field" id="f-t-detail" rows="2"></textarea></div>',
+      async function(){
+        var ti = q('f-t-title').value.trim(); if(!ti){ modalErr('Title is required.'); return false; }
+        await api('POST','/api/crm/tasks',{ title:ti, entity_type:entityType, entity_id:entityId, due_date:getISO(q('f-t-due'))||null,
+          assignee_user_id:q('f-t-assignee').value?+q('f-t-assignee').value:null, priority:q('f-t-prio').value,
+          function_tag:q('f-t-tag').value||null, detail:q('f-t-detail').value.trim()||null });
+        return true;
+      }, 'Add');
+  }
+
+  async function linkProjectModal(orgId){
+    var projs = await allProjects();
+    var pOpts = projs.map(function(p){ return opt(p.project_code, (p.name||p.project_code)+' · '+p.project_code, false); }).join('');
+    if (!pOpts){ alert('No projects available.'); return; }
+    openModal('Link a project',
+      '<div class="crm-field"><label>Project</label><select class="ssc-field" id="f-link-proj">'+pOpts+'</select></div>'
+      + '<div class="crm-mini">The project will show this organization as its client.</div>',
+      async function(){
+        await api('POST','/api/crm/projects/'+encodeURIComponent(q('f-link-proj').value)+'/link',{ org_id: orgId });
+        return true;
+      }, 'Link');
+  }
+
+  // ---------- wiring ----------
+  function wireOnce(){
+    if (inited) return; inited = true;
+    // filter dropdowns
+    q('crm-f-rel').innerHTML = '<option value="">All types</option>'+REL_TYPES.map(function(t){return opt(t,cap(t));}).join('');
+    q('crm-f-stage').innerHTML = '<option value="">All stages</option>'+STAGES.map(function(s){return opt(s,cap(s));}).join('');
+    q('crm-f-tag').innerHTML = '<option value="">All functions</option>'+FUNC_TAGS.map(function(t){return opt(t,cap(t));}).join('');
+    q('crm-na-tag').innerHTML = '<option value="">All functions</option>'+FUNC_TAGS.map(function(t){return opt(t,cap(t));}).join('');
+    // list filters
+    var deb; q('crm-search').addEventListener('input', function(){ clearTimeout(deb); deb=setTimeout(loadOrgs,250); });
+    ['crm-f-rel','crm-f-stage','crm-f-tag'].forEach(function(id){ q(id).addEventListener('change', loadOrgs); });
+    q('crm-na-mine').addEventListener('change', loadNA);
+    q('crm-na-tag').addEventListener('change', loadNA);
+    // subtabs
+    document.querySelectorAll('.crm-subtab').forEach(function(t){ t.addEventListener('click', function(){
+      var v = t.getAttribute('data-crmview'); showView(v); if(v==='orgs') loadOrgs(); if(v==='attention') loadNA();
+    }); });
+    // header buttons
+    q('crm-btn-add-org').addEventListener('click', addOrgModal);
+    q('crm-btn-add-contact').addEventListener('click', function(){ addContactModal(cur && cur.type==='organization' ? cur.id : null); });
+    // detail buttons
+    q('crm-detail-back').addEventListener('click', function(){ cur=null; showView('orgs'); loadOrgs(); });
+    q('crm-detail-log').addEventListener('click', function(){ if(cur) logActivityModal(cur.type, cur.id); });
+    q('crm-detail-addtask').addEventListener('click', function(){ if(cur) addTaskModal(cur.type, cur.id); });
+    q('crm-detail-link').addEventListener('click', function(){ if(cur && cur.type==='organization') linkProjectModal(cur.id); });
+    q('crm-detail-addcontact').addEventListener('click', function(){ if(cur && cur.type==='organization') addContactModal(cur.id); });
+    // modal buttons
+    q('crm-modal-x').addEventListener('click', closeModal);
+    q('crm-modal-cancel').addEventListener('click', closeModal);
+    q('crm-modal-bg').addEventListener('click', function(e){ if(e.target===q('crm-modal-bg')) closeModal(); });
+    q('crm-modal-save').addEventListener('click', async function(){
+      if (!modalSave) return;
+      var btn = q('crm-modal-save'); btn.disabled = true;
+      try {
+        var ok = await modalSave();
+        if (ok !== false){ closeModal(); loadConsole(); usersCache=null;
+          if (cur) openOrg(cur.id); else loadOrgs(); }
+      } catch(e){ modalErr(e.message || 'Could not save.'); }
+      finally { btn.disabled = false; }
+    });
+  }
+
+  window.CRM = {
+    enter: function(){ wireOnce(); showView('orgs'); loadConsole(); loadOrgs(); }
+  };
 })();
 </script>
 </body>
