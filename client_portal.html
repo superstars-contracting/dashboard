@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Superstars Contracting · Project Portal</title>
 <link rel="stylesheet" href="/files/static/fonts/typography.css">
-<!-- #264 — read-only CLIENT portal. Curated: project header + high-level progress + a
-     progress summary + the photos we explicitly shared. NO financials, NO internal nav,
-     NO drop/labor/PII. All data comes from /api/portal/* (server-scoped + per-resource). -->
+<!-- #264 — read-only CLIENT portal. #269 — SECTION-GATED: the page asks /api/portal/context
+     which sections this client has been granted (progress / photos / documents / daily /
+     schedule, all default OFF) and renders ONLY those. Every section's data endpoint
+     re-checks its grant server-side; within Photos/Documents only individually shared
+     items are served. NO financials, NO internal nav, NO drop/labor/PII. -->
 <style>
   :root{
     --brand-red:#B11E2E;--brand-red-deep:#8B1623;--ink:#14161C;--hairline:#E8E4DD;
@@ -44,7 +46,7 @@
   .summary-text{font-size:14px;line-height:1.6;color:var(--ink);margin-top:10px;}
   .summary-meta{font-size:12px;color:var(--mute);margin-top:10px;}
 
-  .sec-head{display:flex;align-items:baseline;justify-content:space-between;margin:8px 2px 14px;}
+  .sec-head{display:flex;align-items:baseline;justify-content:space-between;margin:26px 2px 14px;}
   .sec-head h2{font-family:'Archivo',sans-serif;font-size:18px;font-weight:700;}
   .sec-head .cnt{font-size:12px;color:var(--mute);}
   .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
@@ -54,6 +56,20 @@
   .ph .meta{padding:10px 12px;}
   .ph .cap{font-size:13px;font-weight:600;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
   .ph .date{font-size:11px;color:var(--mute);margin-top:5px;}
+
+  /* #269 — documents / daily / schedule list rows (boxed, calm) */
+  .rows{background:#fff;border:1px solid var(--hairline);border-radius:14px;overflow:hidden;}
+  .row{display:flex;align-items:center;gap:14px;padding:13px 18px;border-bottom:1px solid var(--hairline);}
+  .row:last-child{border-bottom:none;}
+  .row .r-main{min-width:0;flex:1;}
+  .row .r-title{font-size:13.5px;font-weight:600;line-height:1.35;}
+  .row .r-sub{font-size:11.5px;color:var(--mute);margin-top:3px;}
+  .row .r-tag{flex:none;font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--mute);background:#f4f0ea;border-radius:99px;padding:4px 10px;}
+  .row .r-tag.work{color:var(--ok);background:#e9f4ee;}
+  .row .r-tag.nowork{color:#8a6d3b;background:#f7f0e2;}
+  .row a.r-open{flex:none;font-size:12px;font-weight:700;color:var(--brand-red);text-decoration:none;border:1px solid var(--hairline);border-radius:8px;padding:6px 12px;}
+  .row a.r-open:hover{border-color:var(--brand-red);}
+  .row .r-dates{flex:none;font-size:12px;color:var(--mute);font-weight:600;white-space:nowrap;}
 
   .empty{border:1px dashed var(--hairline);border-radius:14px;padding:40px 22px;text-align:center;color:var(--mute);font-size:14px;line-height:1.6;background:#fff;}
   .empty strong{display:block;color:var(--ink);font-size:15px;margin-bottom:5px;}
@@ -81,7 +97,7 @@
   <div class="wrap" id="wrap">
     <div class="hero"><div class="pill">Project Portal</div><h1 id="proj-name">Loading…</h1><div class="addr" id="proj-addr"></div></div>
     <div id="content"></div>
-    <div class="foot" id="build">build #264 · 2026-06-30 · Client portal — read-only, curated, default-deny visibility</div>
+    <div class="foot" id="build">build #269 · 2026-07-02 · Client portal — section-gated (default-off grants) + per-item default-deny visibility</div>
   </div>
 
   <div class="lb" id="lb"><button class="x" id="lb-x" aria-label="Close">×</button><img id="lb-img" alt=""><div class="cap" id="lb-cap"></div></div>
@@ -102,23 +118,60 @@
   document.getElementById('lb-x').onclick=function(){LB.classList.remove('on');document.getElementById('lb-img').src='';};
   LB.onclick=function(e){ if(e.target===LB){LB.classList.remove('on');document.getElementById('lb-img').src='';} };
 
+  function secHead(title, cntId){
+    return '<div class="sec-head"><h2>'+esc(title)+'</h2><span class="cnt" id="'+cntId+'"></span></div>';
+  }
+  function emptyBox(id, strong, text){
+    return '<div class="empty" id="'+id+'"><strong>'+esc(strong)+'</strong>'+esc(text)+'</div>';
+  }
+
+  // #269 — the context call returns ONLY the sections this client has been granted;
+  // the page renders exactly those (server enforces each section's API separately).
   async function load(){
     var content=document.getElementById('content');
     try{
-      var pj=await fetch('/api/portal/project').then(function(r){return r.json();});
-      var d=(pj&&pj.data)||{};
-      if(!d.project){
-        document.getElementById('proj-name').textContent='No project yet';
-        document.getElementById('proj-addr').textContent='';
-        content.innerHTML='<div class="empty"><strong>Your portal isn’t set up yet</strong>Once your project team grants access, your project and photos will appear here.</div>';
-        return;
-      }
+      var r=await fetch('/api/portal/context');
+      if(r.status===403){ window.location.href='/welcome'; return; }  // grants revoked mid-session
+      var cj=await r.json();
+      var d=(cj&&cj.data)||{};
+      if(!d.project){ window.location.href='/welcome'; return; }
       document.getElementById('proj-name').innerHTML=esc(d.project.name)+(d.project.status==='active'?'<span class="status-badge">Active</span>':'');
       document.getElementById('proj-addr').textContent=d.project.address||'';
+      var secs=d.sections||[];
+      var html='';
+      if(secs.indexOf('progress')>=0){ html+='<div id="sec-progress"></div>'; }
+      if(secs.indexOf('photos')>=0){ html+=secHead('Project Photos','ph-cnt')+'<div id="gallery"></div>'; }
+      if(secs.indexOf('documents')>=0){ html+=secHead('Shared Documents','doc-cnt')+'<div id="docs"></div>'; }
+      if(secs.indexOf('daily')>=0){ html+=secHead('Daily Reports','daily-cnt')+'<div id="daily"></div>'; }
+      if(secs.indexOf('schedule')>=0){ html+=secHead('Upcoming Work','sched-cnt')+'<div id="sched"></div>'; }
+      content.innerHTML=html;
+      var jobs=[];
+      if(secs.indexOf('progress')>=0) jobs.push(loadProgress());
+      if(secs.indexOf('photos')>=0) jobs.push(loadPhotos());
+      if(secs.indexOf('documents')>=0) jobs.push(loadDocuments());
+      if(secs.indexOf('daily')>=0) jobs.push(loadDaily());
+      if(secs.indexOf('schedule')>=0) jobs.push(loadSchedule());
+      await Promise.all(jobs);
+    }catch(e){
+      content.innerHTML='<div class="empty">We couldn’t load your project right now. Please refresh.</div>';
+    }
+  }
+
+  // #269 — a 403 on a section fetch means its grant was revoked mid-session. Reload once:
+  // the fresh context re-renders ONLY the still-granted sections (or /welcome if none left).
+  function revokedMidSession(r){ if(r.status===403){ window.location.reload(); return true; } return false; }
+
+  async function loadProgress(){
+    var host=document.getElementById('sec-progress');
+    try{
+      var r0=await fetch('/api/portal/project');
+      if(revokedMidSession(r0)) return;
+      var pj=await r0.json();
+      var d=(pj&&pj.data)||{};
       var pct=Math.max(0,Math.min(100,(d.progress&&d.progress.pct)||0));
       var summary=(d.summary&&d.summary.text)||'';
       var last=(d.summary&&d.summary.last_activity);
-      content.innerHTML=
+      host.innerHTML=
         '<div class="cards">'
         + '<div class="card"><div class="k">Overall progress</div>'
         + '<div class="progress-num">'+pct+'%</div>'
@@ -128,23 +181,20 @@
         + '<div class="summary-text">'+esc(summary)+'</div>'
         + (last?'<div class="summary-meta">Most recent photo: '+fmtDate(last)+'</div>':'')
         + '</div>'
-        + '</div>'
-        + '<div class="sec-head"><h2>Project Photos</h2><span class="cnt" id="ph-cnt"></span></div>'
-        + '<div id="gallery"></div>';
-      await loadPhotos();
-    }catch(e){
-      content.innerHTML='<div class="empty">We couldn’t load your project right now. Please refresh.</div>';
-    }
+        + '</div>';
+    }catch(e){ host.innerHTML='<div class="empty">Could not load progress.</div>'; }
   }
 
   async function loadPhotos(){
     var g=document.getElementById('gallery');
     try{
-      var pr=await fetch('/api/portal/photos').then(function(r){return r.json();});
+      var r0=await fetch('/api/portal/photos');
+      if(revokedMidSession(r0)) return;
+      var pr=await r0.json();
       var photos=(pr&&pr.data&&pr.data.photos)||[];
-      document.getElementById('ph-cnt').textContent=photos.length?(photos.length+' shared'):'';
+      var cnt=document.getElementById('ph-cnt'); if(cnt) cnt.textContent=photos.length?(photos.length+' shared'):'';
       if(!photos.length){
-        g.outerHTML='<div class="empty" id="gallery"><strong>No photos shared yet</strong>Photos from your project will appear here as the team shares them with you.</div>';
+        g.outerHTML=emptyBox('gallery','No photos shared yet','Photos from your project will appear here as the team shares them with you.');
         return;
       }
       g.className='gallery';
@@ -159,6 +209,80 @@
       });
     }catch(e){ g.innerHTML='<div class="empty">Could not load photos.</div>'; }
   }
+
+  // #269 — documents: only the individually shared documents ever arrive here.
+  async function loadDocuments(){
+    var host=document.getElementById('docs');
+    try{
+      var r0=await fetch('/api/portal/documents');
+      if(revokedMidSession(r0)) return;
+      var dr=await r0.json();
+      var docs=(dr&&dr.data&&dr.data.documents)||[];
+      var cnt=document.getElementById('doc-cnt'); if(cnt) cnt.textContent=docs.length?(docs.length+' shared'):'';
+      if(!docs.length){
+        host.outerHTML=emptyBox('docs','No documents shared yet','Project documents will appear here as the team shares them with you.');
+        return;
+      }
+      host.className='rows';
+      host.innerHTML=docs.map(function(d){
+        return '<div class="row"><div class="r-main">'
+          + '<div class="r-title">'+esc(d.title||'Document')+'</div>'
+          + '<div class="r-sub">'+esc(d.category||'')+(d.effective_date?(' · '+fmtDate(d.effective_date)):'')+'</div></div>'
+          + (d.doc_type?'<span class="r-tag">'+esc(d.doc_type)+'</span>':'')
+          + '<a class="r-open" href="'+esc(d.file_url)+'" target="_blank" rel="noopener">Open</a>'
+          + '</div>';
+      }).join('');
+    }catch(e){ host.innerHTML='<div class="empty">Could not load documents.</div>'; }
+  }
+
+  // #269 — daily: curated date + work/no-work timeline.
+  async function loadDaily(){
+    var host=document.getElementById('daily');
+    try{
+      var r0=await fetch('/api/portal/daily');
+      if(revokedMidSession(r0)) return;
+      var dr=await r0.json();
+      var days=(dr&&dr.data&&dr.data.days)||[];
+      var cnt=document.getElementById('daily-cnt'); if(cnt) cnt.textContent=days.length?(days.length+' report day'+(days.length===1?'':'s')):'';
+      if(!days.length){
+        host.outerHTML=emptyBox('daily','No daily reports yet','A day-by-day record of site activity will appear here as reports are issued.');
+        return;
+      }
+      host.className='rows';
+      host.innerHTML=days.map(function(d){
+        return '<div class="row"><div class="r-main">'
+          + '<div class="r-title">'+fmtDate(d.date)+'</div></div>'
+          + '<span class="r-tag '+(d.no_work?'nowork':'work')+'">'+esc(d.label||'')+'</span>'
+          + '</div>';
+      }).join('');
+    }catch(e){ host.innerHTML='<div class="empty">Could not load daily reports.</div>'; }
+  }
+
+  // #269 — schedule: curated look-ahead window (name/type + planned dates only).
+  async function loadSchedule(){
+    var host=document.getElementById('sched');
+    try{
+      var r0=await fetch('/api/portal/schedule');
+      if(revokedMidSession(r0)) return;
+      var sr=await r0.json();
+      var acts=(sr&&sr.data&&sr.data.activities)||[];
+      var cnt=document.getElementById('sched-cnt'); if(cnt) cnt.textContent=acts.length?(acts.length+' planned'):'';
+      if(!acts.length){
+        host.outerHTML=emptyBox('sched','Nothing scheduled in this window','Upcoming planned work will appear here as the schedule fills in.');
+        return;
+      }
+      host.className='rows';
+      host.innerHTML=acts.map(function(a){
+        var range=fmtDate(a.start)+(a.finish&&a.finish!==a.start?(' – '+fmtDate(a.finish)):'');
+        return '<div class="row"><div class="r-main">'
+          + '<div class="r-title">'+esc(a.name||'Activity')+'</div>'
+          + '<div class="r-sub">'+esc(a.type||'')+'</div></div>'
+          + '<span class="r-dates">'+range+'</span>'
+          + '</div>';
+      }).join('');
+    }catch(e){ host.innerHTML='<div class="empty">Could not load the schedule.</div>'; }
+  }
+
   load();
 </script>
 </body>
