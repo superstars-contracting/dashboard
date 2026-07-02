@@ -36,7 +36,7 @@ from pathlib import Path
 
 from flask import Response, g, jsonify, redirect, request, send_file
 
-from auth import _db, current_user, requires_role
+from auth import _db, _now_iso, current_user
 import client_grants
 import visibility
 import dropplan_rollups as _rollups
@@ -110,29 +110,72 @@ def _client_gate():
     return redirect("/portal")
 
 
-# ============= #269 — PER-SECTION ENFORCEMENT DECORATOR =============
+# ============= #270 — EFFECTIVE CLIENT (self, or read-only admin preview) =============
+
+def _resolve_portal_client(conn):
+    """The client whose portal this request serves. Returns (target, is_preview, err):
+      * role `client`      -> SELF. Any ?preview_client param is IGNORED — a client can
+                              never preview anyone (nor widen their own view with it).
+      * admin / c_suite    -> ONLY with a valid ?preview_client=<id> naming an ACTIVE
+                              client: that client, read-only preview. Every grant check,
+                              project scope, and per-item visibility downstream evaluates
+                              against the TARGET — the preview can never show more (or
+                              less) than the client's own login would. No param -> 403.
+      * anyone else        -> 403 (pm/super/etc. can never reach the portal).
+    Stateless by construction: no session swap, no impersonation cookie — the param is
+    re-validated on EVERY request."""
+    user = current_user()
+    if not user:
+        return None, False, (jsonify({"error": "forbidden"}), 403)
+    role = user.get("role")
+    if role == "client":
+        return user, False, None
+    if role in ("admin", "c_suite"):
+        raw = request.args.get("preview_client")
+        if not raw:
+            return None, False, (jsonify({"error": "forbidden"}), 403)
+        try:
+            target_id = int(raw)
+        except (TypeError, ValueError):
+            return None, False, (jsonify({"error": "forbidden"}), 403)
+        row = conn.execute(
+            "SELECT id, role, status, is_active, display_name, full_name, email "
+            "FROM users WHERE id=?", (target_id,)).fetchone()
+        if (not row or row["role"] != "client" or row["status"] != "active"
+                or not row["is_active"]):
+            return None, False, (jsonify({"error": "forbidden"}), 403)
+        target = {"id": row["id"], "role": "client",
+                  "display_name": row["display_name"] or row["full_name"] or row["email"]}
+        return target, True, None
+    return None, False, (jsonify({"error": "forbidden"}), 403)
+
+
+# ============= #269 — PER-SECTION ENFORCEMENT DECORATOR (preview-aware #270) =============
 
 def require_section(section: str):
-    """Endpoint gate for ONE portal section. Runs on top of requires_role('client'):
-    re-derives the client's project + the section grant from the DB per request and
-    403s when the section isn't granted — server-enforced, direct URL included.
-    On success, stashes the project_code in g.client_project_code for the handler."""
+    """Endpoint gate for ONE portal section. Resolves the EFFECTIVE client (self, or the
+    admin-preview target), then re-derives their project + the section grant from the DB
+    per request and 403s when the section isn't granted — server-enforced, direct URL
+    included, preview identical to the real client by construction. On success stashes
+    g.portal_client_id / g.client_project_code / g.portal_is_preview for the handler."""
     def decorator(fn):
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
-            user = current_user()
-            if not user or user.get("role") != "client":
-                return jsonify({"error": "forbidden"}), 403
             conn = _db()
             try:
-                code = client_project_code(user["id"], conn)
-                if not code or not client_grants.has_grant(conn, user["id"], code, section):
+                target, is_preview, err = _resolve_portal_client(conn)
+                if err:
+                    return err
+                code = client_project_code(target["id"], conn)
+                if not code or not client_grants.has_grant(conn, target["id"], code, section):
                     logging.info(
                         f"client_portal: section denied section={section} "
-                        f"user_id={user.get('id')} path={request.path}")
+                        f"target={target.get('id')} preview={is_preview} path={request.path}")
                     return jsonify({"error": "forbidden"}), 403
             finally:
                 conn.close()
+            g.portal_client_id = target["id"]
+            g.portal_is_preview = is_preview
             g.client_project_code = code
             return fn(*args, **kwargs)
         return wrapper
@@ -202,28 +245,48 @@ def _no_store(resp):
     return resp
 
 
-@requires_role("client")
 def _portal_page():
-    # Defense in depth: the gate already bounces zero-grant clients to /welcome.
-    granted = getattr(g, "client_granted_sections", None)
-    if not granted:
-        return redirect("/welcome")
+    """GET /portal — the portal shell. Serves the EFFECTIVE client's portal: a real
+    client (zero grants -> /welcome), or a read-only admin/c_suite preview via
+    ?preview_client=<id> (zero-grant target -> back to /admin/projects, where the
+    containment is stated). Every preview page open writes an audit_log row (#270)."""
+    conn = _db()
+    try:
+        target, is_preview, err = _resolve_portal_client(conn)
+        if err:
+            return err
+        code = client_project_code(target["id"], conn)
+        granted = client_grants.granted_sections(conn, target["id"], code) if code else set()
+        if not granted:
+            return redirect("/admin/projects" if is_preview else "/welcome")
+        if is_preview:
+            actor = current_user() or {}
+            conn.execute(
+                "INSERT INTO audit_log (action, actor_user_id, actor_role, target_type, "
+                "target_id, note, created_at) VALUES (?,?,?,?,?,?,?)",
+                ("client_portal_preview", actor.get("id"), actor.get("role"), "user",
+                 str(target["id"]), "read-only client-portal preview opened", _now_iso()))
+            conn.commit()
+    finally:
+        conn.close()
     if not PORTAL_PAGE.exists():
         return ("client portal page missing", 500)
     return _no_store(send_file(str(PORTAL_PAGE)))
 
 
-@requires_role("client")
 def _portal_context():
     """GET /api/portal/context — the portal SHELL payload: curated project header + the
-    client's granted sections (the ONLY sections the page renders). Requires >=1 grant
-    (the gate 403s zero-grant clients before this runs). Carries NO section data itself —
-    each section loads through its own grant-checked endpoint."""
-    user = current_user()
+    effective client's granted sections (the ONLY sections the page renders). Requires
+    >=1 grant. Carries NO section data itself — each section loads through its own
+    grant-checked endpoint. In preview mode a `preview` block rides OUTSIDE `data`, so
+    `data` stays byte-identical to the real client's own response (parity-guarded)."""
     conn = _db()
     try:
-        code = client_project_code(user["id"], conn)
-        granted = client_grants.granted_sections(conn, user["id"], code) if code else set()
+        target, is_preview, err = _resolve_portal_client(conn)
+        if err:
+            return err
+        code = client_project_code(target["id"], conn)
+        granted = client_grants.granted_sections(conn, target["id"], code) if code else set()
         if not code or not granted:
             return jsonify({"error": "forbidden"}), 403
         p = conn.execute(
@@ -231,7 +294,7 @@ def _portal_context():
             (code,)).fetchone()
         if not p:
             return jsonify({"error": "forbidden"}), 403
-        return _no_store(jsonify({"data": {
+        payload = {"data": {
             "project": {
                 "code": p["project_code"], "name": p["name"] or p["project_code"],
                 "address": ", ".join(x for x in (p["address"], p["city_zip"]) if x) or None,
@@ -239,18 +302,20 @@ def _portal_context():
             },
             # portal display order, granted only
             "sections": [s for s in client_grants.SECTIONS if s in granted],
-        }}))
+        }}
+        if is_preview:
+            # OUTSIDE data (parity): who the preview shows, for the amber banner only.
+            payload["preview"] = {"on": True, "client_name": target.get("display_name")}
+        return _no_store(jsonify(payload))
     finally:
         conn.close()
 
 
-@requires_role("client")
 @require_section("progress")
 def _portal_project():
     """Curated high-level progress + a curated summary (the 'progress' SECTION). NO money,
     NO drop internals — overall % only (project_rollup with include_cost=False). Photo
     counts are mentioned ONLY when the photos section is also granted."""
-    user = current_user()
     code = g.client_project_code
     conn = _db()
     try:
@@ -260,7 +325,7 @@ def _portal_project():
         summary = f"Your project is {label.lower()} — about {pct:.0f}% complete."
         last_activity = None
         photos_shared = None
-        if client_grants.has_grant(conn, user["id"], code, "photos"):
+        if client_grants.has_grant(conn, g.portal_client_id, code, "photos"):
             vis_ids = visibility.client_visible_photo_ids(conn, code)
             photos_shared = len(vis_ids)
             if vis_ids:
@@ -279,7 +344,6 @@ def _portal_project():
         conn.close()
 
 
-@requires_role("client")
 @require_section("photos")
 def _portal_photos():
     """The client gallery — ONLY photos shared to the client audience for the client's
@@ -322,13 +386,11 @@ def _portal_serve(photo_id, col):
     return send_file(str(p), mimetype=(r["mime"] or "image/jpeg"), conditional=True)
 
 
-@requires_role("client")
 @require_section("photos")
 def _portal_photo_thumb(photo_id):
     return _portal_serve(photo_id, "thumb_path")
 
 
-@requires_role("client")
 @require_section("photos")
 def _portal_photo_file(photo_id):
     return _portal_serve(photo_id, "file_path")
@@ -349,7 +411,6 @@ def _portal_document(r) -> dict:
     }
 
 
-@requires_role("client")
 @require_section("documents")
 def _portal_documents():
     """The client document list — ONLY documents shared to the client audience for the
@@ -369,7 +430,6 @@ def _portal_documents():
         conn.close()
 
 
-@requires_role("client")
 @require_section("documents")
 def _portal_document_file(doc_id):
     """Serve document bytes BY ID — per-resource isolation identical to photos: belongs to
@@ -398,7 +458,6 @@ def _portal_document_file(doc_id):
 
 # ---- #269 — daily section (curated daily-report timeline; no internals) ----
 
-@requires_role("client")
 @require_section("daily")
 def _portal_daily():
     """Curated daily-report timeline for the client's project: date + work/no-work label
@@ -423,7 +482,6 @@ def _portal_daily():
 
 # ---- #269 — schedule section (curated look-ahead; no crew/notes/internals) ----
 
-@requires_role("client")
 @require_section("schedule")
 def _portal_schedule():
     """Curated look-ahead for the client's project: activity name/type + planned window,
@@ -450,8 +508,9 @@ def _portal_schedule():
 def register(app) -> None:
     """Wire the grant-aware client gate + the read-only, section-gated portal page/API.
     Call AFTER apply_auth_gate (and the other gates) so g.auth_user is set; the gate then
-    enforces grant-aware default-deny for the client role, and every portal endpoint is
-    requires_role('client') + section-granted + project-scoped + per-resource checked."""
+    enforces grant-aware default-deny for the client role, and every portal endpoint
+    resolves the EFFECTIVE client (self, or admin/c_suite read-only preview #270) +
+    section grant + project scope + per-resource visibility, all per request."""
     app.before_request(_client_gate)
     app.add_url_rule("/welcome", "client_welcome_page", _welcome_page, methods=["GET"])  # #267 hard-stop
     app.add_url_rule("/portal", "client_portal_page", _portal_page, methods=["GET"])
