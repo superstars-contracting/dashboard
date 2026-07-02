@@ -75,6 +75,16 @@
   .empty strong{display:block;color:var(--ink);font-size:15px;margin-bottom:5px;}
   .foot{text-align:center;color:#b6b0a6;font-size:11px;margin-top:42px;}
 
+  /* #270 — read-only admin preview banner (amber, approved Option B). Rendered ONLY when
+     the SERVER says this is a preview (context.preview) — never for a real client. */
+  .pv-banner{background:#8a6d3b;color:#fff;padding:10px 16px;font-size:12.5px;font-weight:700;
+             display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:60;}
+  .pv-banner .eye{font-size:14px;}
+  .pv-banner .pv-exit{margin-left:auto;font-size:11px;font-weight:700;background:rgba(255,255,255,.16);
+             border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:7px;padding:5px 12px;
+             cursor:pointer;text-decoration:none;white-space:nowrap;}
+  .pv-banner .pv-exit:hover{background:rgba(255,255,255,.28);}
+
   /* lightbox */
   .lb{position:fixed;inset:0;background:rgba(20,18,16,.86);display:none;align-items:center;justify-content:center;padding:18px;z-index:40;}
   .lb.on{display:flex;}
@@ -97,7 +107,7 @@
   <div class="wrap" id="wrap">
     <div class="hero"><div class="pill">Project Portal</div><h1 id="proj-name">Loading…</h1><div class="addr" id="proj-addr"></div></div>
     <div id="content"></div>
-    <div class="foot" id="build">build #269 · 2026-07-02 · Client portal — section-gated (default-off grants) + per-item default-deny visibility</div>
+    <div class="foot" id="build">build #270 · 2026-07-02 · Client portal — section-gated + per-item visibility; read-only admin preview (server-declared)</div>
   </div>
 
   <div class="lb" id="lb"><button class="x" id="lb-x" aria-label="Close">×</button><img id="lb-img" alt=""><div class="cap" id="lb-cap"></div></div>
@@ -125,16 +135,33 @@
     return '<div class="empty" id="'+id+'"><strong>'+esc(strong)+'</strong>'+esc(text)+'</div>';
   }
 
+  // #270 — read-only admin preview: the ?preview_client param rides on EVERY portal
+  // fetch (incl. image/file URLs) so the server resolves the same target per request.
+  // The SERVER decides whether this is a preview (context.preview) — the param alone
+  // never renders a banner, and a real client's requests ignore it server-side.
+  var PREVIEW_ID=new URLSearchParams(location.search).get('preview_client');
+  function api(u){ if(!PREVIEW_ID) return u; return u+(u.indexOf('?')>=0?'&':'?')+'preview_client='+encodeURIComponent(PREVIEW_ID); }
+  function homeAway(){ window.location.href = PREVIEW_ID ? '/admin/projects' : '/welcome'; }
+  function showPreviewBanner(name){
+    if(document.getElementById('pv-banner')) return;
+    var b=document.createElement('div');
+    b.className='pv-banner'; b.id='pv-banner';
+    b.innerHTML='<span class="eye">👁</span> Viewing as '+esc(name||'client')+' (client) — read-only preview of exactly what they see '
+      +'<a class="pv-exit" href="/admin/projects">Exit preview</a>';
+    document.body.insertBefore(b, document.body.firstChild);
+  }
+
   // #269 — the context call returns ONLY the sections this client has been granted;
   // the page renders exactly those (server enforces each section's API separately).
   async function load(){
     var content=document.getElementById('content');
     try{
-      var r=await fetch('/api/portal/context');
-      if(r.status===403){ window.location.href='/welcome'; return; }  // grants revoked mid-session
+      var r=await fetch(api('/api/portal/context'));
+      if(r.status===403){ homeAway(); return; }  // grants revoked mid-session (or preview target contained)
       var cj=await r.json();
       var d=(cj&&cj.data)||{};
-      if(!d.project){ window.location.href='/welcome'; return; }
+      if(!d.project){ homeAway(); return; }
+      if(cj&&cj.preview&&cj.preview.on){ showPreviewBanner(cj.preview.client_name); }  // server-declared only
       document.getElementById('proj-name').innerHTML=esc(d.project.name)+(d.project.status==='active'?'<span class="status-badge">Active</span>':'');
       document.getElementById('proj-addr').textContent=d.project.address||'';
       var secs=d.sections||[];
@@ -164,7 +191,7 @@
   async function loadProgress(){
     var host=document.getElementById('sec-progress');
     try{
-      var r0=await fetch('/api/portal/project');
+      var r0=await fetch(api('/api/portal/project'));
       if(revokedMidSession(r0)) return;
       var pj=await r0.json();
       var d=(pj&&pj.data)||{};
@@ -188,7 +215,7 @@
   async function loadPhotos(){
     var g=document.getElementById('gallery');
     try{
-      var r0=await fetch('/api/portal/photos');
+      var r0=await fetch(api('/api/portal/photos'));
       if(revokedMidSession(r0)) return;
       var pr=await r0.json();
       var photos=(pr&&pr.data&&pr.data.photos)||[];
@@ -199,8 +226,8 @@
       }
       g.className='gallery';
       g.innerHTML=photos.map(function(p){
-        return '<a class="ph" data-full="'+esc(p.file_url)+'" data-cap="'+esc(p.caption||'')+'">'
-          + '<img loading="lazy" src="'+esc(p.thumb_url)+'" alt="'+esc(p.caption||'Project photo')+'">'
+        return '<a class="ph" data-full="'+esc(api(p.file_url))+'" data-cap="'+esc(p.caption||'')+'">'
+          + '<img loading="lazy" src="'+esc(api(p.thumb_url))+'" alt="'+esc(p.caption||'Project photo')+'">'
           + '<div class="meta"><div class="cap">'+esc(p.caption||'Project photo')+'</div>'
           + '<div class="date">'+fmtDate(p.taken_at)+'</div></div></a>';
       }).join('');
@@ -214,7 +241,7 @@
   async function loadDocuments(){
     var host=document.getElementById('docs');
     try{
-      var r0=await fetch('/api/portal/documents');
+      var r0=await fetch(api('/api/portal/documents'));
       if(revokedMidSession(r0)) return;
       var dr=await r0.json();
       var docs=(dr&&dr.data&&dr.data.documents)||[];
@@ -229,7 +256,7 @@
           + '<div class="r-title">'+esc(d.title||'Document')+'</div>'
           + '<div class="r-sub">'+esc(d.category||'')+(d.effective_date?(' · '+fmtDate(d.effective_date)):'')+'</div></div>'
           + (d.doc_type?'<span class="r-tag">'+esc(d.doc_type)+'</span>':'')
-          + '<a class="r-open" href="'+esc(d.file_url)+'" target="_blank" rel="noopener">Open</a>'
+          + '<a class="r-open" href="'+esc(api(d.file_url))+'" target="_blank" rel="noopener">Open</a>'
           + '</div>';
       }).join('');
     }catch(e){ host.innerHTML='<div class="empty">Could not load documents.</div>'; }
@@ -239,7 +266,7 @@
   async function loadDaily(){
     var host=document.getElementById('daily');
     try{
-      var r0=await fetch('/api/portal/daily');
+      var r0=await fetch(api('/api/portal/daily'));
       if(revokedMidSession(r0)) return;
       var dr=await r0.json();
       var days=(dr&&dr.data&&dr.data.days)||[];
@@ -262,7 +289,7 @@
   async function loadSchedule(){
     var host=document.getElementById('sched');
     try{
-      var r0=await fetch('/api/portal/schedule');
+      var r0=await fetch(api('/api/portal/schedule'));
       if(revokedMidSession(r0)) return;
       var sr=await r0.json();
       var acts=(sr&&sr.data&&sr.data.activities)||[];

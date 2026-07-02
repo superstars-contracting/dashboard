@@ -4,14 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="/files/static/fonts/typography.css">
-<link rel="stylesheet" href="/files/static/css/widgets.css?v=269">
+<link rel="stylesheet" href="/files/static/css/widgets.css?v=270">
 <title>Project Assignments · Superstars Contracting</title>
 <!-- #263 — admin/c_suite project-assignment + project-close screen. Two axes wired here:
      who manages which projects (pm_project_assignment) and which projects are active vs
      closed (projects.status). Every endpoint it calls is admin/c_suite-only, server-side.
      #269 — Client Access grew per-section, DEFAULT-OFF access toggles (client_section_grant):
      an admin unlocks a client's portal one section at a time; zero sections = the client
-     stays hard-contained on /welcome (#267). -->
+     stays hard-contained on /welcome (#267).
+     #270 — access PRESETS (Minimal/Standard/Full view; apply = replace-set) + a read-only
+     "Preview portal" button per client (/portal?preview_client=<id> — stateless, server-
+     enforced parity, audited; amber banner marks the preview). -->
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:var(--canvas);color:var(--ink);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;}
@@ -73,6 +76,13 @@
   .sec-status .contained{color:#a23b30;font-weight:700;}
   .sec-status .open-n{color:#0c7a5f;font-weight:700;}
   .sec-note{font-size:11.5px;color:var(--muted);margin-top:6px;}
+  /* #270 — preset row + preview button (design-system: boxed, :root tokens) */
+  .preset-row{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:11.5px;color:var(--muted);font-weight:700;}
+  .preset-row select{height:30px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;font-size:12px;background:#fff;color:var(--ink);}
+  .btn-ghost-sm{font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;}
+  .btn-ghost-sm:hover{border-color:var(--accent-edge);background:var(--accent-soft);color:var(--accent-ink);}
+  .btn-ghost-sm:disabled{opacity:.5;cursor:not-allowed;}
+  .pv-open{display:inline-flex;align-items:center;gap:6px;}
   .ph-build{text-align:center;color:#9aa3ae;font-size:11px;margin-top:30px;}
   .brand-mark,.mark{object-fit:contain;}  /* #265 swap-safe logo */
 </style>
@@ -117,7 +127,7 @@
     <div id="client-list"><div class="empty">Loading…</div></div>
   </section>
 
-  <div class="ph-build" id="ap-build-stamp">build #269 · 2026-07-02 · Selective client un-gating — per-section, default-off access grants (admin/c_suite)</div>
+  <div class="ph-build" id="ap-build-stamp">build #270 · 2026-07-02 · Client access — section toggles + presets (Minimal/Standard/Full) + read-only portal preview (admin/c_suite)</div>
 </div>
 
 <script>
@@ -139,7 +149,9 @@
     if(u.role!=='admin' && u.role!=='c_suite'){ document.body.innerHTML='<div style="max-width:520px;margin:18vh auto;text-align:center;font-family:Inter,sans-serif;color:#76777E">This screen is limited to admin and C-suite.</div>'; }
   });
 
-  var STATE = { projects: [], pms: [], clients: [], grantable: ['progress','photos','documents','daily','schedule'] };
+  var STATE = { projects: [], pms: [], clients: [], grantable: ['progress','photos','documents','daily','schedule'],
+                presets: {minimal:['progress'], standard:['progress','photos','daily'], full:['progress','photos','documents','daily','schedule']},
+                presetLabels: {minimal:'Minimal', standard:'Standard', full:'Full view'} };
 
   async function load(){
     clearBars();
@@ -150,6 +162,8 @@
       STATE.pms = (resp.data && resp.data.pms) || [];
       STATE.clients = (resp.data && resp.data.clients) || [];
       if(resp.data && resp.data.grantable_sections){ STATE.grantable = resp.data.grantable_sections; }
+      if(resp.data && resp.data.presets){ STATE.presets = resp.data.presets; }
+      if(resp.data && resp.data.preset_labels){ STATE.presetLabels = resp.data.preset_labels; }
       renderProjects();
       renderPMs();
       renderClients();
@@ -231,17 +245,55 @@
           + ' onchange="toggleSection('+c.user_id+', \''+esc(s)+'\', this)">'
           + esc(SECTION_LABEL[s]||s) + '</label>';
       }).join('');
+      // #270 — preset select (apply = replace-set) + read-only preview entry.
+      // Order smallest->largest bundle (jsonify sorts dict keys, so order here).
+      var PRESET_ORDER=['minimal','standard','full'];
+      var presetNames=Object.keys(STATE.presets||{}).sort(function(a,b){
+        var ia=PRESET_ORDER.indexOf(a),ib=PRESET_ORDER.indexOf(b);
+        return (ia<0?99:ia)-(ib<0?99:ib);
+      });
+      var presetOpts=presetNames.map(function(k){ return '<option value="'+esc(k)+'">'+esc((STATE.presetLabels||{})[k]||k)+'</option>'; }).join('');
+      var dis0=!c.project_code;
+      var presetRow='<div class="preset-row">Preset:'
+        +'<select id="cl-preset-'+c.user_id+'"'+(dis0?' disabled':'')+'>'+presetOpts+'</select>'
+        +'<button class="btn-ghost-sm" onclick="applyPreset('+c.user_id+', this)"'+(dis0?' disabled':'')+'>Apply</button>'
+        +'<span style="font-weight:600;">replaces the toggles above with the bundle</span></div>';
       return '<div class="pm-card"><div class="pm-head"><div><div class="pm-nm">'+esc(c.display_name||c.email)+'</div>'
         +'<div class="pm-em">'+esc(c.email)+'</div></div>'
         +'<div class="pm-save" style="display:flex;gap:8px;align-items:center;">'
+        +'<button class="btn-ghost-sm pv-open" onclick="window.open(\'/portal?preview_client='+c.user_id+'\',\'_blank\')"'
+        +(dis0?' disabled title="Assign a project first"':' title="Open this client\'s exact portal — read-only, logged"')+'>👁 Preview portal</button>'
         +'<select id="cl-sel-'+c.user_id+'" style="height:34px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;font-size:13px;background:#fff;color:var(--ink);">'+opts+'</select>'
         +'<button class="btn-primary" onclick="saveClientAssignment('+c.user_id+', this)">Save</button></div></div>'
         +'<div class="sec-grid" id="cl-secs-'+c.user_id+'">'+toggles+'</div>'
+        +presetRow
         +sectionStatusHTML(c)
         +'<div class="sec-note">Photos and Documents show only the items individually shared with this client — unlocking the section never exposes unshared items.</div>'
         +'</div>';
     }).join('');
   }
+
+  // #270 — apply a named preset: REPLACES the client's grant set with the bundle
+  // (server validates admin/c_suite + active client + assigned project, transactional).
+  window.applyPreset = async function(user_id, btn){
+    clearBars();
+    var sel=document.getElementById('cl-preset-'+user_id);
+    if(!sel || !sel.value) return;
+    if(btn){ btn.disabled=true; btn.textContent='Applying…'; }
+    try{
+      var resp = await fetch('/api/admin/client-grants/preset', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ user_id: user_id, preset: sel.value })
+      }).then(function(r){ return r.json(); });
+      if(resp.error){ showErr(resp.error); return; }
+      var d=resp.data||{};
+      var c=(STATE.clients||[]).find(function(x){ return x.user_id===user_id; });
+      if(c){ c.sections=d.sections||[]; }
+      showOk(((STATE.presetLabels||{})[d.preset]||d.preset)+' applied — '+((d.sections||[]).length)+' section'+(((d.sections||[]).length)===1?'':'s')+' unlocked.');
+      renderClients();
+    }catch(e){ showErr('Network error: '+e.message); }
+    finally{ if(btn){ btn.disabled=false; btn.textContent='Apply'; } }
+  };
 
   // #269 — grant / revoke ONE section (applies immediately; server re-checks admin/c_suite).
   window.toggleSection = async function(user_id, section, box){

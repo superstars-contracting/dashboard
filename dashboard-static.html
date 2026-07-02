@@ -778,7 +778,7 @@
 <!-- #211 calm-blue widget accent — applied via the SHARED widgets.css, loaded
      AFTER the inline #208 styles so the accent (blue band + inward shading + blue
      rings) wins, giving the project page + the company console one source of truth. -->
-<link rel="stylesheet" href="/files/static/css/widgets.css?v=245">
+<link rel="stylesheet" href="/files/static/css/widgets.css?v=270">
 </head>
 <body>
 <!-- #212 nav icons — inline SVG <symbol> defs (defined ONCE, used via <use>).
@@ -1278,6 +1278,28 @@
           .pd-rowacts{display:flex;gap:6px;align-items:center;flex:none}
           .pd-mini2{font-size:10.5px;color:var(--pd-muted);border:1px solid var(--pd-line);background:#fff;border-radius:6px;padding:3px 7px;cursor:pointer;white-space:nowrap}
           .pd-extra{font-size:11.5px;color:var(--pd-muted);padding:7px 15px;background:#fafbfe;border-bottom:1px solid #f3f3f5;display:flex;align-items:center;gap:8px}.pd-extra:last-child{border-bottom:none}
+          /* #270 — per-document client-sharing column (approved Option B: toggle + state caption)
+             + row selection for bulk share. Same engine + captions as the Photos tray. */
+          .pd-share-col{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:150px}
+          .pd-share-top{display:flex;align-items:center;gap:6px}
+          .pd-tog{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:var(--pd-muted);cursor:pointer;user-select:none}
+          .pd-tog .pd-track{width:32px;height:18px;border-radius:99px;background:#e3e6ee;position:relative;transition:background .15s}
+          .pd-tog .pd-track::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:99px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:left .15s}
+          .pd-tog.on{color:var(--pd-accent-ink)}
+          .pd-tog.on .pd-track{background:var(--pd-accent)}
+          .pd-tog.on .pd-track::after{left:16px}
+          .pd-share-state{font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--pd-muted);white-space:nowrap}
+          .pd-share-state.on{color:var(--pd-accent-ink)}
+          .pd-share-state.flag{color:var(--warn-ink)}
+          .pd-flagbtn{flex:none;width:24px;height:24px;border-radius:7px;border:1px solid var(--pd-line);background:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;color:var(--pd-muted);padding:0}
+          .pd-flagbtn:hover{border-color:var(--warn);color:var(--warn-ink);background:var(--warn-soft)}
+          .pd-flagbtn.flagged{border-color:var(--warn);color:#fff;background:var(--warn)}
+          .pd-selbox{flex:none;width:15px;height:15px;accent-color:var(--pd-accent);cursor:pointer;margin:0}
+          .pd-bulkbar{display:flex;align-items:center;gap:10px;background:var(--pd-accent-soft);border:1px solid var(--pd-accent-edge);border-radius:11px;padding:8px 14px;margin-bottom:12px;font-size:12px;font-weight:700;color:var(--pd-accent-ink)}
+          .pd-bulkbar button{font-size:11.5px;font-weight:700;border-radius:8px;padding:6px 12px;cursor:pointer}
+          .pd-bulkbar .pd-bb-share{border:none;background:var(--pd-accent);color:#fff}
+          .pd-bulkbar .pd-bb-unshare{border:1px solid var(--pd-accent-edge);background:#fff;color:var(--pd-accent-ink)}
+          .pd-bulkbar .pd-bb-clear{border:none;background:none;color:var(--pd-muted);margin-left:auto}
           .pd-overlay{position:fixed;inset:0;background:rgba(20,22,30,.30);display:none;align-items:flex-start;justify-content:center;padding:48px 16px;overflow:auto;z-index:1200}
           .pd-overlay.show{display:flex}
           .pd-modal{position:relative;width:460px;max-width:100%;background:#fff;border-radius:18px;box-shadow:0 24px 60px rgba(20,25,40,.28);padding:22px;color:var(--pd-ink)}
@@ -1323,8 +1345,14 @@
             <button class="pd-upload" id="pd-upload-btn"><svg class="pd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg>Upload</button>
           </div>
           <div class="pd-hero" id="pd-hero"><div class="pd-empty" style="margin:0">Loading documents…</div></div>
+          <div class="pd-bulkbar pd-hide" id="pd-bulkbar">
+            <span id="pd-bb-count">0 selected</span>
+            <button class="pd-bb-share" id="pd-bb-share" type="button">Share selected with client</button>
+            <button class="pd-bb-unshare" id="pd-bb-unshare" type="button">Make selected internal</button>
+            <button class="pd-bb-clear" id="pd-bb-clear" type="button">Clear</button>
+          </div>
           <div id="pd-checklist"></div>
-          <div id="pd-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #234 · 2026-06-08 · Project Documents — Batch B AI auto-read (type · category · requirement · dates) on upload</div>
+          <div id="pd-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #270 · 2026-07-02 · Project Documents — per-doc client share/red-flag column + bulk share (one-time; new uploads stay internal)</div>
         </div>
         <div class="pd-overlay" id="pd-modal">
           <div class="pd-modal">
@@ -6869,7 +6897,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   var ICCHECK='<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg>';
   var ICWARN='<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 8v5M12 16.5v.5"/></svg>';
   var ICDOC='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 2h8l4 4v16H6z"/><path d="M14 2v4h4"/></svg>';
-  var PD={data:null,files:[],mode:'single',wired:false,prefill:null};
+  var PD={data:null,files:[],mode:'single',wired:false,prefill:null,sel:new Set()};
 
   function $(id){return document.getElementById(id);}
   function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
@@ -6888,11 +6916,68 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
 
   async function loadDocs(){
     pdWire();
+    PD.sel.clear(); renderBulkBar();   // #270 — a reload resets the bulk selection
     try{
       var j=await jget('/api/projects/'+encodeURIComponent(PROJECT_CODE)+'/documents');
       PD.data=(j&&j.data)||{categories:[],readiness:{}};
       renderHero(); renderChecklist();
     }catch(e){console.warn('[projdocs] load failed',e);var h=$('pd-checklist');if(h)h.innerHTML='<div class="pd-empty">Could not load documents.</div>';}
+  }
+
+  // ---------- #270 — per-document client sharing (same engine + captions as Photos) ----------
+  // Option B (approved): right-hand column = toggle "Client" + state caption; flagged wins.
+  // A superseded doc gets NO controls — the portal never serves superseded versions.
+  function pdShareCol(d){
+    if(d.superseded)return '';
+    if(d.flagged){
+      return '<div class="pd-share-col"><div class="pd-share-top">'
+        +'<button class="pd-flagbtn flagged" data-dflag="'+d.id+'" title="Red-flagged — offline for all external viewers. Click to clear.">⚑</button></div>'
+        +'<span class="pd-share-state flag">⚑ Red-flagged — offline</span></div>';
+    }
+    return '<div class="pd-share-col"><div class="pd-share-top">'
+      +'<span class="pd-tog'+(d.shared_client?' on':'')+'" data-dshare="'+d.id+'" data-don="'+(d.shared_client?1:0)+'" role="switch" aria-checked="'+(d.shared_client?'true':'false')+'"><span class="pd-track"></span>Client</span>'
+      +'<button class="pd-flagbtn" data-dflag="'+d.id+'" title="Red-flag — pull from client view instantly">⚑</button></div>'
+      +'<span class="pd-share-state'+(d.shared_client?' on':'')+'">'+(d.shared_client?'Shared with client':'Internal only')+'</span></div>';
+  }
+  function pdSelBox(d){
+    if(d.superseded)return '';
+    return '<input type="checkbox" class="pd-selbox" data-sel="'+d.id+'"'+(PD.sel.has(d.id)?' checked':'')+' title="Select for bulk share">';
+  }
+  function renderBulkBar(){
+    var bar=$('pd-bulkbar');if(!bar)return;
+    var n=PD.sel.size;
+    bar.classList.toggle('pd-hide',n===0);
+    var c=$('pd-bb-count');if(c)c.textContent=n+' selected';
+  }
+  async function dShare(id,on){
+    try{
+      var r=await fetch('/api/documents/'+id+'/share',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({audience:'client',on:on}),credentials:'include'});
+      var j=await r.json();
+      if(j.error){ alert('Share failed: '+j.error); return; }
+      await loadDocs();
+    }catch(e){ alert('Network error sharing document.'); }
+  }
+  async function dFlag(id,on){
+    if(on && !confirm('Take this document OFFLINE for all external viewers (clients)? It disappears from their portal immediately. You can clear the flag later.')) return;
+    try{
+      var r=await fetch('/api/documents/'+id+'/redflag',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({on:on}),credentials:'include'});
+      var j=await r.json();
+      if(j.error){ alert('Failed: '+j.error); return; }
+      await loadDocs();
+    }catch(e){ alert('Network error.'); }
+  }
+  async function dBulk(on){
+    var ids=Array.from(PD.sel);
+    if(!ids.length)return;
+    try{
+      var r=await fetch('/api/documents/share-bulk',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ids:ids,audience:'client',on:on}),credentials:'include'});
+      var j=await r.json();
+      if(j.error){ alert((on?'Bulk share':'Bulk unshare')+' failed: '+j.error); return; }
+      await loadDocs();   // whole call is atomic server-side; reload shows the new states
+    }catch(e){ alert('Network error.'); }
   }
 
   function renderHero(){
@@ -6927,11 +7012,14 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
         }else{
           right='<span class="pd-cmeta">filed '+mdy(it.doc.effective_date)+'</span><button class="pd-mini2" data-del="'+it.doc.id+'">Remove</button>';
         }
-        return '<div class="pd-crow"><span class="pd-ck '+ckcls+'">'+ckinner+'</span>'+nm+'<span class="pd-rowacts">'+right+'</span></div>';
+        // #270 — doc-bearing rows get a selection box + the client-sharing column
+        var selbox=it.doc?pdSelBox(it.doc):'';
+        var sharecol=it.doc?pdShareCol(it.doc):'';
+        return '<div class="pd-crow">'+selbox+'<span class="pd-ck '+ckcls+'">'+ckinner+'</span>'+nm+'<span class="pd-rowacts">'+right+'</span>'+sharecol+'</div>';
       }).join('');
       var extras=(c.extras||[]).map(function(d){
         var fl=d.status==='expired'?'<span class="pd-flag warn">Expired</span>':(d.status==='expiring'?'<span class="pd-flag warn">Expiring</span>':(d.superseded?'<span class="pd-flag miss">Superseded</span>':'<span class="pd-flag on">Extra</span>'));
-        return '<div class="pd-extra"><span class="pd-cdoc link" data-open="'+d.id+'" style="font-size:12.5px;font-weight:600">'+esc(d.title)+'</span>'+fl+'<span style="margin-left:auto;font-size:10.5px">'+esc(d.doc_type||'')+'</span><button class="pd-mini2" data-del="'+d.id+'">Remove</button></div>';
+        return '<div class="pd-extra">'+pdSelBox(d)+'<span class="pd-cdoc link" data-open="'+d.id+'" style="font-size:12.5px;font-weight:600">'+esc(d.title)+'</span>'+fl+'<span style="margin-left:auto;font-size:10.5px">'+esc(d.doc_type||'')+'</span><button class="pd-mini2" data-del="'+d.id+'">Remove</button>'+pdShareCol(d)+'</div>';
       }).join('');
       return '<div class="pd-grp"><div class="pd-ghead"><span class="pd-gbar" style="background:'+(CATCOLOR[c.category]||'#888')+'"></span>'+esc(c.name)+'<span class="pd-gcount">'+(c.filed||0)+' / '+(c.total||0)+'</span></div>'
         +'<div class="pd-clist">'+(rows||'<div class="pd-extra">No required items.</div>')+extras+'</div></div>';
@@ -7112,10 +7200,18 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     $('pd-bulk-rows').addEventListener('click',function(e){var rm=e.target.closest('[data-brm]');if(rm){var i=+rm.getAttribute('data-brm');PD.files.splice(i,1);renderBulk();}});
     var cl=$('pd-checklist');
     if(cl)cl.addEventListener('click',function(e){
+      // #270 — sharing controls first (they sit inside doc rows; never fall through to open)
+      var sb=e.target.closest('.pd-selbox');if(sb){var sid=+sb.getAttribute('data-sel');if(sb.checked)PD.sel.add(sid);else PD.sel.delete(sid);renderBulkBar();return;}
+      var sh=e.target.closest('[data-dshare]');if(sh){dShare(+sh.getAttribute('data-dshare'), sh.getAttribute('data-don')!=='1');return;}
+      var fb=e.target.closest('[data-dflag]');if(fb){dFlag(+fb.getAttribute('data-dflag'), !fb.classList.contains('flagged'));return;}
       var up=e.target.closest('[data-upcat]');if(up){var cat=up.getAttribute('data-upcat'),req=up.getAttribute('data-upreq');var c=((PD.data&&PD.data.categories)||[]).filter(function(x){return x.category===cat;})[0];var it=c?(c.items||[]).filter(function(x){return x.requirement_key===req;})[0]:null;openModal({cat:cat,req:req,reqLabel:it?it.label:''});return;}
       var del=e.target.closest('[data-del]');if(del){delDoc(+del.getAttribute('data-del'));return;}
       var op=e.target.closest('[data-open]');if(op){window.open('/api/documents/'+op.getAttribute('data-open')+'/file','_blank');return;}
     });
+    // #270 — bulk action bar (one-time actions; NO standing auto-share rules)
+    var bbs=$('pd-bb-share');if(bbs)bbs.addEventListener('click',function(){dBulk(true);});
+    var bbu=$('pd-bb-unshare');if(bbu)bbu.addEventListener('click',function(){dBulk(false);});
+    var bbc=$('pd-bb-clear');if(bbc)bbc.addEventListener('click',function(){PD.sel.clear();renderBulkBar();renderChecklist();});
   }
 
   document.querySelectorAll('.nav-link[data-view="documents"]').forEach(function(l){l.addEventListener('click',loadDocs);});
