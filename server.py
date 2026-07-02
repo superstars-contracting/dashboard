@@ -72,6 +72,13 @@ import visibility  # noqa: E402,F401  # visibility engine (share/redflag, per-re
 import client_portal  # noqa: E402
 client_portal.register(app)
 
+# #269 — SELECTIVE CLIENT UN-GATING: per-client, per-section, DEFAULT-OFF access grants
+# (client_section_grant). The client gate above consumes the grants to route (0 grants ->
+# the #267 /welcome hard-stop; >=1 -> the portal, granted sections only); this registers
+# the admin/c_suite-only grant/revoke/list endpoints.
+import client_grants  # noqa: E402
+client_grants.register(app)
+
 # Security: cap upload size. Raised to 256 MB (#235) so a field-photo BATCH POST
 # (many images, several 8-12 MB) isn't rejected at the WSGI layer; the Field
 # Photos UI also uploads in chunks. A request over the cap returns a clean 413
@@ -9721,6 +9728,72 @@ def api_field_photo_redflag(photo_id):
         (visibility.redflag if on else visibility.unflag)(conn, 'photo', photo_id, uid)
         conn.commit()
         return _fp_no_store(response_wrapper(visibility.state(conn, 'photo', photo_id)))
+    finally:
+        conn.close()
+
+
+# ============= #269 — DOCUMENT VISIBILITY: share-with-client + red-flag (internal) =====
+# Documents join the #264 engine (item_type='document') exactly like photos: default-deny,
+# per-audience share, sticky red-flag, audited. Gated to _PROJDOC_ROLES AND per-resource
+# (the actor must be able to access THIS document's project, re-derived from the row).
+# The CLIENT never reaches these (not in _PROJDOC_ROLES + the client containment gate).
+
+def _doc_actor_can_admin(conn, doc_id):
+    """Resolve the document's project + confirm the current user may act on it. Returns
+    (project_code, None) on success or (None, error_response) — by-ID per-resource check."""
+    row = conn.execute("SELECT project_code FROM project_documents WHERE id=?", (doc_id,)).fetchone()
+    if not row:
+        return None, (jsonify({"error": "not found"}), 404)
+    user = current_user() or {}
+    if not pm_scoping.pm_can_access_project(user.get("role"), user.get("id"), row["project_code"], conn):
+        return None, (jsonify({"error": "forbidden"}), 403)
+    return row["project_code"], None
+
+
+@app.route('/api/documents/<int:doc_id>/share', methods=['POST'])
+@requires_role(*_PROJDOC_ROLES)
+def api_projdoc_share(doc_id):
+    """Toggle an external audience on a document. Body {audience:'client', on:bool}. v1 = client."""
+    body = request.get_json(silent=True) or {}
+    audience = (body.get('audience') or 'client').strip()
+    on = bool(body.get('on'))
+    if audience != 'client':
+        return jsonify({"error": "unsupported audience (v1: client only)"}), 400
+    conn = db()
+    try:
+        _code, err = _doc_actor_can_admin(conn, doc_id)
+        if err:
+            return err
+        uid = (current_user() or {}).get("id")
+        res = (visibility.share(conn, 'document', doc_id, 'client', uid) if on
+               else visibility.unshare(conn, 'document', doc_id, 'client', uid))
+        if not res.get("ok"):
+            return jsonify({"error": res.get("reason", "cannot share")}), 409
+        conn.commit()
+        resp = response_wrapper(visibility.state(conn, 'document', doc_id))
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp
+    finally:
+        conn.close()
+
+
+@app.route('/api/documents/<int:doc_id>/redflag', methods=['POST'])
+@requires_role(*_PROJDOC_ROLES)
+def api_projdoc_redflag(doc_id):
+    """Red-flag / take a document offline (on:true) — instantly revoke ALL external
+    visibility + block re-share; or clear it (on:false). Body {on:bool}."""
+    on = bool((request.get_json(silent=True) or {}).get('on'))
+    conn = db()
+    try:
+        _code, err = _doc_actor_can_admin(conn, doc_id)
+        if err:
+            return err
+        uid = (current_user() or {}).get("id")
+        (visibility.redflag if on else visibility.unflag)(conn, 'document', doc_id, uid)
+        conn.commit()
+        resp = response_wrapper(visibility.state(conn, 'document', doc_id))
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp
     finally:
         conn.close()
 

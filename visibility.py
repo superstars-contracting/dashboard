@@ -145,6 +145,53 @@ def photo_visible_to_client(conn, photo_id, project_code) -> bool:
         (CLIENT, photo_id, project_code)).fetchone())
 
 
+# ============= DOCUMENT CONVENIENCE (#269) — joins to project_documents =============
+# Documents plug into the SAME engine (item_type='document') exactly as #264 promised:
+# default-deny, red-flag, audit — all inherited. Superseded versions are excluded from
+# the client view even if a share row lingers (the operator shares the CURRENT doc).
+
+def client_visible_document_ids(conn, project_code) -> list:
+    """The project_documents ids in `project_code` shared to the client audience, not
+    red-flagged, and not superseded — the ONLY documents a client may see (default-deny)."""
+    rows = conn.execute(
+        "SELECT pd.id FROM project_documents pd "
+        "JOIN item_visibility v ON v.item_type='document' AND v.item_id=pd.id AND v.audience=? "
+        "LEFT JOIN item_redflag rf ON rf.item_type='document' AND rf.item_id=pd.id "
+        "WHERE pd.project_code=? AND rf.id IS NULL AND COALESCE(pd.superseded,0)=0 "
+        "ORDER BY pd.uploaded_at DESC, pd.id DESC",
+        (CLIENT, project_code)).fetchall()
+    return [r[0] for r in rows]
+
+
+def document_visible_to_client(conn, doc_id, project_code) -> bool:
+    """Per-resource isolation gate for a client by-ID document fetch: True ONLY if the
+    document BELONGS to `project_code` AND is shared to the client audience AND is not
+    red-flagged AND is not superseded. Same posture as photo_visible_to_client — False
+    for any other-project / unshared / flagged / superseded / nonexistent id."""
+    return bool(conn.execute(
+        "SELECT 1 FROM project_documents pd "
+        "JOIN item_visibility v ON v.item_type='document' AND v.item_id=pd.id AND v.audience=? "
+        "LEFT JOIN item_redflag rf ON rf.item_type='document' AND rf.item_id=pd.id "
+        "WHERE pd.id=? AND pd.project_code=? AND rf.id IS NULL AND COALESCE(pd.superseded,0)=0",
+        (CLIENT, doc_id, project_code)).fetchone())
+
+
+def document_states(conn, project_code) -> dict:
+    """{doc_id: {shared_client, flagged}} for every document in a project — batched, so
+    the internal Documents list can annotate share state without N lookups."""
+    shared = {r[0] for r in conn.execute(
+        "SELECT v.item_id FROM item_visibility v JOIN project_documents pd ON pd.id=v.item_id "
+        "WHERE v.item_type='document' AND v.audience=? AND pd.project_code=?",
+        (CLIENT, project_code)).fetchall()}
+    flagged = {r[0] for r in conn.execute(
+        "SELECT rf.item_id FROM item_redflag rf JOIN project_documents pd ON pd.id=rf.item_id "
+        "WHERE rf.item_type='document' AND pd.project_code=?",
+        (project_code,)).fetchall()}
+    ids = shared | flagged
+    return {did: {"shared_client": (did in shared and did not in flagged),
+                  "flagged": (did in flagged)} for did in ids}
+
+
 def photo_states(conn, project_code) -> dict:
     """{photo_id: {shared_client, flagged}} for every photo in a project — one batched pair
     of queries so the internal Field Photos list can annotate each card without N lookups."""
