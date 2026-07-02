@@ -32,6 +32,7 @@ from pathlib import Path
 from flask import Response, jsonify, request, send_file
 
 import access
+import client_grants
 from auth import _db, _now_iso, current_user, requires_company
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -190,20 +191,25 @@ def _list_assignments():
                 "project_codes": sorted(assigned_codes(u["id"], conn)),
             })
         # #264 — external clients (read-only portal), each scoped to ONE project.
-        clients = []
-        for u in conn.execute(
+        # #269 — each carries its granted sections (default OFF; empty = welcome-contained).
+        client_rows = conn.execute(
             "SELECT id, email, display_name, full_name FROM users "
             "WHERE role='client' AND status='active' AND is_active=1 AND COALESCE(is_system,0)=0 "
             "ORDER BY LOWER(COALESCE(display_name, full_name, email))"
-        ).fetchall():
+        ).fetchall()
+        per_user = client_grants.grants_by_user(conn, [u["id"] for u in client_rows])
+        clients = []
+        for u in client_rows:
             codes = sorted(assigned_codes(u["id"], conn))
             clients.append({
                 "user_id": u["id"],
                 "email": u["email"],
                 "display_name": u["display_name"] or u["full_name"] or u["email"],
                 "project_code": codes[0] if codes else None,
+                "sections": per_user.get(u["id"], []),
             })
-        return jsonify({"data": {"projects": projects, "pms": pms, "clients": clients}})
+        return jsonify({"data": {"projects": projects, "pms": pms, "clients": clients,
+                                 "grantable_sections": list(client_grants.SECTIONS)}})
     finally:
         conn.close()
 
@@ -244,6 +250,18 @@ def _set_assignments():
                 "INSERT INTO pm_project_assignment (user_id, project_code, assigned_by, assigned_at) "
                 "VALUES (?, ?, ?, ?)",
                 (user_id, c, (actor or {}).get("id"), now))
+        # #269 — default-deny hygiene: a client unassigned from a project loses its section
+        # grants NOW (no dormant rows that silently resurrect on a future re-assignment).
+        # Gated on a CATALOG probe, not try/except: on Postgres a failed statement aborts
+        # the whole transaction, so swallowing it would silently roll back the assignment
+        # INSERTs above while still returning 200.
+        if target["role"] == "client" and client_grants.table_ready(conn):
+            if codes:
+                conn.execute(
+                    f"DELETE FROM client_section_grant WHERE user_id = ? AND project_code NOT IN "
+                    f"({','.join(['?'] * len(codes))})", (user_id, *codes))
+            else:
+                conn.execute("DELETE FROM client_section_grant WHERE user_id = ?", (user_id,))
         conn.commit()
         logging.info(
             f"pm_scoping: set assignments user_id={user_id} n={len(codes)} "

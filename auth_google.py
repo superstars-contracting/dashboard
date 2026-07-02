@@ -83,7 +83,10 @@ def sso_enabled() -> bool:
 def _role_home(role: str) -> str:
     # #263 — pm lands on the assigned-projects-only view; non-company roles never land on
     # the company console (it 403s for them), so default also routes to /projects.
-    return {"admin": "/admin/users", "c_suite": "/", "pm": "/projects"}.get(role, "/projects")
+    # #267/#269 — a client goes to /welcome; the grant-aware client gate forwards clients
+    # with >=1 granted section on to /portal (zero grants: the welcome hard-stop stays).
+    return {"admin": "/admin/users", "c_suite": "/", "pm": "/projects",
+            "client": "/welcome"}.get(role, "/projects")
 
 
 # ============= STATE COOKIE (CSRF) =============

@@ -1,22 +1,28 @@
-"""#264 CLIENT portal + the client DEFAULT-DENY gate — #267 contains clients to /welcome.
+"""#264 CLIENT portal + the client DEFAULT-DENY gate — #267 welcome hard-stop,
+#269 selective per-section un-gating.
 
-The most security-sensitive surface in the app. Posture:
+The most security-sensitive surface in the app. Posture (TWO default-deny layers, both
+server-enforced — hiding UI is never the control):
 
-  * DEFAULT-DENY GATE. #267 — for now a `client` has NO access grants, so `_client_gate`
-    HARD-CONTAINS them to the welcome/pending page + auth: EVERY other page redirects to
-    /welcome and every API returns 403 by construction (company dashboard, portal, crm,
-    internal project endpoints, field-photos, drop plan, admin, by-ID fetches — none
-    reachable). The #264 portal below stays code-intact but is NOT client-reachable yet;
-    per-section un-gating returns when the access-grant system is built. The remaining
-    portal design notes describe that future-reachable surface:
+  * SECTION GRANTS (#269, client_grants.py). Every portal section (progress / photos /
+    documents / daily / schedule) starts OFF. A client with ZERO granted sections is
+    HARD-CONTAINED on /welcome exactly as #267 built it: every other page redirects to
+    /welcome, every API returns 403. Granting sections (admin/c_suite only) unlocks the
+    portal ONE SECTION AT A TIME: the portal page renders ONLY granted sections, and every
+    /api/portal/<section> endpoint re-checks its grant per request — a non-granted
+    section's endpoint is 403 no matter how it's addressed.
+  * PER-ITEM VISIBILITY (#264, visibility.py). Within photos AND documents (#269 extends
+    the engine to documents), only individually client-shared, non-red-flagged items are
+    served. A granted section shows ONLY its shared items.
   * PROJECT-SCOPED. A client is assigned to exactly ONE project (pm_project_assignment,
     generalized from #263). They see only that project, and only while it is active.
   * PER-RESOURCE ISOLATION (closes the #263 by-ID gap). Every by-ID fetch re-derives
-    ownership from the row: a photo serves ONLY if it BELONGS to the client's project AND
-    is shared to the `client` audience AND is not red-flagged (visibility.py). Guessing an
-    id from another project or an unshared photo yields 404 — never the bytes.
-  * CURATED-ONLY PAYLOAD. The portal serializes id / caption / date / gated URLs only —
-    never cost, labor, worker PII, file paths, uploader, or any internal field (CLAUDE.md).
+    ownership from the row: a photo/document serves ONLY if it BELONGS to the client's
+    project AND is shared to the `client` audience AND is not red-flagged (visibility.py).
+    Guessing an id from another project or an unshared item yields 404 — never the bytes.
+  * CURATED-ONLY PAYLOAD. The portal serializes id / caption / title / date / gated URLs
+    only — never cost, labor, worker PII, file paths, uploader, or any internal field
+    (CLAUDE.md).
   * READ-ONLY. The portal exposes no write endpoint.
 
 Production stays on SQLite; all SQL routes through the caller's db_layer connection so it
@@ -24,12 +30,14 @@ runs identically on Postgres. Dates are LOCAL.
 """
 from __future__ import annotations
 
+import functools
 import logging
 from pathlib import Path
 
-from flask import Response, jsonify, redirect, request, send_file
+from flask import Response, g, jsonify, redirect, request, send_file
 
 from auth import _db, current_user, requires_role
+import client_grants
 import visibility
 import dropplan_rollups as _rollups
 
@@ -37,39 +45,98 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PORTAL_PAGE = SCRIPT_DIR / "client_portal.html"
 WELCOME_PAGE = SCRIPT_DIR / "welcome.html"   # #267 — the client hard-stop
 _FP_BASE = SCRIPT_DIR / "data_room" / "field_photos"
+_DOC_BASE = SCRIPT_DIR / "data_room" / "project_docs"
 
-# ============= CLIENT DEFAULT-DENY GATE — #267: contain to /welcome =============
-# For now a `client` has NO access grants, so they are HARD-CONTAINED to the welcome/pending
-# page + auth. The ONLY paths a client may reach: /welcome, the forced-reset page, the auth
-# API, the two public no-data pings, and the vendored static assets the welcome page loads.
-# Every other PAGE -> redirect to /welcome; every API -> 403 — server-side, so no portal,
-# internal, admin, drop-plan, crm, or by-ID surface is reachable even by direct URL.
-# (The #264 portal endpoints below stay REGISTERED — code-intact — but are NOT client-
-# reachable yet; per-section un-gating returns when the access-grant system is built.)
+# ============= CLIENT DEFAULT-DENY GATE — #267 contain / #269 grant-aware =============
+# The ONLY paths a client may ALWAYS reach: the forced-reset page, the auth API, the two
+# public no-data pings, and the vendored static assets the welcome/portal shells load.
+# Everything else is grant-routed:
+#   0 granted sections  -> #267 behavior byte-for-byte: /welcome only; every other PAGE
+#                          redirects to /welcome, every API -> 403.
+#   >=1 granted section -> the portal is the client's home: /welcome forwards to /portal,
+#                          /portal + /api/portal/* become reachable (each API still
+#                          enforces ITS OWN section grant — see require_section), and
+#                          every OTHER page/API stays contained (redirect /portal | 403).
 _CLIENT_ALLOW_PREFIXES = ("/api/auth/", "/files/static/")
-_CLIENT_ALLOW_EXACT = {"/welcome", "/set-password", "/api/health", "/api/today"}
+_CLIENT_ALLOW_EXACT = {"/set-password", "/api/health", "/api/today"}
 
 
-def _client_allowed(path: str) -> bool:
+def _client_always_allowed(path: str) -> bool:
     if path in _CLIENT_ALLOW_EXACT:
         return True
     return any(path.startswith(p) for p in _CLIENT_ALLOW_PREFIXES)
 
 
+def _grant_ctx(user):
+    """(project_code, granted_sections) for the current client — re-derived per request
+    from the DB (a revoke takes effect on the very next request; no session state)."""
+    conn = _db()
+    try:
+        code = client_project_code(user["id"], conn)
+        return code, (client_grants.granted_sections(conn, user["id"], code) if code else set())
+    finally:
+        conn.close()
+
+
 def _client_gate():
-    """Registered AFTER the auth gate (g.auth_user set). A `client` is hard-contained to the
-    welcome page + auth (#267): default-deny everything else — every PAGE redirects to
-    /welcome, every API returns 403 — server-side, so no portal/internal/by-ID resource is
-    reachable even by direct URL. Grants (per-section un-gating) are a later build."""
+    """Registered AFTER the auth gate (g.auth_user set). Grant-aware containment (#269):
+    a `client` with zero granted sections is hard-contained on /welcome (#267 unchanged);
+    with >=1 grant their world is the portal — and ONLY the portal. Server-side, so no
+    internal/admin/by-ID surface is reachable even by direct URL either way."""
     user = current_user()
     if not user or user.get("role") != "client":
         return None  # non-clients handled by their own gates
-    if _client_allowed(request.path):
+    path = request.path
+    if _client_always_allowed(path):
         return None
-    logging.info(f"client_portal: contain block path={request.path}")
-    if request.path.startswith("/api/"):
+    _code, granted = _grant_ctx(user)
+    g.client_granted_sections = granted   # portal endpoints reuse (same request)
+    if not granted:
+        # ---- #267 hard-stop: zero grants -> welcome is the ONLY page ----
+        if path == "/welcome":
+            return None
+        logging.info(f"client_portal: contain block (no grants) path={path}")
+        if path.startswith("/api/"):
+            return jsonify({"error": "forbidden"}), 403
+        return redirect("/welcome")
+    # ---- >=1 grant: the portal is home ----
+    if path == "/welcome":
+        return redirect("/portal")      # granted clients land on the portal (#269 routing)
+    if path == "/portal" or path.startswith("/api/portal/"):
+        return None                     # per-endpoint section grants enforced below
+    logging.info(f"client_portal: contain block (granted) path={path}")
+    if path.startswith("/api/"):
         return jsonify({"error": "forbidden"}), 403
-    return redirect("/welcome")
+    return redirect("/portal")
+
+
+# ============= #269 — PER-SECTION ENFORCEMENT DECORATOR =============
+
+def require_section(section: str):
+    """Endpoint gate for ONE portal section. Runs on top of requires_role('client'):
+    re-derives the client's project + the section grant from the DB per request and
+    403s when the section isn't granted — server-enforced, direct URL included.
+    On success, stashes the project_code in g.client_project_code for the handler."""
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            user = current_user()
+            if not user or user.get("role") != "client":
+                return jsonify({"error": "forbidden"}), 403
+            conn = _db()
+            try:
+                code = client_project_code(user["id"], conn)
+                if not code or not client_grants.has_grant(conn, user["id"], code, section):
+                    logging.info(
+                        f"client_portal: section denied section={section} "
+                        f"user_id={user.get('id')} path={request.path}")
+                    return jsonify({"error": "forbidden"}), 403
+            finally:
+                conn.close()
+            g.client_project_code = code
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 # ============= CLIENT PROJECT SCOPE =============
@@ -126,13 +193,9 @@ def _welcome_page():
     return resp
 
 
-# ============= PORTAL ENDPOINTS (client-only, read-only) =============
+# ============= PORTAL ENDPOINTS (client-only, read-only, section-gated #269) =============
 
-@requires_role("client")
-def _portal_page():
-    if not PORTAL_PAGE.exists():
-        return ("client portal page missing", 500)
-    resp = send_file(str(PORTAL_PAGE))
+def _no_store(resp):
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
@@ -140,67 +203,97 @@ def _portal_page():
 
 
 @requires_role("client")
-def _portal_project():
-    """Curated project header + high-level progress + a curated progress summary. NO money,
-    NO drop internals — overall % only (project_rollup with include_cost=False)."""
+def _portal_page():
+    # Defense in depth: the gate already bounces zero-grant clients to /welcome.
+    granted = getattr(g, "client_granted_sections", None)
+    if not granted:
+        return redirect("/welcome")
+    if not PORTAL_PAGE.exists():
+        return ("client portal page missing", 500)
+    return _no_store(send_file(str(PORTAL_PAGE)))
+
+
+@requires_role("client")
+def _portal_context():
+    """GET /api/portal/context — the portal SHELL payload: curated project header + the
+    client's granted sections (the ONLY sections the page renders). Requires >=1 grant
+    (the gate 403s zero-grant clients before this runs). Carries NO section data itself —
+    each section loads through its own grant-checked endpoint."""
     user = current_user()
     conn = _db()
     try:
         code = client_project_code(user["id"], conn)
-        if not code:
-            return jsonify({"data": {"project": None}})
+        granted = client_grants.granted_sections(conn, user["id"], code) if code else set()
+        if not code or not granted:
+            return jsonify({"error": "forbidden"}), 403
         p = conn.execute(
             "SELECT project_code, name, address, city_zip, status FROM projects WHERE project_code = ?",
             (code,)).fetchone()
         if not p:
-            return jsonify({"data": {"project": None}})
-        roll = _rollups.project_rollup(conn, code, include_cost=False)  # include_cost=False => NO $ fields
-        pct = roll.get("overall_progress_pct", 0.0) or 0.0
-        vis_ids = visibility.client_visible_photo_ids(conn, code)
-        last_activity = None
-        if vis_ids:
-            row = conn.execute(
-                f"SELECT MAX(substr(taken_at,1,10)) FROM field_photos "
-                f"WHERE id IN ({','.join(['?']*len(vis_ids))})", vis_ids).fetchone()
-            last_activity = row[0] if row else None
-        label = _progress_label(pct)
-        summary = (f"Your project is {label.lower()} — about {pct:.0f}% complete."
-                   + (f" {len(vis_ids)} photo{'s' if len(vis_ids) != 1 else ''} shared with you."
-                      if vis_ids else " New photos will appear here as we share them."))
-        return jsonify({"data": {
+            return jsonify({"error": "forbidden"}), 403
+        return _no_store(jsonify({"data": {
             "project": {
                 "code": p["project_code"], "name": p["name"] or p["project_code"],
                 "address": ", ".join(x for x in (p["address"], p["city_zip"]) if x) or None,
                 "status": (p["status"] or "active"),
             },
-            "progress": {"pct": round(pct, 0), "label": label},
-            "summary": {"text": summary, "last_activity": last_activity,
-                        "photos_shared": len(vis_ids)},
-            # v1: financials intentionally omitted — a clean spot for a future curated note.
-        }})
+            # portal display order, granted only
+            "sections": [s for s in client_grants.SECTIONS if s in granted],
+        }}))
     finally:
         conn.close()
 
 
 @requires_role("client")
+@require_section("progress")
+def _portal_project():
+    """Curated high-level progress + a curated summary (the 'progress' SECTION). NO money,
+    NO drop internals — overall % only (project_rollup with include_cost=False). Photo
+    counts are mentioned ONLY when the photos section is also granted."""
+    user = current_user()
+    code = g.client_project_code
+    conn = _db()
+    try:
+        roll = _rollups.project_rollup(conn, code, include_cost=False)  # include_cost=False => NO $ fields
+        pct = roll.get("overall_progress_pct", 0.0) or 0.0
+        label = _progress_label(pct)
+        summary = f"Your project is {label.lower()} — about {pct:.0f}% complete."
+        last_activity = None
+        photos_shared = None
+        if client_grants.has_grant(conn, user["id"], code, "photos"):
+            vis_ids = visibility.client_visible_photo_ids(conn, code)
+            photos_shared = len(vis_ids)
+            if vis_ids:
+                row = conn.execute(
+                    f"SELECT MAX(substr(taken_at,1,10)) FROM field_photos "
+                    f"WHERE id IN ({','.join(['?']*len(vis_ids))})", vis_ids).fetchone()
+                last_activity = row[0] if row else None
+                summary += f" {photos_shared} photo{'s' if photos_shared != 1 else ''} shared with you."
+        payload = {"progress": {"pct": round(pct, 0), "label": label},
+                   "summary": {"text": summary, "last_activity": last_activity}}
+        if photos_shared is not None:
+            payload["summary"]["photos_shared"] = photos_shared
+        # financials intentionally omitted (omitted, not zeroed — CLAUDE.md comp governance)
+        return _no_store(jsonify({"data": payload}))
+    finally:
+        conn.close()
+
+
+@requires_role("client")
+@require_section("photos")
 def _portal_photos():
     """The client gallery — ONLY photos shared to the client audience for the client's
     project, never red-flagged. Default-deny: an unshared photo is simply absent."""
-    user = current_user()
+    code = g.client_project_code
     conn = _db()
     try:
-        code = client_project_code(user["id"], conn)
-        if not code:
-            return jsonify({"data": {"photos": []}})
         ids = visibility.client_visible_photo_ids(conn, code)
         if not ids:
-            return jsonify({"data": {"photos": []}})
+            return _no_store(jsonify({"data": {"photos": []}}))
         rows = conn.execute(
             f"SELECT id, caption, taken_at FROM field_photos WHERE id IN ({','.join(['?']*len(ids))}) "
             f"ORDER BY taken_at DESC, id DESC", ids).fetchall()
-        resp = jsonify({"data": {"photos": [_portal_photo(r) for r in rows]}})
-        resp.headers["Cache-Control"] = "no-store"
-        return resp
+        return _no_store(jsonify({"data": {"photos": [_portal_photo(r) for r in rows]}}))
     finally:
         conn.close()
 
@@ -209,11 +302,10 @@ def _portal_serve(photo_id, col):
     """Serve photo bytes to a client BY ID — only after re-deriving ownership + visibility
     from the row (per-resource isolation). Any other-project / unshared / flagged / unknown
     id -> 404 (never reveals existence). `col` is 'file_path' or 'thumb_path'."""
-    user = current_user()
+    code = g.client_project_code
     conn = _db()
     try:
-        code = client_project_code(user["id"], conn)
-        if not code or not visibility.photo_visible_to_client(conn, photo_id, code):
+        if not visibility.photo_visible_to_client(conn, photo_id, code):
             return jsonify({"error": "not found"}), 404
         r = conn.execute(
             f"SELECT {col} AS p, mime FROM field_photos WHERE id = ?", (photo_id,)).fetchone()
@@ -231,26 +323,147 @@ def _portal_serve(photo_id, col):
 
 
 @requires_role("client")
+@require_section("photos")
 def _portal_photo_thumb(photo_id):
     return _portal_serve(photo_id, "thumb_path")
 
 
 @requires_role("client")
+@require_section("photos")
 def _portal_photo_file(photo_id):
     return _portal_serve(photo_id, "file_path")
 
 
+# ---- #269 — documents section (per-item visibility, same engine as photos) ----
+
+def _portal_document(r) -> dict:
+    """The ONLY document fields a client receives. No file_path / file_name / file_size /
+    mime / uploader / notes / requirement_key — just what's needed to list + open it."""
+    return {
+        "id": r["id"],
+        "title": r["title"],
+        "category": r["category"],
+        "doc_type": r["doc_type"],
+        "effective_date": r["effective_date"],
+        "file_url": f"/api/portal/documents/{r['id']}/file",
+    }
+
+
+@requires_role("client")
+@require_section("documents")
+def _portal_documents():
+    """The client document list — ONLY documents shared to the client audience for the
+    client's project (item_type='document'), never red-flagged, never superseded."""
+    code = g.client_project_code
+    conn = _db()
+    try:
+        ids = visibility.client_visible_document_ids(conn, code)
+        if not ids:
+            return _no_store(jsonify({"data": {"documents": []}}))
+        rows = conn.execute(
+            f"SELECT id, title, category, doc_type, effective_date FROM project_documents "
+            f"WHERE id IN ({','.join(['?']*len(ids))}) ORDER BY uploaded_at DESC, id DESC",
+            ids).fetchall()
+        return _no_store(jsonify({"data": {"documents": [_portal_document(r) for r in rows]}}))
+    finally:
+        conn.close()
+
+
+@requires_role("client")
+@require_section("documents")
+def _portal_document_file(doc_id):
+    """Serve document bytes BY ID — per-resource isolation identical to photos: belongs to
+    the client's project AND client-shared AND not red-flagged/superseded, else 404."""
+    code = g.client_project_code
+    conn = _db()
+    try:
+        if not visibility.document_visible_to_client(conn, doc_id, code):
+            return jsonify({"error": "not found"}), 404
+        r = conn.execute(
+            "SELECT file_path, mime FROM project_documents WHERE id = ?", (doc_id,)).fetchone()
+    finally:
+        conn.close()
+    if not r or not r["file_path"]:
+        return jsonify({"error": "not found"}), 404
+    p = Path(r["file_path"])
+    try:
+        if not p.resolve().is_relative_to(_DOC_BASE.resolve()) or not p.exists():
+            return jsonify({"error": "not found"}), 404
+    except (OSError, ValueError):
+        return jsonify({"error": "not found"}), 404
+    resp = send_file(str(p), mimetype=(r["mime"] or "application/octet-stream"), conditional=True)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+# ---- #269 — daily section (curated daily-report timeline; no internals) ----
+
+@requires_role("client")
+@require_section("daily")
+def _portal_daily():
+    """Curated daily-report timeline for the client's project: date + work/no-work label
+    per issued report day. NO labor, NO worker identities, NO report internals — the full
+    client-version DCR render stays internal until a deliberate future share build."""
+    code = g.client_project_code
+    conn = _db()
+    try:
+        rows = conn.execute(
+            "SELECT report_date, MAX(COALESCE(no_work,0)) AS no_work "
+            "FROM report_index WHERE project_code=? AND status='issued' "
+            "GROUP BY report_date ORDER BY report_date DESC LIMIT 60",
+            (code,)).fetchall()
+        days = [{"date": r["report_date"],
+                 "no_work": bool(r["no_work"]),
+                 "label": ("No work performed" if r["no_work"] else "Crew on site — work performed")}
+                for r in rows]
+        return _no_store(jsonify({"data": {"days": days}}))
+    finally:
+        conn.close()
+
+
+# ---- #269 — schedule section (curated look-ahead; no crew/notes/internals) ----
+
+@requires_role("client")
+@require_section("schedule")
+def _portal_schedule():
+    """Curated look-ahead for the client's project: activity name/type + planned window,
+    recent past through the near future. NO crew, NO notes, NO drop internals."""
+    from datetime import date, timedelta
+    code = g.client_project_code
+    today = date.today()                       # LOCAL (CLAUDE.md dates rule)
+    lo = (today - timedelta(days=7)).isoformat()
+    hi = (today + timedelta(days=28)).isoformat()
+    conn = _db()
+    try:
+        rows = conn.execute(
+            "SELECT name, activity_type, planned_start, planned_finish FROM lookahead_activity "
+            "WHERE project_code=? AND planned_finish >= ? AND planned_start <= ? "
+            "ORDER BY planned_start, planned_finish, id LIMIT 120",
+            (code, lo, hi)).fetchall()
+        acts = [{"name": r["name"], "type": r["activity_type"],
+                 "start": r["planned_start"], "finish": r["planned_finish"]} for r in rows]
+        return _no_store(jsonify({"data": {"activities": acts, "window": {"start": lo, "end": hi}}}))
+    finally:
+        conn.close()
+
+
 def register(app) -> None:
-    """Wire the client default-deny gate + the read-only portal page/API. Call AFTER
-    apply_auth_gate (and the other gates) so g.auth_user is set; the gate then enforces
-    default-deny for the client role, and every portal endpoint is requires_role('client')
-    + project-scoped + per-resource visibility-checked."""
+    """Wire the grant-aware client gate + the read-only, section-gated portal page/API.
+    Call AFTER apply_auth_gate (and the other gates) so g.auth_user is set; the gate then
+    enforces grant-aware default-deny for the client role, and every portal endpoint is
+    requires_role('client') + section-granted + project-scoped + per-resource checked."""
     app.before_request(_client_gate)
     app.add_url_rule("/welcome", "client_welcome_page", _welcome_page, methods=["GET"])  # #267 hard-stop
     app.add_url_rule("/portal", "client_portal_page", _portal_page, methods=["GET"])
+    app.add_url_rule("/api/portal/context", "client_portal_context", _portal_context, methods=["GET"])
     app.add_url_rule("/api/portal/project", "client_portal_project", _portal_project, methods=["GET"])
     app.add_url_rule("/api/portal/photos", "client_portal_photos", _portal_photos, methods=["GET"])
     app.add_url_rule("/api/portal/photos/<int:photo_id>/thumb", "client_portal_thumb",
                      _portal_photo_thumb, methods=["GET"])
     app.add_url_rule("/api/portal/photos/<int:photo_id>/file", "client_portal_file",
                      _portal_photo_file, methods=["GET"])
+    app.add_url_rule("/api/portal/documents", "client_portal_documents", _portal_documents, methods=["GET"])
+    app.add_url_rule("/api/portal/documents/<int:doc_id>/file", "client_portal_document_file",
+                     _portal_document_file, methods=["GET"])
+    app.add_url_rule("/api/portal/daily", "client_portal_daily", _portal_daily, methods=["GET"])
+    app.add_url_rule("/api/portal/schedule", "client_portal_schedule", _portal_schedule, methods=["GET"])

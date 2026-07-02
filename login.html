@@ -219,12 +219,15 @@
   // #257/#263 — role home: admin -> admin console, c_suite -> company console,
   // pm -> assigned-projects-only landing. Non-company roles (pm/super/…) never land
   // on the company console (it 403s for them); they go to /projects.
+  // #267/#269 — a client is sent to /welcome; the grant-aware SERVER gate decides from
+  // there: zero granted sections -> the welcome hard-stop stays; >=1 granted section ->
+  // /welcome forwards to /portal (which renders ONLY the granted sections).
   function roleHome(role) {
     switch (role) {
       case 'admin': return '/admin/users';
       case 'c_suite': return '/';
       case 'pm': return '/projects';
-      case 'client': return '/welcome';   // #267 — external client hard-stop welcome/pending page
+      case 'client': return '/welcome';   // #269 — server gate forwards granted clients to /portal
       default: return '/projects';
     }
   }
