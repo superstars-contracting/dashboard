@@ -209,7 +209,10 @@ def _list_assignments():
                 "sections": per_user.get(u["id"], []),
             })
         return jsonify({"data": {"projects": projects, "pms": pms, "clients": clients,
-                                 "grantable_sections": list(client_grants.SECTIONS)}})
+                                 "grantable_sections": list(client_grants.SECTIONS),
+                                 # #270 — named grant bundles (apply = replace-set)
+                                 "presets": {k: list(v) for k, v in client_grants.PRESETS.items()},
+                                 "preset_labels": dict(client_grants.PRESET_LABELS)}})
     finally:
         conn.close()
 

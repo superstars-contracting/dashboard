@@ -4221,6 +4221,19 @@ def api_project_documents(project_code):
                              'extras': extras, 'filed': filed, 'total': len(items)})
         rt = agg['required_total']
         pct = round(100 * agg['on_file'] / rt) if rt else 0
+        # #270 — annotate every doc payload with its client-visibility state (one batched
+        # query pair via visibility.document_states; default internal-only/not-flagged).
+        states = visibility.document_states(conn, project_code)
+        for c in out_cats:
+            for it in c['items']:
+                if it.get('doc'):
+                    st = states.get(it['doc']['id'], {})
+                    it['doc']['shared_client'] = bool(st.get('shared_client'))
+                    it['doc']['flagged'] = bool(st.get('flagged'))
+            for d in c['extras']:
+                st = states.get(d['id'], {})
+                d['shared_client'] = bool(st.get('shared_client'))
+                d['flagged'] = bool(st.get('flagged'))
         resp = response_wrapper({'categories': out_cats, 'readiness': {**agg, 'pct': pct}})
         resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         return resp
@@ -9792,6 +9805,68 @@ def api_projdoc_redflag(doc_id):
         (visibility.redflag if on else visibility.unflag)(conn, 'document', doc_id, uid)
         conn.commit()
         resp = response_wrapper(visibility.state(conn, 'document', doc_id))
+        resp.headers['Cache-Control'] = 'no-store'
+        return resp
+    finally:
+        conn.close()
+
+
+@app.route('/api/documents/share-bulk', methods=['POST'])
+@requires_role(*_PROJDOC_ROLES)
+def api_projdoc_share_bulk():
+    """#270 — bulk share/unshare documents with the client audience in ONE atomic call.
+    Body {ids:[int], audience:'client', on:bool}. SKIP-NONE semantics: every id must
+    exist (else 404) and the actor must pass the per-resource pm_can_access_project
+    check for EVERY id's project (else 403) — any failure rejects the WHOLE call before
+    a single write; there is no partial silent success. Sharing (on) with any red-flagged
+    id in the selection -> 409 whole-call (the engine refuses shares on flagged items —
+    clear the flag deliberately first). Each share/unshare is audited individually by the
+    #264 engine. This is a ONE-TIME action — no standing auto-share rules exist; new
+    uploads stay internal-only by default (deliberate)."""
+    body = request.get_json(silent=True) or {}
+    audience = (body.get('audience') or 'client').strip()
+    on = bool(body.get('on'))
+    raw_ids = body.get('ids')
+    if audience != 'client':
+        return jsonify({"error": "unsupported audience (v1: client only)"}), 400
+    if not isinstance(raw_ids, list) or not raw_ids:
+        return jsonify({"error": "ids[] is required"}), 400
+    try:
+        ids = sorted({int(i) for i in raw_ids})
+    except (TypeError, ValueError):
+        return jsonify({"error": "ids[] must be integers"}), 400
+    if len(ids) > 200:
+        return jsonify({"error": "too many ids (max 200 per call)"}), 400
+    qmarks = ','.join(['?'] * len(ids))
+    conn = db()
+    try:
+        rows = conn.execute(
+            f"SELECT id, project_code FROM project_documents WHERE id IN ({qmarks})",
+            ids).fetchall()
+        if len(rows) != len(ids):
+            return jsonify({"error": "one or more documents not found"}), 404
+        user = current_user() or {}
+        for code in sorted({r['project_code'] for r in rows}):
+            if not pm_scoping.pm_can_access_project(user.get('role'), user.get('id'), code, conn):
+                logging.info(f"share-bulk: per-resource deny actor={user.get('id')} project={code}")
+                return jsonify({"error": "forbidden"}), 403
+        if on:
+            flagged = [r[0] for r in conn.execute(
+                f"SELECT item_id FROM item_redflag WHERE item_type='document' "
+                f"AND item_id IN ({qmarks})", ids).fetchall()]
+            if flagged:
+                return jsonify({"error": f"{len(flagged)} selected document(s) are red-flagged — "
+                                         f"clear the flag before sharing"}), 409
+        uid = user.get('id')
+        for doc_id in ids:
+            res = (visibility.share(conn, 'document', doc_id, 'client', uid) if on
+                   else visibility.unshare(conn, 'document', doc_id, 'client', uid))
+            if not res.get('ok'):
+                conn.rollback()   # no partial writes — the whole call fails together
+                return jsonify({"error": res.get('reason', 'cannot share')}), 409
+        conn.commit()
+        states = {str(doc_id): visibility.state(conn, 'document', doc_id) for doc_id in ids}
+        resp = response_wrapper({'on': on, 'count': len(ids), 'states': states})
         resp.headers['Cache-Control'] = 'no-store'
         return resp
     finally:

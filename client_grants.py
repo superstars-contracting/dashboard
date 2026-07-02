@@ -42,6 +42,16 @@ from auth import _db, _now_iso, current_user, requires_company
 # design, see schema_client_grants_269.sql).
 SECTIONS = ("progress", "photos", "documents", "daily", "schedule")
 
+# #270 — access presets: named bundles an admin applies in one click. IN CODE, no
+# schema — applying one REPLACES the client's grant set with these sections (the
+# per-section toggles remain the fine-grained control). Order = SECTIONS order.
+PRESETS = {
+    "minimal": ("progress",),
+    "standard": ("progress", "photos", "daily"),
+    "full": SECTIONS,
+}
+PRESET_LABELS = {"minimal": "Minimal", "standard": "Standard", "full": "Full view"}
+
 
 _TABLE_READY = False   # cached once True — a created table never disappears in-process
 
@@ -203,6 +213,48 @@ def _api_set_grant():
         conn.close()
 
 
+@requires_company
+def _api_apply_preset():
+    """POST /api/admin/client-grants/preset — {user_id, preset} REPLACES the client's
+    grant set with the preset's sections (one transaction: delete + insert, stamped
+    granted_by/granted_at). admin/c_suite ONLY; same validation as _api_set_grant
+    (active client + assigned project, project re-derived server-side). Idempotent —
+    re-applying a preset yields the same set. NOT additive: applying `standard` over
+    `full` removes documents/schedule (that's the point of a preset)."""
+    actor = current_user() or {}
+    data = request.get_json(silent=True) or {}
+    user_id = data.get("user_id")
+    preset = (data.get("preset") or "").strip().lower()
+    if user_id is None or not preset:
+        return jsonify({"error": "user_id and preset are required"}), 400
+    if preset not in PRESETS:
+        return jsonify({"error": f"unknown preset (valid: {', '.join(PRESETS)})"}), 400
+    conn = _db()
+    try:
+        if not table_ready(conn):
+            return jsonify({"error": "grants schema not migrated — run apply_client_grants_269.py"}), 503
+        _cl, code, err = _client_and_project(conn, user_id)
+        if err:
+            return err
+        now = _now_iso()
+        conn.execute("DELETE FROM client_section_grant WHERE user_id=? AND project_code=?",
+                     (user_id, code))
+        for s in PRESETS[preset]:
+            conn.execute(
+                "INSERT INTO client_section_grant "
+                "(user_id, project_code, section, granted_by, granted_at) VALUES (?,?,?,?,?)",
+                (user_id, code, s, actor.get("id"), now))
+        conn.commit()
+        sections = sorted(granted_sections(conn, user_id, code))
+        logging.info(
+            f"client_grants: preset={preset} applied user_id={user_id} project={code} "
+            f"by={actor.get('id')} now={sections}")
+        return jsonify({"data": {"user_id": user_id, "project_code": code,
+                                 "preset": preset, "sections": sections}})
+    finally:
+        conn.close()
+
+
 def register(app) -> None:
     """Wire the admin grant endpoints. The gate/endpoint enforcement lives in
     client_portal (which imports this module) — call AFTER client_portal.register."""
@@ -210,3 +262,5 @@ def register(app) -> None:
                      _api_list_grants, methods=["GET"])
     app.add_url_rule("/api/admin/client-grants", "client_grants_set",
                      _api_set_grant, methods=["POST"])
+    app.add_url_rule("/api/admin/client-grants/preset", "client_grants_preset",
+                     _api_apply_preset, methods=["POST"])   # #270 — one-click bundles
