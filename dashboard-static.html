@@ -778,7 +778,7 @@
 <!-- #211 calm-blue widget accent — applied via the SHARED widgets.css, loaded
      AFTER the inline #208 styles so the accent (blue band + inward shading + blue
      rings) wins, giving the project page + the company console one source of truth. -->
-<link rel="stylesheet" href="/files/static/css/widgets.css?v=270">
+<link rel="stylesheet" href="/files/static/css/widgets.css?v=271">
 </head>
 <body>
 <!-- #212 nav icons — inline SVG <symbol> defs (defined ONCE, used via <use>).
@@ -1300,6 +1300,31 @@
           .pd-bulkbar .pd-bb-share{border:none;background:var(--pd-accent);color:#fff}
           .pd-bulkbar .pd-bb-unshare{border:1px solid var(--pd-accent-edge);background:#fff;color:var(--pd-accent-ink)}
           .pd-bulkbar .pd-bb-clear{border:none;background:none;color:var(--pd-muted);margin-left:auto}
+          /* #271 — document row rework (approved mockup): richer main, always-on status
+             pill, boxed share group, Update primary / Replace quiet, history dropdown */
+          .pd-dmain{min-width:0;flex:1}
+          .pd-dtitle{font-size:13.5px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+          .pd-dtitle:hover{color:var(--pd-accent-ink);text-decoration:underline}
+          .pd-dsub{font-size:11.5px;color:var(--pd-muted);margin-top:3px}
+          .pd-st{flex:none;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;border-radius:999px;padding:4px 11px;white-space:nowrap}
+          .pd-st.onfile{color:#0c7a5f;background:var(--on-soft,#e7f6f0)}
+          .pd-st.expiring{color:#a05a1f;background:#fdf3e4}
+          .pd-st.expired{color:#a23b30;background:var(--warn-soft,#fdeeec)}
+          .pd-share-grp{flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;border-left:1px solid var(--pd-line);border-right:1px solid var(--pd-line)}
+          .pd-share-grp .pd-off{font-size:9.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--warn-ink)}
+          .pd-acts{flex:none;display:flex;gap:7px;align-items:center}
+          .pd-btn-update{font-size:11.5px;font-weight:700;padding:6px 13px;border-radius:8px;border:none;background:var(--pd-accent);color:#fff;cursor:pointer}
+          .pd-btn-update:hover{background:var(--pd-accent-ink)}
+          .pd-btn-replace{font-size:11.5px;font-weight:700;padding:6px 11px;border-radius:8px;border:1px solid var(--pd-line);background:#fff;color:var(--pd-muted);cursor:pointer}
+          .pd-btn-replace:hover{border-color:var(--warn);color:#a23b30}
+          .pd-vhist-toggle{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--pd-accent-ink);cursor:pointer;margin-top:4px;user-select:none}
+          .pd-vhist{margin:8px 0 2px 26px;border-left:2px solid var(--pd-line);padding-left:14px}
+          .pd-vrow{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12px;color:var(--pd-muted)}
+          .pd-vrow .pd-vlabel{font-weight:700;color:var(--pd-ink)}
+          .pd-vrow .pd-vtag{font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#5b6270;background:#eef0f4;border-radius:999px;padding:3px 8px}
+          .pd-vrow a{color:var(--pd-accent-ink);font-weight:700;text-decoration:none;font-size:11.5px;margin-left:auto;cursor:pointer}
+          .pd-vrow a:hover{text-decoration:underline}
+          .pd-vnote{font-size:10.5px;color:var(--pd-muted);padding:4px 0 2px}
           .pd-overlay{position:fixed;inset:0;background:rgba(20,22,30,.30);display:none;align-items:flex-start;justify-content:center;padding:48px 16px;overflow:auto;z-index:1200}
           .pd-overlay.show{display:flex}
           .pd-modal{position:relative;width:460px;max-width:100%;background:#fff;border-radius:18px;box-shadow:0 24px 60px rgba(20,25,40,.28);padding:22px;color:var(--pd-ink)}
@@ -1352,7 +1377,7 @@
             <button class="pd-bb-clear" id="pd-bb-clear" type="button">Clear</button>
           </div>
           <div id="pd-checklist"></div>
-          <div id="pd-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #270 · 2026-07-02 · Project Documents — per-doc client share/red-flag column + bulk share (one-time; new uploads stay internal)</div>
+          <div id="pd-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #271 · 2026-07-02 · Project Documents — versioning (Update keeps History, Replace fixes wrong files) · always-on status pills · view-not-print</div>
         </div>
         <div class="pd-overlay" id="pd-modal">
           <div class="pd-modal">
@@ -4324,7 +4349,7 @@
             <div id="fp-clusters"></div>
             <div id="fp-sort-empty" class="fp-empty fp-hide">Nothing to sort — every photo is filed to a drop. 🎉</div>
           </div>
-          <div id="fp-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:18px 0;">build #235 · 2026-06-08 · Field Photos — gallery + Unassigned sort/assign tray + bulk upload (EXIF/HEIC/orientation-safe)</div>
+          <div id="fp-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:18px 0;">build #271 · 2026-07-02 · Field Photos — capture-time (EXIF) ordering everywhere; photos without a capture time show "upload time", never a fake claim</div>
         </div>
         <!-- floating assign bar (sort mode) -->
         <div class="fp-bar fp-hide" id="fp-bar">
@@ -6897,7 +6922,8 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   var ICCHECK='<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg>';
   var ICWARN='<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 8v5M12 16.5v.5"/></svg>';
   var ICDOC='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 2h8l4 4v16H6z"/><path d="M14 2v4h4"/></svg>';
-  var PD={data:null,files:[],mode:'single',wired:false,prefill:null,sel:new Set()};
+  var PD={data:null,files:[],mode:'single',wired:false,prefill:null,sel:new Set(),
+          histOpen:new Set(),updateOf:null};   // #271 — expanded histories + update-target
 
   function $(id){return document.getElementById(id);}
   function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
@@ -6924,20 +6950,56 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     }catch(e){console.warn('[projdocs] load failed',e);var h=$('pd-checklist');if(h)h.innerHTML='<div class="pd-empty">Could not load documents.</div>';}
   }
 
-  // ---------- #270 — per-document client sharing (same engine + captions as Photos) ----------
-  // Option B (approved): right-hand column = toggle "Client" + state caption; flagged wins.
-  // A superseded doc gets NO controls — the portal never serves superseded versions.
+  // ---------- #270/#271 — per-document client sharing (same engine as Photos) ----------
+  // #271 (approved mockup): a boxed GROUP between hairlines — Client toggle + red-flag —
+  // sitting between the status pill and the actions. Flagged wins: the toggle hides and
+  // a small Offline mark shows. A superseded doc gets NO controls — the portal never
+  // serves superseded versions.
   function pdShareCol(d){
     if(d.superseded)return '';
     if(d.flagged){
-      return '<div class="pd-share-col"><div class="pd-share-top">'
-        +'<button class="pd-flagbtn flagged" data-dflag="'+d.id+'" title="Red-flagged — offline for all external viewers. Click to clear.">⚑</button></div>'
-        +'<span class="pd-share-state flag">⚑ Red-flagged — offline</span></div>';
+      return '<div class="pd-share-grp"><span class="pd-off">⚑ Offline</span>'
+        +'<button class="pd-flagbtn flagged" data-dflag="'+d.id+'" title="Red-flagged — offline for all external viewers. Click to clear.">⚑</button></div>';
     }
-    return '<div class="pd-share-col"><div class="pd-share-top">'
-      +'<span class="pd-tog'+(d.shared_client?' on':'')+'" data-dshare="'+d.id+'" data-don="'+(d.shared_client?1:0)+'" role="switch" aria-checked="'+(d.shared_client?'true':'false')+'"><span class="pd-track"></span>Client</span>'
-      +'<button class="pd-flagbtn" data-dflag="'+d.id+'" title="Red-flag — pull from client view instantly">⚑</button></div>'
-      +'<span class="pd-share-state'+(d.shared_client?' on':'')+'">'+(d.shared_client?'Shared with client':'Internal only')+'</span></div>';
+    return '<div class="pd-share-grp">'
+      +'<span class="pd-tog'+(d.shared_client?' on':'')+'" data-dshare="'+d.id+'" data-don="'+(d.shared_client?1:0)+'" role="switch" aria-checked="'+(d.shared_client?'true':'false')+'" title="'+(d.shared_client?'Shared with client':'Internal only')+'"><span class="pd-track"></span>Client</span>'
+      +'<button class="pd-flagbtn" data-dflag="'+d.id+'" title="Red-flag — pull from client view instantly">⚑</button></div>';
+  }
+
+  // ---------- #271 — row-rework helpers (status pill · dates line · version history) ----------
+  function pdStatusPill(d){
+    if(d.status==='expired')return '<span class="pd-st expired">Expired'+(d.expiry_date?(' '+mdy(d.expiry_date)):'')+'</span>';
+    if(d.status==='expiring')return '<span class="pd-st expiring">Expiring '+mdy(d.expiry_date)+'</span>';
+    return '<span class="pd-st onfile">On file</span>';   // always present once a doc is on file
+  }
+  function pdDocSub(d){
+    var bits=[];
+    if(d.doc_type)bits.push(esc(d.doc_type));
+    if(d.effective_date)bits.push('effective '+mdy(d.effective_date));
+    if(d.expiry_date)bits.push('expires '+mdy(d.expiry_date));
+    return bits.join(' · ');
+  }
+  function pdHistLine(d){
+    var n=d.history_count||0;
+    if(!n)return '';
+    var open=PD.histOpen.has(d.id);
+    var line='<div class="pd-vhist-toggle" data-vhist="'+d.id+'">'+(open?'▾':'▸')+' History ('+n+' previous)</div>';
+    if(!open)return line;
+    var rows=(d.history||[]).map(function(v,i){
+      var vn=n-i;   // newest previous first; the oldest is v1
+      var range='effective '+mdy(v.effective_date)+(v.expiry_date?(' – '+mdy(v.expiry_date)):'');
+      return '<div class="pd-vrow"><span class="pd-vlabel">v'+vn+'</span> '+range
+        +' <span class="pd-vtag">Superseded</span><a data-open="'+v.id+'">View</a></div>';
+    }).join('');
+    return line+'<div class="pd-vhist">'+rows
+      +'<div class="pd-vnote">Previous versions are internal-only — clients only ever see the current shared version.</div></div>';
+  }
+  function pdActs(d, withRemove){
+    return '<div class="pd-acts">'
+      +'<button class="pd-btn-update" data-update="'+d.id+'">Update</button>'
+      +'<button class="pd-btn-replace" data-replace="'+d.id+'" title="Wrong file? Swap this version\'s file — no history entry">Replace</button>'
+      +(withRemove?'<button class="pd-mini2" data-del="'+d.id+'">Remove</button>':'')
+      +'</div>';
   }
   function pdSelBox(d){
     if(d.superseded)return '';
@@ -6980,6 +7042,48 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     }catch(e){ alert('Network error.'); }
   }
 
+  // ---------- #271 — Update (new version) / Replace (wrong-file fix) ----------
+  function pdFindDoc(id){
+    var cats=(PD.data&&PD.data.categories)||[];
+    for(var i=0;i<cats.length;i++){
+      var c=cats[i];
+      for(var j=0;j<(c.items||[]).length;j++){
+        var it=c.items[j];
+        if(it.doc&&it.doc.id===id)return {doc:it.doc,cat:c.category,req:it.requirement_key,label:it.label};
+      }
+      for(var k=0;k<(c.extras||[]).length;k++){
+        if(c.extras[k].id===id)return {doc:c.extras[k],cat:c.category,req:c.extras[k].requirement_key,label:c.extras[k].title};
+      }
+    }
+    return null;
+  }
+  function updateDoc(id){
+    var f=pdFindDoc(id);if(!f)return;
+    // the everyday renewal: a NEW VERSION with its own dates. The old version is kept
+    // (superseded -> History) and the new one starts INTERNAL-ONLY (re-share deliberately).
+    openModal({cat:f.cat,req:f.req||'',reqLabel:f.label});
+    PD.updateOf=id;   // set AFTER openModal (openModal resets it)
+    $('pd-modal-title').textContent='Update — new version';
+    $('pd-modal-sub').textContent=(f.label||'document')+' · the current version moves to History; the new version starts internal-only';
+    $('pd-f-title').value=f.doc.title||f.label||'';
+  }
+  function replaceDoc(id){
+    if(!confirm('Replace the file on this version? Use this only if the wrong file was uploaded.'))return;
+    var inp=document.createElement('input');
+    inp.type='file';inp.accept='.pdf,.jpg,.jpeg,.png,.heic,.heif';
+    inp.onchange=async function(){
+      if(!inp.files||!inp.files.length)return;
+      var fd=new FormData();fd.append('file',inp.files[0]);
+      try{
+        var r=await fetch('/api/documents/'+id+'/replace-file',{method:'POST',credentials:'include',body:fd});
+        var j=await r.json().catch(function(){return {};});
+        if(!r.ok||j.error){ alert('Replace failed: '+((j&&j.error)||r.status)); return; }
+        await loadDocs();
+      }catch(e){ alert('Network error.'); }
+    };
+    inp.click();
+  }
+
   function renderHero(){
     var r=(PD.data&&PD.data.readiness)||{},el=$('pd-hero');if(!el)return;
     var rt=r.required_total||0,on=r.on_file||0,miss=r.missing||0,att=r.attention||0,pct=r.pct||0;
@@ -6999,27 +7103,46 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     var cats=(PD.data&&PD.data.categories)||[];
     host.innerHTML=cats.map(function(c){
       var rows=(c.items||[]).map(function(it){
-        var warn=(it.status==='expiring'||it.status==='expired');
-        var ckcls=it.status==='missing'?'miss':(warn?'warn':'on');
-        var ckinner=it.status==='missing'?'':(warn?ICWARN:ICCHECK);
-        var nm='<span class="pd-cdoc'+(it.status==='missing'?' misstxt':'')+(it.doc?' link" data-open="'+it.doc.id+'"':'"')+'>'+esc(it.label)+'</span>';
-        var right;
         if(it.status==='missing'){
-          right='<button class="pd-upmini" data-upcat="'+esc(c.category)+'" data-upreq="'+esc(it.requirement_key)+'">Upload</button>';
-        }else if(warn){
-          var lbl=(it.status==='expired'?'Expired ':'Expiring ')+mdy(it.doc.expiry_date);
-          right='<span class="pd-flag warn">'+lbl+'</span><button class="pd-upmini" data-upcat="'+esc(c.category)+'" data-upreq="'+esc(it.requirement_key)+'">Replace</button>';
-        }else{
-          right='<span class="pd-cmeta">filed '+mdy(it.doc.effective_date)+'</span><button class="pd-mini2" data-del="'+it.doc.id+'">Remove</button>';
+          // requirement not uploaded yet — unchanged Upload row (mockup row D)
+          return '<div class="pd-crow"><span class="pd-ck miss"></span>'
+            +'<div class="pd-dmain"><span class="pd-cdoc misstxt">'+esc(it.label)+'</span></div>'
+            +'<div class="pd-acts"><button class="pd-upmini" data-upcat="'+esc(c.category)+'" data-upreq="'+esc(it.requirement_key)+'">Upload</button></div>'
+            +'</div>';
         }
-        // #270 — doc-bearing rows get a selection box + the client-sharing column
-        var selbox=it.doc?pdSelBox(it.doc):'';
-        var sharecol=it.doc?pdShareCol(it.doc):'';
-        return '<div class="pd-crow">'+selbox+'<span class="pd-ck '+ckcls+'">'+ckinner+'</span>'+nm+'<span class="pd-rowacts">'+right+'</span>'+sharecol+'</div>';
+        // #271 — filed row per the approved mockup: title+dates+history · pill ·
+        // boxed share group · Update (primary) / Replace (quiet). Title click = VIEW.
+        var d=it.doc;
+        return '<div class="pd-crow">'+pdSelBox(d)
+          +'<div class="pd-dmain">'
+          +'<div class="pd-dtitle" data-open="'+d.id+'" title="Open to view">'+esc(it.label)+'</div>'
+          +'<div class="pd-dsub">'+pdDocSub(d)+'</div>'
+          +pdHistLine(d)
+          +'</div>'
+          +pdStatusPill(d)
+          +pdShareCol(d)
+          +pdActs(d,false)
+          +'</div>';
       }).join('');
       var extras=(c.extras||[]).map(function(d){
-        var fl=d.status==='expired'?'<span class="pd-flag warn">Expired</span>':(d.status==='expiring'?'<span class="pd-flag warn">Expiring</span>':(d.superseded?'<span class="pd-flag miss">Superseded</span>':'<span class="pd-flag on">Extra</span>'));
-        return '<div class="pd-extra">'+pdSelBox(d)+'<span class="pd-cdoc link" data-open="'+d.id+'" style="font-size:12.5px;font-weight:600">'+esc(d.title)+'</span>'+fl+'<span style="margin-left:auto;font-size:10.5px">'+esc(d.doc_type||'')+'</span><button class="pd-mini2" data-del="'+d.id+'">Remove</button>'+pdShareCol(d)+'</div>';
+        if(d.superseded){
+          // legacy superseded leftovers (no version chain) — quiet row, unchanged
+          return '<div class="pd-extra"><span class="pd-cdoc link" data-open="'+d.id+'" style="font-size:12.5px;font-weight:600">'+esc(d.title)+'</span>'
+            +'<span class="pd-flag miss">Superseded</span>'
+            +'<span style="margin-left:auto;font-size:10.5px">'+esc(d.doc_type||'')+'</span>'
+            +'<button class="pd-mini2" data-del="'+d.id+'">Remove</button></div>';
+        }
+        // extra (non-required) docs get the same #271 anatomy + keep Remove
+        return '<div class="pd-crow" style="background:#fafbfe">'+pdSelBox(d)
+          +'<div class="pd-dmain">'
+          +'<div class="pd-dtitle" data-open="'+d.id+'" title="Open to view" style="font-size:12.5px">'+esc(d.title)+'</div>'
+          +'<div class="pd-dsub">'+pdDocSub(d)+'</div>'
+          +pdHistLine(d)
+          +'</div>'
+          +pdStatusPill(d)
+          +pdShareCol(d)
+          +pdActs(d,true)
+          +'</div>';
       }).join('');
       return '<div class="pd-grp"><div class="pd-ghead"><span class="pd-gbar" style="background:'+(CATCOLOR[c.category]||'#888')+'"></span>'+esc(c.name)+'<span class="pd-gcount">'+(c.filed||0)+' / '+(c.total||0)+'</span></div>'
         +'<div class="pd-clist">'+(rows||'<div class="pd-extra">No required items.</div>')+extras+'</div></div>';
@@ -7035,7 +7158,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     return opts;
   }
   function openModal(prefill){
-    PD.prefill=prefill||null; PD.files=[]; setMode('single');
+    PD.prefill=prefill||null; PD.files=[]; PD.updateOf=null; setMode('single');   // #271 — plain uploads never inherit an update target
     $('pd-modal-title').textContent=prefill&&prefill.req?'Upload — '+(prefill.reqLabel||'required doc'):'Upload document';
     $('pd-modal-sub').textContent=prefill&&prefill.cat?(catName(prefill.cat)+(prefill.reqLabel?' · '+prefill.reqLabel:'')):'Add a project document';
     var cat=prefill&&prefill.cat?prefill.cat:'PERMITS';
@@ -7049,7 +7172,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     if(window.SSCDatePicker){ try{SSCDatePicker.wire($('pd-f-eff'));SSCDatePicker.wire($('pd-f-exp'));SSCDatePicker.setISO($('pd-f-eff'),todayLocal());SSCDatePicker.setISO($('pd-f-exp'),'');}catch(e){} }
     $('pd-modal').classList.add('show');
   }
-  function closeModal(){$('pd-modal').classList.remove('show');PD.files=[];}
+  function closeModal(){$('pd-modal').classList.remove('show');PD.files=[];PD.updateOf=null;}
   function catName(code){var c=CATS.filter(function(x){return x[0]===code;})[0];return c?c[1]:code;}
   function setMode(m){
     PD.mode=m;
@@ -7146,6 +7269,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     fd.append('effective_date',(window.SSCDatePicker?SSCDatePicker.getISO($('pd-f-eff')):$('pd-f-eff').value)||'');
     fd.append('expiry_date',(window.SSCDatePicker?SSCDatePicker.getISO($('pd-f-exp')):$('pd-f-exp').value)||'');
     fd.append('notes',$('pd-f-notes').value||'');
+    if(PD.updateOf){fd.append('supersedes_id',PD.updateOf);}   // #271 — Update = new version; server supersedes the old one
     $('pd-save-single').disabled=true;
     try{
       var r=await fetch('/api/projects/'+encodeURIComponent(PROJECT_CODE)+'/documents',{method:'POST',credentials:'include',body:fd});
@@ -7204,6 +7328,10 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
       var sb=e.target.closest('.pd-selbox');if(sb){var sid=+sb.getAttribute('data-sel');if(sb.checked)PD.sel.add(sid);else PD.sel.delete(sid);renderBulkBar();return;}
       var sh=e.target.closest('[data-dshare]');if(sh){dShare(+sh.getAttribute('data-dshare'), sh.getAttribute('data-don')!=='1');return;}
       var fb=e.target.closest('[data-dflag]');if(fb){dFlag(+fb.getAttribute('data-dflag'), !fb.classList.contains('flagged'));return;}
+      // #271 — version controls (before data-open: History's View links also use data-open)
+      var vh=e.target.closest('[data-vhist]');if(vh){var hid=+vh.getAttribute('data-vhist');if(PD.histOpen.has(hid))PD.histOpen.delete(hid);else PD.histOpen.add(hid);renderChecklist();return;}
+      var up1=e.target.closest('[data-update]');if(up1){updateDoc(+up1.getAttribute('data-update'));return;}
+      var rp=e.target.closest('[data-replace]');if(rp){replaceDoc(+rp.getAttribute('data-replace'));return;}
       var up=e.target.closest('[data-upcat]');if(up){var cat=up.getAttribute('data-upcat'),req=up.getAttribute('data-upreq');var c=((PD.data&&PD.data.categories)||[]).filter(function(x){return x.category===cat;})[0];var it=c?(c.items||[]).filter(function(x){return x.requirement_key===req;})[0]:null;openModal({cat:cat,req:req,reqLabel:it?it.label:''});return;}
       var del=e.target.closest('[data-del]');if(del){delDoc(+del.getAttribute('data-del'));return;}
       var op=e.target.closest('[data-open]');if(op){window.open('/api/documents/'+op.getAttribute('data-open')+'/file','_blank');return;}
@@ -7316,7 +7444,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     var capShort=cap.length>34?cap.slice(0,32)+'…':cap;
     return '<div class="fp-photo" data-pid="'+p.id+'">'
       +'<img loading="lazy" src="'+esc(p.thumb_url)+'" alt="">'
-      +(p.taken_at_estimated?'<span class="fp-est">est date</span>':'')
+      +(p.taken_at_estimated?'<span class="fp-est" title="No capture time in the photo — showing when it was uploaded">upload time</span>':'')
       +fpVis(p)
       +'<div class="fp-grad"></div><div class="fp-meta"><span>'+mdyShort(p.taken_at)+'</span>'
       +(cap?'<span class="fp-cap" title="'+esc(cap)+'">'+esc(capShort)+'</span>':'<span></span>')+'</div></div>';
