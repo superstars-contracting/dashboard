@@ -4108,7 +4108,7 @@ def _projdoc_status(d, today_iso, d30_iso):
 
 def _projdoc_public(d, today_iso, d30_iso):
     """PII/path-safe shape — NO file_path. file_url is the GATED route, not a path."""
-    return {
+    out = {
         'id': d['id'], 'project_code': d['project_code'], 'category': d['category'],
         'requirement_key': d['requirement_key'], 'title': d['title'], 'doc_type': d['doc_type'],
         'file_name': d['file_name'], 'file_size': d['file_size'], 'mime': d['mime'],
@@ -4117,6 +4117,11 @@ def _projdoc_public(d, today_iso, d30_iso):
         'uploaded_at': d['uploaded_at'], 'status': _projdoc_status(d, today_iso, d30_iso),
         'file_url': f"/api/documents/{d['id']}/file",
     }
+    # #271 — version history (computed by the list endpoint for current docs only)
+    if '_history' in d:
+        out['history'] = d['_history']
+        out['history_count'] = len(d['_history'])
+    return out
 
 
 def _projdoc_save_file(project_code, fs):
@@ -4137,9 +4142,11 @@ def _projdoc_save_file(project_code, fs):
     return fpath, doc_type, mime, fpath.stat().st_size
 
 
-def _projdoc_insert(conn, project_code, fs, form):
+def _projdoc_insert(conn, project_code, fs, form, supersedes_id=None):
     """Single-row insert from a FileStorage + form-like dict. Rolls the on-disk file
-    back on DB failure so disk/DB never diverge. Returns the new id."""
+    back on DB failure so disk/DB never diverge. Returns the new id.
+    #271: supersedes_id links this row as the NEW VERSION of an existing document
+    (the caller validates + marks the old row superseded in the same transaction)."""
     category = (form.get('category') or '').strip().upper()
     if category not in _PROJDOC_CATEGORIES:
         raise ValueError("invalid category")
@@ -4159,9 +4166,9 @@ def _projdoc_insert(conn, project_code, fs, form):
         cur = conn.execute(
             "INSERT INTO project_documents (project_code, category, requirement_key, title, doc_type, "
             "file_path, file_name, file_size, mime, effective_date, expiry_date, version, notes, "
-            "superseded, uploaded_by_uid, uploaded_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?)",
+            "superseded, uploaded_by_uid, uploaded_at, supersedes_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?)",
             (project_code, category, rk, title, doc_type, str(fpath), file_name, size, mime,
-             eff, exp, version, notes, uid, datetime.now().isoformat()))
+             eff, exp, version, notes, uid, datetime.now().isoformat(), supersedes_id))
         return cur.lastrowid
     except Exception:
         try:
@@ -4193,6 +4200,29 @@ def api_project_documents(project_code):
             rk = d['requirement_key']
             if rk and not d['superseded'] and rk not in by_req:
                 by_req[rk] = d
+        # #271 — version chains: history = walk supersedes_id from each CURRENT doc.
+        # A superseded row that is REFERENCED by a newer version lives in History (not
+        # extras); legacy superseded rows with no successor stay extras as before.
+        by_id = {d['id']: d for d in docs}
+        in_history = set()
+
+        def _doc_history(d):
+            chain, seen = [], set()
+            cur_id = d.get('supersedes_id')
+            while cur_id and cur_id in by_id and cur_id not in seen:
+                seen.add(cur_id)
+                prev = by_id[cur_id]
+                chain.append({'id': prev['id'], 'effective_date': prev['effective_date'],
+                              'expiry_date': prev['expiry_date'], 'uploaded_at': prev['uploaded_at'],
+                              'doc_type': prev['doc_type'],
+                              'file_url': f"/api/documents/{prev['id']}/file"})
+                in_history.add(cur_id)
+                cur_id = prev.get('supersedes_id')
+            return chain   # newest previous first; v-numbers rendered client-side
+
+        for d in docs:
+            if not d['superseded']:
+                d['_history'] = _doc_history(d)
         cat_reqs = {}
         for r in reqs:
             cat_reqs.setdefault(r['category'], []).append(r)
@@ -4214,8 +4244,9 @@ def api_project_documents(project_code):
                                   'status': 'missing', 'doc': None})
             req_keys = {r['requirement_key'] for r in cat_reqs.get(code, [])}
             extras = [_projdoc_public(d, today_iso, d30_iso) for d in docs
-                      if d['category'] == code and (not d['requirement_key']
-                                                    or d['requirement_key'] not in req_keys or d['superseded'])]
+                      if d['category'] == code and d['id'] not in in_history
+                      and (not d['requirement_key']
+                           or d['requirement_key'] not in req_keys or d['superseded'])]
             filed = sum(1 for it in items if it['status'] != 'missing')
             out_cats.append({'category': code, 'name': _PROJDOC_CATNAMES[code], 'items': items,
                              'extras': extras, 'filed': filed, 'total': len(items)})
@@ -4245,17 +4276,43 @@ def api_project_documents(project_code):
 @requires_role(*_PROJDOC_ROLES)
 def api_project_documents_upload(project_code):
     """#229 — upload ONE document (multipart: file + category, requirement_key, title,
-    effective_date, expiry_date, version, notes). LOCAL dates."""
+    effective_date, expiry_date, version, notes). LOCAL dates.
+    #271 — optional supersedes_id makes this an UPDATE (new version): the old row is
+    marked superseded (NEVER deleted — file + row kept for History) and its external
+    share rows are removed with the engine's audit trail (a client never sees a stale
+    permit). The NEW version starts INTERNAL-ONLY by design — re-sharing is deliberate
+    (operator-approved security default)."""
     conn = db()
     try:
         if not validate_project_exists(conn, project_code):
             return jsonify({"error": "project not found"}), 404
         if 'file' not in request.files:
             return jsonify({"error": "no file"}), 400
+        supersedes_id = (request.form.get('supersedes_id') or '').strip() or None
+        old = None
+        if supersedes_id is not None:
+            try:
+                supersedes_id = int(supersedes_id)
+            except ValueError:
+                return jsonify({"error": "supersedes_id must be an integer"}), 400
+            old = conn.execute(
+                "SELECT id, project_code, superseded FROM project_documents WHERE id=?",
+                (supersedes_id,)).fetchone()
+            if not old or old['project_code'] != project_code:
+                return jsonify({"error": "document to update not found in this project"}), 404
+            if old['superseded']:
+                return jsonify({"error": "that version is already superseded — update the current version"}), 409
         try:
-            new_id = _projdoc_insert(conn, project_code, request.files['file'], request.form)
+            new_id = _projdoc_insert(conn, project_code, request.files['file'], request.form,
+                                     supersedes_id=supersedes_id)
         except ValueError as ve:
             return jsonify({"error": str(ve)}), 400
+        if old is not None:
+            uid = (current_user() or {}).get('id')
+            conn.execute("UPDATE project_documents SET superseded=1 WHERE id=?", (supersedes_id,))
+            # instant external revoke of the stale version, audited per audience
+            for aud in visibility.audiences_for(conn, 'document', supersedes_id):
+                visibility.unshare(conn, 'document', supersedes_id, aud, uid)
         conn.commit()
         today = date.today()
         row = dict(conn.execute("SELECT * FROM project_documents WHERE id=?", (new_id,)).fetchone())
@@ -4393,19 +4450,76 @@ def api_project_documents_scan(project_code):
 @requires_role(*_PROJDOC_ROLES)
 def api_projdoc_file(doc_id):
     """Serve a document's bytes through THIS auth-gated route ONLY. Never exposes the
-    path; confined to data_room/project_docs/. no-store (docs may be sensitive)."""
+    path; confined to data_room/project_docs/. no-store (docs may be sensitive).
+    #271 — VIEW, NOT PRINT: Content-Disposition is EXPLICITLY inline (with the original
+    filename for a deliberate save-as), so a title click renders the PDF in the tab;
+    printing is only ever the operator's manual choice. No print-intent exists on this
+    path — guarded against regression by smoke_docs_photos_271."""
     from flask import send_file
     conn = db()
     try:
-        row = conn.execute("SELECT file_path, mime FROM project_documents WHERE id=?", (doc_id,)).fetchone()
+        row = conn.execute("SELECT file_path, mime, file_name FROM project_documents WHERE id=?",
+                           (doc_id,)).fetchone()
         if not row or not row['file_path']:
             return jsonify({"error": "not found"}), 404
         p = Path(row['file_path'])
         base = (SCRIPT_DIR / 'data_room' / 'project_docs').resolve()
         if not (p.resolve().is_relative_to(base) and p.exists()):
             return jsonify({"error": "file missing"}), 404
-        resp = send_file(str(p), mimetype=row['mime'] or 'application/octet-stream')
+        resp = send_file(str(p), mimetype=row['mime'] or 'application/octet-stream',
+                         as_attachment=False, download_name=(row['file_name'] or f"document-{doc_id}"))
         resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return resp
+    finally:
+        conn.close()
+
+
+@app.route('/api/documents/<int:doc_id>/replace-file', methods=['POST'])
+@requires_role(*_PROJDOC_ROLES)
+def api_projdoc_replace_file(doc_id):
+    """#271 — REPLACE: the 'wrong file was uploaded' fix ONLY. Swaps the FILE on this
+    SAME version row (path/name/size/mime/doc_type updated, old file deleted from disk),
+    creates NO history entry, changes NO version/share/flag state. The everyday renewal
+    action is Update (a new version via the upload endpoint's supersedes_id)."""
+    conn = db()
+    try:
+        code, err = _doc_actor_can_admin(conn, doc_id)
+        if err:
+            return err
+        if 'file' not in request.files:
+            return jsonify({"error": "no file"}), 400
+        row = conn.execute("SELECT file_path FROM project_documents WHERE id=?", (doc_id,)).fetchone()
+        old_path = Path(row['file_path']) if row and row['file_path'] else None
+        try:
+            fpath, doc_type, mime, size = _projdoc_save_file(code, request.files['file'])
+        except ValueError as ve:
+            return jsonify({"error": str(ve)}), 400
+        file_name = Path(request.files['file'].filename or 'document').name
+        try:
+            conn.execute(
+                "UPDATE project_documents SET file_path=?, file_name=?, file_size=?, mime=?, doc_type=? "
+                "WHERE id=?",
+                (str(fpath), file_name, size, mime, doc_type, doc_id))
+            conn.commit()
+        except Exception:
+            try:
+                fpath.unlink(missing_ok=True)   # roll the new file back; row unchanged
+            except Exception:
+                pass
+            raise
+        # the wrong file is gone for good (confined delete; the ROW/version is untouched)
+        base = (SCRIPT_DIR / 'data_room' / 'project_docs').resolve()
+        if old_path is not None:
+            try:
+                if old_path.resolve().is_relative_to(base):
+                    old_path.unlink(missing_ok=True)
+            except (OSError, ValueError):
+                pass
+        today = date.today()
+        fresh = dict(conn.execute("SELECT * FROM project_documents WHERE id=?", (doc_id,)).fetchone())
+        resp = response_wrapper(_projdoc_public(fresh, today.isoformat(),
+                                                (today + timedelta(days=30)).isoformat()))
+        resp.headers['Cache-Control'] = 'no-store'
         return resp
     finally:
         conn.close()
