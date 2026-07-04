@@ -410,7 +410,7 @@
     <div class="nav-tab" data-panel="cert-health" data-i18n="tab-cert-health">Cert Health</div>
     <div class="nav-tab" data-panel="cert-library" data-i18n="tab-cert-library">Cert Library</div>
     <div class="nav-tab" data-panel="compliance" data-i18n="tab-compliance">Compliance</div>
-    <div class="nav-tab" data-panel="bid" data-i18n="tab-bid">Bid Tracker</div>
+    <div class="nav-tab" data-panel="estimates" data-i18n="tab-estimates">Estimates</div>
     <!-- #193 — LRT relocated to the FR-BX-001 project-internal page
          as the operator-facing entry point. Tab hidden here, panel
          retained so /company-dashboard.html#labor-rate hash-routing
@@ -638,12 +638,151 @@
     </div>
   </div>
 
-  <!-- BID TRACKER -->
-  <div class="panel" data-panel="bid">
+  <!-- #273 — ESTIMATES / BID TRACKING (C-suite section; page is admin/c_suite-only,
+       endpoints @requires_section('estimates')). Board -> detail on the console —
+       the VP never opens a project dashboard to work a bid. #274 adds the
+       Inspections + Calendar views inside this same section. -->
+  <style>
+    /* ===== #273 ESTIMATES (module styles; tokens come from :root in widgets.css) ===== */
+    .est-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:14px; }
+    .est-sub { font-size:12px; color:var(--muted); margin-top:3px; }
+    .est-actions { display:flex; gap:8px; flex:none; }
+    .est-subtabs { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+    .est-subtab { padding:7px 14px; font-size:12.5px; font-weight:700; color:var(--muted); cursor:pointer; border-radius:8px; }
+    .est-subtab.active { color:#fff; background:var(--accent); }
+    .est-group { margin-bottom:18px; }
+    .est-group-head { display:flex; align-items:center; gap:8px; margin-bottom:9px; }
+    .est-group-head h3 { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#54505A; margin:0; }
+    .est-group-count { font-size:11px; font-weight:700; color:var(--muted); background:#f2f3f7; border-radius:999px; padding:1px 8px; }
+    .est-dot { width:9px; height:9px; border-radius:50%; flex:none; }
+    .est-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
+    .est-card { background:#fff; border:1px solid var(--accent-edge); border-radius:14px; padding:13px 15px; cursor:pointer;
+                box-shadow: inset 0 0 13px var(--accent-in), 0 1px 4px rgba(0,0,0,.04); }
+    .est-card:hover { box-shadow: inset 0 0 13px var(--accent-in), 0 3px 10px rgba(0,0,0,.09); }
+    .est-card-code { font-weight:700; color:var(--brand-red); font-size:13.5px; }
+    .est-card-org { font-size:12.5px; color:var(--ink); font-weight:600; margin-top:4px; }
+    .est-card-addr { font-size:12px; color:var(--muted); margin-top:2px; min-height:15px; }
+    .est-card-row { display:flex; align-items:center; gap:6px; margin-top:9px; flex-wrap:wrap; }
+    .est-card-age { font-size:11px; color:var(--muted); margin-top:8px; }
+    .est-amount { font-weight:700; color:var(--status-complete-deep); font-variant-numeric:tabular-nums; font-size:12.5px; }
+    /* stage badges — pipeline stages are CATEGORIES (non-semantic palette); approved
+       is genuinely positive (status green); lost is closed/muted. Color=status rule. */
+    .est-badge { display:inline-block; border-radius:999px; padding:2px 9px; font-size:10px; font-weight:700;
+                 text-transform:uppercase; letter-spacing:.05em; }
+    .est-badge.st-intake    { background:var(--status-oat-soft); color:var(--oat-ink); }
+    .est-badge.st-scoping   { background:#e6f3f2; color:#1b7f79; }
+    .est-badge.st-submitted { background:#eceafb; color:#5a4fb8; }
+    .est-badge.st-approved  { background:var(--status-complete-soft); color:var(--status-complete-deep); }
+    .est-badge.st-lost      { background:#f0f0f2; color:#76777E; }
+    .est-badge.st-converted { background:var(--status-complete-soft); color:var(--status-complete-deep); border:1px solid var(--status-complete); }
+    .est-type-chip { display:inline-block; border-radius:999px; padding:2px 9px; font-size:10px; font-weight:700;
+                     text-transform:uppercase; letter-spacing:.05em; background:var(--accent-soft); color:var(--accent-ink); }
+    .est-back { display:inline-block; margin-bottom:14px; font-size:13px; font-weight:600; color:var(--accent-ink); cursor:pointer; }
+    .est-detail-grid { display:grid; grid-template-columns:300px 1fr; gap:18px; align-items:start; }
+    @media (max-width:860px){ .est-detail-grid{ grid-template-columns:1fr; } }
+    .est-info { background:#fff; border:1px solid var(--accent-edge); border-radius:14px; padding:16px 18px;
+                box-shadow: inset 0 0 13px var(--accent-in), 0 1px 4px rgba(0,0,0,.04); }
+    .est-info h2 { font-size:19px; margin:0 0 6px; color:var(--brand-red); }
+    .est-kv { margin:9px 0; }
+    .est-kv .k { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#9a96a2; font-weight:700; }
+    .est-kv .v { font-size:13px; color:var(--ink); margin-top:1px; word-break:break-word; }
+    .est-flow { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+    .est-box { background:#fff; border:1px solid var(--accent-edge); border-radius:14px; padding:14px 18px; margin-bottom:14px;
+               box-shadow: inset 0 0 13px var(--accent-in), 0 1px 4px rgba(0,0,0,.04); }
+    .est-box-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; gap:10px; flex-wrap:wrap; }
+    .est-box-head h3 { font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:#54505A; margin:0; }
+    .est-mini-btn { background:#fff; border:1px solid var(--line); border-radius:8px; padding:5px 10px; font-size:11.5px;
+                    font-weight:700; color:var(--accent-ink); cursor:pointer; font-family:inherit; }
+    .est-mini-btn:hover { border-color:var(--accent-edge); }
+    .est-doc-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #F2EFE7; font-size:12.5px; }
+    .est-doc-row:last-child { border-bottom:none; }
+    .est-doc-title { font-weight:600; color:var(--accent-ink); cursor:pointer; text-decoration:none; }
+    .est-doc-meta { color:var(--muted); font-size:11px; }
+    .est-cat-chip { display:inline-block; border-radius:999px; padding:1px 8px; font-size:9.5px; font-weight:700;
+                    text-transform:uppercase; letter-spacing:.05em; background:#f2f3f7; color:#54505A; flex:none; }
+    .est-act-row { padding:7px 0; border-bottom:1px solid #F2EFE7; font-size:12px; }
+    .est-act-row:last-child { border-bottom:none; }
+    .est-act-when { color:var(--muted); font-size:11px; }
+    .est-empty { text-align:center; color:#76777E; padding:22px 10px; font-size:12.5px; }
+    .est-field { margin-bottom:12px; }
+    .est-field label { display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#76777E; margin-bottom:5px; }
+    .est-field .ssc-field { width:100%; }
+    .est-field-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .est-err { color:var(--brand-red); font-size:12px; margin-top:8px; display:none; }
+    .est-err.show { display:block; }
+    .est-modal-bg { position:fixed; inset:0; background:rgba(20,22,28,.45); z-index:1500; display:none; align-items:center; justify-content:center; padding:20px; }
+    .est-modal-bg.show { display:flex; }
+    .est-modal { background:#fff; border-radius:14px; width:100%; max-width:480px; max-height:90vh; overflow:auto; box-shadow:0 18px 60px rgba(0,0,0,.28); }
+    .est-modal-head { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--line); }
+    .est-modal-head h3 { margin:0; font-size:15px; }
+    .est-modal-x { cursor:pointer; color:#9a96a2; font-size:20px; line-height:1; background:none; border:0; }
+    .est-modal-body { padding:18px 20px; }
+    .est-modal-foot { display:flex; justify-content:flex-end; gap:10px; padding:14px 20px; border-top:1px solid var(--line); }
+  </style>
+  <div class="panel" data-panel="estimates">
     <div class="section">
-      <h2 data-i18n="p-bid-title">Bid Tracker</h2>
-      <div class="h2-sub" data-i18n="p-bid-sub">Opportunities, estimates, and proposals.</div>
-      <div class="placeholder" data-i18n="p-bid-placeholder">Bid pipeline — coming in Phase C.</div>
+      <div class="est-head">
+        <div>
+          <h2>Estimates</h2>
+          <div class="est-sub">Every inquiry the company bids — intake to approved, then one click into Active Projects.</div>
+        </div>
+        <div class="est-actions">
+          <button type="button" class="btn-primary" id="est-btn-new">+ New estimate</button>
+        </div>
+      </div>
+
+      <div class="est-subtabs" id="est-subtabs">
+        <div class="est-subtab active" data-estview="board">Estimates Board</div>
+      </div>
+
+      <!-- BOARD view: grouped by status -->
+      <div class="est-view" data-estview="board">
+        <div id="est-board"><div class="est-empty">Loading…</div></div>
+      </div>
+
+      <!-- DETAIL view -->
+      <div class="est-view" data-estview="detail" style="display:none;">
+        <span class="est-back" id="est-back">← Back to board</span>
+        <div class="est-detail-grid">
+          <div class="est-info" id="est-info"></div>
+          <div>
+            <div class="est-box" id="est-box-ira" style="display:none;">
+              <div class="est-box-head"><h3>IRA details</h3><button type="button" class="btn-primary" id="est-ira-save" style="padding:6px 12px;font-size:12px;">Save IRA details</button></div>
+              <div class="est-field-row">
+                <div class="est-field"><label>DOB registered email</label><input class="ssc-field" id="est-ira-email"></div>
+                <div class="est-field"><label>Engineer</label><input class="ssc-field" id="est-ira-eng"></div>
+              </div>
+              <div class="est-field-row">
+                <div class="est-field"><label>Scope mode</label>
+                  <select class="ssc-field" id="est-ira-mode"><option value="">—</option><option value="drops">Drops</option><option value="days">Days</option></select>
+                </div>
+                <div class="est-field"><label>Scope value</label><input class="ssc-field" id="est-ira-scope" type="number" step="0.1" min="0"></div>
+              </div>
+              <div class="est-field"><label>Internal drop calc</label><input class="ssc-field" id="est-ira-calc" type="number" step="0.1" min="0"></div>
+            </div>
+            <div class="est-box">
+              <div class="est-box-head"><h3>Documents</h3><button type="button" class="est-mini-btn" id="est-doc-add">+ Upload</button></div>
+              <div id="est-docs"></div>
+            </div>
+            <div class="est-box">
+              <div class="est-box-head"><h3>Client activity</h3></div>
+              <div id="est-activity"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- shared ESTIMATES modal shell -->
+  <div class="est-modal-bg" id="est-modal-bg">
+    <div class="est-modal" role="dialog" aria-modal="true">
+      <div class="est-modal-head"><h3 id="est-modal-title">—</h3><button type="button" class="est-modal-x" id="est-modal-x">&times;</button></div>
+      <div class="est-modal-body" id="est-modal-body"></div>
+      <div class="est-modal-foot">
+        <button type="button" class="btn-ghost" id="est-modal-cancel">Cancel</button>
+        <button type="button" class="btn-primary" id="est-modal-save">Save</button>
+      </div>
     </div>
   </div>
 
@@ -1381,7 +1520,7 @@ const I18N = {
     'tab-cert-health': 'Cert Health',
     'tab-cert-library': 'Cert Library',
     'tab-compliance': 'Compliance',
-    'tab-bid': 'Bid Tracker',
+    'tab-estimates': 'Estimates',
     'tab-labor-rate': 'Labor Rate',
     'tab-specs': 'Specs Library',
     'p-specs-title': 'Specifications Library',
@@ -1434,9 +1573,6 @@ const I18N = {
     'p-compliance-title': 'Compliance (Company-Wide)',
     'p-compliance-sub': 'NYC DOB permits, violations, and complaints across all your active job sites.',
     'p-compliance-placeholder': 'Company-wide compliance rollup — coming soon. Per-project compliance lives inside each project dashboard.',
-    'p-bid-title': 'Bid Tracker',
-    'p-bid-sub': 'Opportunities, estimates, and proposals.',
-    'p-bid-placeholder': 'Bid pipeline — coming soon.',
     'p-labor-rate-title': 'Labor Rate Tracker',
     'p-labor-rate-sub': 'Check-cutting sheet: weekly hours worked × hourly rate. Hours auto-populate from the daily reports — same source as the Hours Log.',
     'p-labor-rate-sample': 'SAMPLE DATA — placeholder rates only. Real rate entry + secure storage arrive with the auth/governance phase. Do not use these numbers for payroll.',
@@ -1539,7 +1675,7 @@ const I18N = {
     'tab-cert-health': 'Estado de Certificaciones',
     'tab-cert-library': 'Catálogo de Cert.',
     'tab-compliance': 'Cumplimiento',
-    'tab-bid': 'Seguimiento de Ofertas',
+    'tab-estimates': 'Presupuestos',
     'tab-labor-rate': 'Tarifa Laboral',
     'tab-specs': 'Especificaciones',
     'p-specs-title': 'Biblioteca de Especificaciones',
@@ -1592,9 +1728,6 @@ const I18N = {
     'p-compliance-title': 'Cumplimiento (Toda la Empresa)',
     'p-compliance-sub': 'Permisos, infracciones y quejas del NYC DOB para todos tus sitios activos.',
     'p-compliance-placeholder': 'Resumen de cumplimiento de toda la empresa — próximamente. El cumplimiento por proyecto está dentro de cada tablero de proyecto.',
-    'p-bid-title': 'Seguimiento de Ofertas',
-    'p-bid-sub': 'Oportunidades, estimaciones y propuestas.',
-    'p-bid-placeholder': 'Cartera de ofertas — próximamente.',
     'p-labor-rate-title': 'Seguimiento de Tarifa Laboral',
     'p-labor-rate-sub': 'Hoja de pagos: horas trabajadas semanales × tarifa por hora. Las horas se completan automáticamente desde los reportes diarios.',
     'p-labor-rate-sample': 'DATOS DE MUESTRA — tarifas ficticias solamente. La entrada real de tarifas + almacenamiento seguro llega con la fase de autenticación. No usar estos números para nómina.',
@@ -1843,6 +1976,7 @@ applyLanguage();
     if (target === 'labor-rate' && typeof window.LRT_loadGrid === 'function') window.LRT_loadGrid(null);
     if (target === 'specs' && typeof window.SPECS_loadCatalog === 'function') window.SPECS_loadCatalog();
     if (target === 'crm' && window.CRM) window.CRM.enter();
+  if (target === 'estimates' && window.EST) window.EST.enter();
   }
   $$('.nav-tab').forEach(t => t.addEventListener('click', () => {
     activatePanel(t.getAttribute('data-panel'));
@@ -4147,7 +4281,7 @@ applyLanguage();
 })();
 </script>
 
-<div class="container"><div class="ph-build" id="cc-build-stamp">build #266 · 2026-06-30 · CRM / Ops core — organizations + contacts + activity log + follow-up tasks + Needs-Attention, C-suite-gated & function-tagged (scale-ready); projects link to a client org</div></div>
+<div class="container"><div class="ph-build" id="cc-build-stamp">build #273 · 2026-07-04 · Estimates — general bid tracking ({TYPE}-{BORO}-{NNN}), documents, CRM-linked activity, one-click convert-to-project; C-suite-gated</div></div>
 
 <script>
 /* ===== Company console widgets (#210) — live data + reused #209 drag framework.
@@ -4656,6 +4790,395 @@ applyLanguage();
 
   window.CRM = {
     enter: function(){ wireOnce(); showView('orgs'); loadConsole(); loadOrgs(); }
+  };
+})();
+</script>
+
+<!-- #273 — ESTIMATES UI module (board -> detail; server-validated transitions; docs
+     via the gated by-id route; CRM-linked). #274 extends with Inspections + Calendar. -->
+<script>
+(function(){
+  var q = function(id){ return document.getElementById(id); };
+  function esc(s){ if(s==null) return ''; return String(s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  function cap(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : ''; }
+  function dOnly(s){ return (s||'').slice(0,10); }
+  function fmtD(s){ s=dOnly(s); if(!s) return '—'; return (window.SSCDatePicker && SSCDatePicker.fmtMDY(s)) || s; }
+  function fmtMoney(v){ if(v==null||v==='') return '—'; return '$'+Number(v).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2}); }
+  function fmtSize(n){ if(!n) return ''; if(n>1048576) return (n/1048576).toFixed(1)+' MB'; if(n>1024) return Math.round(n/1024)+' KB'; return n+' B'; }
+  function getISO(el){ return el ? (window.SSCDatePicker ? (SSCDatePicker.getISO(el)||'') : (el.value||'').trim()) : ''; }
+
+  async function api(method, path, body){
+    var opts = { method: method, credentials: 'include', headers: {} };
+    if (body !== undefined){ opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify(body); }
+    var r = await fetch(path, opts);
+    var j = null; try { j = await r.json(); } catch(e){}
+    if (!r.ok) throw new Error((j && j.error) || ('HTTP '+r.status));
+    return j ? j.data : null;
+  }
+
+  var inited = false, curId = null, meta = null, modalSave = null;
+  var BOARD_ORDER = ['intake','scoping','submitted','approved','lost'];
+  var GROUP_DOT = { intake:'var(--status-oat)', scoping:'#1b7f79', submitted:'#5a4fb8',
+                    approved:'var(--status-complete)', lost:'#b9bac2' };
+
+  function showView(name){
+    document.querySelectorAll('.est-view').forEach(function(v){ v.style.display = (v.getAttribute('data-estview')===name)?'':'none'; });
+    document.querySelectorAll('.est-subtab').forEach(function(t){ t.classList.toggle('active', t.getAttribute('data-estview')===name); });
+  }
+
+  async function ensureMeta(){
+    if (!meta) meta = await api('GET','/api/estimates/meta');
+    return meta;
+  }
+
+  // ---------- BOARD ----------
+  async function loadBoard(){
+    var host = q('est-board');
+    host.innerHTML = '<div class="est-empty">Loading…</div>';
+    try {
+      var d = await api('GET','/api/estimates');
+      var rows = d.estimates || [];
+      var byStatus = {};
+      rows.forEach(function(e){ (byStatus[e.status] = byStatus[e.status] || []).push(e); });
+      var html = BOARD_ORDER.map(function(st){
+        var items = byStatus[st] || [];
+        var cards = items.map(function(e){
+          return '<div class="est-card" data-est="'+e.id+'">'
+            + '<div class="est-card-code">'+esc(e.code)+'</div>'
+            + '<div class="est-card-org">'+esc(e.org_name||'—')+'</div>'
+            + '<div class="est-card-addr">'+esc(e.building_address||'')+'</div>'
+            + '<div class="est-card-row"><span class="est-type-chip">'+esc(e.est_type)+'</span>'
+            + (e.final_amount!=null ? '<span class="est-amount">'+fmtMoney(e.final_amount)+'</span>' : '')
+            + '</div>'
+            + '<div class="est-card-age">'+(e.age_days===0?'entered today':(e.age_days+'d in stage'))+'</div>'
+            + '</div>';
+        }).join('');
+        return '<div class="est-group">'
+          + '<div class="est-group-head"><span class="est-dot" style="background:'+GROUP_DOT[st]+';"></span>'
+          + '<h3>'+cap(st)+'</h3><span class="est-group-count">'+items.length+'</span></div>'
+          + (items.length ? '<div class="est-cards">'+cards+'</div>'
+                          : '<div class="est-empty" style="padding:10px;">Nothing in '+esc(st)+'.</div>')
+          + '</div>';
+      }).join('');
+      var nConv = (byStatus.converted||[]).length;
+      if (nConv) html += '<div class="est-empty" style="text-align:left;padding:4px 2px;">'+nConv+' converted estimate'+(nConv>1?'s':'')+' now live in Active Projects.</div>';
+      host.innerHTML = html;
+      host.querySelectorAll('.est-card[data-est]').forEach(function(c){
+        c.addEventListener('click', function(){ openEst(+c.getAttribute('data-est')); });
+      });
+    } catch(e){ host.innerHTML = '<div class="est-empty">'+esc(e.message)+'</div>'; }
+  }
+
+  // ---------- DETAIL ----------
+  var curDetail = null;
+
+  function kv(k, v){ return '<div class="est-kv"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'; }
+
+  async function openEst(id){
+    curId = id;
+    showView('detail');
+    q('est-info').innerHTML = '<div class="est-empty">Loading…</div>';
+    q('est-docs').innerHTML = ''; q('est-activity').innerHTML = '';
+    q('est-box-ira').style.display = 'none';
+    try {
+      var d = await api('GET','/api/estimates/'+id);
+      curDetail = d;
+      renderInfo(d);
+      renderDocs(d.documents);
+      renderActivity(d.client_activity);
+      if (d.estimate.est_type === 'IRA'){ q('est-box-ira').style.display=''; fillIra(d.ira||{}); }
+    } catch(e){ q('est-info').innerHTML = '<div class="est-empty">'+esc(e.message)+'</div>'; }
+  }
+
+  function transBtn(to, from){
+    var fwd = { intake:0, scoping:1, submitted:2, approved:3 };
+    var lbl;
+    if (to === 'lost') lbl = 'Mark lost';
+    else if (to === 'approved') lbl = 'Approve';
+    else if ((fwd[to]!=null) && (fwd[from]!=null) && fwd[to] > fwd[from]) lbl = '→ '+cap(to);
+    else lbl = '← '+cap(to);
+    var cls = (to === 'approved') ? 'btn-primary' : 'btn-ghost';
+    return '<button type="button" class="'+cls+'" style="padding:7px 13px;font-size:12px;" data-est-to="'+to+'">'+lbl+'</button>';
+  }
+
+  function renderInfo(d){
+    var e = d.estimate;
+    var html = '<h2>'+esc(e.code)+'</h2>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">'
+      + '<span class="est-badge st-'+esc(e.status)+'">'+esc(e.status)+'</span>'
+      + '<span class="est-type-chip" title="'+esc(e.type_label)+'">'+esc(e.est_type)+'</span></div>'
+      + '<div style="font-size:11px;color:var(--muted);">'+esc(e.type_label)+' · '+esc(e.borough)+'</div>'
+      + kv('Client', esc(e.org_name||'—'))
+      + kv('Contact', esc(e.contact_name||'—'))
+      + kv('Building address', esc(e.building_address||'—'))
+      + kv('QB estimate #', esc(e.qb_estimate_ref||'—'))
+      + kv('Final amount', fmtMoney(e.final_amount))
+      + kv('Submitted', fmtD(e.submitted_date))
+      + kv('Decided', fmtD(e.decided_date))
+      + (e.converted_project_code
+          ? kv('Project', '<a href="/projects/'+encodeURIComponent(e.converted_project_code)+'" style="color:var(--accent-ink);font-weight:700;text-decoration:none;">'+esc(e.converted_project_code)+' →</a>')
+          : '')
+      + kv('Age in stage', (e.age_days===0?'entered today':e.age_days+' days'))
+      + kv('Notes', esc(e.notes||'—'));
+    var flow = (d.allowed_transitions||[]).map(function(t){ return transBtn(t, e.status); }).join('');
+    if (d.convertible) flow += '<button type="button" class="btn-primary" style="padding:7px 13px;font-size:12px;" id="est-btn-convert">Convert to project</button>';
+    html += '<div class="est-flow">'+flow+'</div>';
+    html += '<div class="est-flow" style="margin-top:10px;">'
+      + (e.status!=='converted' ? '<button type="button" class="est-mini-btn" id="est-btn-edit">Edit</button>' : '')
+      + ((e.status!=='converted' && !(d.documents||[]).length) ? '<button type="button" class="est-mini-btn" id="est-btn-del" style="color:var(--brand-red);">Delete</button>' : '')
+      + '</div>';
+    q('est-info').innerHTML = html;
+    q('est-info').querySelectorAll('[data-est-to]').forEach(function(b){
+      b.addEventListener('click', function(){ transitionFlow(b.getAttribute('data-est-to')); });
+    });
+    var cv = q('est-btn-convert'); if (cv) cv.addEventListener('click', convertFlow);
+    var ed = q('est-btn-edit');   if (ed) ed.addEventListener('click', editModal);
+    var dl = q('est-btn-del');    if (dl) dl.addEventListener('click', deleteFlow);
+  }
+
+  function renderDocs(docs){
+    var host = q('est-docs');
+    if (!docs || !docs.length){ host.innerHTML = '<div class="est-empty">No documents yet.</div>'; return; }
+    host.innerHTML = docs.map(function(x){
+      return '<div class="est-doc-row">'
+        + '<span class="est-cat-chip">'+esc(x.category.replace('_',' '))+'</span>'
+        + '<a class="est-doc-title" href="'+esc(x.file_url)+'" target="_blank" rel="noopener">'+esc(x.title||x.file_name)+'</a>'
+        + '<span class="est-doc-meta">'+esc(x.doc_type||'')+' · '+fmtSize(x.file_size)+' · '+fmtD(x.uploaded_at)+'</span>'
+        + '</div>';
+    }).join('');
+  }
+
+  function renderActivity(acts){
+    var host = q('est-activity');
+    if (!acts || !acts.length){ host.innerHTML = '<div class="est-empty">No activity yet.</div>'; return; }
+    host.innerHTML = acts.map(function(a){
+      return '<div class="est-act-row">'+esc(a.summary||a.activity_type)
+        + ' <span class="est-act-when">· '+fmtD(a.occurred_at)
+        + (a.function_tag ? ' · '+esc(a.function_tag) : '')+'</span></div>';
+    }).join('');
+  }
+
+  function fillIra(ira){
+    q('est-ira-email').value = ira.dob_registered_email || '';
+    q('est-ira-eng').value = ira.engineer_name || '';
+    q('est-ira-mode').value = ira.scope_mode || '';
+    q('est-ira-scope').value = (ira.scope_value!=null ? ira.scope_value : '');
+    q('est-ira-calc').value = (ira.internal_drop_calc!=null ? ira.internal_drop_calc : '');
+  }
+
+  async function saveIra(){
+    if (!curId) return;
+    var btn = q('est-ira-save'); btn.disabled = true;
+    try {
+      await api('PUT','/api/estimates/'+curId+'/ira', {
+        dob_registered_email: q('est-ira-email').value.trim() || null,
+        engineer_name: q('est-ira-eng').value.trim() || null,
+        scope_mode: q('est-ira-mode').value || null,
+        scope_value: q('est-ira-scope').value.trim() || null,
+        internal_drop_calc: q('est-ira-calc').value.trim() || null
+      });
+      btn.textContent = 'Saved ✓';
+      setTimeout(function(){ btn.textContent = 'Save IRA details'; }, 1400);
+    } catch(e){ alert(e.message); }
+    finally { btn.disabled = false; }
+  }
+
+  // ---------- modal plumbing (mirrors the CRM shell) ----------
+  function openModal(title, bodyHtml, onSave, saveLabel){
+    q('est-modal-title').textContent = title;
+    q('est-modal-body').innerHTML = bodyHtml + '<div class="est-err" id="est-modal-err"></div>';
+    q('est-modal-save').textContent = saveLabel || 'Save';
+    modalSave = onSave;
+    q('est-modal-bg').classList.add('show');
+    if (window.SSCDatePicker){ q('est-modal-body').querySelectorAll('input.ssc-date').forEach(function(el){ SSCDatePicker.wire(el); }); }
+    var first = q('est-modal-body').querySelector('input,select,textarea'); if(first) try{ first.focus(); }catch(e){}
+  }
+  function closeModal(){ q('est-modal-bg').classList.remove('show'); q('est-modal-body').innerHTML=''; modalSave = null; }
+  function modalErr(msg){ var e=q('est-modal-err'); if(e){ e.textContent=msg; e.classList.add('show'); } }
+
+  // ---------- flows ----------
+  function fieldSel(id, label, opts){
+    return '<div class="est-field"><label>'+label+'</label><select class="ssc-field" id="'+id+'">'+opts+'</select></div>';
+  }
+
+  async function newEstimateModal(){
+    var m = await ensureMeta();
+    var orgs = await api('GET','/api/crm/organizations');
+    var typeOpts = m.types.map(function(t){ return '<option value="'+esc(t.code)+'">'+esc(t.code)+' — '+esc(t.label)+'</option>'; }).join('');
+    var boroOpts = m.boroughs.map(function(b){ return '<option value="'+esc(b)+'">'+esc(b)+'</option>'; }).join('');
+    var orgOpts = '<option value="">Choose client…</option>'
+      + orgs.map(function(o){ return '<option value="'+o.id+'">'+esc(o.name)+'</option>'; }).join('')
+      + '<option value="__new__">+ New organization…</option>';
+    openModal('New estimate',
+      '<div class="est-field-row">'
+      +   fieldSel('f-est-type','Type *', typeOpts)
+      +   fieldSel('f-est-boro','Borough *', boroOpts)
+      + '</div>'
+      + fieldSel('f-est-org','Client organization *', orgOpts)
+      + '<div class="est-field" id="f-est-neworg-wrap" style="display:none;"><label>New organization name *</label><input class="ssc-field" id="f-est-neworg" placeholder="Organization name"></div>'
+      + fieldSel('f-est-contact','Contact', '<option value="">—</option>')
+      + '<div class="est-field"><label>Building address</label><input class="ssc-field" id="f-est-addr" placeholder="Street address"></div>'
+      + '<div class="est-field"><label>Notes</label><textarea class="ssc-field" id="f-est-notes" rows="2" style="height:auto;"></textarea></div>',
+      async function(){
+        var orgSel = q('f-est-org').value;
+        var orgId = null;
+        if (orgSel === '__new__'){
+          var name = q('f-est-neworg').value.trim();
+          if (!name){ modalErr('New organization needs a name.'); return false; }
+          var no = await api('POST','/api/crm/organizations',{ name:name, relationship_type:'client' });
+          orgId = no.id;
+        } else if (orgSel){ orgId = +orgSel; }
+        if (!orgId){ modalErr('Pick or create the client organization.'); return false; }
+        var body = {
+          est_type: q('f-est-type').value, borough: q('f-est-boro').value,
+          client_org_id: orgId,
+          contact_id: q('f-est-contact').value ? +q('f-est-contact').value : null,
+          building_address: q('f-est-addr').value.trim() || null,
+          notes: q('f-est-notes').value.trim() || null
+        };
+        var est = await api('POST','/api/estimates', body);
+        closeModal(); openEst(est.id);
+        return false;   // we already closed + navigated
+      }, 'Create');
+    q('f-est-org').addEventListener('change', async function(){
+      var v = q('f-est-org').value;
+      q('f-est-neworg-wrap').style.display = (v==='__new__') ? '' : 'none';
+      var cSel = q('f-est-contact');
+      cSel.innerHTML = '<option value="">—</option>';
+      if (v && v!=='__new__'){
+        try {
+          var cs = await api('GET','/api/crm/contacts?org_id='+v);
+          cSel.innerHTML = '<option value="">—</option>' + cs.map(function(c){ return '<option value="'+c.id+'">'+esc(c.full_name)+'</option>'; }).join('');
+        } catch(e){}
+      }
+    });
+  }
+
+  function transitionFlow(to){
+    if (!curDetail) return;
+    var e = curDetail.estimate;
+    if (to === 'scoping' || to === 'intake'){
+      api('POST','/api/estimates/'+curId+'/status',{ status: to })
+        .then(function(){ openEst(curId); })
+        .catch(function(err){ alert(err.message); });
+      return;
+    }
+    var dateField = '<div class="est-field"><label>Date</label><input class="ssc-date ssc-field" id="f-tr-date" placeholder="MM/DD/YYYY"></div>';
+    if (to === 'submitted'){
+      openModal('Mark submitted', dateField, async function(){
+        await api('POST','/api/estimates/'+curId+'/status',{ status:'submitted', date: getISO(q('f-tr-date')) || null });
+        closeModal(); openEst(curId); return false;
+      }, 'Mark submitted');
+    } else if (to === 'lost'){
+      openModal('Mark lost', dateField, async function(){
+        await api('POST','/api/estimates/'+curId+'/status',{ status:'lost', date: getISO(q('f-tr-date')) || null });
+        closeModal(); openEst(curId); return false;
+      }, 'Mark lost');
+    } else if (to === 'approved'){
+      openModal('Approve estimate',
+        '<div class="est-field"><label>Final amount *</label><input class="ssc-field" id="f-tr-amount" type="number" step="0.01" min="0" value="'+(e.final_amount!=null?e.final_amount:'')+'"></div>'
+        + '<div class="est-field"><label>QB estimate # *</label><input class="ssc-field" id="f-tr-qb" value="'+esc(e.qb_estimate_ref||'')+'"></div>'
+        + dateField,
+        async function(){
+          var amt = q('f-tr-amount').value.trim();
+          var ref = q('f-tr-qb').value.trim();
+          if (!amt || !ref){ modalErr('Approval requires the final amount and the QB estimate reference.'); return false; }
+          await api('POST','/api/estimates/'+curId+'/status',
+            { status:'approved', final_amount:+amt, qb_estimate_ref:ref, date: getISO(q('f-tr-date')) || null });
+          closeModal(); openEst(curId); return false;
+        }, 'Approve');
+    }
+  }
+
+  function convertFlow(){
+    if (!curDetail) return;
+    var e = curDetail.estimate;
+    openModal('Convert to project',
+      '<div style="font-size:13px;color:var(--ink);line-height:1.6;">Creates project <b style="color:var(--brand-red);">'+esc(e.code)+'</b> in Active Projects (name: '+esc(e.building_address||e.code)+'). The estimate becomes read-only.</div>',
+      async function(){
+        var r = await api('POST','/api/estimates/'+curId+'/convert');
+        closeModal(); openEst(curId);
+        return false;
+      }, 'Convert');
+  }
+
+  function editModal(){
+    if (!curDetail) return;
+    var e = curDetail.estimate;
+    openModal('Edit estimate',
+      '<div class="est-field"><label>Building address</label><input class="ssc-field" id="f-ed-addr" value="'+esc(e.building_address||'')+'"></div>'
+      + '<div class="est-field-row">'
+      + '<div class="est-field"><label>QB estimate #</label><input class="ssc-field" id="f-ed-qb" value="'+esc(e.qb_estimate_ref||'')+'"></div>'
+      + '<div class="est-field"><label>Final amount</label><input class="ssc-field" id="f-ed-amount" type="number" step="0.01" min="0" value="'+(e.final_amount!=null?e.final_amount:'')+'"></div>'
+      + '</div>'
+      + '<div class="est-field"><label>Notes</label><textarea class="ssc-field" id="f-ed-notes" rows="2" style="height:auto;">'+esc(e.notes||'')+'</textarea></div>',
+      async function(){
+        await api('PUT','/api/estimates/'+curId, {
+          building_address: q('f-ed-addr').value.trim() || null,
+          qb_estimate_ref: q('f-ed-qb').value.trim() || null,
+          final_amount: q('f-ed-amount').value.trim() || null,
+          notes: q('f-ed-notes').value.trim() || null
+        });
+        closeModal(); openEst(curId); return false;
+      });
+  }
+
+  function deleteFlow(){
+    if (!curDetail) return;
+    var e = curDetail.estimate;
+    openModal('Delete estimate',
+      '<div style="font-size:13px;color:var(--ink);line-height:1.6;">Delete <b>'+esc(e.code)+'</b>? Only possible while it has no documents. This cannot be undone.</div>',
+      async function(){
+        await api('DELETE','/api/estimates/'+curId);
+        closeModal(); curId=null; showView('board'); loadBoard(); return false;
+      }, 'Delete');
+  }
+
+  async function uploadDocModal(){
+    if (!curId) return;
+    var m = await ensureMeta();
+    var catOpts = m.doc_categories.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c.replace('_',' '))+'</option>'; }).join('');
+    openModal('Upload document',
+      fieldSel('f-doc-cat','Category *', catOpts)
+      + '<div class="est-field"><label>Title</label><input class="ssc-field" id="f-doc-title" placeholder="Defaults to the file name"></div>'
+      + '<div class="est-field"><label>File *</label><input class="ssc-field" id="f-doc-file" type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,.xlsx" style="padding:7px;"></div>',
+      async function(){
+        var f = q('f-doc-file').files[0];
+        if (!f){ modalErr('Choose a file.'); return false; }
+        var fd = new FormData();
+        fd.append('file', f);
+        fd.append('category', q('f-doc-cat').value);
+        if (q('f-doc-title').value.trim()) fd.append('title', q('f-doc-title').value.trim());
+        var r = await fetch('/api/estimates/'+curId+'/documents', { method:'POST', credentials:'include', body: fd });
+        var j = null; try { j = await r.json(); } catch(e){}
+        if (!r.ok) throw new Error((j && j.error) || ('HTTP '+r.status));
+        closeModal(); openEst(curId); return false;
+      }, 'Upload');
+  }
+
+  function wireOnce(){
+    if (inited) return;
+    inited = true;
+    q('est-btn-new').addEventListener('click', function(){ newEstimateModal().catch(function(e){ alert(e.message); }); });
+    q('est-back').addEventListener('click', function(){ curId=null; showView('board'); loadBoard(); });
+    q('est-doc-add').addEventListener('click', function(){ uploadDocModal().catch(function(e){ alert(e.message); }); });
+    q('est-ira-save').addEventListener('click', saveIra);
+    q('est-modal-x').addEventListener('click', closeModal);
+    q('est-modal-cancel').addEventListener('click', closeModal);
+    q('est-modal-bg').addEventListener('click', function(e){ if(e.target===q('est-modal-bg')) closeModal(); });
+    q('est-modal-save').addEventListener('click', async function(){
+      if (!modalSave) return;
+      var btn = q('est-modal-save'); btn.disabled = true;
+      try {
+        var ok = await modalSave();
+        if (ok !== false) closeModal();
+      } catch(e){ modalErr(e.message || 'Could not save.'); }
+      finally { btn.disabled = false; }
+    });
+  }
+
+  window.EST = {
+    enter: function(){ wireOnce(); showView('board'); loadBoard(); }
   };
 })();
 </script>
