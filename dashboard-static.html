@@ -778,7 +778,7 @@
 <!-- #211 calm-blue widget accent — applied via the SHARED widgets.css, loaded
      AFTER the inline #208 styles so the accent (blue band + inward shading + blue
      rings) wins, giving the project page + the company console one source of truth. -->
-<link rel="stylesheet" href="/files/static/css/widgets.css?v=271">
+<link rel="stylesheet" href="/files/static/css/widgets.css?v=272">
 </head>
 <body>
 <!-- #212 nav icons — inline SVG <symbol> defs (defined ONCE, used via <use>).
@@ -3778,10 +3778,182 @@
 
       <!-- MATERIALS & DELIVERIES -->
       <section class="view" data-view="materials">
-        <div class="section">
-          <h2>Materials & Deliveries</h2>
-          <div class="placeholder-card">Materials log & delivery tracking · Coming with Phase 2B</div>
+        <style>
+          /* #272a — Materials & Deliveries (per the approved A+B mockup). Tokens from
+             :root (widgets.css); mt- namespaced. Burn/days-left/order-by chips are
+             #272b — cards deliberately carry NO estimates beyond ledger on-hand. */
+          .mt-wrap{--mt-line:var(--line,#eceef3);--mt-muted:var(--muted,#8c92a0);--mt-ink:var(--ink,#222633);
+                   --mt-accent:var(--accent,#4364dc);--mt-accent-ink:var(--accent-ink,#3a5fd0);
+                   --mt-accent-soft:var(--accent-soft,#ebf0fe);--mt-accent-edge:var(--accent-edge,rgba(67,100,220,.30));}
+          .mt-head{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+          .mt-head h2{font-size:16px;font-weight:800;margin:0;}
+          .mt-head .mt-sub{font-size:11.5px;color:var(--mt-muted);}
+          .mt-head .mt-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;}
+          .mt-btn-ghost{font-size:12px;font-weight:700;padding:7px 13px;border-radius:8px;border:1px solid var(--mt-line);background:#fff;color:var(--mt-ink);cursor:pointer;}
+          .mt-btn-ghost:hover{border-color:var(--mt-accent-edge);}
+          .mt-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:12px;margin-bottom:16px;}
+          .mt-card{background:#fff;border:1px solid var(--mt-line);border-radius:14px;padding:15px 16px;}
+          .mt-card .nm{font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px;}
+          .mt-card .nm .pin{font-size:10px;color:var(--mt-accent-ink);}
+          .mt-card .unit{font-size:10.5px;color:var(--mt-muted);font-weight:600;margin-top:2px;}
+          .mt-card .row{display:flex;align-items:baseline;gap:8px;margin-top:12px;}
+          .mt-card .qty{font-size:26px;font-weight:800;line-height:1;}
+          .mt-card .qlbl{font-size:10.5px;color:var(--mt-muted);font-weight:700;}
+          .mt-card .meta{font-size:10.5px;color:var(--mt-muted);font-weight:600;margin-top:9px;line-height:1.7;}
+          .mt-table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--mt-line);border-radius:14px;overflow:hidden;}
+          .mt-table th,.mt-table td{text-align:left;padding:10px 13px;font-size:12.5px;border-bottom:1px solid var(--mt-line);vertical-align:middle;}
+          .mt-table th{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--mt-muted);font-weight:700;background:#fcfcfd;}
+          .mt-table tr:last-child td{border-bottom:none;}
+          .mt-table td.num{font-weight:800;font-variant-numeric:tabular-nums;}
+          .mt-table .un{color:var(--mt-muted);font-size:11px;font-weight:600;}
+          .mt-empty{border:1px dashed var(--mt-line);border-radius:14px;padding:34px 20px;text-align:center;color:var(--mt-muted);font-size:13px;background:#fff;line-height:1.7;}
+          .mt-panel{background:#fff;border:1px solid var(--mt-line);border-radius:14px;overflow:hidden;margin-top:14px;}
+          .mt-panel .ph{padding:11px 16px;border-bottom:1px solid var(--mt-line);font-size:12px;font-weight:800;background:#fcfcfd;display:flex;align-items:center;gap:8px;}
+          .mt-panel .ph .mini{margin-left:auto;font-size:11px;font-weight:700;color:var(--mt-accent-ink);cursor:pointer;background:none;border:none;}
+          .mt-row{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--mt-line);font-size:12.5px;}
+          .mt-row:last-child{border-bottom:none;}
+          .mt-chip{flex:none;font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;border-radius:6px;padding:3px 8px;}
+          .mt-chip.ordered{color:#5b6270;background:#eef0f4;}
+          .mt-chip.confirmed{color:var(--mt-accent-ink);background:var(--mt-accent-soft);}
+          .mt-chip.arriving{color:#0c7a5f;background:var(--status-complete-soft,#e7f6f0);}
+          .mt-chip.delivery{color:#0c7a5f;background:var(--status-complete-soft,#e7f6f0);}
+          .mt-chip.pickup{color:var(--mt-accent-ink);background:var(--mt-accent-soft);}
+          .mt-chip.return,.mt-chip.writeoff{color:#a23b30;background:var(--status-behind-soft,#fdeeec);}
+          .mt-chip.count_adjust{color:#5b6270;background:#eef0f4;}
+          .mt-chip.transfer_out,.mt-chip.transfer_in{color:#7a4fbf;background:#f1eafc;}
+          .mt-row .det{flex:1;min-width:0;}
+          .mt-row .dt{flex:none;color:var(--mt-muted);font-size:11px;font-weight:600;}
+          .mt-row a{flex:none;font-size:11px;font-weight:700;color:var(--mt-accent-ink);text-decoration:none;cursor:pointer;}
+          .mt-count-row{display:flex;align-items:center;gap:10px;padding:6px 16px;font-size:12.5px;}
+          .mt-count-row .cn{flex:1;font-weight:600;}
+          .mt-count-row input{width:96px;height:32px;border:1px solid var(--mt-line);border-radius:8px;padding:0 9px;font:inherit;font-size:13px;text-align:right;}
+          .mt-count-row .cu{width:82px;font-size:10.5px;color:var(--mt-muted);font-weight:600;}
+          .mt-count-row .drift{font-size:10.5px;font-weight:700;width:110px;text-align:right;}
+          .mt-count-foot{display:flex;justify-content:flex-end;padding:10px 16px 14px;}
+          .mt-overlay{position:fixed;inset:0;background:rgba(20,22,30,.30);display:none;align-items:flex-start;justify-content:center;padding:48px 16px;overflow:auto;z-index:1200;}
+          .mt-overlay.show{display:flex;}
+          .mt-modal{position:relative;width:440px;max-width:100%;background:#fff;border-radius:18px;box-shadow:0 24px 60px rgba(20,25,40,.28);padding:22px;color:var(--mt-ink);}
+          .mt-modal h3{margin:0 0 2px;font-size:16px;}
+          .mt-msub{color:var(--mt-muted);font-size:12px;margin-bottom:14px;}
+          .mt-fld{margin-bottom:11px;}
+          .mt-fld label{display:block;color:var(--mt-muted);font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:5px;}
+          .mt-fld input,.mt-fld select{width:100%;height:36px;border:1px solid var(--mt-line);border-radius:9px;padding:0 11px;font:inherit;font-size:13px;background:#fff;color:var(--mt-ink);}
+          .mt-fld .hint{font-size:10.5px;color:var(--mt-muted);margin-top:4px;}
+          .mt-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+          .mt-mfoot{display:flex;justify-content:flex-end;gap:9px;margin-top:16px;}
+          .mt-seg{display:flex;border:1px solid var(--mt-line);border-radius:9px;overflow:hidden;margin-bottom:13px;}
+          .mt-seg span{flex:1;text-align:center;font-size:11.5px;font-weight:700;padding:8px 0;color:var(--mt-muted);cursor:pointer;user-select:none;}
+          .mt-seg span.on{background:var(--mt-accent-soft);color:var(--mt-accent-ink);}
+          .mt-err{color:#a23b30;font-size:12px;margin-top:8px;min-height:14px;}
+          .mt-pintog{cursor:pointer;font-size:14px;background:none;border:none;padding:2px 6px;}
+          .mt-hide{display:none!important;}
+        </style>
+        <div class="mt-wrap">
+          <div class="mt-head">
+            <div><h2>Materials &amp; Deliveries</h2><div class="mt-sub" id="mt-sub">—</div></div>
+            <div class="mt-actions">
+              <button class="mt-btn-ghost" id="mt-btn-count">Weekly count</button>
+              <button class="mt-btn-ghost" id="mt-btn-transfer">Transfer</button>
+              <button class="mt-btn-ghost" id="mt-btn-add">+ Add material</button>
+              <button class="btn-primary" id="mt-btn-log">+ Log delivery / pickup</button>
+            </div>
+          </div>
+          <div id="mt-pinned" class="mt-cards"></div>
+          <div id="mt-catalog"></div>
+          <div class="mt-panel" id="mt-expected-panel">
+            <div class="ph">Expected deliveries <button class="mini" id="mt-btn-expected">+ Expected</button></div>
+            <div id="mt-expected"></div>
+          </div>
+          <div class="mt-panel mt-hide" id="mt-count-panel">
+            <div class="ph">Weekly count — pinned items <span style="margin-left:8px;font-weight:600;color:var(--mt-muted);font-size:11px;">type what you actually see; the ledger reconciles</span></div>
+            <div id="mt-count-rows"></div>
+            <div class="mt-count-foot"><button class="btn-primary" id="mt-count-save">Save count — reconcile</button></div>
+          </div>
+          <div class="mt-panel">
+            <div class="ph">Material activity</div>
+            <div id="mt-activity"></div>
+          </div>
+          <div id="mt-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #272 · 2026-07-04 · Materials &amp; Deliveries — per-project catalog · delivery/pickup/transfer ledger · expected deliveries · weekly count (consumption &amp; reorder = #272b)</div>
         </div>
+
+        <!-- modals -->
+        <div class="mt-overlay" id="mt-modal-log"><div class="mt-modal">
+          <h3 id="mt-log-title">Log material in</h3><div class="mt-msub" id="mt-log-sub"></div>
+          <div class="mt-seg" id="mt-log-seg">
+            <span data-t="delivery" class="on">Delivery received</span><span data-t="pickup">Self-pickup</span><span data-t="return">Return / credit</span>
+          </div>
+          <div class="mt-fld"><label>Material</label><select id="mt-log-mat"></select></div>
+          <div class="mt-grid2">
+            <div class="mt-fld"><label>Quantity</label><input id="mt-log-qty" inputmode="decimal"></div>
+            <div class="mt-fld"><label>Unit</label><select id="mt-log-unit"></select></div>
+          </div>
+          <div class="mt-grid2">
+            <div class="mt-fld"><label>Vendor</label><input id="mt-log-vendor" placeholder="optional"></div>
+            <div class="mt-fld"><label>Date</label><input type="date" id="mt-log-date"></div>
+          </div>
+          <div class="mt-fld"><label>Packing slip / receipt</label><input type="file" id="mt-log-slip" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif"><div class="hint">optional — stored gated, viewable from the activity log</div></div>
+          <div class="mt-err" id="mt-log-err"></div>
+          <div class="mt-mfoot"><button class="mt-btn-ghost" data-close="mt-modal-log">Cancel</button><button class="btn-primary" id="mt-log-save">Save</button></div>
+        </div></div>
+
+        <div class="mt-overlay" id="mt-modal-mat"><div class="mt-modal">
+          <h3 id="mt-mat-title">Add material</h3><div class="mt-msub">Your catalog, your names — nothing is preloaded.</div>
+          <div class="mt-fld"><label>Name</label><input id="mt-mat-name" placeholder="e.g. what the crew calls it"></div>
+          <div class="mt-grid2">
+            <div class="mt-fld"><label>Base unit (counted in)</label><select id="mt-mat-base"></select></div>
+            <div class="mt-fld"><label>Purchase unit (optional)</label><select id="mt-mat-purch"></select></div>
+          </div>
+          <div class="mt-grid2">
+            <div class="mt-fld"><label>Pack conversion</label><input id="mt-mat-pack" inputmode="decimal" placeholder="e.g. 56"><div class="hint" id="mt-mat-packhint">1 purchase unit = N base units</div></div>
+            <div class="mt-fld"><label>Lead time (days, optional)</label><input id="mt-mat-lead" inputmode="numeric"></div>
+          </div>
+          <div class="mt-grid2">
+            <div class="mt-fld"><label>Default vendor (optional)</label><input id="mt-mat-vendor"></div>
+            <div class="mt-fld"><label>Category (optional)</label><input id="mt-mat-cat"></div>
+          </div>
+          <div class="mt-fld"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:12.5px;color:var(--mt-ink);"><input type="checkbox" id="mt-mat-pinned" style="width:15px;height:15px;"> Pinned — show on the card board + weekly count</label></div>
+          <div class="mt-err" id="mt-mat-err"></div>
+          <div class="mt-mfoot"><button class="mt-btn-ghost" data-close="mt-modal-mat">Cancel</button><button class="btn-primary" id="mt-mat-save">Save material</button></div>
+        </div></div>
+
+        <div class="mt-overlay" id="mt-modal-transfer"><div class="mt-modal">
+          <h3>Transfer between projects</h3><div class="mt-msub">Writes both sides atomically — nothing is lost in transit.</div>
+          <div class="mt-fld"><label>Material</label><select id="mt-tr-mat"></select></div>
+          <div class="mt-fld"><label>To project</label><select id="mt-tr-dest"></select></div>
+          <div class="mt-grid2">
+            <div class="mt-fld"><label>Quantity</label><input id="mt-tr-qty" inputmode="decimal"></div>
+            <div class="mt-fld"><label>Unit</label><select id="mt-tr-unit"></select></div>
+          </div>
+          <div class="mt-grid2">
+            <div class="mt-fld"><label>Date</label><input type="date" id="mt-tr-date"></div>
+            <div class="mt-fld"><label>Note (optional)</label><input id="mt-tr-note"></div>
+          </div>
+          <div class="mt-err" id="mt-tr-err"></div>
+          <div class="mt-mfoot"><button class="mt-btn-ghost" data-close="mt-modal-transfer">Cancel</button><button class="btn-primary" id="mt-tr-save">Transfer</button></div>
+        </div></div>
+
+        <div class="mt-overlay" id="mt-modal-expected"><div class="mt-modal">
+          <h3>Expected delivery</h3><div class="mt-msub">A heads-up row — mark it received in one step when the truck shows up.</div>
+          <div class="mt-fld"><label>Material (optional — general orders allowed)</label><select id="mt-ex-mat"></select></div>
+          <div class="mt-fld"><label>Description</label><input id="mt-ex-desc" placeholder="what's coming"></div>
+          <div class="mt-grid2">
+            <div class="mt-fld"><label>Quantity (optional)</label><input id="mt-ex-qty" inputmode="decimal"></div>
+            <div class="mt-fld"><label>Unit (optional)</label><select id="mt-ex-unit"></select></div>
+          </div>
+          <div class="mt-grid2">
+            <div class="mt-fld"><label>Vendor</label><input id="mt-ex-vendor"></div>
+            <div class="mt-fld"><label>Expected date</label><input type="date" id="mt-ex-date"></div>
+          </div>
+          <div class="mt-err" id="mt-ex-err"></div>
+          <div class="mt-mfoot"><button class="mt-btn-ghost" data-close="mt-modal-expected">Cancel</button><button class="btn-primary" id="mt-ex-save">Save expected</button></div>
+        </div></div>
+
+        <div class="mt-overlay" id="mt-modal-copy"><div class="mt-modal">
+          <h3>Copy catalog from another project</h3><div class="mt-msub">Copies the material definitions only — never transactions. Existing names are skipped.</div>
+          <div class="mt-fld"><label>Source project</label><select id="mt-cp-src"></select></div>
+          <div class="mt-err" id="mt-cp-err"></div>
+          <div class="mt-mfoot"><button class="mt-btn-ghost" data-close="mt-modal-copy">Cancel</button><button class="btn-primary" id="mt-cp-save">Copy catalog</button></div>
+        </div></div>
       </section>
 
       <!-- MEETING MINUTES -->
@@ -7344,6 +7516,363 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
 
   document.querySelectorAll('.nav-link[data-view="documents"]').forEach(function(l){l.addEventListener('click',loadDocs);});
   if(document.querySelector('section[data-view="documents"].active'))loadDocs();
+})();
+</script>
+
+<script>
+/* #272a — Materials & Deliveries: catalog + ledger + expected + weekly count.
+   NOTHING hardcoded (operator's catalog rule): names/vendors come only from what the
+   operator types; units come from the server (the expense taxonomy enum). On-hand is
+   the server's derived SUM — this UI never computes stock, only displays it.
+   Burn/days-left/order-by chips belong to #272b and are deliberately absent. */
+(function(){
+  var pc=(location.pathname.match(/\/projects\/([^\/]+)/)||[])[1];
+  var PROJECT_CODE = pc ? decodeURIComponent(pc) : 'FR-BX-001';
+  function $(id){return document.getElementById(id);}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
+  function jget(u){return fetch(u,{credentials:'include'}).then(function(r){return r.json();});}
+  function mdy(iso){if(!iso)return '—';var m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?(m[2]+'/'+m[3]+'/'+m[1]):iso;}
+  function mdyShort(iso){var m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?(m[2]+'/'+m[3]):'—';}
+  function todayLocal(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function fmtQ(n){if(n==null)return '—';return (Math.round(n*100)/100).toLocaleString();}
+
+  var MT={mats:[],units:[],expected:[],txns:[],projects:[],wired:false,logType:'delivery',editId:null,receiveExp:null};
+  function byId(id){return (MT.mats||[]).find(function(m){return m.id===id;});}
+
+  async function loadAll(){
+    mtWire();
+    try{
+      var base='/api/projects/'+encodeURIComponent(PROJECT_CODE);
+      var rs=await Promise.all([jget(base+'/materials'),jget(base+'/expected-deliveries'),jget(base+'/material-txns?limit=40'),jget('/api/projects')]);
+      MT.mats=(rs[0].data&&rs[0].data.materials)||[];
+      MT.units=(rs[0].data&&rs[0].data.units)||[];
+      MT.expected=(rs[1].data&&rs[1].data.expected)||[];
+      MT.txns=(rs[2].data&&rs[2].data.txns)||[];
+      MT.projects=(rs[3].data||[]).filter(function(p){return p.project_code!==PROJECT_CODE&&(p.status||'active')!=='closed';});
+      renderAll();
+    }catch(e){console.warn('[materials] load failed',e);var h=$('mt-catalog');if(h)h.innerHTML='<div class="mt-empty">Could not load materials.</div>';}
+  }
+  function renderAll(){
+    var pinned=MT.mats.filter(function(m){return m.pinned;});
+    $('mt-sub').textContent=MT.mats.length?('tracked items: '+pinned.length+' pinned · '+MT.mats.length+' total'):'nothing tracked yet';
+    renderPinned(pinned); renderCatalog(); renderExpected(); renderCount(pinned); renderActivity();
+  }
+
+  function cardMeta(m){
+    var last=m.last_delivery?('last delivery '+mdyShort(m.last_delivery.date)):'no deliveries yet';
+    var next=m.next_expected?('next expected '+mdyShort(m.next_expected.date)+' · '+m.next_expected.status):'nothing expected';
+    return '<div class="meta">'+esc(last)+'<br>'+esc(next)+'</div>';
+  }
+  function unitLine(m){
+    var u=esc(m.base_unit);
+    if(m.purchase_unit&&m.pack_qty>1)u+=' · '+esc(m.purchase_unit)+' = '+fmtQ(m.pack_qty);
+    return u;
+  }
+  function renderPinned(pinned){
+    var host=$('mt-pinned');
+    if(!pinned.length){host.innerHTML='';return;}
+    host.innerHTML=pinned.map(function(m){
+      return '<div class="mt-card"><div class="nm"><span class="pin" title="Pinned — on the weekly count">📌</span>'+esc(m.name)+'</div>'
+        +'<div class="unit">'+unitLine(m)+'</div>'
+        +'<div class="row"><span class="qty">'+fmtQ(m.on_hand)+'</span><span class="qlbl">'+esc(m.base_unit)+' on hand</span></div>'
+        +cardMeta(m)+'</div>';
+    }).join('');
+  }
+  function renderCatalog(){
+    var host=$('mt-catalog');
+    if(!MT.mats.length){
+      host.innerHTML='<div class="mt-empty"><b>No materials yet.</b><br>Add your first material, or copy a catalog from another project.<br><br>'
+        +'<button class="mt-btn-ghost" id="mt-empty-add">+ Add material</button> '
+        +'<button class="mt-btn-ghost" id="mt-empty-copy">Copy catalog from another project</button></div>';
+      var a=$('mt-empty-add');if(a)a.onclick=function(){openMat(null);};
+      var c=$('mt-empty-copy');if(c)c.onclick=openCopy;
+      return;
+    }
+    host.innerHTML='<table class="mt-table"><thead><tr><th>Material</th><th>On hand</th><th>Last delivery</th><th>Next expected</th><th>Pinned</th><th></th></tr></thead><tbody>'
+      +MT.mats.map(function(m){
+        var last=m.last_delivery?(mdy(m.last_delivery.date)+' · '+fmtQ(m.last_delivery.qty)+' '+esc(m.base_unit)+(m.last_delivery.vendor?(' · '+esc(m.last_delivery.vendor)):'')):'—';
+        var next=m.next_expected?(mdy(m.next_expected.date)+' · '+esc(m.next_expected.status)+(m.next_expected.vendor?(' · '+esc(m.next_expected.vendor)):'')):'—';
+        return '<tr><td><span class="nm">'+esc(m.name)+'</span> <span class="un">· '+unitLine(m)+'</span></td>'
+          +'<td class="num">'+fmtQ(m.on_hand)+'</td><td>'+last+'</td><td>'+next+'</td>'
+          +'<td><button class="mt-pintog" data-pin="'+m.id+'" title="'+(m.pinned?'Unpin':'Pin to the board + weekly count')+'">'+(m.pinned?'📌':'○')+'</button></td>'
+          +'<td><a data-edit="'+m.id+'">edit</a></td></tr>';
+      }).join('')+'</tbody></table>';
+  }
+  function renderExpected(){
+    var host=$('mt-expected');
+    if(!MT.expected.length){host.innerHTML='<div class="mt-row" style="color:var(--mt-muted);">Nothing on the way — add one with + Expected.</div>';return;}
+    host.innerHTML=MT.expected.map(function(x){
+      var what=x.material_name?esc(x.material_name):esc(x.description||'General order');
+      var qty=x.qty?(fmtQ(x.qty)+(x.unit?(' '+esc(x.unit)):'')+' '):'';
+      return '<div class="mt-row"><span class="mt-chip '+esc(x.status)+'">'+esc(x.status)+'</span>'
+        +'<span class="det"><b>'+qty+what+'</b>'+(x.vendor?(' — '+esc(x.vendor)):'')+'</span>'
+        +'<span class="dt">expected '+mdy(x.expected_date)+'</span>'
+        +(x.status!=='arriving'?'<a data-exadv="'+x.id+'">advance</a>':'')
+        +'<a data-exrecv="'+x.id+'" data-exmat="'+(x.material_id||'')+'">mark received</a>'
+        +'<a data-excancel="'+x.id+'" style="color:#a23b30;">cancel</a></div>';
+    }).join('');
+  }
+  function renderCount(pinned){
+    var host=$('mt-count-rows');
+    if(!pinned.length){host.innerHTML='<div class="mt-row" style="color:var(--mt-muted);">Pin materials to put them on the weekly count.</div>';return;}
+    host.innerHTML=pinned.map(function(m){
+      return '<div class="mt-count-row"><span class="cn">'+esc(m.name)+'</span>'
+        +'<input inputmode="decimal" data-count="'+m.id+'" placeholder="'+fmtQ(m.on_hand)+'">'
+        +'<span class="cu">'+esc(m.base_unit)+'</span><span class="drift" data-drift="'+m.id+'"></span></div>';
+    }).join('');
+  }
+  function renderActivity(){
+    var host=$('mt-activity');
+    if(!MT.txns.length){host.innerHTML='<div class="mt-row" style="color:var(--mt-muted);">No activity yet.</div>';return;}
+    host.innerHTML=MT.txns.map(function(t){
+      var qty=Math.abs(t.qty_base), entered='';
+      if(t.unit_entered&&t.unit_entered!==(byId(t.material_id)||{}).base_unit)
+        entered=fmtQ(t.qty_entered)+' '+esc(t.unit_entered)+' ('+fmtQ(qty)+' base)';
+      else entered=fmtQ(qty)+' '+esc(t.unit_entered||'');
+      var lbl=t.txn_type.replace('_',' ');
+      return '<div class="mt-row"><span class="mt-chip '+esc(t.txn_type)+'">'+esc(lbl)+'</span>'
+        +'<span class="det"><b>'+entered+' '+esc(t.material_name||'')+'</b>'
+        +(t.vendor?(' — '+esc(t.vendor)):'')+(t.note?(' · '+esc(t.note)):'')+'</span>'
+        +'<span class="dt">'+mdyShort(t.txn_date)+'</span>'
+        +(t.slip_url?'<a href="'+esc(t.slip_url)+'" target="_blank" rel="noopener">slip</a>':'')
+        +'</div>';
+    }).join('');
+  }
+
+  // ---------- modals ----------
+  function openOv(id){$(id).classList.add('show');}
+  function closeOv(id){$(id).classList.remove('show');}
+  function wireDate(id){var el=$(id);if(window.SSCDatePicker){try{SSCDatePicker.wire(el);SSCDatePicker.setISO(el,todayLocal());return;}catch(e){}}if(el)el.value=todayLocal();}
+  function getDate(id){var el=$(id);if(window.SSCDatePicker){try{var v=SSCDatePicker.getISO(el);if(v)return v;}catch(e){}}return el?el.value:'';}
+  function matOptions(sel){return MT.mats.filter(function(m){return m.active;}).map(function(m){return '<option value="'+m.id+'"'+(sel===m.id?' selected':'')+'>'+esc(m.name)+' ('+esc(m.base_unit)+')</option>';}).join('');}
+  function unitOptionsFor(m){
+    var o='<option value="'+esc(m.base_unit)+'">'+esc(m.base_unit)+'</option>';
+    if(m.purchase_unit&&m.pack_qty>1)o+='<option value="'+esc(m.purchase_unit)+'">'+esc(m.purchase_unit)+' (= '+fmtQ(m.pack_qty)+' '+esc(m.base_unit)+')</option>';
+    return o;
+  }
+  function enumOptions(sel){return ['<option value=""></option>'].concat(MT.units.map(function(u){return '<option'+(u===sel?' selected':'')+'>'+esc(u)+'</option>';})).join('');}
+
+  // log modal
+  function openLog(prefill){
+    prefill=prefill||{};
+    if(!MT.mats.filter(function(m){return m.active;}).length){alert('Add a material first.');return;}
+    MT.logType=prefill.type||'delivery'; MT.receiveExp=prefill.receiveExp||null;
+    $('mt-log-seg').querySelectorAll('span').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-t')===MT.logType);});
+    $('mt-log-sub').textContent=PROJECT_CODE+(MT.receiveExp?' · receiving expected delivery':'');
+    $('mt-log-mat').innerHTML=matOptions(prefill.material_id);
+    syncLogUnits(); $('mt-log-qty').value=prefill.qty||''; $('mt-log-vendor').value=prefill.vendor||'';
+    $('mt-log-slip').value=''; $('mt-log-err').textContent='';
+    wireDate('mt-log-date'); updateLogPreview(); openOv('mt-modal-log');
+  }
+  function syncLogUnits(){
+    var m=byId(+$('mt-log-mat').value); if(!m)return;
+    $('mt-log-unit').innerHTML=unitOptionsFor(m);
+    if(!$('mt-log-vendor').value&&m.default_vendor)$('mt-log-vendor').value=m.default_vendor;
+    updateLogPreview();
+  }
+  function updateLogPreview(){
+    var m=byId(+$('mt-log-mat').value), q=parseFloat($('mt-log-qty').value), u=$('mt-log-unit').value;
+    var verb=MT.logType==='return'?'removes':'adds';
+    if(!m||!q||q<=0){$('mt-log-save').textContent='Save';return;}
+    var base=(m.purchase_unit&&u===m.purchase_unit)?q*m.pack_qty:q;
+    $('mt-log-save').textContent='Save — '+verb+' '+fmtQ(base)+' '+m.base_unit;
+  }
+  async function saveLog(){
+    var m=byId(+$('mt-log-mat').value); var err=$('mt-log-err'); err.textContent='';
+    if(!m){err.textContent='Pick a material.';return;}
+    var q=$('mt-log-qty').value, u=$('mt-log-unit').value, slip=$('mt-log-slip').files[0];
+    var payload={material_id:m.id,txn_type:MT.logType,qty:q,unit:u,vendor:$('mt-log-vendor').value,txn_date:getDate('mt-log-date')};
+    try{
+      var r;
+      if(slip){
+        var fd=new FormData();Object.keys(payload).forEach(function(k){fd.append(k,payload[k]==null?'':payload[k]);});fd.append('slip',slip);
+        r=await fetch('/api/projects/'+encodeURIComponent(PROJECT_CODE)+'/material-txns',{method:'POST',credentials:'include',body:fd});
+      }else{
+        r=await fetch('/api/projects/'+encodeURIComponent(PROJECT_CODE)+'/material-txns',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      }
+      var j=await r.json().catch(function(){return {};});
+      if(!r.ok||j.error){err.textContent=(j&&j.error)||('Save failed ('+r.status+')');return;}
+      if(MT.receiveExp){ await fetch('/api/expected-deliveries/'+MT.receiveExp,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'received'})}); }
+      closeOv('mt-modal-log'); await loadAll();
+    }catch(e){err.textContent='Network error';}
+  }
+
+  // material modal (add / edit)
+  function openMat(id){
+    MT.editId=id;
+    $('mt-mat-title').textContent=id?'Edit material':'Add material';
+    var m=id?byId(id):null;
+    $('mt-mat-name').value=m?m.name:'';
+    $('mt-mat-base').innerHTML=enumOptions(m?m.base_unit:'');
+    $('mt-mat-purch').innerHTML=enumOptions(m?(m.purchase_unit||''):'');
+    $('mt-mat-pack').value=m?(m.pack_qty||1):'';
+    $('mt-mat-lead').value=m&&m.lead_time_days!=null?m.lead_time_days:'';
+    $('mt-mat-vendor').value=m?(m.default_vendor||''):'';
+    $('mt-mat-cat').value=m?(m.category||''):'';
+    $('mt-mat-pinned').checked=!!(m&&m.pinned);
+    $('mt-mat-err').textContent='';
+    openOv('mt-modal-mat');
+  }
+  async function saveMat(){
+    var err=$('mt-mat-err'); err.textContent='';
+    var body={name:$('mt-mat-name').value,base_unit:$('mt-mat-base').value,
+              purchase_unit:$('mt-mat-purch').value||null,pack_qty:$('mt-mat-pack').value||1,
+              lead_time_days:$('mt-mat-lead').value||null,default_vendor:$('mt-mat-vendor').value,
+              category:$('mt-mat-cat').value,pinned:$('mt-mat-pinned').checked};
+    var url=MT.editId?('/api/materials/'+MT.editId):('/api/projects/'+encodeURIComponent(PROJECT_CODE)+'/materials');
+    try{
+      var r=await fetch(url,{method:MT.editId?'PATCH':'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      var j=await r.json().catch(function(){return {};});
+      if(!r.ok||j.error){err.textContent=(j&&j.error)||('Save failed ('+r.status+')');return;}
+      closeOv('mt-modal-mat'); await loadAll();
+    }catch(e){err.textContent='Network error';}
+  }
+
+  // transfer modal
+  function openTransfer(){
+    if(!MT.mats.filter(function(m){return m.active;}).length){alert('Add a material first.');return;}
+    if(!MT.projects.length){alert('No other active project to transfer to.');return;}
+    $('mt-tr-mat').innerHTML=matOptions();
+    $('mt-tr-dest').innerHTML=MT.projects.map(function(p){return '<option value="'+esc(p.project_code)+'">'+esc(p.name||p.project_code)+'</option>';}).join('');
+    syncTrUnits(); $('mt-tr-qty').value=''; $('mt-tr-note').value=''; $('mt-tr-err').textContent='';
+    wireDate('mt-tr-date'); openOv('mt-modal-transfer');
+  }
+  function syncTrUnits(){var m=byId(+$('mt-tr-mat').value);if(m)$('mt-tr-unit').innerHTML=unitOptionsFor(m);}
+  async function saveTransfer(){
+    var err=$('mt-tr-err'); err.textContent='';
+    try{
+      var r=await fetch('/api/projects/'+encodeURIComponent(PROJECT_CODE)+'/material-transfers',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({material_id:+$('mt-tr-mat').value,to_project_code:$('mt-tr-dest').value,qty:$('mt-tr-qty').value,unit:$('mt-tr-unit').value,txn_date:getDate('mt-tr-date'),note:$('mt-tr-note').value})});
+      var j=await r.json().catch(function(){return {};});
+      if(!r.ok||j.error){err.textContent=(j&&j.error)||('Transfer failed ('+r.status+')');return;}
+      closeOv('mt-modal-transfer'); await loadAll();
+    }catch(e){err.textContent='Network error';}
+  }
+
+  // expected modal
+  function openExpected(){
+    $('mt-ex-mat').innerHTML='<option value="">— general order —</option>'+matOptions();
+    $('mt-ex-desc').value=''; $('mt-ex-qty').value=''; $('mt-ex-unit').innerHTML=enumOptions('');
+    $('mt-ex-vendor').value=''; $('mt-ex-err').textContent='';
+    wireDate('mt-ex-date'); openOv('mt-modal-expected');
+  }
+  async function saveExpected(){
+    var err=$('mt-ex-err'); err.textContent='';
+    try{
+      var r=await fetch('/api/projects/'+encodeURIComponent(PROJECT_CODE)+'/expected-deliveries',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({material_id:$('mt-ex-mat').value||null,description:$('mt-ex-desc').value,qty:$('mt-ex-qty').value||null,unit:$('mt-ex-unit').value||null,vendor:$('mt-ex-vendor').value,expected_date:getDate('mt-ex-date')})});
+      var j=await r.json().catch(function(){return {};});
+      if(!r.ok||j.error){err.textContent=(j&&j.error)||('Save failed ('+r.status+')');return;}
+      closeOv('mt-modal-expected'); await loadAll();
+    }catch(e){err.textContent='Network error';}
+  }
+
+  // copy modal
+  function openCopy(){
+    if(!MT.projects.length){alert('No other project to copy from.');return;}
+    $('mt-cp-src').innerHTML=MT.projects.map(function(p){return '<option value="'+esc(p.project_code)+'">'+esc(p.name||p.project_code)+'</option>';}).join('');
+    $('mt-cp-err').textContent=''; openOv('mt-modal-copy');
+  }
+  async function saveCopy(){
+    var err=$('mt-cp-err'); err.textContent='';
+    try{
+      var r=await fetch('/api/projects/'+encodeURIComponent(PROJECT_CODE)+'/materials/copy-from',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({source_project_code:$('mt-cp-src').value})});
+      var j=await r.json().catch(function(){return {};});
+      if(!r.ok||j.error){err.textContent=(j&&j.error)||('Copy failed ('+r.status+')');return;}
+      closeOv('mt-modal-copy'); await loadAll();
+    }catch(e){err.textContent='Network error';}
+  }
+
+  // weekly count
+  async function saveCount(){
+    var inputs=Array.prototype.slice.call($('mt-count-rows').querySelectorAll('[data-count]'));
+    var counts={};
+    inputs.forEach(function(i){ if(String(i.value).trim()!=='')counts[i.getAttribute('data-count')]=i.value; });
+    if(!Object.keys(counts).length)return;
+    try{
+      var r=await fetch('/api/projects/'+encodeURIComponent(PROJECT_CODE)+'/material-count',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({counts:counts,txn_date:todayLocal()})});
+      var j=await r.json().catch(function(){return {};});
+      if(!r.ok||j.error){alert('Count failed: '+((j&&j.error)||r.status));return;}
+      (j.data.results||[]).forEach(function(x){
+        var el=$('mt-count-rows').querySelector('[data-drift="'+x.material_id+'"]');
+        if(el){el.textContent=x.drift===0?'no drift':('drift '+(x.drift>0?'+':'')+fmtQ(x.drift));el.style.color=x.drift===0?'#0c7a5f':'#a23b30';}
+      });
+      // leave the drift readable for a beat, then refresh the ledger views
+      setTimeout(function(){ loadAll().then(function(){ $('mt-count-panel').classList.remove('mt-hide'); }); }, 2600);
+    }catch(e){alert('Network error.');}
+  }
+
+  // expected row actions
+  var EX_NEXT={ordered:'confirmed',confirmed:'arriving'};
+  async function advanceExpected(id){
+    var x=MT.expected.find(function(e){return e.id===id;}); if(!x)return;
+    var next=EX_NEXT[x.status]; if(!next)return;
+    await fetch('/api/expected-deliveries/'+id,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:next})});
+    await loadAll();
+  }
+  async function receiveExpected(id, matId){
+    var x=MT.expected.find(function(e){return e.id===id;}); if(!x)return;
+    if(matId){
+      // one-step server-side receive, pre-filled from the row
+      var r=await fetch('/api/expected-deliveries/'+id+'/receive',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({txn_date:todayLocal()})});
+      var j=await r.json().catch(function(){return {};});
+      if(!r.ok||j.error){alert('Receive failed: '+((j&&j.error)||r.status));return;}
+      await loadAll();
+    }else{
+      // general order: pick the material in the log modal; the row closes on save
+      openLog({type:'delivery',vendor:x.vendor||'',receiveExp:id});
+    }
+  }
+  async function cancelExpected(id){
+    if(!confirm('Cancel this expected delivery?'))return;
+    await fetch('/api/expected-deliveries/'+id,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'cancelled'})});
+    await loadAll();
+  }
+
+  function mtWire(){
+    if(MT.wired)return; MT.wired=true;
+    $('mt-btn-log').addEventListener('click',function(){openLog(null);});
+    $('mt-btn-add').addEventListener('click',function(){openMat(null);});
+    $('mt-btn-transfer').addEventListener('click',openTransfer);
+    $('mt-btn-expected').addEventListener('click',openExpected);
+    $('mt-btn-count').addEventListener('click',function(){$('mt-count-panel').classList.toggle('mt-hide');});
+    $('mt-count-save').addEventListener('click',saveCount);
+    $('mt-log-save').addEventListener('click',saveLog);
+    $('mt-mat-save').addEventListener('click',saveMat);
+    $('mt-tr-save').addEventListener('click',saveTransfer);
+    $('mt-ex-save').addEventListener('click',saveExpected);
+    $('mt-cp-save').addEventListener('click',saveCopy);
+    $('mt-log-mat').addEventListener('change',syncLogUnits);
+    $('mt-log-qty').addEventListener('input',updateLogPreview);
+    $('mt-log-unit').addEventListener('change',updateLogPreview);
+    $('mt-tr-mat').addEventListener('change',syncTrUnits);
+    $('mt-log-seg').addEventListener('click',function(e){
+      var s=e.target.closest('span[data-t]'); if(!s)return;
+      MT.logType=s.getAttribute('data-t');
+      $('mt-log-seg').querySelectorAll('span').forEach(function(x){x.classList.toggle('on',x===s);});
+      updateLogPreview();
+    });
+    document.querySelectorAll('#mt-modal-log [data-close],#mt-modal-mat [data-close],#mt-modal-transfer [data-close],#mt-modal-expected [data-close],#mt-modal-copy [data-close]').forEach(function(b){
+      b.addEventListener('click',function(){closeOv(b.getAttribute('data-close'));});
+    });
+    ['mt-modal-log','mt-modal-mat','mt-modal-transfer','mt-modal-expected','mt-modal-copy'].forEach(function(id){
+      $(id).addEventListener('click',function(e){if(e.target===$(id))closeOv(id);});
+    });
+    $('mt-catalog').addEventListener('click',function(e){
+      var p=e.target.closest('[data-pin]');
+      if(p){var m=byId(+p.getAttribute('data-pin'));if(m){fetch('/api/materials/'+m.id,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({pinned:!m.pinned})}).then(loadAll);}return;}
+      var ed=e.target.closest('[data-edit]');
+      if(ed){openMat(+ed.getAttribute('data-edit'));return;}
+    });
+    $('mt-expected').addEventListener('click',function(e){
+      var a=e.target.closest('[data-exadv]'); if(a){advanceExpected(+a.getAttribute('data-exadv'));return;}
+      var r=e.target.closest('[data-exrecv]'); if(r){receiveExpected(+r.getAttribute('data-exrecv'), +(r.getAttribute('data-exmat')||0));return;}
+      var c=e.target.closest('[data-excancel]'); if(c){cancelExpected(+c.getAttribute('data-excancel'));return;}
+    });
+  }
+
+  document.querySelectorAll('.nav-link[data-view="materials"]').forEach(function(l){l.addEventListener('click',loadAll);});
+  if(document.querySelector('section[data-view="materials"].active'))loadAll();
 })();
 </script>
 
