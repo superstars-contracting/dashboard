@@ -45,6 +45,7 @@ sys.path.insert(0, str(SCRIPT_DIR.parent))
 import db_layer            # noqa: E402
 from auth import hash_password  # noqa: E402
 from apply_estimates_273 import ensure_estimates_schema  # noqa: E402
+from apply_crm_266 import _table_exists  # noqa: E402
 import crm                 # noqa: E402
 
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
@@ -101,10 +102,16 @@ def _cleanup():
     conn = db_layer.connect(pragma_fk=True)
     try:
         codes = []
+        # #274 made converting an IRA estimate create ira_job/ira_visit children — a
+        # deliberate guard update (#263-class): clear them first when the tables exist.
+        has_ira = _table_exists(conn, "ira_job")
         for t, b in SERIES:
             for r in conn.execute("SELECT id, code FROM estimate WHERE est_type=? AND borough=?",
                                   (t, b)).fetchall():
                 codes.append(r[1])
+                if has_ira:
+                    conn.execute("DELETE FROM ira_visit WHERE project_code=?", (r[1],))
+                    conn.execute("DELETE FROM ira_job WHERE project_code=?", (r[1],))
                 conn.execute("DELETE FROM estimate_document WHERE estimate_id=?", (r[0],))
                 conn.execute("DELETE FROM estimate_ira WHERE estimate_id=?", (r[0],))
                 conn.execute("DELETE FROM estimate WHERE id=?", (r[0],))

@@ -718,6 +718,49 @@
     .est-modal-x { cursor:pointer; color:#9a96a2; font-size:20px; line-height:1; background:none; border:0; }
     .est-modal-body { padding:18px 20px; }
     .est-modal-foot { display:flex; justify-content:flex-end; gap:10px; padding:14px 20px; border-top:1px solid var(--line); }
+    /* ===== #274 IRA pipeline + calendar ===== */
+    .ira-job-card { background:#fff; border:1px solid var(--accent-edge); border-radius:14px; padding:14px 16px; margin-bottom:12px;
+                    box-shadow: inset 0 0 13px var(--accent-in), 0 1px 4px rgba(0,0,0,.04); cursor:pointer; }
+    .ira-job-card:hover { box-shadow: inset 0 0 13px var(--accent-in), 0 3px 10px rgba(0,0,0,.09); }
+    .ira-job-top { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+    .ira-job-code { font-weight:700; color:var(--brand-red); font-size:13.5px; }
+    .ira-job-meta { font-size:12px; color:var(--muted); }
+    .ira-rail { display:flex; gap:7px; flex-wrap:wrap; margin-top:10px; }
+    .ira-pill { display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:3px 10px; font-size:10.5px;
+                font-weight:700; letter-spacing:.03em; background:#f2f3f7; color:#54505A; }
+    .ira-pill.on   { background:var(--status-complete-soft); color:var(--status-complete-deep); }
+    .ira-pill.warn { background:#f7efe2; color:#a05a1f; }
+    .ira-pill.bad  { background:var(--status-behind-soft); color:#a23b30; }
+    .ira-pill a { color:inherit; text-decoration:none; }
+    .ira-check-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(290px,1fr)); gap:14px; margin-top:14px; }
+    .ira-visit-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #F2EFE7; font-size:12.5px; flex-wrap:wrap; }
+    .ira-visit-row:last-child { border-bottom:none; }
+    .ira-visit-status { display:inline-block; border-radius:999px; padding:2px 9px; font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+    .ira-visit-status.scheduled { background:var(--status-active-soft); color:var(--accent-ink); }
+    .ira-visit-status.performed { background:var(--status-complete-soft); color:var(--status-complete-deep); }
+    .ira-visit-status.cancelled { background:#f0f0f2; color:#9a96a2; }
+    .ira-cal-layout { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr); gap:16px; align-items:start; }
+    @media (max-width:980px){ .ira-cal-layout{ grid-template-columns:1fr; } }
+    .ira-cal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+    .ira-cal-head h3 { font-size:14px; margin:0; letter-spacing:.02em; }
+    .ira-cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+    .ira-cal-dow { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); text-align:center; padding:3px 0; }
+    .ira-cal-day { min-height:76px; border:1px solid var(--line); border-radius:9px; padding:5px 6px; font-size:11px; position:relative;
+                   background:#fff; cursor:pointer; }
+    .ira-cal-day:hover { border-color:var(--accent-edge); }
+    .ira-cal-day.out { background:var(--canvas); color:#c3c6cf; cursor:default; }
+    .ira-cal-day.today { border-color:var(--accent); border-width:2px; }
+    .ira-cal-num { font-weight:700; color:#54505A; }
+    .ira-cal-day.out .ira-cal-num { color:#c3c6cf; }
+    .ira-cal-badge { position:absolute; top:4px; right:5px; background:#f7efe2; color:#a05a1f; border-radius:999px;
+                     padding:1px 7px; font-size:9px; font-weight:700; }
+    .ira-cal-chip { display:block; border-radius:6px; padding:2px 6px; margin-top:3px; font-size:9.5px; font-weight:700;
+                    background:var(--status-active-soft); color:var(--accent-ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .ira-cal-chip.performed { background:var(--status-complete-soft); color:var(--status-complete-deep); }
+    .ira-cal-chip.cancelled { background:#f0f0f2; color:#9a96a2; text-decoration:line-through; }
+    .ira-wait-row { padding:8px 0; border-bottom:1px solid #F2EFE7; font-size:12px; }
+    .ira-wait-row:last-child { border-bottom:none; }
+    .ira-wait-code { font-weight:700; color:var(--brand-red); cursor:pointer; }
   </style>
   <div class="panel" data-panel="estimates">
     <div class="section">
@@ -733,11 +776,48 @@
 
       <div class="est-subtabs" id="est-subtabs">
         <div class="est-subtab active" data-estview="board">Estimates Board</div>
+        <div class="est-subtab" data-estview="inspections">Inspections</div>
+        <div class="est-subtab" data-estview="calendar">Calendar</div>
       </div>
 
       <!-- BOARD view: grouped by status -->
       <div class="est-view" data-estview="board">
         <div id="est-board"><div class="est-empty">Loading…</div></div>
+      </div>
+
+      <!-- #274 — INSPECTIONS view: every converted IRA job + its checklist rail -->
+      <div class="est-view" data-estview="inspections" style="display:none;">
+        <div id="ira-jobs"><div class="est-empty">Loading…</div></div>
+      </div>
+
+      <!-- #274 — JOB detail: checklist artifacts + visits, all worked ON THE CONSOLE -->
+      <div class="est-view" data-estview="job" style="display:none;">
+        <span class="est-back" id="ira-job-back">← Back to inspections</span>
+        <div id="ira-job-host"><div class="est-empty">Loading…</div></div>
+      </div>
+
+      <!-- #274 — CALENDAR view: month grid + upcoming + the waiting-on digest -->
+      <div class="est-view" data-estview="calendar" style="display:none;">
+        <div class="ira-cal-layout">
+          <div class="est-box" style="margin-bottom:0;">
+            <div class="ira-cal-head">
+              <button type="button" class="est-mini-btn" id="ira-cal-prev">‹</button>
+              <h3 id="ira-cal-title">—</h3>
+              <button type="button" class="est-mini-btn" id="ira-cal-next">›</button>
+            </div>
+            <div class="ira-cal-grid" id="ira-cal-grid"></div>
+          </div>
+          <div>
+            <div class="est-box">
+              <div class="est-box-head"><h3>Next 14 days</h3></div>
+              <div id="ira-upcoming"></div>
+            </div>
+            <div class="est-box">
+              <div class="est-box-head"><h3>Waiting on</h3></div>
+              <div id="ira-waiting"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- DETAIL view -->
@@ -4281,7 +4361,7 @@ applyLanguage();
 })();
 </script>
 
-<div class="container"><div class="ph-build" id="cc-build-stamp">build #273 · 2026-07-04 · Estimates — general bid tracking ({TYPE}-{BORO}-{NNN}), documents, CRM-linked activity, one-click convert-to-project; C-suite-gated</div></div>
+<div class="container"><div class="ph-build" id="cc-build-stamp">build #274 · 2026-07-04 · Estimates + IRA pipeline — bid board with convert-to-project (#273) + inspection checklist (CD-5/COI/contract), multi-visit calendar, waiting-on digest (#274); C-suite-gated</div></div>
 
 <script>
 /* ===== Company console widgets (#210) — live data + reused #209 drag framework.
@@ -5156,9 +5236,337 @@ applyLanguage();
       }, 'Upload');
   }
 
+  // ==================== #274 — IRA pipeline + calendar ====================
+  var curJob = null, calMonth = null;   // calMonth = 'YYYY-MM'
+
+  function railPill(label, state, extra){
+    // state: 'on' | 'warn' | 'bad' | '' (off/neutral)
+    return '<span class="ira-pill '+(state||'')+'">'+label+(extra?(' '+extra):'')+'</span>';
+  }
+
+  function jobRail(j){
+    var pills = [];
+    pills.push(railPill(j.contract_doc ? 'Contract ✓' : 'Contract ☐', j.contract_doc ? 'on' : ''));
+    var cdState = j.cd5_status==='approved' ? 'on' : (j.cd5_status==='filed' ? 'warn' : '');
+    pills.push(railPill('CD-5 '+j.cd5_status.replace('_',' '), cdState, j.cd5_filed_date ? '· '+fmtD(j.cd5_filed_date) : ''));
+    if (!j.coi_doc) pills.push(railPill('COI ☐', ''));
+    else {
+      var cs = j.coi_expiry_status;
+      var st = cs==='expired' ? 'bad' : (cs==='expiring' ? 'warn' : 'on');
+      var lbl = cs==='expired' ? 'COI expired' : (cs==='expiring' ? 'COI expiring' : 'COI ✓');
+      pills.push(railPill(lbl, st, j.coi_doc.expiry_date ? '· '+fmtD(j.coi_doc.expiry_date) : ''));
+    }
+    if (j.fieldwire_url) pills.push('<span class="ira-pill on"><a href="'+esc(j.fieldwire_url)+'" target="_blank" rel="noopener" onclick="event.stopPropagation();">Fieldwire ↗</a></span>');
+    else pills.push(railPill('Fieldwire ☐', ''));
+    pills.push(railPill(j.report_sent_date ? 'Report ✓' : 'Report ☐', j.report_sent_date ? 'on' : '', j.report_sent_date ? '· '+fmtD(j.report_sent_date) : ''));
+    pills.push(railPill(j.deposit_received ? 'Deposit ✓' : 'Deposit ☐', j.deposit_received ? 'on' : '', j.deposit_date ? '· '+fmtD(j.deposit_date) : ''));
+    pills.push(railPill('Balance '+j.balance_status, j.balance_status==='paid' ? 'on' : ''));
+    return '<div class="ira-rail">'+pills.join('')+'</div>';
+  }
+
+  async function loadJobs(){
+    var host = q('ira-jobs');
+    host.innerHTML = '<div class="est-empty">Loading…</div>';
+    try {
+      var d = await api('GET','/api/ira/jobs');
+      var jobs = d.jobs || [];
+      if (!jobs.length){ host.innerHTML = '<div class="est-empty">No IRA jobs yet — convert an approved IRA estimate on the board.</div>'; return; }
+      host.innerHTML = jobs.map(function(j){
+        return '<div class="ira-job-card" data-job="'+esc(j.project_code)+'">'
+          + '<div class="ira-job-top"><div>'
+          + '<span class="ira-job-code">'+esc(j.project_code)+'</span>'
+          + ' <span class="ira-job-meta">'+esc(j.org_name||'')+(j.building_address ? ' · '+esc(j.building_address) : '')+'</span>'
+          + '</div><div class="ira-job-meta">'
+          + (j.next_visit ? 'next visit '+fmtD(j.next_visit.visit_date) : 'no visit scheduled')
+          + ' · '+j.visits_count+' visit'+(j.visits_count===1?'':'s')+'</div></div>'
+          + jobRail(j) + '</div>';
+      }).join('');
+      host.querySelectorAll('[data-job]').forEach(function(c){
+        c.addEventListener('click', function(){ openJob(c.getAttribute('data-job')); });
+      });
+    } catch(e){ host.innerHTML = '<div class="est-empty">'+esc(e.message)+'</div>'; }
+  }
+
+  function checkBox(title, inner){
+    return '<div class="est-box" style="margin-bottom:0;"><div class="est-box-head"><h3>'+title+'</h3></div>'+inner+'</div>';
+  }
+
+  function docLine(doc){
+    if (!doc) return '<div class="est-empty" style="padding:8px;">Not uploaded.</div>';
+    return '<div class="est-doc-row"><a class="est-doc-title" href="'+esc(doc.file_url)+'" target="_blank" rel="noopener">'
+      + esc(doc.title||doc.file_name)+'</a><span class="est-doc-meta">'+fmtD(doc.uploaded_at)+'</span></div>';
+  }
+
+  async function openJob(code){
+    curJob = code;
+    showView('job');
+    q('ira-job-host').innerHTML = '<div class="est-empty">Loading…</div>';
+    try {
+      var d = await api('GET','/api/ira/jobs/'+encodeURIComponent(code));
+      renderJob(d);
+    } catch(e){ q('ira-job-host').innerHTML = '<div class="est-empty">'+esc(e.message)+'</div>'; }
+  }
+
+  function renderJob(d){
+    var j = d.job;
+    var cdBtns = '';
+    if (j.cd5_status==='not_filed') cdBtns = '<button type="button" class="btn-primary" style="padding:6px 12px;font-size:12px;" data-cd5="filed">Mark filed</button>';
+    else if (j.cd5_status==='filed') cdBtns = '<button type="button" class="btn-primary" style="padding:6px 12px;font-size:12px;" data-cd5="approved">Mark approved</button>'
+      + ' <button type="button" class="est-mini-btn" data-cd5="not_filed">← Not filed</button>';
+    else cdBtns = '<button type="button" class="est-mini-btn" data-cd5="filed">← Back to filed</button>';
+    var html = '<div class="est-box">'
+      + '<div class="ira-job-top"><div>'
+      + '<span class="ira-job-code" style="font-size:17px;">'+esc(j.project_code)+'</span>'
+      + ' <span class="ira-job-meta">'+esc(j.org_name||'')+(j.building_address ? ' · '+esc(j.building_address) : '')+'</span></div>'
+      + '<a class="est-mini-btn" style="text-decoration:none;" href="/projects/'+encodeURIComponent(j.project_code)+'">Open project →</a></div>'
+      + jobRail(j) + '</div>'
+      + '<div class="ira-check-grid">'
+      + checkBox('Contract', docLine(j.contract_doc)
+        + '<div class="est-flow"><button type="button" class="btn-primary" style="padding:6px 12px;font-size:12px;" data-art="contract">Upload contract</button></div>')
+      + checkBox('CD-5 — DOB NOW (tracked)',
+        '<div style="margin-bottom:8px;"><span class="est-badge '+(j.cd5_status==='approved'?'st-approved':(j.cd5_status==='filed'?'st-submitted':'st-intake'))+'">'
+        + esc(j.cd5_status.replace('_',' '))+'</span>'
+        + (j.cd5_filed_date ? ' <span class="ira-job-meta">filed '+fmtD(j.cd5_filed_date)+'</span>' : '')+'</div>'
+        + docLine(j.cd5_doc)
+        + '<div class="est-flow">'+cdBtns
+        + ' <button type="button" class="est-mini-btn" data-art="cd5">Upload approved doc</button></div>')
+      + checkBox('COI — certificate of insurance', docLine(j.coi_doc)
+        + (j.coi_doc && j.coi_doc.expiry_date
+            ? '<div style="margin:4px 0 8px;"><span class="ira-pill '+(j.coi_expiry_status==='expired'?'bad':(j.coi_expiry_status==='expiring'?'warn':'on'))+'">'
+              + (j.coi_expiry_status==='expired'?'expired':(j.coi_expiry_status==='expiring'?'expiring soon':'valid'))
+              + ' · '+fmtD(j.coi_doc.expiry_date)+'</span></div>' : '')
+        + '<div class="est-flow"><button type="button" class="btn-primary" style="padding:6px 12px;font-size:12px;" data-art="coi">Upload COI</button></div>')
+      + checkBox('Fieldwire',
+        '<div class="est-field"><label>Project link</label><input class="ssc-field" id="ira-fw-url" value="'+esc(j.fieldwire_url||'')+'" placeholder="https://app.fieldwire.com/…"></div>'
+        + '<div class="est-flow"><button type="button" class="btn-primary" style="padding:6px 12px;font-size:12px;" id="ira-fw-save">Save link</button>'
+        + (j.fieldwire_url ? ' <a class="est-mini-btn" style="text-decoration:none;" href="'+esc(j.fieldwire_url)+'" target="_blank" rel="noopener">Open ↗</a>' : '')+'</div>')
+      + checkBox('Report',
+        '<div class="est-field"><label>Report sent</label><input class="ssc-date ssc-field" id="ira-report-date" placeholder="MM/DD/YYYY"></div>'
+        + '<div class="est-flow"><button type="button" class="btn-primary" style="padding:6px 12px;font-size:12px;" id="ira-report-save">Save report date</button></div>'
+        + (j.report_sent_date ? '<div class="ira-job-meta" style="margin-top:6px;">sent '+fmtD(j.report_sent_date)+'</div>' : ''))
+      + checkBox('Payment',
+        '<div class="est-field-row">'
+        + '<div class="est-field"><label>Deposit received</label><select class="ssc-field" id="ira-dep"><option value="0"'+(!j.deposit_received?' selected':'')+'>No</option><option value="1"'+(j.deposit_received?' selected':'')+'>Yes</option></select></div>'
+        + '<div class="est-field"><label>Deposit date</label><input class="ssc-date ssc-field" id="ira-dep-date" placeholder="MM/DD/YYYY"></div></div>'
+        + '<div class="est-field-row">'
+        + '<div class="est-field"><label>Balance</label><select class="ssc-field" id="ira-bal"><option value="open"'+(j.balance_status!=='paid'?' selected':'')+'>Open</option><option value="paid"'+(j.balance_status==='paid'?' selected':'')+'>Paid</option></select></div>'
+        + '<div class="est-field"><label>QB invoice #</label><input class="ssc-field" id="ira-qbinv" value="'+esc(j.qb_invoice_ref||'')+'"></div></div>'
+        + '<div class="est-flow"><button type="button" class="btn-primary" style="padding:6px 12px;font-size:12px;" id="ira-pay-save">Save payment</button></div>'
+        + (j.deposit_date ? '<div class="ira-job-meta" style="margin-top:6px;">deposit '+fmtD(j.deposit_date)+'</div>' : ''))
+      + '</div>'
+      + '<div class="est-box" style="margin-top:14px;">'
+      + '<div class="est-box-head"><h3>Visits</h3><button type="button" class="btn-primary" style="padding:6px 12px;font-size:12px;" id="ira-visit-add">+ Add visit</button></div>'
+      + '<div id="ira-visits">'
+      + ((d.visits||[]).length ? (d.visits||[]).map(function(v){
+          var acts = '';
+          if (v.status==='scheduled') acts = '<button type="button" class="est-mini-btn" data-vact="performed" data-vid="'+v.id+'">Performed</button>'
+            + ' <button type="button" class="est-mini-btn" data-vact="cancelled" data-vid="'+v.id+'">Cancel</button>'
+            + ' <button type="button" class="est-mini-btn" data-vedit="'+v.id+'" data-vdate="'+esc(v.visit_date)+'" data-vlabel="'+esc(v.label||'')+'">Edit</button>';
+          else if (v.status==='performed') acts = '<button type="button" class="est-mini-btn" data-vact="scheduled" data-vid="'+v.id+'">Reopen</button>';
+          return '<div class="ira-visit-row"><b>'+fmtD(v.visit_date)+'</b>'
+            + '<span class="ira-visit-status '+esc(v.status)+'">'+esc(v.status)+'</span>'
+            + '<span style="color:var(--muted);">'+esc(v.label||'')+'</span>'
+            + '<span style="margin-left:auto;display:flex;gap:6px;">'+acts+'</span></div>';
+        }).join('') : '<div class="est-empty">No visits yet.</div>')
+      + '</div></div>';
+    var host = q('ira-job-host');
+    host.innerHTML = html;
+    if (window.SSCDatePicker){
+      host.querySelectorAll('input.ssc-date').forEach(function(el){ SSCDatePicker.wire(el); });
+      if (j.report_sent_date) SSCDatePicker.setISO(q('ira-report-date'), j.report_sent_date);
+      if (j.deposit_date) SSCDatePicker.setISO(q('ira-dep-date'), j.deposit_date);
+    }
+    host.querySelectorAll('[data-cd5]').forEach(function(b){
+      b.addEventListener('click', function(){
+        api('PUT','/api/ira/jobs/'+encodeURIComponent(curJob), { cd5_status: b.getAttribute('data-cd5') })
+          .then(function(){ openJob(curJob); }).catch(function(e){ alert(e.message); });
+      });
+    });
+    host.querySelectorAll('[data-art]').forEach(function(b){
+      b.addEventListener('click', function(){ artifactModal(b.getAttribute('data-art')); });
+    });
+    q('ira-fw-save').addEventListener('click', function(){
+      api('PUT','/api/ira/jobs/'+encodeURIComponent(curJob), { fieldwire_url: q('ira-fw-url').value.trim() || null })
+        .then(function(){ openJob(curJob); }).catch(function(e){ alert(e.message); });
+    });
+    q('ira-report-save').addEventListener('click', function(){
+      api('PUT','/api/ira/jobs/'+encodeURIComponent(curJob), { report_sent_date: getISO(q('ira-report-date')) || null })
+        .then(function(){ openJob(curJob); }).catch(function(e){ alert(e.message); });
+    });
+    q('ira-pay-save').addEventListener('click', function(){
+      api('PUT','/api/ira/jobs/'+encodeURIComponent(curJob), {
+        deposit_received: q('ira-dep').value==='1',
+        deposit_date: getISO(q('ira-dep-date')) || null,
+        balance_status: q('ira-bal').value,
+        qb_invoice_ref: q('ira-qbinv').value.trim() || null
+      }).then(function(){ openJob(curJob); }).catch(function(e){ alert(e.message); });
+    });
+    q('ira-visit-add').addEventListener('click', function(){ addVisitModal(curJob, null, 0); });
+    host.querySelectorAll('[data-vact]').forEach(function(b){
+      b.addEventListener('click', function(){
+        api('PUT','/api/ira/visits/'+b.getAttribute('data-vid'), { status: b.getAttribute('data-vact') })
+          .then(function(){ openJob(curJob); }).catch(function(e){ alert(e.message); });
+      });
+    });
+    host.querySelectorAll('[data-vedit]').forEach(function(b){
+      b.addEventListener('click', function(){ editVisitModal(+b.getAttribute('data-vedit'), b.getAttribute('data-vdate'), b.getAttribute('data-vlabel')); });
+    });
+  }
+
+  function artifactModal(kind){
+    var label = kind==='cd5' ? 'CD-5 approved document' : (kind==='coi' ? 'COI (broker-issued)' : 'Contract');
+    openModal('Upload '+label,
+      '<div class="est-field"><label>File *</label><input class="ssc-field" id="f-art-file" type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,.xlsx" style="padding:7px;"></div>'
+      + (kind==='coi' ? '<div class="est-field"><label>COI expiry date</label><input class="ssc-date ssc-field" id="f-art-exp" placeholder="MM/DD/YYYY"></div>' : ''),
+      async function(){
+        var f = q('f-art-file').files[0];
+        if (!f){ modalErr('Choose a file.'); return false; }
+        var fd = new FormData();
+        fd.append('kind', kind); fd.append('file', f);
+        if (kind==='coi'){ var iso = getISO(q('f-art-exp')); if (iso) fd.append('expiry_date', iso); }
+        var r = await fetch('/api/ira/jobs/'+encodeURIComponent(curJob)+'/artifact', { method:'POST', credentials:'include', body: fd });
+        var j = null; try { j = await r.json(); } catch(e){}
+        if (!r.ok) throw new Error((j && j.error) || ('HTTP '+r.status));
+        closeModal(); openJob(curJob); return false;
+      }, 'Upload');
+  }
+
+  function addVisitModal(code, presetDate, sameDayCount){
+    openModal('Add visit — '+code,
+      (sameDayCount ? '<div style="font-size:12px;color:#a05a1f;background:#f7efe2;border-radius:8px;padding:8px 10px;margin-bottom:10px;">'
+        + sameDayCount+' other visit'+(sameDayCount>1?'s':'')+' already on this day — subvendor days are allowed.</div>' : '')
+      + '<div class="est-field"><label>Date *</label><input class="ssc-date ssc-field" id="f-v-date" placeholder="MM/DD/YYYY"></div>'
+      + '<div class="est-field"><label>Crew / subvendor note</label><input class="ssc-field" id="f-v-label" placeholder="e.g. crew A, sub — ropes"></div>'
+      + '<div class="est-field"><label>Status</label><select class="ssc-field" id="f-v-status"><option value="scheduled">Scheduled</option><option value="performed">Performed (backfill)</option></select></div>',
+      async function(){
+        var iso = getISO(q('f-v-date'));
+        if (!iso){ modalErr('Pick the visit date.'); return false; }
+        await api('POST','/api/ira/jobs/'+encodeURIComponent(code)+'/visits',
+          { visit_date: iso, label: q('f-v-label').value.trim() || null, status: q('f-v-status').value });
+        closeModal();
+        if (curJob === code && document.querySelector('.est-view[data-estview="job"]').style.display !== 'none') openJob(code);
+        else loadCalendar();
+        return false;
+      }, 'Add visit');
+    if (presetDate && window.SSCDatePicker) SSCDatePicker.setISO(q('f-v-date'), presetDate);
+  }
+
+  function editVisitModal(vid, vdate, vlabel){
+    openModal('Edit visit',
+      '<div class="est-field"><label>Date *</label><input class="ssc-date ssc-field" id="f-ve-date" placeholder="MM/DD/YYYY"></div>'
+      + '<div class="est-field"><label>Crew / subvendor note</label><input class="ssc-field" id="f-ve-label" value="'+esc(vlabel||'')+'"></div>',
+      async function(){
+        var iso = getISO(q('f-ve-date'));
+        if (!iso){ modalErr('Pick the visit date.'); return false; }
+        await api('PUT','/api/ira/visits/'+vid, { visit_date: iso, label: q('f-ve-label').value.trim() || null });
+        closeModal(); if (curJob) openJob(curJob); return false;
+      });
+    if (window.SSCDatePicker) SSCDatePicker.setISO(q('f-ve-date'), vdate);
+  }
+
+  // ---------- calendar ----------
+  function monthTitle(ym){
+    var p = ym.split('-');
+    var names = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return names[+p[1]-1]+' '+p[0];
+  }
+  function shiftMonth(ym, delta){
+    var p = ym.split('-'); var y = +p[0], m = +p[1]-1+delta;
+    y += Math.floor(m/12); m = ((m%12)+12)%12;
+    return y+'-'+String(m+1).padStart(2,'0');
+  }
+  function todayLocalISO(){
+    var d = new Date();
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+
+  async function loadCalendar(){
+    calMonth = calMonth || todayLocalISO().slice(0,7);
+    q('ira-cal-title').textContent = monthTitle(calMonth);
+    q('ira-cal-grid').innerHTML = '<div class="est-empty" style="grid-column:1/-1;">Loading…</div>';
+    try {
+      var d = await api('GET','/api/ira/calendar?month='+calMonth);
+      renderCalendar(d);
+      q('ira-upcoming').innerHTML = (d.upcoming||[]).length ? d.upcoming.map(function(v){
+        return '<div class="ira-wait-row"><b>'+fmtD(v.visit_date)+'</b> — <span class="ira-wait-code" data-goto="'+esc(v.project_code)+'">'+esc(v.project_code)+'</span>'
+          + (v.label ? ' <span style="color:var(--muted);">'+esc(v.label)+'</span>' : '')+'</div>';
+      }).join('') : '<div class="est-empty">Nothing in the next 14 days.</div>';
+      var MISS = { contract:'contract', cd5:'CD-5 approval', coi:'COI', coi_expired:'COI EXPIRED' };
+      q('ira-waiting').innerHTML = (d.waiting_on||[]).length ? d.waiting_on.map(function(w){
+        return '<div class="ira-wait-row"><span class="ira-wait-code" data-goto="'+esc(w.project_code)+'">'+esc(w.project_code)+'</span>'
+          + ' <span style="color:var(--muted);">visit '+fmtD(w.next_visit_date)+'</span><br>'
+          + '<span style="color:#a23b30;font-weight:600;">waiting on: '+w.missing.map(function(m){ return MISS[m]||m; }).join(', ')+'</span></div>';
+      }).join('') : '<div class="est-empty">Nothing blocked. 🎉</div>';
+      document.querySelectorAll('#ira-upcoming [data-goto], #ira-waiting [data-goto]').forEach(function(el){
+        el.addEventListener('click', function(){ openJob(el.getAttribute('data-goto')); });
+      });
+    } catch(e){ q('ira-cal-grid').innerHTML = '<div class="est-empty" style="grid-column:1/-1;">'+esc(e.message)+'</div>'; }
+  }
+
+  function renderCalendar(d){
+    var byDay = {};
+    (d.visits||[]).forEach(function(v){ (byDay[v.visit_date] = byDay[v.visit_date] || []).push(v); });
+    var first = new Date(+calMonth.slice(0,4), +calMonth.slice(5,7)-1, 1);
+    var startDow = first.getDay();
+    var daysIn = new Date(+calMonth.slice(0,4), +calMonth.slice(5,7), 0).getDate();
+    var today = todayLocalISO();
+    var cells = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(function(x){ return '<div class="ira-cal-dow">'+x+'</div>'; });
+    for (var i=0;i<startDow;i++) cells.push('<div class="ira-cal-day out"></div>');
+    for (var day=1;day<=daysIn;day++){
+      var iso = calMonth+'-'+String(day).padStart(2,'0');
+      var vs = byDay[iso] || [];
+      var uniqueJobs = {}; vs.forEach(function(v){ uniqueJobs[v.project_code]=1; });
+      var nJobs = Object.keys(uniqueJobs).length;
+      var chips = vs.slice(0,3).map(function(v){
+        return '<span class="ira-cal-chip '+esc(v.status)+'" data-vgoto="'+esc(v.project_code)+'" title="'+esc(v.project_code+(v.label?' — '+v.label:''))+'">'+esc(v.project_code)+'</span>';
+      }).join('') + (vs.length>3 ? '<span class="ira-cal-chip">+'+(vs.length-3)+' more</span>' : '');
+      cells.push('<div class="ira-cal-day'+(iso===today?' today':'')+'" data-day="'+iso+'" data-count="'+vs.length+'">'
+        + '<span class="ira-cal-num">'+day+'</span>'
+        + (nJobs>1 ? '<span class="ira-cal-badge">'+nJobs+' jobs</span>' : '')
+        + chips + '</div>');
+    }
+    q('ira-cal-grid').innerHTML = cells.join('');
+    q('ira-cal-grid').querySelectorAll('[data-vgoto]').forEach(function(el){
+      el.addEventListener('click', function(ev){ ev.stopPropagation(); openJob(el.getAttribute('data-vgoto')); });
+    });
+    q('ira-cal-grid').querySelectorAll('.ira-cal-day[data-day]').forEach(function(cell){
+      cell.addEventListener('click', function(){ dayAddFlow(cell.getAttribute('data-day'), +cell.getAttribute('data-count')); });
+    });
+  }
+
+  async function dayAddFlow(iso, sameDayCount){
+    try {
+      var d = await api('GET','/api/ira/jobs');
+      var jobs = d.jobs || [];
+      if (!jobs.length){ alert('No IRA jobs yet — convert an approved IRA estimate first.'); return; }
+      var opts = jobs.map(function(j){ return '<option value="'+esc(j.project_code)+'">'+esc(j.project_code)+' — '+esc(j.org_name||'')+'</option>'; }).join('');
+      openModal('Add visit — '+fmtD(iso),
+        (sameDayCount ? '<div style="font-size:12px;color:#a05a1f;background:#f7efe2;border-radius:8px;padding:8px 10px;margin-bottom:10px;">'
+          + sameDayCount+' visit'+(sameDayCount>1?'s':'')+' already on this day — subvendor days are allowed.</div>' : '')
+        + '<div class="est-field"><label>Job *</label><select class="ssc-field" id="f-dv-job">'+opts+'</select></div>'
+        + '<div class="est-field"><label>Crew / subvendor note</label><input class="ssc-field" id="f-dv-label" placeholder="e.g. crew A, sub — ropes"></div>',
+        async function(){
+          await api('POST','/api/ira/jobs/'+encodeURIComponent(q('f-dv-job').value)+'/visits',
+            { visit_date: iso, label: q('f-dv-label').value.trim() || null, status: 'scheduled' });
+          closeModal(); loadCalendar(); return false;
+        }, 'Add visit');
+    } catch(e){ alert(e.message); }
+  }
+
   function wireOnce(){
     if (inited) return;
     inited = true;
+    document.querySelectorAll('.est-subtab').forEach(function(t){
+      t.addEventListener('click', function(){
+        var v = t.getAttribute('data-estview'); showView(v);
+        if (v==='board') loadBoard();
+        if (v==='inspections') loadJobs();
+        if (v==='calendar') loadCalendar();
+      });
+    });
+    q('ira-job-back').addEventListener('click', function(){ curJob=null; showView('inspections'); loadJobs(); });
+    q('ira-cal-prev').addEventListener('click', function(){ calMonth = shiftMonth(calMonth || todayLocalISO().slice(0,7), -1); loadCalendar(); });
+    q('ira-cal-next').addEventListener('click', function(){ calMonth = shiftMonth(calMonth || todayLocalISO().slice(0,7), 1); loadCalendar(); });
     q('est-btn-new').addEventListener('click', function(){ newEstimateModal().catch(function(e){ alert(e.message); }); });
     q('est-back').addEventListener('click', function(){ curId=null; showView('board'); loadBoard(); });
     q('est-doc-add').addEventListener('click', function(){ uploadDocModal().catch(function(e){ alert(e.message); }); });
