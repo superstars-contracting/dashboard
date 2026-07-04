@@ -79,6 +79,13 @@ client_portal.register(app)
 import client_grants  # noqa: E402
 client_grants.register(app)
 
+# #272a — Materials & Deliveries: per-project catalog + txn ledger + expected
+# deliveries + weekly count. Operational section (all dashboard roles; pm via the
+# central scoping hook on /api/projects/<code>/ paths + per-resource checks on by-id
+# routes). Units reuse the expense taxonomy enum (server.EXPENSE_UNITS, read lazily).
+import materials  # noqa: E402
+materials.register(app)
+
 # Security: cap upload size. Raised to 256 MB (#235) so a field-photo BATCH POST
 # (many images, several 8-12 MB) isn't rejected at the WSGI layer; the Field
 # Photos UI also uploads in chunks. A request over the cap returns a clean 413
