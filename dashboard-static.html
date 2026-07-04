@@ -3829,6 +3829,15 @@
           .mt-count-row input{width:96px;height:32px;border:1px solid var(--mt-line);border-radius:8px;padding:0 9px;font:inherit;font-size:13px;text-align:right;}
           .mt-count-row .cu{width:82px;font-size:10.5px;color:var(--mt-muted);font-weight:600;}
           .mt-count-row .drift{font-size:10.5px;font-weight:700;width:110px;text-align:right;}
+          /* #272b — reorder chips (status colors only) + burn meta + count hint */
+          .mt-stchip{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;border-radius:999px;padding:4px 10px;white-space:nowrap;}
+          .mt-stchip.stocked{color:#0c7a5f;background:var(--status-complete-soft,#e7f6f0);}
+          .mt-stchip.order_by{color:#a05a1f;background:#fdf3e4;}
+          .mt-stchip.order_now{color:#a23b30;background:var(--status-behind-soft,#fdeeec);}
+          .mt-card .burnline{font-size:10.5px;color:var(--mt-muted);font-weight:600;margin-top:8px;display:flex;justify-content:space-between;}
+          .mt-card .mt-stchip{margin-top:10px;}
+          .mt-count-hint{padding:2px 16px 8px;font-size:11px;color:#a05a1f;font-weight:600;}
+          .mt-map-preview{font-size:11px;color:var(--mt-accent-ink);font-weight:600;margin-top:6px;min-height:14px;}
           .mt-count-foot{display:flex;justify-content:flex-end;padding:10px 16px 14px;}
           .mt-overlay{position:fixed;inset:0;background:rgba(20,22,30,.30);display:none;align-items:flex-start;justify-content:center;padding:48px 16px;overflow:auto;z-index:1200;}
           .mt-overlay.show{display:flex;}
@@ -3873,7 +3882,7 @@
             <div class="ph">Material activity</div>
             <div id="mt-activity"></div>
           </div>
-          <div id="mt-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #272 · 2026-07-04 · Materials &amp; Deliveries — per-project catalog · delivery/pickup/transfer ledger · expected deliveries · weekly count (consumption &amp; reorder = #272b)</div>
+          <div id="mt-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #272b · 2026-07-04 · Materials &amp; Deliveries — catalog · ledger · expected · weekly count + derived consumption, burn rates &amp; reorder alerts (operator-tuned maps; unmapped = honest absence)</div>
         </div>
 
         <!-- modals -->
@@ -3912,6 +3921,24 @@
             <div class="mt-fld"><label>Category (optional)</label><input id="mt-mat-cat"></div>
           </div>
           <div class="mt-fld"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:12.5px;color:var(--mt-ink);"><input type="checkbox" id="mt-mat-pinned" style="width:15px;height:15px;"> Pinned — show on the card board + weekly count</label></div>
+          <div style="border-top:1px solid var(--mt-line);margin:14px 0 12px;padding-top:12px;">
+            <div style="font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--mt-muted);margin-bottom:9px;">Consumption — optional (#272b)</div>
+            <div class="mt-fld"><label>Driver</label><select id="mt-mat-driver">
+              <option value="">— none (no burn/forecast shown) —</option>
+              <option value="volume_cf">CF placed (drop-plan volume)</option>
+              <option value="area_sf">SF covered (drop-plan area)</option>
+              <option value="manual_rate">Flat per-workday rate</option>
+            </select></div>
+            <div class="mt-grid2">
+              <div class="mt-fld"><label id="mt-mat-yieldlbl">Yield</label><input id="mt-mat-yield" inputmode="decimal"></div>
+              <div class="mt-fld"><label>Waste %</label><input id="mt-mat-waste" inputmode="decimal" placeholder="0"></div>
+            </div>
+            <div class="mt-grid2">
+              <div class="mt-fld"><label>Safety days</label><input id="mt-mat-safety" inputmode="numeric" placeholder="4"></div>
+              <div class="mt-fld"><label>Map notes (optional)</label><input id="mt-mat-mapnotes"></div>
+            </div>
+            <div class="mt-map-preview" id="mt-mat-preview"></div>
+          </div>
           <div class="mt-err" id="mt-mat-err"></div>
           <div class="mt-mfoot"><button class="mt-btn-ghost" data-close="mt-modal-mat">Cancel</button><button class="btn-primary" id="mt-mat-save">Save material</button></div>
         </div></div>
@@ -7536,7 +7563,8 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   function todayLocal(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
   function fmtQ(n){if(n==null)return '—';return (Math.round(n*100)/100).toLocaleString();}
 
-  var MT={mats:[],units:[],expected:[],txns:[],projects:[],wired:false,logType:'delivery',editId:null,receiveExp:null};
+  var MT={mats:[],units:[],expected:[],txns:[],projects:[],wired:false,logType:'delivery',editId:null,receiveExp:null,
+          window:{volume_cf:0,area_sf:0,workdays:0},sched:0,safetyDefault:4};   // #272b — derivation context
   function byId(id){return (MT.mats||[]).find(function(m){return m.id===id;});}
 
   async function loadAll(){
@@ -7546,6 +7574,9 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
       var rs=await Promise.all([jget(base+'/materials'),jget(base+'/expected-deliveries'),jget(base+'/material-txns?limit=40'),jget('/api/projects')]);
       MT.mats=(rs[0].data&&rs[0].data.materials)||[];
       MT.units=(rs[0].data&&rs[0].data.units)||[];
+      MT.window=(rs[0].data&&rs[0].data.quantity_window)||{volume_cf:0,area_sf:0,workdays:0};
+      MT.sched=(rs[0].data&&rs[0].data.sched_days_next14)||0;
+      if(rs[0].data&&rs[0].data.safety_default)MT.safetyDefault=rs[0].data.safety_default;
       MT.expected=(rs[1].data&&rs[1].data.expected)||[];
       MT.txns=(rs[2].data&&rs[2].data.txns)||[];
       MT.projects=(rs[3].data||[]).filter(function(p){return p.project_code!==PROJECT_CODE&&(p.status||'active')!=='closed';});
@@ -7568,6 +7599,19 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     if(m.purchase_unit&&m.pack_qty>1)u+=' · '+esc(m.purchase_unit)+' = '+fmtQ(m.pack_qty);
     return u;
   }
+  // #272b — chips appear ONLY when a consumption map exists (honest absence otherwise)
+  function stChip(m){
+    if(!m.map||!m.stock_status)return '';
+    var lead=(m.lead_time_days!=null)?(' · lead '+m.lead_time_days+'d'):'';
+    if(m.stock_status==='order_now')return '<span class="mt-stchip order_now">Order NOW'+lead+'</span>';
+    if(m.stock_status==='order_by')return '<span class="mt-stchip order_by">Order by '+mdyShort(m.order_by_date)+lead+'</span>';
+    return '<span class="mt-stchip stocked">Stocked</span>';
+  }
+  function burnLine(m){
+    if(!m.map)return '';
+    var left=(m.days_left!=null)?('≈ '+fmtQ(m.days_left)+' days left'):'no recent burn';
+    return '<div class="burnline"><span>burn ~'+fmtQ(m.burn_day)+' '+esc(m.base_unit)+'/day</span><span>'+left+'</span></div>';
+  }
   function renderPinned(pinned){
     var host=$('mt-pinned');
     if(!pinned.length){host.innerHTML='';return;}
@@ -7575,7 +7619,9 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
       return '<div class="mt-card"><div class="nm"><span class="pin" title="Pinned — on the weekly count">📌</span>'+esc(m.name)+'</div>'
         +'<div class="unit">'+unitLine(m)+'</div>'
         +'<div class="row"><span class="qty">'+fmtQ(m.on_hand)+'</span><span class="qlbl">'+esc(m.base_unit)+' on hand</span></div>'
-        +cardMeta(m)+'</div>';
+        +burnLine(m)
+        +cardMeta(m)
+        +stChip(m)+'</div>';
     }).join('');
   }
   function renderCatalog(){
@@ -7588,12 +7634,16 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
       var c=$('mt-empty-copy');if(c)c.onclick=openCopy;
       return;
     }
-    host.innerHTML='<table class="mt-table"><thead><tr><th>Material</th><th>On hand</th><th>Last delivery</th><th>Next expected</th><th>Pinned</th><th></th></tr></thead><tbody>'
+    host.innerHTML='<table class="mt-table"><thead><tr><th>Material</th><th>On hand</th><th>Last delivery</th><th>Next expected</th><th>Burn/day</th><th>Days left</th><th>Status</th><th>Pinned</th><th></th></tr></thead><tbody>'
       +MT.mats.map(function(m){
         var last=m.last_delivery?(mdy(m.last_delivery.date)+' · '+fmtQ(m.last_delivery.qty)+' '+esc(m.base_unit)+(m.last_delivery.vendor?(' · '+esc(m.last_delivery.vendor)):'')):'—';
         var next=m.next_expected?(mdy(m.next_expected.date)+' · '+esc(m.next_expected.status)+(m.next_expected.vendor?(' · '+esc(m.next_expected.vendor)):'')):'—';
+        // #272b — derived columns stay BLANK when unmapped (never zeros pretending)
+        var burn=m.map?fmtQ(m.burn_day):'';
+        var left=m.map?(m.days_left!=null?fmtQ(m.days_left):'—'):'';
         return '<tr><td><span class="nm">'+esc(m.name)+'</span> <span class="un">· '+unitLine(m)+'</span></td>'
           +'<td class="num">'+fmtQ(m.on_hand)+'</td><td>'+last+'</td><td>'+next+'</td>'
+          +'<td class="num">'+burn+'</td><td class="num">'+left+'</td><td>'+stChip(m)+'</td>'
           +'<td><button class="mt-pintog" data-pin="'+m.id+'" title="'+(m.pinned?'Unpin':'Pin to the board + weekly count')+'">'+(m.pinned?'📌':'○')+'</button></td>'
           +'<td><a data-edit="'+m.id+'">edit</a></td></tr>';
       }).join('')+'</tbody></table>';
@@ -7710,8 +7760,41 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     $('mt-mat-vendor').value=m?(m.default_vendor||''):'';
     $('mt-mat-cat').value=m?(m.category||''):'';
     $('mt-mat-pinned').checked=!!(m&&m.pinned);
+    // #272b — consumption map (blank until the operator sets it; nothing preloaded)
+    var mp=m&&m.map?m.map:null;
+    $('mt-mat-driver').value=mp?mp.driver:'';
+    $('mt-mat-yield').value=mp?mp.yield_per_unit:'';
+    $('mt-mat-waste').value=mp&&mp.waste_pct?mp.waste_pct:'';
+    $('mt-mat-safety').value=mp&&mp.safety_days!=null?mp.safety_days:'';
+    $('mt-mat-mapnotes').value=mp&&mp.notes?mp.notes:'';
+    syncYieldLabel(); mapPreview();
     $('mt-mat-err').textContent='';
     openOv('mt-modal-mat');
+  }
+  function syncYieldLabel(){
+    var d=$('mt-mat-driver').value, base=$('mt-mat-base').value||'base unit';
+    var lbl=$('mt-mat-yieldlbl');
+    if(d==='volume_cf')lbl.textContent='Yield — CF per '+base;
+    else if(d==='area_sf')lbl.textContent='Yield — SF per '+base;
+    else if(d==='manual_rate')lbl.textContent='Rate — '+base+' per workday';
+    else lbl.textContent='Yield';
+  }
+  function mapPreview(){
+    var el=$('mt-mat-preview'); if(!el)return;
+    var d=$('mt-mat-driver').value;
+    if(!d){el.textContent='';return;}
+    var y=parseFloat($('mt-mat-yield').value), w=parseFloat($('mt-mat-waste').value)||0;
+    var base=$('mt-mat-base').value||'units';
+    if(!y||y<=0){el.textContent='enter a yield to preview the burn';return;}
+    var f=1+w/100;
+    if(d==='manual_rate'){
+      el.textContent='at this map: flat ≈'+fmtQ(y*f)+' '+base+'/workday';
+    }else{
+      var qty=d==='volume_cf'?(MT.window.volume_cf||0):(MT.window.area_sf||0);
+      var unitName=d==='volume_cf'?'CF':'SF';
+      var burn=(qty/y)*f/14;
+      el.textContent='at current pace: trailing 14 days logged '+fmtQ(qty)+' '+unitName+' → ≈'+fmtQ(burn)+' '+base+'/day';
+    }
   }
   async function saveMat(){
     var err=$('mt-mat-err'); err.textContent='';
@@ -7724,6 +7807,19 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
       var r=await fetch(url,{method:MT.editId?'PATCH':'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
       var j=await r.json().catch(function(){return {};});
       if(!r.ok||j.error){err.textContent=(j&&j.error)||('Save failed ('+r.status+')');return;}
+      // #272b — persist the consumption map (or unmap when the driver was cleared)
+      var matId=MT.editId||(j.data&&j.data.id);
+      var driver=$('mt-mat-driver').value;
+      if(matId&&driver){
+        var mr=await fetch('/api/materials/'+matId+'/consumption-map',{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({driver:driver,yield_per_unit:$('mt-mat-yield').value,waste_pct:$('mt-mat-waste').value||0,
+                               safety_days:$('mt-mat-safety').value||null,notes:$('mt-mat-mapnotes').value})});
+        var mj=await mr.json().catch(function(){return {};});
+        if(!mr.ok||mj.error){err.textContent='Material saved, but the map failed: '+((mj&&mj.error)||mr.status);return;}
+      }else if(matId&&!driver&&MT.editId){
+        var had=byId(MT.editId);
+        if(had&&had.map){await fetch('/api/materials/'+matId+'/consumption-map',{method:'DELETE',credentials:'include'});}
+      }
       closeOv('mt-modal-mat'); await loadAll();
     }catch(e){err.textContent='Network error';}
   }
@@ -7793,9 +7889,15 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
       var r=await fetch('/api/projects/'+encodeURIComponent(PROJECT_CODE)+'/material-count',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({counts:counts,txn_date:todayLocal()})});
       var j=await r.json().catch(function(){return {};});
       if(!r.ok||j.error){alert('Count failed: '+((j&&j.error)||r.status));return;}
+      Array.prototype.forEach.call($('mt-count-rows').querySelectorAll('.mt-count-hint'),function(h){h.remove();});
       (j.data.results||[]).forEach(function(x){
         var el=$('mt-count-rows').querySelector('[data-drift="'+x.material_id+'"]');
         if(el){el.textContent=x.drift===0?'no drift':('drift '+(x.drift>0?'+':'')+fmtQ(x.drift));el.style.color=x.drift===0?'#0c7a5f':'#a23b30';}
+        // #272b — waste-recalibration HINT (informational only; the map is never touched)
+        if(x.usage_check&&x.usage_check.hint&&el){
+          var row=el.closest('.mt-count-row');
+          if(row)row.insertAdjacentHTML('afterend','<div class="mt-count-hint">⚠ '+esc(x.usage_check.hint)+'</div>');
+        }
       });
       // leave the drift readable for a beat, then refresh the ledger views
       setTimeout(function(){ loadAll().then(function(){ $('mt-count-panel').classList.remove('mt-hide'); }); }, 2600);
@@ -7846,6 +7948,11 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     $('mt-log-qty').addEventListener('input',updateLogPreview);
     $('mt-log-unit').addEventListener('change',updateLogPreview);
     $('mt-tr-mat').addEventListener('change',syncTrUnits);
+    // #272b — live map preview in the edit modal
+    $('mt-mat-driver').addEventListener('change',function(){syncYieldLabel();mapPreview();});
+    $('mt-mat-base').addEventListener('change',function(){syncYieldLabel();mapPreview();});
+    $('mt-mat-yield').addEventListener('input',mapPreview);
+    $('mt-mat-waste').addEventListener('input',mapPreview);
     $('mt-log-seg').addEventListener('click',function(e){
       var s=e.target.closest('span[data-t]'); if(!s)return;
       MT.logType=s.getAttribute('data-t');

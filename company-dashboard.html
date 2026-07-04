@@ -465,6 +465,18 @@
           </div>
         </div>
 
+        <!-- #272b — materials reorder alerts across ALL projects (admin/c_suite console;
+             rows appear only for materials whose operator-set consumption map says
+             order-by/order-now — no map, no row; nothing fabricated) -->
+        <div class="grid-stack-item" gs-id="material-alerts" gs-x="0" gs-y="7" gs-w="5" gs-h="3">
+          <div class="grid-stack-item-content">
+            <section class="ph-widget" data-widget="material-alerts">
+              <div class="ph-widget-head"><h3>Materials — order alerts</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
+              <div class="ph-widget-body" id="cc-materials-body"><div class="ph-loading">Loading…</div></div>
+            </section>
+          </div>
+        </div>
+
         <div class="grid-stack-item" gs-id="on-site" gs-x="9" gs-y="0" gs-w="3" gs-h="4">
           <div class="grid-stack-item-content">
             <section class="ph-widget" data-widget="on-site">
@@ -4165,7 +4177,7 @@ applyLanguage();
 
   async function load(){
     const t=todayLocal();
-    const [summary,projects,rollup,drops,onSite,compliance,activity]=await Promise.all([
+    const [summary,projects,rollup,drops,onSite,compliance,activity,matAlerts]=await Promise.all([
       jget('/api/company/summary'),
       jget('/api/projects'),
       jget(`/api/dropplan/projects/${PROJECT}/rollup`),
@@ -4173,6 +4185,7 @@ applyLanguage();
       jget(`/api/projects/${PROJECT}/on-site?date=${t}`),
       jget('/api/compliance/summary'),
       jget('/api/activity/recent?limit=12'),
+      jget('/api/company/material-alerts'),
     ]);
     const S=(summary&&summary.data)||{}, D=(drops&&drops.data)||[], R=(rollup&&rollup.data)||{};
     try{ renderKpis(S,D,R); }catch(e){ console.warn('[CC] kpis',e); }
@@ -4180,6 +4193,27 @@ applyLanguage();
     try{ renderCompliance(S,compliance); }catch(e){ console.warn('[CC] compliance',e); }
     try{ renderOnSite(onSite); }catch(e){ console.warn('[CC] onsite',e); }
     try{ renderActivity(activity); }catch(e){ console.warn('[CC] activity',e); }
+    try{ renderMaterialAlerts(matAlerts); }catch(e){ console.warn('[CC] materials',e); }
+  }
+
+  // #272b — every project's order-now / order-by materials in one glance. Rows exist
+  // only where an operator-set consumption map produced a real forecast.
+  function renderMaterialAlerts(resp){
+    const body=$('cc-materials-body'); if(!body)return;
+    const alerts=(resp&&resp.data&&resp.data.alerts)||[];
+    if(!alerts.length){
+      body.innerHTML='<div class="ph-empty"><div class="ph-empty-title">Nothing to order</div><div class="ph-empty-sub">No mapped material is inside its reorder window.</div></div>';
+      return;
+    }
+    body.innerHTML='<div class="cc-rows">'+alerts.map(a=>{
+      const chip=a.stock_status==='order_now'
+        ?'<b style="color:#a23b30;">Order NOW</b>'
+        :`<b style="color:#a05a1f;">Order by ${fmtMDY(a.order_by_date)}</b>`;
+      const left=a.days_left!=null?` · ≈${a.days_left}d left`:'';
+      const lead=a.lead_time_days!=null?` · lead ${a.lead_time_days}d`:'';
+      return `<div class="cc-row"><span>${esc(a.name)} <span style="color:#76777E;">· ${esc(a.project_name)}</span><br>
+        <span style="font-size:11px;color:#76777E;">${a.on_hand} ${esc(a.base_unit)} on hand${left}${lead}</span></span>${chip}</div>`;
+    }).join('')+'</div>';
   }
 
   function renderKpis(S,D,R){
