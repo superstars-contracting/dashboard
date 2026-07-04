@@ -93,6 +93,12 @@ materials.register(app)
 import estimates  # noqa: E402
 estimates.register(app)
 
+# #274 — IRA inspection pipeline + calendar, same 'estimates' section/gating:
+# checklist rail (CD-5 tracking, COI w/ #271-style expiry pill, contract, Fieldwire
+# link, report + payment strip), multi-visit calendar, waiting-on digest.
+import ira  # noqa: E402
+ira.register(app)
+
 # Security: cap upload size. Raised to 256 MB (#235) so a field-photo BATCH POST
 # (many images, several 8-12 MB) isn't rejected at the WSGI layer; the Field
 # Photos UI also uploads in chunks. A request over the cap returns a clean 413

@@ -267,6 +267,14 @@ def convert_to_project(conn, est_id, *, actor_user_id=None) -> dict:
     crm.add_activity(conn, entity_type="organization", entity_id=est["client_org_id"],
                      activity_type="system", author_user_id=actor_user_id, function_tag="sales",
                      summary=f"Estimate {code} converted to project {code}")
+    if est["est_type"] == "IRA":
+        # #274 — a converted IRA estimate is an inspection JOB: create its checklist row
+        # immediately (the ira list also self-heals, so pre-#274 conversions backfill).
+        try:
+            import ira
+            ira.ensure_job(conn, code, est_id)
+        except ImportError:
+            pass   # #273-only deployment — the #274 migration backfills later
     return {"already": False, "project_code": code, "estimate": get_estimate(conn, est_id)}
 
 
@@ -297,11 +305,13 @@ def est_public(row, org_name=None, contact_name=None) -> dict:
 
 
 def doc_public(d) -> dict:
-    """PII/path-safe shape — NO file_path. file_url is the GATED route, not a path."""
+    """PII/path-safe shape — NO file_path. file_url is the GATED route, not a path.
+    expiry_date rides along when present (#274 — the COI's #271-style pill source)."""
     return {
         "id": d["id"], "estimate_id": d["estimate_id"], "category": d["category"],
         "title": d["title"], "doc_type": d["doc_type"], "file_name": d["file_name"],
         "file_size": d["file_size"], "mime": d["mime"], "uploaded_at": d["uploaded_at"],
+        "expiry_date": d.get("expiry_date"),
         "file_url": f"/api/estimates/documents/{d['id']}/file",
     }
 
@@ -325,7 +335,8 @@ def _doc_save_file(code, fs):
     return fpath, doc_type, mime, fpath.stat().st_size
 
 
-def add_document(conn, est_id, fs, *, category, title=None, uploaded_by=None) -> int:
+def add_document(conn, est_id, fs, *, category, title=None, uploaded_by=None,
+                 expiry_date=None) -> int:
     est = get_estimate(conn, est_id)
     if not est:
         raise LookupError("estimate not found")
@@ -335,12 +346,18 @@ def add_document(conn, est_id, fs, *, category, title=None, uploaded_by=None) ->
     fpath, doc_type, mime, size = _doc_save_file(est["code"], fs)
     try:
         file_name = Path(fs.filename or "document").name
+        cols = ["estimate_id", "category", "title", "doc_type", "file_path", "file_name",
+                "file_size", "mime", "uploaded_by", "uploaded_at"]
+        vals = [est_id, category, (title or "").strip() or file_name, doc_type,
+                str(fpath), file_name, size, mime, uploaded_by, _now()]
+        # #274 — expiry_date column exists once apply_ira_274 ran; include it only when
+        # provided so a #273-only schema (older gate DB) keeps working unchanged.
+        if expiry_date:
+            cols.append("expiry_date")
+            vals.append(expiry_date)
         conn.execute(
-            "INSERT INTO estimate_document (estimate_id, category, title, doc_type, "
-            "file_path, file_name, file_size, mime, uploaded_by, uploaded_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (est_id, category, (title or "").strip() or file_name, doc_type,
-             str(fpath), file_name, size, mime, uploaded_by, _now()))
+            f"INSERT INTO estimate_document ({', '.join(cols)}) "
+            f"VALUES ({','.join('?' * len(cols))})", vals)
         conn.commit()
         r = conn.execute("SELECT MAX(id) AS m FROM estimate_document").fetchone()
         return r["m"]
