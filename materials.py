@@ -35,7 +35,8 @@ from pathlib import Path
 
 from flask import jsonify, request, send_file
 
-from auth import _db, _now_iso, current_user, requires_role
+from auth import _db, _now_iso, current_user, requires_company, requires_role
+import db_layer
 import pm_scoping
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -226,10 +227,21 @@ def _api_list_materials(project_code):
         next_e = _next_expected_map(conn, project_code)
         mats = [_mat_public(m, on_hand.get(m["id"], 0), last_d.get(m["id"]),
                             next_e.get(m["id"])) for m in rows]
+        # #272b — mapped materials gain derived burn/forecast fields; unmapped get
+        # NOTHING (honest absence, never zeros pretending). Compute-on-read.
+        extras = {}
+        if consumption_ready(conn):
+            derived, extras = _project_derivation(conn, project_code, rows, on_hand)
+            for m in mats:
+                if m["id"] in derived:
+                    m.update(derived[m["id"]])
         return jsonify({"data": {"materials": mats,
                                  "units": list(_units()),
+                                 "drivers": list(DRIVERS),
+                                 "safety_default": SAFETY_DEFAULT,
                                  "pinned_count": sum(1 for m in mats if m["pinned"]),
-                                 "total": len(mats)}})
+                                 "total": len(mats),
+                                 **extras}})
     finally:
         conn.close()
 
@@ -795,7 +807,11 @@ def _api_weekly_count(project_code):
         return jsonify({"error": "txn_date must be YYYY-MM-DD"}), 400
     conn = _db()
     try:
+        from datetime import date, timedelta
         on_hand = _on_hand_map(conn, project_code)
+        today = date.today()
+        maps = (_maps_for(conn, [int(k) for k in counts.keys()])
+                if consumption_ready(conn) else {})
         results = []
         for k, v in counts.items():
             try:
@@ -808,15 +824,331 @@ def _api_weekly_count(project_code):
                 return jsonify({"error": f"material {mid} not found on this project"}), 404
             before = on_hand.get(mid, 0)
             drift = round(counted - before, 4)
+            item = {"material_id": mid, "name": m["name"], "before": before,
+                    "counted": counted, "drift": drift}
+            # #272b — estimate-vs-count recalibration HINT (never auto-adjusts the map).
+            # The ledger never subtracts consumption, so (ledger − counted) IS the
+            # actual usage since the ledger was last true (the previous count, or the
+            # trailing window). Compare to what the operator's map PREDICTED for the
+            # same window; suggest a waste% that would have matched. Read BEFORE the
+            # count_adjust below lands, so the math uses the pre-reconcile ledger.
+            mp = maps.get(mid)
+            if mp:
+                last = conn.execute(
+                    "SELECT MAX(txn_date) FROM material_txn WHERE material_id=? "
+                    "AND txn_type='count_adjust'", (mid,)).fetchone()[0]
+                start = last or (today - timedelta(days=TRAIL_DAYS)).isoformat()
+                win = _quantity_window(conn, project_code, start, today.isoformat())
+                f = 1.0 + (float(mp["waste_pct"] or 0) / 100.0)
+                y = float(mp["yield_per_unit"])
+                if mp["driver"] == "manual_rate":
+                    expected = y * f * win["workdays"]
+                else:
+                    qty = win["volume_cf"] if mp["driver"] == "volume_cf" else win["area_sf"]
+                    expected = (qty / y) * f if y > 0 else 0.0
+                actual = round(before - counted, 4)   # positive = used since last truth
+                if expected > 1e-9 and actual > 0:
+                    over = (actual - expected) / expected
+                    item["usage_check"] = {"expected_used": round(expected, 2),
+                                           "actual_used": actual,
+                                           "over_pct": round(over * 100)}
+                    if abs(over) >= 0.05:
+                        w = float(mp["waste_pct"] or 0)
+                        suggested = max(0, round(((1 + w / 100.0) * (actual / expected) - 1) * 100))
+                        item["usage_check"]["hint"] = (
+                            f"actual usage ran ~{abs(round(over*100))}% "
+                            f"{'over' if over > 0 else 'under'} the map — "
+                            f"consider waste {round(w)}%→{suggested}%")
             if abs(drift) > 1e-9:
                 _insert_txn(conn, project_code, mid, "count_adjust", drift, counted,
                             m["base_unit"], None, txn_date,
                             f"weekly count: counted {counted}, ledger said {before}")
-            results.append({"material_id": mid, "name": m["name"], "before": before,
-                            "counted": counted, "drift": drift})
+            results.append(item)
         conn.commit()
         return jsonify({"data": {"results": results,
                                  "adjusted": sum(1 for x in results if abs(x["drift"]) > 1e-9)}})
+    finally:
+        conn.close()
+
+
+# ============= #272b — DERIVED CONSUMPTION, BURN, REORDER (compute-on-read) =============
+# The field never logs usage. Consumption is DERIVED from the drop-plan quantity_entries
+# the crew already enters, through a PER-MATERIAL, OPERATOR-EDITED map (yield + waste —
+# the catalog rule extends to numbers: nothing hardcoded, blank until set). No map = no
+# burn/forecast fields at all (honest absence). Nothing derived is ever stored — every
+# number traces to quantity_entries rows × the operator's own map at read time.
+
+DRIVERS = ("volume_cf", "area_sf", "manual_rate")
+SAFETY_DEFAULT = 4        # days — spec default; per-material override on the map
+TRAIL_DAYS = 14           # trailing burn window (LOCAL calendar days)
+FWD_DAYS = 14             # look-ahead window for forward demand
+AMBER_DAYS = 7            # order_by within a week -> amber chip
+
+_CONSUMPTION_READY = False
+
+
+def consumption_ready(conn) -> bool:
+    """Catalog probe for material_consumption_map (the #269 lesson: NEVER try/except a
+    failed statement on Postgres — it aborts the whole transaction). Pre-migration the
+    module degrades to #272a behavior: no derived fields anywhere."""
+    global _CONSUMPTION_READY
+    if _CONSUMPTION_READY:
+        return True
+    if db_layer.is_postgres():
+        found = bool(conn.execute(
+            "SELECT 1 FROM information_schema.tables WHERE table_schema='public' "
+            "AND table_name='material_consumption_map'").fetchone())
+    else:
+        found = bool(conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='material_consumption_map'"
+        ).fetchone())
+    if found:
+        _CONSUMPTION_READY = True
+    return found
+
+
+def _map_public(r) -> dict:
+    return {"driver": r["driver"], "yield_per_unit": r["yield_per_unit"],
+            "waste_pct": r["waste_pct"],
+            "safety_days": r["safety_days"] if r["safety_days"] is not None else SAFETY_DEFAULT,
+            "notes": r["notes"], "updated_at": r["updated_at"]}
+
+
+def _maps_for(conn, material_ids) -> dict:
+    ids = [int(i) for i in material_ids]
+    if not ids or not consumption_ready(conn):
+        return {}
+    rows = conn.execute(
+        f"SELECT * FROM material_consumption_map WHERE material_id IN ({','.join(['?']*len(ids))})",
+        ids).fetchall()
+    return {r["material_id"]: r for r in rows}
+
+
+def _quantity_window(conn, project_code, start_iso, end_iso) -> dict:
+    """Drop-plan quantities logged in (start, end] for this project: total volume_cf,
+    derived area_sf (length×width unit-corrected + flat entries logged with unit SF),
+    and the count of distinct work days. LOCAL date strings; REAL sums (dual-backend)."""
+    r = conn.execute(
+        "SELECT COALESCE(SUM(q.volume_cf), 0), "
+        "COALESCE(SUM(CASE WHEN q.length IS NOT NULL AND q.width IS NOT NULL "
+        "  THEN (q.length * CASE q.length_unit WHEN 'in' THEN 1.0/12.0 ELSE 1.0 END) "
+        "     * (q.width  * CASE q.width_unit  WHEN 'in' THEN 1.0/12.0 ELSE 1.0 END) "
+        "  ELSE 0 END), 0), "
+        "COALESCE(SUM(CASE WHEN q.quantity IS NOT NULL AND UPPER(COALESCE(q.unit,''))='SF' "
+        "  THEN q.quantity ELSE 0 END), 0), "
+        "COUNT(DISTINCT q.logged_on) "
+        "FROM quantity_entries q JOIN drops d ON d.drop_id = q.drop_id "
+        "WHERE d.project_code=? AND q.logged_on > ? AND q.logged_on <= ?",
+        (project_code, start_iso, end_iso)).fetchone()
+    return {"volume_cf": round(float(r[0] or 0), 4),
+            "area_sf": round(float(r[1] or 0) + float(r[2] or 0), 4),
+            "workdays": int(r[3] or 0)}
+
+
+def _sched_days_next(conn, project_code, today) -> int:
+    """Distinct calendar days in (today, today+FWD_DAYS] covered by look-ahead
+    activities — v1's whole forward model (do NOT over-model)."""
+    from datetime import timedelta
+    lo, hi = today, today + timedelta(days=FWD_DAYS)
+    rows = conn.execute(
+        "SELECT planned_start, planned_finish FROM lookahead_activity "
+        "WHERE project_code=? AND planned_finish > ? AND planned_start <= ?",
+        (project_code, lo.isoformat(), hi.isoformat())).fetchall()
+    days = set()
+    for r in rows:
+        try:
+            s = datetime.strptime(str(r[0])[:10], "%Y-%m-%d").date()
+            e = datetime.strptime(str(r[1])[:10], "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        d = max(s, lo + timedelta(days=1))
+        end = min(e, hi)
+        while d <= end:
+            days.add(d)
+            d += timedelta(days=1)
+    return len(days)
+
+
+def _derive_one(map_row, window, sched_days, on_hand, lead_days, today) -> dict:
+    """The whole #272b math, in one traceable place. Returns the derived fields for ONE
+    mapped material. All 'consumed' figures are base units over the trailing window.
+
+      volume_cf / area_sf : consumed = driver_qty ÷ yield × (1 + waste%)
+                            burn/day = consumed ÷ 14 (calendar)
+      manual_rate         : burn/day = yield × (1 + waste%) (flat per-workday rate)
+                            consumed = burn/day × trailing workdays
+      per-workday pace    = consumed ÷ max(trailing workdays, 1)
+      forward/day         = per-workday × scheduled_days_next14 ÷ 14
+      days_left           = on_hand ÷ max(burn/day, forward/day)
+      order_by            = today + days_left − (lead_time + safety_days)
+      chip                : order_by ≤ today -> order_now; ≤ today+7 -> order_by; else stocked
+    """
+    from datetime import timedelta
+    f = 1.0 + (float(map_row["waste_pct"] or 0) / 100.0)
+    y = float(map_row["yield_per_unit"])
+    driver = map_row["driver"]
+    workdays = window["workdays"]
+    if driver == "manual_rate":
+        burn_day = y * f
+        consumed = burn_day * workdays
+        per_workday = burn_day
+    else:
+        qty = window["volume_cf"] if driver == "volume_cf" else window["area_sf"]
+        consumed = (qty / y) * f if y > 0 else 0.0
+        burn_day = consumed / TRAIL_DAYS
+        per_workday = consumed / max(workdays, 1)
+    forward_day = per_workday * (sched_days / float(FWD_DAYS))
+    rate = max(burn_day, forward_day)
+    out = {"consumed_14d": round(consumed, 2), "burn_day": round(burn_day, 2),
+           "forward_day": round(forward_day, 2)}
+    if rate <= 1e-9:
+        out.update({"days_left": None, "order_by_date": None, "stock_status": "stocked"})
+        return out
+    days_left = max(float(on_hand or 0), 0.0) / rate
+    safety = map_row["safety_days"] if map_row["safety_days"] is not None else SAFETY_DEFAULT
+    order_by = today + timedelta(days=int(days_left)) - timedelta(days=int(lead_days or 0) + int(safety))
+    status = ("order_now" if order_by <= today
+              else ("order_by" if order_by <= today + timedelta(days=AMBER_DAYS) else "stocked"))
+    out.update({"days_left": round(days_left, 1), "order_by_date": order_by.isoformat(),
+                "stock_status": status})
+    return out
+
+
+def _project_derivation(conn, project_code, mats_rows, on_hand_map):
+    """(per-material derived dict, payload extras) for one project — one window query,
+    one schedule scan, shared by the list endpoint and the company widget."""
+    from datetime import date, timedelta
+    today = date.today()
+    start = (today - timedelta(days=TRAIL_DAYS)).isoformat()
+    window = _quantity_window(conn, project_code, start, today.isoformat())
+    sched = _sched_days_next(conn, project_code, today)
+    maps = _maps_for(conn, [m["id"] for m in mats_rows])
+    derived = {}
+    for m in mats_rows:
+        mp = maps.get(m["id"])
+        if not mp:
+            continue
+        d = _derive_one(mp, window, sched, on_hand_map.get(m["id"], 0),
+                        m["lead_time_days"], today)
+        d["map"] = _map_public(mp)
+        derived[m["id"]] = d
+    return derived, {"quantity_window": window, "sched_days_next14": sched}
+
+
+@requires_role(*_MAT_ROLES)
+def _api_put_consumption_map(material_id):
+    """PUT /api/materials/<id>/consumption-map — upsert the operator's map (driver,
+    yield, waste %, safety days, notes). One map per material; per-resource gated."""
+    b = request.get_json(silent=True) or {}
+    conn = _db()
+    try:
+        if not consumption_ready(conn):
+            return jsonify({"error": "consumption schema not migrated — run apply_material_consumption_272b.py"}), 503
+        m = _material(conn, material_id)
+        if not m:
+            return jsonify({"error": "not found"}), 404
+        if not _can_project(conn, m["project_code"]):
+            return jsonify({"error": "forbidden"}), 403
+        driver = (b.get("driver") or "").strip()
+        if driver not in DRIVERS:
+            return jsonify({"error": f"driver must be one of {', '.join(DRIVERS)}"}), 400
+        try:
+            y = float(b.get("yield_per_unit"))
+        except (TypeError, ValueError):
+            return jsonify({"error": "yield_per_unit must be a number"}), 400
+        if y <= 0:
+            return jsonify({"error": "yield_per_unit must be positive"}), 400
+        try:
+            waste = float(b.get("waste_pct") or 0)
+        except (TypeError, ValueError):
+            return jsonify({"error": "waste_pct must be a number"}), 400
+        if waste < 0 or waste > 500:
+            return jsonify({"error": "waste_pct must be between 0 and 500"}), 400
+        safety = b.get("safety_days")
+        if safety is None or str(safety).strip() == "":
+            safety = None
+        else:
+            try:
+                safety = int(safety)
+            except (TypeError, ValueError):
+                return jsonify({"error": "safety_days must be an integer"}), 400
+            if safety < 0:
+                return jsonify({"error": "safety_days must be >= 0"}), 400
+        notes = (b.get("notes") or "").strip() or None
+        now = _now_iso()
+        if conn.execute("SELECT 1 FROM material_consumption_map WHERE material_id=?",
+                        (material_id,)).fetchone():
+            conn.execute(
+                "UPDATE material_consumption_map SET driver=?, yield_per_unit=?, waste_pct=?, "
+                "safety_days=?, notes=?, updated_at=? WHERE material_id=?",
+                (driver, y, waste, safety, notes, now, material_id))
+        else:
+            conn.execute(
+                "INSERT INTO material_consumption_map (material_id, driver, yield_per_unit, "
+                "waste_pct, safety_days, notes, updated_at) VALUES (?,?,?,?,?,?,?)",
+                (material_id, driver, y, waste, safety, notes, now))
+        conn.commit()
+        r = conn.execute("SELECT * FROM material_consumption_map WHERE material_id=?",
+                         (material_id,)).fetchone()
+        return jsonify({"data": {"material_id": material_id, "map": _map_public(r)}})
+    finally:
+        conn.close()
+
+
+@requires_role(*_MAT_ROLES)
+def _api_delete_consumption_map(material_id):
+    """DELETE /api/materials/<id>/consumption-map — unmap; the material returns to the
+    honest chipless state."""
+    conn = _db()
+    try:
+        if not consumption_ready(conn):
+            return jsonify({"error": "consumption schema not migrated"}), 503
+        m = _material(conn, material_id)
+        if not m:
+            return jsonify({"error": "not found"}), 404
+        if not _can_project(conn, m["project_code"]):
+            return jsonify({"error": "forbidden"}), 403
+        conn.execute("DELETE FROM material_consumption_map WHERE material_id=?", (material_id,))
+        conn.commit()
+        return jsonify({"data": {"material_id": material_id, "map": None}})
+    finally:
+        conn.close()
+
+
+@requires_company
+def _api_company_material_alerts():
+    """GET /api/company/material-alerts — admin/c_suite console widget: every project's
+    Order-NOW / Order-by materials in one list (order_now first, then soonest date)."""
+    conn = _db()
+    try:
+        if not consumption_ready(conn):
+            return jsonify({"data": {"alerts": []}})
+        codes = [r[0] for r in conn.execute(
+            "SELECT DISTINCT project_code FROM material WHERE active=1").fetchall()]
+        names = {r[0]: r[1] for r in conn.execute(
+            "SELECT project_code, name FROM projects").fetchall()}
+        alerts = []
+        for code in codes:
+            mats = conn.execute(
+                "SELECT * FROM material WHERE project_code=? AND active=1", (code,)).fetchall()
+            if not mats:
+                continue
+            oh = _on_hand_map(conn, code)
+            derived, _extras = _project_derivation(conn, code, mats, oh)
+            for m in mats:
+                d = derived.get(m["id"])
+                if not d or d.get("stock_status") in (None, "stocked"):
+                    continue
+                alerts.append({
+                    "project_code": code, "project_name": names.get(code) or code,
+                    "material_id": m["id"], "name": m["name"], "base_unit": m["base_unit"],
+                    "on_hand": oh.get(m["id"], 0), "burn_day": d["burn_day"],
+                    "days_left": d["days_left"], "order_by_date": d["order_by_date"],
+                    "lead_time_days": m["lead_time_days"], "stock_status": d["stock_status"],
+                })
+        alerts.sort(key=lambda a: (0 if a["stock_status"] == "order_now" else 1,
+                                   a["order_by_date"] or "9999-12-31"))
+        return jsonify({"data": {"alerts": alerts}})
     finally:
         conn.close()
 
@@ -852,3 +1184,10 @@ def register(app) -> None:
                      _api_receive_expected, methods=["POST"])
     app.add_url_rule("/api/projects/<project_code>/material-count", "materials_count",
                      _api_weekly_count, methods=["POST"])
+    # #272b — consumption maps + the company-console reorder widget
+    app.add_url_rule("/api/materials/<int:material_id>/consumption-map", "materials_map_put",
+                     _api_put_consumption_map, methods=["PUT"])
+    app.add_url_rule("/api/materials/<int:material_id>/consumption-map", "materials_map_delete",
+                     _api_delete_consumption_map, methods=["DELETE"])
+    app.add_url_rule("/api/company/material-alerts", "materials_company_alerts",
+                     _api_company_material_alerts, methods=["GET"])
