@@ -49,6 +49,7 @@ GATE = [
     "smoke_client_grants_269.py",# #269 — selective client un-gating (per-section default-off grants)
     "smoke_preview_presets_270.py",# #270 — preview-as-client parity + presets + doc bulk share
     "smoke_docs_photos_271.py",   # #271 — doc versioning + view-not-print + EXIF capture order
+    "smoke_materials_272.py",     # #272a — materials catalog/ledger/expected/count + role gates
     "smoke_crm_266.py",           # #266 — CRM/ops core (C-suite-gated; entities/activity/tasks/needs-attention)
     "smoke_dropplan_api.py",
     "smoke_worker_lifecycle.py",
