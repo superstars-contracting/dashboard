@@ -52,6 +52,7 @@ GATE = [
     "smoke_materials_272.py",     # #272a — materials catalog/ledger/expected/count + role gates
     "smoke_materials_272b.py",    # #272b — derived consumption/burn/reorder math + hint + widget
     "smoke_crm_266.py",           # #266 — CRM/ops core (C-suite-gated; entities/activity/tasks/needs-attention)
+    "smoke_estimates_273.py",     # #273 — estimates/bid tracking (numeric series, transitions, convert, gated docs)
     "smoke_dropplan_api.py",
     "smoke_worker_lifecycle.py",
     "smoke_dcr214_lifecycle.py",
