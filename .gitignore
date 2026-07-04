@@ -199,3 +199,4 @@ MIGRATION_REPORT.txt
 
 # #259 dev-only local Postgres (binaries + data) — never commit
 .pgdev/
+.dev_db_url

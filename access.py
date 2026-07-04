@@ -25,6 +25,12 @@ SECTION_ACCESS = {
     # external role) get 403 on every CRM endpoint and the CRM tab is absent from their nav.
     # function-tags on the data are recorded for future role-slicing — NO new roles here.
     "crm": frozenset({"admin", "c_suite"}),
+    # #273/#274 — Estimates/bids + the IRA inspection pipeline + inspection calendar live
+    # in ONE company-console section, CRM-class gating: admin/c_suite ONLY. Amounts and
+    # payment status never touch a field-reachable surface — pm/super/external get 403 on
+    # every /api/estimates/* and /api/ira/* endpoint, and the console page itself already
+    # 403s non-company roles (#263), so the section is fully absent for them.
+    "estimates": frozenset({"admin", "c_suite"}),
 }
 
 # #263 — COMPANY axis. The company overview console (`/`) and its company-level tabs

@@ -86,6 +86,13 @@ client_grants.register(app)
 import materials  # noqa: E402
 materials.register(app)
 
+# #273 — Estimate/bid tracking on the company console: the general estimate log
+# ({TYPE}-{BORO}-{NNN} series), attachments (gated by-id serving), server-validated
+# status pipeline + one-click convert-to-project, CRM-linked activity ('sales').
+# Every endpoint @requires_section('estimates') = admin/c_suite (access.py, one source).
+import estimates  # noqa: E402
+estimates.register(app)
+
 # Security: cap upload size. Raised to 256 MB (#235) so a field-photo BATCH POST
 # (many images, several 8-12 MB) isn't rejected at the WSGI layer; the Field
 # Photos UI also uploads in chunks. A request over the cap returns a clean 413
@@ -10854,6 +10861,18 @@ def internal_error(error):
 
 if __name__ == '__main__':
     import sys
+    # #273 — DEV-ONLY isolation marker: when `python server.py` (this __main__ dev
+    # path — production waitress imports server:app and NEVER runs it) starts with
+    # no SSC_DB_URL, a gitignored `.dev_db_url` file redirects the dev server to an
+    # ISOLATED DB copy so browser preview sessions can never write the live
+    # superstars.db (CLAUDE.md isolation rule). Loud banner when active; delete the
+    # file to point a manual dev run back at live.
+    _dev_marker = SCRIPT_DIR / '.dev_db_url'
+    if not os.environ.get('SSC_DB_URL') and _dev_marker.exists():
+        _dev_url = _dev_marker.read_text(encoding='utf-8').strip()
+        if _dev_url:
+            os.environ['SSC_DB_URL'] = _dev_url
+            print("\n  *** DEV DB OVERRIDE (.dev_db_url) — ISOLATED COPY, NOT LIVE ***", flush=True)
     print("\n" + "=" * 60, flush=True)
     print("  Server starting...", flush=True)
     print("  Try in browser: http://127.0.0.1:5050", flush=True)

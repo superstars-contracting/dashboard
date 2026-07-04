@@ -118,8 +118,16 @@ def ensure_crm_schema(conn) -> dict:
               body           TEXT,
               author_user_id INTEGER,
               occurred_at    TEXT,
-              created_at     TEXT
+              created_at     TEXT,
+              function_tag   TEXT
             )""")
+    # #273 — activity rows gain a function_tag (finance|sales|compliance|ops|exec), same
+    # vocab as crm_task: the estimates pipeline stamps its auto-logged rows 'sales'.
+    # Additive for tables created before #273.
+    changed["crm_activity_function_tag"] = False
+    if "function_tag" not in _columns(conn, "crm_activity"):
+        conn.execute("ALTER TABLE crm_activity ADD COLUMN function_tag TEXT")
+        changed["crm_activity_function_tag"] = True
     conn.execute("CREATE INDEX IF NOT EXISTS idx_crmact_entity ON crm_activity(entity_type, entity_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_crmact_occurred ON crm_activity(occurred_at)")
 

@@ -222,7 +222,10 @@ def update_contact(conn, contact_id, **fields) -> bool:
 # ============================ activity (the timeline) ============================
 
 def add_activity(conn, *, entity_type, entity_id, activity_type, summary=None, body=None,
-                 author_user_id=None, occurred_at=None) -> int:
+                 author_user_id=None, occurred_at=None, function_tag=None) -> int:
+    """#273 — optional function_tag (same vocab as crm_task): the estimates/IRA pipeline
+    stamps its auto-logged rows 'sales' so future role-slicing can filter the timeline.
+    Requires the #273 migration (ensure_crm_schema adds the column additively)."""
     if entity_type not in ACTIVITY_ENTITIES:
         raise ValueError(f"invalid entity_type: {entity_type}")
     if activity_type not in ACTIVITY_TYPES:
@@ -230,9 +233,9 @@ def add_activity(conn, *, entity_type, entity_id, activity_type, summary=None, b
     occurred = (occurred_at or "").strip() or _now()   # user-picked LOCAL, else now
     conn.execute(
         "INSERT INTO crm_activity (entity_type, entity_id, activity_type, summary, body, "
-        "author_user_id, occurred_at, created_at) VALUES (?,?,?,?,?,?,?,?)",
+        "author_user_id, occurred_at, created_at, function_tag) VALUES (?,?,?,?,?,?,?,?,?)",
         (entity_type, entity_id, activity_type, (summary or "").strip() or None,
-         (body or "").strip() or None, author_user_id, occurred, _now()))
+         (body or "").strip() or None, author_user_id, occurred, _now(), _one_tag(function_tag)))
     conn.commit()
     return _new_id(conn, "crm_activity")
 
