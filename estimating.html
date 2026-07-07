@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/files/static/fonts/typography.css">
+<link rel="stylesheet" href="/files/static/css/widgets.css?v=276">
+<script src="/files/static/js/datepicker.js?v=276"></script>
+<title>Estimating · Superstars Contracting</title>
+<!-- #276 — THE ESTIMATING WORKSPACE (blueprint Build B; bound visual reference:
+     MOCKUP_estimating_workspace_v2.html). estimator/admin/c_suite only — served by
+     estimating.py behind access.SECTION_ACCESS['estimating']; every API it calls is
+     server-gated the same way. OPERATOR COLOR LAW: green/blue/coral/oat status-only;
+     divisions = neutral oat chips; brand red = identity (codes). OPERATOR BORDER
+     RULE: neutral hairline boxes; blue glow hover/focus; RED glow only on items
+     demanding attention (stage aged past SLA). Status lives INSIDE cards. -->
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--canvas);color:var(--ink);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;}
+  .top{display:flex;align-items:center;gap:12px;padding:16px 26px;background:#fff;border-bottom:1px solid var(--line);}
+  .top .mark{width:30px;height:30px;display:block;object-fit:contain;}
+  .top .brand-home{display:inline-flex;text-decoration:none;}
+  .top h1{font-size:16px;font-weight:800;letter-spacing:.3px;}
+  .top .who{margin-left:auto;font-size:12px;color:var(--muted);text-align:right;}
+  .top .who b{color:var(--ink);font-weight:700;}
+  .top .who a{color:var(--accent);text-decoration:none;font-weight:700;margin-left:10px;cursor:pointer;}
+  .wrap{max-width:1000px;margin:0 auto;padding:26px 18px 80px;}
+  .card-sh{box-shadow:0 1px 2px rgba(30,35,60,.04), 0 8px 24px rgba(30,35,60,.06);}
+
+  /* ===== HERO BAND (ring + segmented bar + counts — mockup v2) ===== */
+  .hero{background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px 24px;display:flex;gap:22px;align-items:center;margin-bottom:18px;
+        box-shadow:0 1px 2px rgba(30,35,60,.04), 0 8px 24px rgba(30,35,60,.06);}
+  .ring{width:86px;height:86px;border-radius:50%;flex:none;position:relative;background:var(--status-oat-soft);}
+  .ring::after{content:"";position:absolute;inset:9px;background:#fff;border-radius:50%;}
+  .ring .rv{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1;}
+  .ring .rv b{font-size:17px;font-weight:800;}
+  .ring .rv span{font-size:8px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);}
+  .hero-main{flex:1;min-width:0;}
+  .hero-main h2{font-size:15px;font-weight:800;margin-bottom:10px;}
+  .hero-main h2 small{font-weight:600;color:var(--muted);font-size:11.5px;margin-left:8px;}
+  .bigbar{height:12px;border-radius:99px;overflow:hidden;display:flex;background:var(--status-oat-soft);}
+  .bigbar i{display:block;height:100%;}
+  .bigbar .seg-g{background:linear-gradient(90deg,#12986f,var(--status-complete));}
+  .bigbar .seg-b{background:linear-gradient(90deg,var(--accent),#5d7bee);}
+  .bigbar .seg-c{background:linear-gradient(90deg,var(--status-behind),#f08276);}
+  .legend{display:flex;gap:18px;margin-top:10px;flex-wrap:wrap;}
+  .legend span{font-size:11.5px;font-weight:600;color:var(--muted);display:inline-flex;align-items:center;gap:6px;}
+  .legend i{width:9px;height:9px;border-radius:99px;display:inline-block;}
+  .hero-stats{flex:none;text-align:right;border-left:1px solid var(--line);padding-left:22px;}
+  .hero-stats .v{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;}
+  .hero-stats .k{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-top:2px;}
+
+  /* ===== QUEUE CARDS (neutral hairline; blue glow hover; RED glow = attention) ===== */
+  .qrow{background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px 18px 13px;margin-bottom:12px;display:flex;gap:16px;align-items:center;
+        box-shadow:0 1px 2px rgba(30,35,60,.04), 0 8px 24px rgba(30,35,60,.06);
+        transition:box-shadow .15s, border-color .15s, transform .15s;}
+  .qrow:hover{border-color:var(--accent-edge);box-shadow:0 0 0 3px rgba(67,100,220,.10), 0 2px 4px rgba(30,35,60,.06), 0 14px 34px rgba(30,35,60,.10);transform:translateY(-1px);}
+  .qrow.hl-red{border-color:rgba(177,30,46,.45);box-shadow:0 0 0 3px rgba(177,30,46,.08), 0 1px 2px rgba(30,35,60,.04), 0 8px 24px rgba(30,35,60,.06);}
+  .qrow.hl-red:hover{border-color:rgba(177,30,46,.6);box-shadow:0 0 0 3px rgba(177,30,46,.12), 0 2px 4px rgba(30,35,60,.06), 0 14px 34px rgba(30,35,60,.10);}
+  .q-main{min-width:0;flex:1;}
+  .q-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+  .q-title{font-size:13.5px;font-weight:800;}
+  .q-title .code{color:var(--brand-red);}
+  .dchip{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#7a6f5c;background:var(--status-oat-soft);border:1px solid #e8e2d6;border-radius:6px;padding:2px 8px;}
+  .kind{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#5b6270;background:#eef0f4;border-radius:6px;padding:2px 8px;}
+  .q-sub{font-size:11.5px;color:var(--muted);margin-top:4px;}
+  .q-sub a{color:var(--accent-ink);text-decoration:none;font-weight:700;}
+  .pipe{display:flex;align-items:center;gap:5px;margin-top:11px;}
+  .pipe .seg{height:6px;flex:1;border-radius:99px;background:var(--status-oat-soft);}
+  .pipe .seg.done{background:var(--status-complete);}
+  .pipe .seg.now{background:var(--accent);position:relative;overflow:hidden;}
+  .pipe .seg.now::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);}
+  .pipe .seg.late{background:var(--status-behind);}
+  .pipe-lbl{display:flex;justify-content:space-between;margin-top:5px;}
+  .pipe-lbl span{font-size:8.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#c3c8d2;flex:1;text-align:center;}
+  .pipe-lbl span.on{color:var(--accent-ink);}
+  .pipe-lbl span.done{color:#0c7a5f;}
+  .pipe-lbl span.late{color:#a23b30;}
+  .q-side{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:7px;min-width:190px;}
+  .agepill{font-size:10px;font-weight:800;padding:3px 10px;border-radius:999px;text-transform:uppercase;letter-spacing:.4px;}
+  .agepill.ok{color:#0c7a5f;background:var(--status-complete-soft);}
+  .agepill.late{color:#a23b30;background:var(--status-behind-soft);}
+  .due{font-size:10.5px;font-weight:700;color:#a23b30;}
+  .due.calm{color:var(--muted);}
+  .q-side .row{display:flex;gap:7px;align-items:center;}
+  .btn-back{font-size:11px;font-weight:700;padding:6px 10px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--muted);cursor:pointer;}
+  .btn-back:hover{border-color:var(--accent-edge);color:var(--accent-ink);}
+  .withvp{font-size:11px;font-weight:700;color:var(--muted);padding:6px 4px;}
+  .empty{padding:34px 20px;text-align:center;color:var(--muted);background:#fff;border:1px dashed var(--line);border-radius:14px;font-size:13px;line-height:1.7;}
+
+  /* modal (shared shell shape; fields carry .ssc-field — the #275 structural guard scans this page) */
+  .est-modal-bg{position:fixed;inset:0;background:rgba(20,22,28,.45);z-index:1500;display:none;align-items:center;justify-content:center;padding:20px;}
+  .est-modal-bg.show{display:flex;}
+  .est-modal{background:#fff;border-radius:14px;width:100%;max-width:440px;max-height:90vh;overflow:auto;box-shadow:0 18px 60px rgba(0,0,0,.28);}
+  .est-modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line);}
+  .est-modal-head h3{margin:0;font-size:15px;}
+  .est-modal-x{cursor:pointer;color:#9a96a2;font-size:20px;line-height:1;background:none;border:0;}
+  .est-modal-body{padding:18px 20px;}
+  .est-modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;border-top:1px solid var(--line);}
+  .fld{margin-bottom:12px;}
+  .fld label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#76777E;margin-bottom:5px;}
+  .fld .ssc-field{width:100%;}
+  .m-err{color:var(--brand-red);font-size:12px;margin-top:8px;display:none;}
+  .m-err.show{display:block;}
+  @media (max-width:720px){ .qrow{flex-direction:column;align-items:stretch;} .q-side{align-items:flex-start;min-width:0;} .hero{flex-direction:column;align-items:stretch;} .hero-stats{border-left:none;padding-left:0;text-align:left;} }
+</style>
+</head>
+<body>
+<div class="top">
+  <a class="brand-home" href="/estimating" title="Estimating"><img class="mark" src="/files/static/brand/mark.svg" alt="Superstars Contracting"></a>
+  <h1>Estimating</h1>
+  <div class="who" id="who">—</div>
+</div>
+
+<div class="wrap">
+  <!-- HERO -->
+  <div class="hero" id="hero" style="display:none;">
+    <div class="ring" id="ring"><div class="rv"><b id="ring-n">0</b><span>Open</span></div></div>
+    <div class="hero-main">
+      <h2>Estimating pipeline · all divisions <small id="div-counts"></small></h2>
+      <div class="bigbar" id="bigbar"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="hero-stats">
+      <div><div class="v" id="due-n">0</div><div class="k">Bids due this week</div></div>
+    </div>
+  </div>
+
+  <div id="queue"><div class="empty">Loading the queue…</div></div>
+</div>
+
+<!-- modal shell -->
+<div class="est-modal-bg" id="m-bg">
+  <div class="est-modal" role="dialog" aria-modal="true">
+    <div class="est-modal-head"><h3 id="m-title">—</h3><button type="button" class="est-modal-x" id="m-x">&times;</button></div>
+    <div class="est-modal-body" id="m-body"></div>
+    <div class="est-modal-foot">
+      <button type="button" class="btn-ghost" id="m-cancel">Cancel</button>
+      <button type="button" class="btn-primary" id="m-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var q = function(id){ return document.getElementById(id); };
+  function esc(s){ if(s==null) return ''; return String(s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  function fmtD(s){ s=(s||'').slice(0,10); if(!s) return '—'; return (window.SSCDatePicker && SSCDatePicker.fmtMDY(s)) || s; }
+  function getISO(el){ return el ? (window.SSCDatePicker ? (SSCDatePicker.getISO(el)||'') : (el.value||'').trim()) : ''; }
+
+  async function api(method, path, body){
+    var opts = { method: method, credentials: 'include', headers: {} };
+    if (body !== undefined){ opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify(body); }
+    var r = await fetch(path, opts);
+    var j = null; try { j = await r.json(); } catch(e){}
+    if (!r.ok) throw new Error((j && j.error) || ('HTTP '+r.status));
+    return j ? j.data : null;
+  }
+
+  var modalSave = null;
+  function openModal(title, bodyHtml, onSave, saveLabel){
+    q('m-title').textContent = title;
+    q('m-body').innerHTML = bodyHtml + '<div class="m-err" id="m-err"></div>';
+    q('m-save').textContent = saveLabel || 'Save';
+    modalSave = onSave;
+    q('m-bg').classList.add('show');
+    if (window.SSCDatePicker){ q('m-body').querySelectorAll('input.ssc-date').forEach(function(el){ SSCDatePicker.wire(el); }); }
+    var first = q('m-body').querySelector('input,select,textarea'); if(first) try{ first.focus(); }catch(e){}
+  }
+  function closeModal(){ q('m-bg').classList.remove('show'); q('m-body').innerHTML=''; modalSave = null; }
+  function modalErr(msg){ var e=q('m-err'); if(e){ e.textContent=msg; e.classList.add('show'); } }
+
+  var SEG_LBL = ['Intake','Walkthrough','Proposal','VP','Submitted'];
+  var DIV_SHORT = { facade:'FR', rope_access:'RA', interior:'IR', parking_garage:'PG' };
+
+  function renderHero(h){
+    q('hero').style.display = '';
+    q('ring-n').textContent = h.open_total;
+    var total = Math.max(1, h.open_total);
+    var deg = function(n){ return Math.round(360 * n / total); };
+    var g = deg(h.submitted), b = deg(h.in_estimating), c = deg(h.stalled);
+    q('ring').style.background = 'conic-gradient('
+      + 'var(--status-complete) 0 ' + g + 'deg,'
+      + 'var(--accent) ' + g + 'deg ' + (g+b) + 'deg,'
+      + 'var(--status-behind) ' + (g+b) + 'deg ' + (g+b+c) + 'deg,'
+      + 'var(--status-oat) ' + (g+b+c) + 'deg 360deg)';
+    var pct = function(n){ return (100 * n / total) + '%'; };
+    q('bigbar').innerHTML = '<i class="seg-g" style="width:'+pct(h.submitted)+';"></i>'
+      + '<i class="seg-b" style="width:'+pct(h.in_estimating)+';"></i>'
+      + '<i class="seg-c" style="width:'+pct(h.stalled)+';"></i>';
+    q('legend').innerHTML =
+      '<span><i style="background:var(--status-complete);"></i>'+h.submitted+' submitted</span>'
+      + '<span><i style="background:var(--accent);"></i>'+h.in_estimating+' in estimating</span>'
+      + '<span><i style="background:var(--status-behind);"></i>'+h.stalled+' stalled / overdue</span>'
+      + '<span><i style="background:var(--status-oat);"></i>'+h.intake+' new intake</span>';
+    var dc = h.division_counts || {};
+    q('div-counts').textContent = Object.keys(dc).map(function(k){ return (DIV_SHORT[k]||k)+' '+dc[k]; }).join(' · ');
+    q('due-n').textContent = h.bids_due_week;
+    q('due-n').style.color = h.bids_due_week > 0 ? '#a23b30' : 'var(--ink)';
+  }
+
+  function pipeHtml(lead){
+    var segs = lead.pipe.map(function(s){ return '<span class="seg '+(s==='todo'?'':s)+'"></span>'; }).join('');
+    var lbls = lead.pipe.map(function(s, i){
+      var txt = SEG_LBL[i];
+      if (i === 1 && lead.walkthrough_date && (s === 'now' || s === 'late')) txt = 'Walkthrough '+fmtD(lead.walkthrough_date).slice(0,5);
+      if (s === 'late') txt += ' — '+lead.age_days+'d overdue';
+      var cls = s==='now' ? 'on' : (s==='done' ? 'done' : (s==='late' ? 'late' : ''));
+      return '<span class="'+cls+'">'+esc(txt)+'</span>';
+    }).join('');
+    return '<div class="pipe">'+segs+'</div><div class="pipe-lbl">'+lbls+'</div>';
+  }
+
+  function dueHtml(lead){
+    if (!lead.bid_due_date) return '<span class="due calm">No bid deadline</span>';
+    var d = lead.bid_due_days;
+    if (d === null) return '<span class="due calm">No bid deadline</span>';
+    if (d < 0) return '<span class="due">Bid was due '+fmtD(lead.bid_due_date)+' — '+(-d)+'d ago</span>';
+    return '<span class="due'+(d>7?' calm':'')+'">Bid due '+fmtD(lead.bid_due_date)+' — '+d+' day'+(d===1?'':'s')+'</span>';
+  }
+
+  var BACK_OF = { walkthrough_scheduled:'received', walkthrough_done:'walkthrough_scheduled',
+                  proposal_draft:'walkthrough_done', sent_to_vp:'proposal_draft' };
+
+  function renderQueue(d){
+    renderHero(d.hero);
+    var host = q('queue');
+    if (!d.leads.length){
+      host.innerHTML = '<div class="empty">The queue is clear — new leads land here from intake.</div>';
+      return;
+    }
+    host.innerHTML = d.leads.map(function(l){
+      var chips = '<span class="dchip">'+esc(l.division_label||'—')+(l.ra_subtype?' · '+esc(l.ra_subtype):'')+'</span>'
+        + '<span class="kind">'+esc((l.inquiry_kind||'undetermined').toUpperCase())+'</span>';
+      var sub = esc(l.building_address||'—')
+        + (l.docs_count ? ' · <a href="#" data-docs="'+l.id+'">'+l.docs_count+' doc'+(l.docs_count===1?'':'s')+'</a>' : ' · no docs');
+      var act = '';
+      if (l.action && l.action.action){
+        act = '<button type="button" class="btn-primary" style="padding:7px 14px;font-size:11.5px;" data-act="'+esc(l.action.action)+'" data-id="'+l.id+'">'+esc(l.action.label)+'</button>';
+      } else if (l.est_stage === 'sent_to_vp'){
+        act = '<span class="withvp">With VP · '+l.age_days+'d</span>';
+      }
+      var back = (l.status==='scoping' && BACK_OF[l.est_stage])
+        ? '<button type="button" class="btn-back" data-back="'+esc(BACK_OF[l.est_stage])+'" data-id="'+l.id+'" title="One step back">←</button>' : '';
+      return '<div class="qrow'+(l.overdue?' hl-red':'')+'" id="lead-'+esc(l.code)+'">'
+        + '<div class="q-main">'
+        +   '<div class="q-top"><span class="q-title"><span class="code">'+esc(l.code)+'</span> · '+esc(l.org_name||'—')+'</span>'+chips+'</div>'
+        +   '<div class="q-sub">'+sub+'</div>'
+        +   pipeHtml(l)
+        + '</div>'
+        + '<div class="q-side">'
+        +   '<span class="agepill '+(l.overdue?'late':'ok')+'">'+l.age_days+'d in stage</span>'
+        +   dueHtml(l)
+        +   '<div class="row">'+back+act+'</div>'
+        + '</div></div>';
+    }).join('');
+    host.querySelectorAll('[data-act]').forEach(function(b){
+      b.addEventListener('click', function(){ doAction(b.getAttribute('data-act'), +b.getAttribute('data-id')); });
+    });
+    host.querySelectorAll('[data-back]').forEach(function(b){
+      b.addEventListener('click', function(){
+        api('POST','/api/estimating/'+b.getAttribute('data-id')+'/stage', { stage: b.getAttribute('data-back') })
+          .then(load).catch(function(e){ alert(e.message); });
+      });
+    });
+    host.querySelectorAll('[data-docs]').forEach(function(a){
+      a.addEventListener('click', function(ev){ ev.preventDefault(); showDocs(+a.getAttribute('data-docs')); });
+    });
+    // deep link: /estimating#CODE scrolls to the card with a brief focus glow
+    if (location.hash){
+      var el = document.getElementById('lead-'+location.hash.slice(1));
+      if (el){ el.scrollIntoView({behavior:'smooth', block:'center'});
+        el.style.borderColor='var(--accent-edge)'; el.style.boxShadow='0 0 0 3px rgba(67,100,220,.14)';
+        setTimeout(function(){ el.style.borderColor=''; el.style.boxShadow=''; }, 2200); }
+    }
+  }
+
+  var LEADS = {};
+  function doAction(act, id){
+    if (act === 'start'){
+      api('POST','/api/estimating/'+id+'/start').then(load).catch(function(e){ alert(e.message); });
+    } else if (act === 'schedule_walkthrough'){
+      openModal('Schedule walkthrough',
+        '<div class="fld"><label>Walkthrough date *</label><input class="ssc-date ssc-field" id="f-wd" placeholder="MM/DD/YYYY"></div>',
+        async function(){
+          var iso = getISO(q('f-wd'));
+          if (!iso){ modalErr('Pick the walkthrough date.'); return false; }
+          await api('POST','/api/estimating/'+id+'/stage', { stage:'walkthrough_scheduled', walkthrough_date: iso });
+          closeModal(); load(); return false;
+        }, 'Schedule');
+    } else if (act === 'walkthrough_done'){
+      api('POST','/api/estimating/'+id+'/stage', { stage:'walkthrough_done' }).then(load).catch(function(e){ alert(e.message); });
+    } else if (act === 'proposal_draft'){
+      api('POST','/api/estimating/'+id+'/stage', { stage:'proposal_draft' }).then(load).catch(function(e){ alert(e.message); });
+    } else if (act === 'send_to_vp'){
+      var l = LEADS[id] || {};
+      openModal('Send to VP',
+        '<div class="fld"><label>Proposal amount</label><input class="ssc-field" id="f-amt" type="number" step="0.01" min="0" value="'+(l.final_amount!=null?l.final_amount:'')+'"></div>'
+        + '<div class="fld"><label>QB estimate #</label><input class="ssc-field" id="f-qb" value="'+esc(l.qb_estimate_ref||'')+'"></div>'
+        + '<div style="font-size:11.5px;color:var(--muted);line-height:1.5;">The VP approves from his table — amount + QB reference are required by approval time; enter them now if you have them.</div>',
+        async function(){
+          await api('POST','/api/estimating/'+id+'/stage',
+            { stage:'sent_to_vp', final_amount: q('f-amt').value.trim() || null, qb_estimate_ref: q('f-qb').value.trim() || null });
+          closeModal(); load(); return false;
+        }, 'Send to VP');
+    }
+  }
+
+  async function showDocs(id){
+    try {
+      var docs = await api('GET','/api/estimates/'+id+'/documents');
+      openModal('Documents',
+        (docs||[]).map(function(x){
+          return '<div style="padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px;">'
+            + '<a href="'+esc(x.file_url)+'" target="_blank" rel="noopener" style="color:var(--accent-ink);font-weight:700;text-decoration:none;">'+esc(x.title||x.file_name)+'</a>'
+            + ' <span style="color:var(--muted);font-size:11px;">'+esc(x.category)+' · '+fmtD(x.uploaded_at)+'</span></div>';
+        }).join('') || '<div style="color:var(--muted);font-size:12.5px;">No documents.</div>',
+        async function(){ return true; }, 'Close');
+      q('m-cancel').style.display = 'none';
+    } catch(e){ alert(e.message); }
+  }
+
+  async function load(){
+    try {
+      var d = await api('GET','/api/estimating/queue');
+      (d.leads||[]).forEach(function(l){ LEADS[l.id] = l; });
+      renderQueue(d);
+    } catch(e){ q('queue').innerHTML = '<div class="empty">'+esc(e.message)+'</div>'; }
+  }
+
+  q('m-x').addEventListener('click', function(){ q('m-cancel').style.display=''; closeModal(); });
+  q('m-cancel').addEventListener('click', closeModal);
+  q('m-bg').addEventListener('click', function(e){ if(e.target===q('m-bg')){ q('m-cancel').style.display=''; closeModal(); } });
+  q('m-save').addEventListener('click', async function(){
+    if (!modalSave) return;
+    var btn = q('m-save'); btn.disabled = true;
+    try {
+      var ok = await modalSave();
+      if (ok !== false){ q('m-cancel').style.display=''; closeModal(); }
+    } catch(e){ modalErr(e.message || 'Could not save.'); }
+    finally { btn.disabled = false; }
+  });
+
+  fetch('/api/auth/me', {credentials:'include'}).then(function(r){ return r.ok ? r.json() : null; }).then(function(j){
+    var u = j && j.data && j.data.user ? j.data.user : (j && j.data ? j.data : null);
+    if (u) q('who').innerHTML = '<b>'+esc(u.display_name||u.full_name||u.email)+'</b> · '+esc(u.role)
+      + ' <a id="signout">Sign out</a>';
+    var so = q('signout');
+    if (so) so.addEventListener('click', function(){
+      fetch('/api/auth/logout', {method:'POST', credentials:'include'}).then(function(){ window.location.href='/login'; });
+    });
+  }).catch(function(){});
+
+  load();
+})();
+</script>
+<div style="text-align:center;color:#9aa3ae;font-size:11px;margin:10px 0 26px;">build #276 · 2026-07-07 · Estimating workspace — queue, pipeline strips, SLA aging (stage 7d · VP 3d), stage machine</div>
+</body>
+</html>

@@ -761,6 +761,37 @@
     .ira-wait-row { padding:8px 0; border-bottom:1px solid #F2EFE7; font-size:12px; }
     .ira-wait-row:last-child { border-bottom:none; }
     .ira-wait-code { font-weight:700; color:var(--brand-red); cursor:pointer; }
+    /* ===== #276 — VP table + pipeline strips + lead chips (mockup v2; color law:
+       green/blue/coral/oat status-only, oat chips for divisions, red glow = attention) ===== */
+    .dchip { display:inline-block; font-size:9px; font-weight:800; letter-spacing:.6px; text-transform:uppercase;
+             color:#7a6f5c; background:var(--status-oat-soft); border:1px solid #e8e2d6; border-radius:6px; padding:2px 8px; }
+    .kindchip { font-size:9px; font-weight:800; letter-spacing:.6px; text-transform:uppercase;
+                color:#5b6270; background:#eef0f4; border-radius:6px; padding:2px 8px; }
+    .pipe { display:flex; align-items:center; gap:4px; margin-top:9px; }
+    .pipe .seg { height:5px; flex:1; border-radius:99px; background:var(--status-oat-soft); }
+    .pipe .seg.done { background:var(--status-complete); }
+    .pipe .seg.now { background:var(--accent); position:relative; overflow:hidden; }
+    .pipe .seg.now::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent); }
+    .pipe .seg.late { background:var(--status-behind); }
+    .est-card.hl-red { border-color:rgba(177,30,46,.45); box-shadow: inset 0 0 13px var(--accent-in), 0 0 0 3px rgba(177,30,46,.08), 0 1px 4px rgba(0,0,0,.04); }
+    .vp-band { display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+    .vp-stat { flex:1; min-width:200px; background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px 16px;
+               box-shadow:0 1px 2px rgba(30,35,60,.04), 0 8px 24px rgba(30,35,60,.06); display:flex; align-items:center; gap:12px; }
+    .mini-ring { width:40px; height:40px; border-radius:50%; flex:none; position:relative; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; }
+    .mini-ring::before { content:""; position:absolute; inset:0; border-radius:50%; background:var(--ring-bg, var(--status-oat-soft)); }
+    .mini-ring::after { content:""; position:absolute; inset:4px; background:#fff; border-radius:50%; }
+    .mini-ring b { position:relative; z-index:1; }
+    .vp-stat .k { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); }
+    .vp-stat .s { font-size:12px; font-weight:700; margin-top:1px; }
+    .vprow { background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:8px; display:flex; gap:12px; align-items:center;
+             box-shadow:0 1px 2px rgba(30,35,60,.04), 0 8px 24px rgba(30,35,60,.06); transition:border-color .15s, box-shadow .15s; }
+    .vprow:hover { border-color:var(--accent-edge); box-shadow:0 0 0 3px rgba(67,100,220,.10), 0 1px 2px rgba(30,35,60,.04), 0 8px 24px rgba(30,35,60,.06); }
+    .vprow.hl-red { border-color:rgba(177,30,46,.45); box-shadow:0 0 0 3px rgba(177,30,46,.08), 0 1px 2px rgba(30,35,60,.04), 0 8px 24px rgba(30,35,60,.06); }
+    .vprow .vp-main { min-width:0; flex:1; }
+    .vprow .vp-t { font-size:13px; font-weight:700; }
+    .vprow .vp-t .code { color:var(--brand-red); }
+    .vprow .vp-s { font-size:11px; color:var(--muted); margin-top:2px; }
+    .vprow .amount { flex:none; font-size:14px; font-weight:800; font-variant-numeric:tabular-nums; }
   </style>
   <div class="panel" data-panel="estimates">
     <div class="section">
@@ -776,6 +807,7 @@
 
       <div class="est-subtabs" id="est-subtabs">
         <div class="est-subtab active" data-estview="board">Estimates Board</div>
+        <div class="est-subtab" data-estview="vptable">VP's Table</div>
         <div class="est-subtab" data-estview="inspections">Inspections</div>
         <div class="est-subtab" data-estview="calendar">Calendar</div>
       </div>
@@ -783,6 +815,22 @@
       <!-- BOARD view: grouped by status -->
       <div class="est-view" data-estview="board">
         <div id="est-board"><div class="est-empty">Loading…</div></div>
+      </div>
+
+      <!-- #276 — THE VP'S TABLE: everything pending exactly his action. Stat band
+           (mini-rings) + awaiting-approval rows (red glow past the 3d SLA) + the
+           stalled-in-estimating list (past the 7d stage SLA; Nudge pokes the
+           estimator). Follow-up funnel + Gmail drafts are Build D — nothing here. -->
+      <div class="est-view" data-estview="vptable" style="display:none;">
+        <div class="vp-band" id="vp-band"></div>
+        <div class="est-box">
+          <div class="est-box-head"><h3>Awaiting your approval</h3></div>
+          <div id="vp-awaiting"><div class="est-empty">Loading…</div></div>
+        </div>
+        <div class="est-box">
+          <div class="est-box-head"><h3>Stalled in estimating</h3></div>
+          <div id="vp-stalled"></div>
+        </div>
       </div>
 
       <!-- #274 — INSPECTIONS view: every converted IRA job + its checklist rail -->
@@ -4361,7 +4409,7 @@ applyLanguage();
 })();
 </script>
 
-<div class="container"><div class="ph-build" id="cc-build-stamp">build #275 · 2026-07-04 · Estimates + IRA pipeline (#273/#274) + boxed-field root fix: structural any-modal-field design guard — no enumerated field lists ever again (#275)</div></div>
+<div class="container"><div class="ph-build" id="cc-build-stamp">build #276 · 2026-07-07 · Estimating division core — divisions/bid-PO/due dates, estimating sub-stages, estimator role + /estimating workspace, the VP's table with SLA aging + attention glow, honest backfill</div></div>
 
 <script>
 /* ===== Company console widgets (#210) — live data + reused #209 drag framework.
@@ -4900,6 +4948,7 @@ applyLanguage();
   var BOARD_ORDER = ['intake','scoping','submitted','approved','lost'];
   var GROUP_DOT = { intake:'var(--status-oat)', scoping:'#1b7f79', submitted:'#5a4fb8',
                     approved:'var(--status-complete)', lost:'#b9bac2' };
+  var DIV_LABEL = { facade:'Facade', rope_access:'Rope Access', interior:'Interior', parking_garage:'Parking Garage' };
 
   function showView(name){
     document.querySelectorAll('.est-view').forEach(function(v){ v.style.display = (v.getAttribute('data-estview')===name)?'':'none'; });
@@ -4923,14 +4972,21 @@ applyLanguage();
       var html = BOARD_ORDER.map(function(st){
         var items = byStatus[st] || [];
         var cards = items.map(function(e){
-          return '<div class="est-card" data-est="'+e.id+'">'
+          // #276 — division/kind chips + the per-lead pipeline strip (server-mapped)
+          var chips = '<span class="est-type-chip">'+esc(e.est_type)+'</span>'
+            + (e.division ? '<span class="dchip">'+esc(DIV_LABEL[e.division]||e.division)+(e.ra_subtype?' · '+esc(e.ra_subtype):'')+'</span>' : '')
+            + (e.inquiry_kind && e.inquiry_kind!=='undetermined' ? '<span class="kindchip">'+esc(e.inquiry_kind.toUpperCase())+'</span>' : '');
+          var strip = e.pipe ? '<div class="pipe">'+e.pipe.map(function(s){ return '<span class="seg '+(s==='todo'?'':s)+'"></span>'; }).join('')+'</div>' : '';
+          return '<div class="est-card'+(e.overdue?' hl-red':'')+'" data-est="'+e.id+'">'
             + '<div class="est-card-code">'+esc(e.code)+'</div>'
             + '<div class="est-card-org">'+esc(e.org_name||'—')+'</div>'
             + '<div class="est-card-addr">'+esc(e.building_address||'')+'</div>'
-            + '<div class="est-card-row"><span class="est-type-chip">'+esc(e.est_type)+'</span>'
+            + '<div class="est-card-row">'+chips
             + (e.final_amount!=null ? '<span class="est-amount">'+fmtMoney(e.final_amount)+'</span>' : '')
             + '</div>'
-            + '<div class="est-card-age">'+(e.age_days===0?'entered today':(e.age_days+'d in stage'))+'</div>'
+            + strip
+            + '<div class="est-card-age">'+(e.age_days===0?'entered today':(e.age_days+'d in stage'))
+            + (e.bid_due_date ? ' · <span style="color:#a23b30;font-weight:700;">bid due '+fmtD(e.bid_due_date)+'</span>' : '')+'</div>'
             + '</div>';
         }).join('');
         return '<div class="est-group">'
@@ -4991,6 +5047,11 @@ applyLanguage();
       + kv('Client', esc(e.org_name||'—'))
       + kv('Contact', esc(e.contact_name||'—'))
       + kv('Building address', esc(e.building_address||'—'))
+      + kv('Division', esc((e.division && (DIV_LABEL[e.division]||e.division))||'—')
+           + (e.ra_subtype ? ' · '+esc(e.ra_subtype) : ''))
+      + kv('Inquiry kind', esc((e.inquiry_kind||'undetermined').toUpperCase()))
+      + (e.bid_due_date ? kv('Bid due', fmtD(e.bid_due_date)) : '')
+      + (e.est_stage ? kv('Estimating stage', esc(e.est_stage.replace(/_/g,' '))) : '')
       + kv('QB estimate #', esc(e.qb_estimate_ref||'—'))
       + kv('Final amount', fmtMoney(e.final_amount))
       + kv('Submitted', fmtD(e.submitted_date))
@@ -5089,15 +5150,27 @@ applyLanguage();
     var orgOpts = '<option value="">Choose client…</option>'
       + orgs.map(function(o){ return '<option value="'+o.id+'">'+esc(o.name)+'</option>'; }).join('')
       + '<option value="__new__">+ New organization…</option>';
+    var divOpts = Object.keys(DIV_LABEL).map(function(k){ return '<option value="'+k+'">'+esc(DIV_LABEL[k])+'</option>'; }).join('');
     openModal('New estimate',
       '<div class="est-field-row">'
       +   fieldSel('f-est-type','Type *', typeOpts)
       +   fieldSel('f-est-boro','Borough *', boroOpts)
       + '</div>'
+      + '<div class="est-field-row">'
+      +   fieldSel('f-est-div','Division', divOpts)
+      +   fieldSel('f-est-kind','Inquiry kind', '<option value="undetermined">Undetermined</option><option value="bid">Bid</option><option value="po">PO</option>')
+      + '</div>'
+      + '<div class="est-field" id="f-est-subtype-wrap" style="display:none;">'
+      +   '<label>Rope-access subtype</label><select class="ssc-field" id="f-est-subtype"><option value="inspection">Inspection</option><option value="work">Work</option></select></div>'
       + fieldSel('f-est-org','Client organization *', orgOpts)
       + '<div class="est-field" id="f-est-neworg-wrap" style="display:none;"><label>New organization name *</label><input class="ssc-field" id="f-est-neworg" placeholder="Organization name"></div>'
       + fieldSel('f-est-contact','Contact', '<option value="">—</option>')
       + '<div class="est-field"><label>Building address</label><input class="ssc-field" id="f-est-addr" placeholder="Street address"></div>'
+      + '<div class="est-field-row">'
+      +   '<div class="est-field"><label>Bid due date</label><input class="ssc-date ssc-field" id="f-est-due" placeholder="MM/DD/YYYY"></div>'
+      +   '<div class="est-field"><label>Backfill — in this stage since</label><input class="ssc-date ssc-field" id="f-est-since" placeholder="MM/DD/YYYY"></div>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--muted);margin:-6px 0 10px;">Backfill is for entering the current paper backlog — aging counts from the date you give, honestly.</div>'
       + '<div class="est-field"><label>Notes</label><textarea class="ssc-field" id="f-est-notes" rows="2" style="height:auto;"></textarea></div>',
       async function(){
         var orgSel = q('f-est-org').value;
@@ -5109,17 +5182,34 @@ applyLanguage();
           orgId = no.id;
         } else if (orgSel){ orgId = +orgSel; }
         if (!orgId){ modalErr('Pick or create the client organization.'); return false; }
+        var div = q('f-est-div').value;
         var body = {
           est_type: q('f-est-type').value, borough: q('f-est-boro').value,
           client_org_id: orgId,
           contact_id: q('f-est-contact').value ? +q('f-est-contact').value : null,
           building_address: q('f-est-addr').value.trim() || null,
+          division: div,
+          ra_subtype: div==='rope_access' ? q('f-est-subtype').value : null,
+          inquiry_kind: q('f-est-kind').value,
+          bid_due_date: getISO(q('f-est-due')) || null,
+          in_stage_since: getISO(q('f-est-since')) || null,
           notes: q('f-est-notes').value.trim() || null
         };
         var est = await api('POST','/api/estimates', body);
         closeModal(); openEst(est.id);
         return false;   // we already closed + navigated
       }, 'Create');
+    var DIV_OF_TYPE = { IRA:'rope_access', FR:'facade', IR:'interior', PG:'parking_garage' };
+    function syncDiv(){
+      var t = q('f-est-type').value;
+      if (DIV_OF_TYPE[t]) q('f-est-div').value = DIV_OF_TYPE[t];
+      q('f-est-subtype-wrap').style.display = (q('f-est-div').value==='rope_access') ? '' : 'none';
+    }
+    q('f-est-type').addEventListener('change', syncDiv);
+    q('f-est-div').addEventListener('change', function(){
+      q('f-est-subtype-wrap').style.display = (q('f-est-div').value==='rope_access') ? '' : 'none';
+    });
+    syncDiv();
     q('f-est-org').addEventListener('change', async function(){
       var v = q('f-est-org').value;
       q('f-est-neworg-wrap').style.display = (v==='__new__') ? '' : 'none';
@@ -5185,22 +5275,49 @@ applyLanguage();
   function editModal(){
     if (!curDetail) return;
     var e = curDetail.estimate;
+    var divOpts = Object.keys(DIV_LABEL).map(function(k){
+      return '<option value="'+k+'"'+(e.division===k?' selected':'')+'>'+esc(DIV_LABEL[k])+'</option>'; }).join('');
     openModal('Edit estimate',
       '<div class="est-field"><label>Building address</label><input class="ssc-field" id="f-ed-addr" value="'+esc(e.building_address||'')+'"></div>'
+      + '<div class="est-field-row">'
+      + '<div class="est-field"><label>Division</label><select class="ssc-field" id="f-ed-div">'+divOpts+'</select></div>'
+      + '<div class="est-field"><label>Inquiry kind</label><select class="ssc-field" id="f-ed-kind">'
+      +   ['undetermined','bid','po'].map(function(k){ return '<option value="'+k+'"'+((e.inquiry_kind||'undetermined')===k?' selected':'')+'>'+k.toUpperCase()+'</option>'; }).join('')
+      + '</select></div>'
+      + '</div>'
+      + '<div class="est-field" id="f-ed-subtype-wrap" style="display:'+(e.division==='rope_access'?'':'none')+';">'
+      +   '<label>Rope-access subtype</label><select class="ssc-field" id="f-ed-subtype">'
+      +   ['inspection','work'].map(function(k){ return '<option value="'+k+'"'+((e.ra_subtype||'inspection')===k?' selected':'')+'>'+cap(k)+'</option>'; }).join('')
+      + '</select></div>'
       + '<div class="est-field-row">'
       + '<div class="est-field"><label>QB estimate #</label><input class="ssc-field" id="f-ed-qb" value="'+esc(e.qb_estimate_ref||'')+'"></div>'
       + '<div class="est-field"><label>Final amount</label><input class="ssc-field" id="f-ed-amount" type="number" step="0.01" min="0" value="'+(e.final_amount!=null?e.final_amount:'')+'"></div>'
       + '</div>'
+      + '<div class="est-field-row">'
+      + '<div class="est-field"><label>Bid due date</label><input class="ssc-date ssc-field" id="f-ed-due" placeholder="MM/DD/YYYY"></div>'
+      + '<div class="est-field"><label>Backfill — in this stage since</label><input class="ssc-date ssc-field" id="f-ed-since" placeholder="MM/DD/YYYY"></div>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--muted);margin:-6px 0 10px;">Backfill re-anchors aging to the date you give (paper-backlog entry) — leave blank to keep the true history.</div>'
       + '<div class="est-field"><label>Notes</label><textarea class="ssc-field" id="f-ed-notes" rows="2" style="height:auto;">'+esc(e.notes||'')+'</textarea></div>',
       async function(){
+        var div = q('f-ed-div').value;
         await api('PUT','/api/estimates/'+curId, {
           building_address: q('f-ed-addr').value.trim() || null,
           qb_estimate_ref: q('f-ed-qb').value.trim() || null,
           final_amount: q('f-ed-amount').value.trim() || null,
+          division: div,
+          ra_subtype: div==='rope_access' ? q('f-ed-subtype').value : null,
+          inquiry_kind: q('f-ed-kind').value,
+          bid_due_date: getISO(q('f-ed-due')) || null,
+          in_stage_since: getISO(q('f-ed-since')) || null,
           notes: q('f-ed-notes').value.trim() || null
         });
         closeModal(); openEst(curId); return false;
       });
+    if (e.bid_due_date && window.SSCDatePicker) SSCDatePicker.setISO(q('f-ed-due'), e.bid_due_date);
+    q('f-ed-div').addEventListener('change', function(){
+      q('f-ed-subtype-wrap').style.display = (q('f-ed-div').value==='rope_access') ? '' : 'none';
+    });
   }
 
   function deleteFlow(){
@@ -5234,6 +5351,78 @@ applyLanguage();
         if (!r.ok) throw new Error((j && j.error) || ('HTTP '+r.status));
         closeModal(); openEst(curId); return false;
       }, 'Upload');
+  }
+
+  // ==================== #276 — THE VP'S TABLE ====================
+  function ringStyle(kind, frac){
+    // conic progress ring in the working palette only (status meaning)
+    var col = kind==='late' ? 'var(--status-behind)' : (kind==='green' ? 'var(--status-complete)' : 'var(--accent)');
+    var soft = kind==='late' ? 'var(--status-behind-soft)' : (kind==='green' ? 'var(--status-complete-soft)' : 'var(--accent-soft)');
+    var deg = Math.max(0, Math.min(360, Math.round(360*(frac==null?0.66:frac))));
+    return '--ring-bg: conic-gradient('+col+' 0 '+deg+'deg, '+soft+' '+deg+'deg 360deg);';
+  }
+
+  async function loadVpTable(){
+    var host = q('vp-awaiting');
+    host.innerHTML = '<div class="est-empty">Loading…</div>';
+    try {
+      var d = await api('GET','/api/estimating/vp-table');
+      var b = d.band;
+      q('vp-band').innerHTML =
+        '<div class="vp-stat"><div class="mini-ring" style="'+ringStyle(b.awaiting? 'late':'green', b.awaiting?0.75:1)+'"><b>'+b.awaiting+'</b></div>'
+        + '<div><div class="k">Awaiting your approval</div><div class="s">'+(b.awaiting? ('oldest '+b.awaiting_oldest_days+' day'+(b.awaiting_oldest_days===1?'':'s')) : 'table clear')+'</div></div></div>'
+        + '<div class="vp-stat"><div class="mini-ring" style="'+ringStyle(b.stalled?'late':'green', b.stalled?0.6:1)+'"><b>'+b.stalled+'</b></div>'
+        + '<div><div class="k">Stalled in estimating</div><div class="s">past the '+d.sla.stage_days+'-day stage SLA</div></div></div>'
+        + '<div class="vp-stat"><div class="mini-ring" style="'+ringStyle('blue', 0.66)+'"><b>$</b></div>'
+        + '<div><div class="k">Open pipeline</div><div class="s">'+fmtMoney(b.pipeline_amount)+' · '+b.bids_due_week+' bid'+(b.bids_due_week===1?'':'s')+' due this week</div></div></div>';
+      host.innerHTML = (d.awaiting||[]).map(function(l){
+        var late = l.age_days > d.sla.vp_days;
+        return '<div class="vprow'+(late?' hl-red':'')+'">'
+          + '<div class="vp-main"><div class="vp-t"><span class="code">'+esc(l.code)+'</span> · '+esc(l.org_name||'—')
+          + (l.building_address? ' — '+esc(l.building_address):'')+'</div>'
+          + '<div class="vp-s">'+esc(DIV_LABEL[l.division]||l.division||'—')+' · '
+          + (l.inquiry_kind && l.inquiry_kind!=='undetermined' ? l.inquiry_kind.toUpperCase()+' · ' : '')
+          + 'on your table '+l.age_days+' day'+(l.age_days===1?'':'s')+'</div></div>'
+          + (l.final_amount!=null ? '<span class="amount">'+fmtMoney(l.final_amount)+'</span>' : '<span class="vp-s">no amount yet</span>')
+          + '<button type="button" class="btn-primary" style="padding:7px 13px;font-size:12px;" data-vpapprove="'+l.id+'">Review &amp; approve</button>'
+          + '</div>';
+      }).join('') || '<div class="est-empty">Nothing awaits your approval. 🎉</div>';
+      q('vp-stalled').innerHTML = (d.stalled||[]).map(function(l){
+        return '<div class="vprow hl-red">'
+          + '<div class="vp-main"><div class="vp-t"><span class="code">'+esc(l.code)+'</span> · '+esc(l.org_name||'—')+'</div>'
+          + '<div class="vp-s">'+esc((l.est_stage||'received').replace(/_/g,' '))+' · '+l.age_days+'d in stage'
+          + (l.bid_due_date ? ' · bid due '+fmtD(l.bid_due_date) : '')+'</div></div>'
+          + '<button type="button" class="est-mini-btn" data-nudge="'+l.id+'">Nudge</button>'
+          + '</div>';
+      }).join('') || '<div class="est-empty">Nothing stalled — the funnel is moving.</div>';
+      q('vp-awaiting').querySelectorAll('[data-vpapprove]').forEach(function(btn){
+        btn.addEventListener('click', function(){ vpApproveModal(+btn.getAttribute('data-vpapprove'), d); });
+      });
+      q('vp-stalled').querySelectorAll('[data-nudge]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          btn.disabled = true;
+          api('POST','/api/estimating/'+btn.getAttribute('data-nudge')+'/nudge')
+            .then(function(){ btn.textContent = 'Nudged ✓'; })
+            .catch(function(e){ btn.disabled=false; alert(e.message); });
+        });
+      });
+    } catch(e){ host.innerHTML = '<div class="est-empty">'+esc(e.message)+'</div>'; }
+  }
+
+  function vpApproveModal(id, d){
+    var l = (d.awaiting||[]).find(function(x){ return x.id===id; }) || {};
+    openModal('Review & approve — '+(l.code||''),
+      '<div style="font-size:12.5px;color:var(--ink);line-height:1.6;margin-bottom:12px;">Approving submits this proposal: the macro lifecycle walks scoping → submitted → approved (the #273 machine, both steps logged).</div>'
+      + '<div class="est-field"><label>Final amount *</label><input class="ssc-field" id="f-vp-amt" type="number" step="0.01" min="0" value="'+(l.final_amount!=null?l.final_amount:'')+'"></div>'
+      + '<div class="est-field"><label>QB estimate # *</label><input class="ssc-field" id="f-vp-qb" value="'+esc(l.qb_estimate_ref||'')+'"></div>'
+      + '<div class="est-field"><label>Date</label><input class="ssc-date ssc-field" id="f-vp-date" placeholder="MM/DD/YYYY"></div>',
+      async function(){
+        var amt = q('f-vp-amt').value.trim(), ref = q('f-vp-qb').value.trim();
+        if (!amt || !ref){ modalErr('Approval requires the final amount and the QB estimate reference.'); return false; }
+        await api('POST','/api/estimating/'+id+'/vp-approve',
+          { final_amount:+amt, qb_estimate_ref:ref, date: getISO(q('f-vp-date')) || null });
+        closeModal(); loadVpTable(); return false;
+      }, 'Approve');
   }
 
   // ==================== #274 — IRA pipeline + calendar ====================
@@ -5560,6 +5749,7 @@ applyLanguage();
       t.addEventListener('click', function(){
         var v = t.getAttribute('data-estview'); showView(v);
         if (v==='board') loadBoard();
+        if (v==='vptable') loadVpTable();
         if (v==='inspections') loadJobs();
         if (v==='calendar') loadCalendar();
       });
