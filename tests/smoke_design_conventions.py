@@ -530,7 +530,8 @@ def main():
     REGISTERED = {"company-dashboard.html", "dashboard-static.html", "admin_labor_rates.html",
                   "login.html", "worker-app.html", "dropplan.html", "rfi_submission_form.html",
                   "admin_users.html", "set_password.html",   # #257 multi-user accounts & roles
-                  "admin_projects.html"}   # #263 PM project-scoping (assignment + close screen)
+                  "admin_projects.html",   # #263 PM project-scoping (assignment + close screen)
+                  "estimating.html"}       # #276 estimating workspace (estimator/admin/c_suite)
     EXEMPT = {"facade-dashboard.html", "facade-dashboard-presentation.html"}  # pre-rebuild legacy
     unregistered = []
     for page in sorted(root_dir.glob("*.html")):
@@ -620,7 +621,8 @@ def main():
     # carries NO inline star + NO hollow, and reserves swap-safe space (object-fit:contain)
     LOGO_SURFACES = ["company-dashboard.html", "dashboard-static.html", "projects.html",
                      "client_portal.html", "login.html", "set_password.html", "admin_users.html",
-                     "admin_projects.html", "admin_labor_rates.html", "dropplan.html"]
+                     "admin_projects.html", "admin_labor_rates.html", "dropplan.html",
+                     "estimating.html"]   # #276
 
     # A swapped logo must NEVER shift surrounding layout. object-fit:contain alone is NOT
     # enough — the img also needs a RESERVED width+height box, else a bare <img> renders at
