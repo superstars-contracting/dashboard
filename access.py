@@ -31,6 +31,12 @@ SECTION_ACCESS = {
     # every /api/estimates/* and /api/ira/* endpoint, and the console page itself already
     # 403s non-company roles (#263), so the section is fully absent for them.
     "estimates": frozenset({"admin", "c_suite"}),
+    # #276 — the ESTIMATING QUEUE surfaces (blueprint §5): /estimating + the queue/stage
+    # endpoints + the lead's own detail/docs. The `estimator` role works the queue —
+    # including entering the proposal amount on leads they work — but the console
+    # Estimates section above (board, VP table, CRM links, rollup $) stays admin/c_suite.
+    # pm/super/client get 403 on ALL estimating surfaces.
+    "estimating": frozenset({"admin", "c_suite", "estimator"}),
 }
 
 # #263 — COMPANY axis. The company overview console (`/`) and its company-level tabs

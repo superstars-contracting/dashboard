@@ -99,6 +99,13 @@ estimates.register(app)
 import ira  # noqa: E402
 ira.register(app)
 
+# #276 — the estimating-division core: /estimating workspace (estimator/admin/
+# c_suite via SECTION_ACCESS['estimating']), the estimating sub-stage machine, the
+# VP's table + SLA aging ('estimates' section), internal notifications (stub/record;
+# live SendGrid only when SENDGRID_API_KEY is present).
+import estimating  # noqa: E402
+estimating.register(app)
+
 # Security: cap upload size. Raised to 256 MB (#235) so a field-photo BATCH POST
 # (many images, several 8-12 MB) isn't rejected at the WSGI layer; the Field
 # Photos UI also uploads in chunks. A request over the cap returns a clean 413

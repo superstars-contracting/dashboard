@@ -86,7 +86,8 @@ def _role_home(role: str) -> str:
     # #267/#269 — a client goes to /welcome; the grant-aware client gate forwards clients
     # with >=1 granted section on to /portal (zero grants: the welcome hard-stop stays).
     return {"admin": "/admin/users", "c_suite": "/", "pm": "/projects",
-            "client": "/welcome"}.get(role, "/projects")
+            "client": "/welcome",
+            "estimator": "/estimating"}.get(role, "/projects")   # #276
 
 
 # ============= STATE COOKIE (CSRF) =============

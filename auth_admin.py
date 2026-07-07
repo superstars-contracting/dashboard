@@ -40,11 +40,13 @@ from auth import (_client_ip, _db, _login_audit, _now_iso, current_user,
 SCRIPT_DIR = Path(__file__).resolve().parent
 ADMIN_USERS_PAGE = SCRIPT_DIR / "admin_users.html"
 
-ROLE_CATALOG = ('admin', 'c_suite', 'pm', 'super', 'client', 'architect', 'vendor')
+ROLE_CATALOG = ('admin', 'c_suite', 'pm', 'super', 'client', 'architect', 'vendor',
+                'estimator')   # #276 — the estimating seat (blueprint §5)
 # Onboardable via the UI this phase: the internal tier minus admin (single-admin
 # invariant) + the external `client` (#264 — read-only portal; email/password, forced
-# first-login reset). super + architect/vendor stay defined-not-onboarded for now.
-ONBOARDABLE_ROLES = ('c_suite', 'pm', 'client')
+# first-login reset) + `estimator` (#276 — lands on /estimating, works the queue).
+# super + architect/vendor stay defined-not-onboarded for now.
+ONBOARDABLE_ROLES = ('c_suite', 'pm', 'client', 'estimator')
 # Assignable as a role-change target: anything in the catalog EXCEPT admin
 # (no elevation to admin, ever).
 ASSIGNABLE_ROLES = tuple(r for r in ROLE_CATALOG if r != 'admin')

@@ -51,8 +51,12 @@ EST_TYPES = {
     "IRA": "Industrial Rope Access Inspection",
     "FR":  "Facade Restoration",
     "IR":  "Interior Repair",
+    "PG":  "Parking Garage",   # #276 — the fourth division's code series (blueprint §1)
 }
 BOROUGHS = ("MN", "BX", "BK", "QN", "SI")
+# #276 — division derivation (obvious mappings; editable per lead)
+DIVISION_OF_TYPE = {"IRA": "rope_access", "FR": "facade", "IR": "interior",
+                    "PG": "parking_garage"}
 STATUSES = ("intake", "scoping", "submitted", "approved", "lost", "converted")
 
 # Server-validated pipeline: one step forward, one step back, lost from any live
@@ -102,6 +106,35 @@ def _valid_date(s):
     return s
 
 
+def _has_276(conn) -> bool:
+    """True when the #276 lead-expansion columns exist. Keeps this module working
+    against a #273-only schema (standalone smoke DBs) — same adaptive pattern as
+    add_document's expiry_date."""
+    from apply_crm_266 import _columns
+    return "division" in _columns(conn, "estimate")
+
+
+_DIVISIONS = ("facade", "rope_access", "interior", "parking_garage")
+_INQUIRY_KINDS = ("bid", "po", "undetermined")
+_RA_SUBTYPES = ("inspection", "work")
+
+
+def _validate_lead_fields(*, division=None, ra_subtype=None, inquiry_kind=None,
+                          bid_due_date=None):
+    """#276 lead-field vocabulary checks (ValueError -> 400 at the endpoints)."""
+    if division and division not in _DIVISIONS:
+        raise ValueError(f"unknown division: {division}")
+    st = (ra_subtype or "").strip().lower()
+    if st and st not in _RA_SUBTYPES:
+        raise ValueError(f"unknown ra_subtype: {st}")
+    if st and division != "rope_access":
+        raise ValueError("ra_subtype applies only to the rope_access division")
+    k = (inquiry_kind or "").strip().lower()
+    if k and k not in _INQUIRY_KINDS:
+        raise ValueError(f"unknown inquiry_kind: {k}")
+    _valid_date(bid_due_date)   # raises on garbage
+
+
 # ============================ allocation (the E-00013 rule) ============================
 
 def next_seq(conn, est_type: str, borough: str) -> int:
@@ -131,7 +164,9 @@ def make_code(est_type: str, borough: str, seq: int) -> str:
 # ============================ core logic (shared with the smoke) ============================
 
 def create_estimate(conn, *, est_type, borough, client_org_id, contact_id=None,
-                    building_address=None, notes=None, created_by=None) -> dict:
+                    building_address=None, notes=None, created_by=None,
+                    division=None, ra_subtype=None, inquiry_kind=None,
+                    bid_due_date=None, in_stage_since=None) -> dict:
     est_type = (est_type or "").strip().upper()
     borough = (borough or "").strip().upper()
     if est_type not in EST_TYPES:
@@ -150,13 +185,31 @@ def create_estimate(conn, *, est_type, borough, client_org_id, contact_id=None,
     seq = next_seq(conn, est_type, borough)
     code = make_code(est_type, borough, seq)
     now = _now()
+    cols = ["code", "est_type", "borough", "seq", "client_org_id", "contact_id",
+            "building_address", "status", "notes", "created_by", "created_at",
+            "updated_at", "status_changed_at"]
+    vals = [code, est_type, borough, seq, client_org_id, contact_id,
+            (building_address or "").strip() or None, "intake",
+            (notes or "").strip() or None, created_by, now, now, now]
+    if _has_276(conn):
+        # #276 lead expansion — division derived-defaulted from the type, editable;
+        # kind defaults undetermined; the BACKFILL date makes aging TRUE from day one.
+        division = (division or "").strip().lower() or DIVISION_OF_TYPE.get(est_type)
+        _validate_lead_fields(division=division, ra_subtype=ra_subtype,
+                              inquiry_kind=inquiry_kind, bid_due_date=bid_due_date)
+        since = _valid_date(in_stage_since)
+        if since:
+            vals[cols.index("status_changed_at")] = since
+        cols += ["division", "ra_subtype", "inquiry_kind", "bid_due_date"]
+        vals += [division,
+                 ((ra_subtype or "").strip().lower() or
+                  ("inspection" if (division == "rope_access" and est_type == "IRA") else None))
+                 if division == "rope_access" else None,
+                 (inquiry_kind or "").strip().lower() or "undetermined",
+                 _valid_date(bid_due_date)]
     conn.execute(
-        "INSERT INTO estimate (code, est_type, borough, seq, client_org_id, contact_id, "
-        "building_address, status, notes, created_by, created_at, updated_at, status_changed_at) "
-        "VALUES (?,?,?,?,?,?,?, 'intake', ?,?,?,?,?)",
-        (code, est_type, borough, seq, client_org_id, contact_id,
-         (building_address or "").strip() or None, (notes or "").strip() or None,
-         created_by, now, now, now))
+        f"INSERT INTO estimate ({', '.join(cols)}) VALUES ({','.join('?' * len(cols))})",
+        vals)
     conn.commit()
     new_id = conn.execute("SELECT id FROM estimate WHERE code=?", (code,)).fetchone()["id"]
     if est_type == "IRA":   # the IRA-only extension row exists from day one
@@ -226,6 +279,14 @@ def change_status(conn, est_id, new_status, *, on_date=None, final_amount=None,
     params.append(est_id)
     conn.execute(f"UPDATE estimate SET {', '.join(sets)} WHERE id=?", params)
     conn.commit()
+    if new_status == "scoping" and _has_276(conn):
+        # #276 MACRO/MICRO contract — entering estimating initializes the sub-machine
+        # at 'received' (once; a submitted->scoping pull-back keeps its prior stage).
+        conn.execute(
+            "UPDATE estimate SET est_stage=COALESCE(est_stage,'received'), "
+            "est_stage_changed_at=COALESCE(est_stage_changed_at, ?) WHERE id=?",
+            (_now(), est_id))
+        conn.commit()
     crm.add_activity(conn, entity_type="organization", entity_id=est["client_org_id"],
                      activity_type="system", author_user_id=actor_user_id, function_tag="sales",
                      summary=f"Estimate {est['code']}: {old} → {new_status}")
@@ -289,6 +350,7 @@ def _age_days(row) -> int:
 
 
 def est_public(row, org_name=None, contact_name=None) -> dict:
+    d = dict(row)
     return {
         "id": row["id"], "code": row["code"], "est_type": row["est_type"],
         "type_label": EST_TYPES.get(row["est_type"], row["est_type"]),
@@ -301,6 +363,12 @@ def est_public(row, org_name=None, contact_name=None) -> dict:
         "converted_project_code": row["converted_project_code"], "notes": row["notes"],
         "created_at": row["created_at"], "updated_at": row["updated_at"],
         "status_changed_at": row["status_changed_at"], "age_days": _age_days(dict(row)),
+        # #276 lead expansion (None on a pre-276 schema)
+        "division": d.get("division"), "ra_subtype": d.get("ra_subtype"),
+        "inquiry_kind": d.get("inquiry_kind"), "bid_due_date": d.get("bid_due_date"),
+        "est_stage": d.get("est_stage"), "est_stage_changed_at": d.get("est_stage_changed_at"),
+        "walkthrough_date": d.get("walkthrough_date"),
+        "assigned_estimator": d.get("assigned_estimator"),
     }
 
 
@@ -414,6 +482,16 @@ def _api_list():
         sql += " ORDER BY e.est_type, e.borough, CAST(e.seq AS INTEGER)"
         rows = conn.execute(sql, params).fetchall()
         out = [est_public(dict(r), r["org_name"], r["contact_name"]) for r in rows]
+        if _has_276(conn):
+            # #276 — the board cards carry the same pipeline strip + SLA aging as the
+            # workspace: ONE mapping source (estimating.pipe_state), imported lazily
+            # (estimating imports this module at top level).
+            import estimating as _estimating
+            for r, raw in zip(out, rows):
+                d = dict(raw)
+                r["pipe"] = _estimating.pipe_state(d)
+                r["age_days"] = _estimating.lead_age_days(d)
+                r["overdue"] = _estimating.lead_overdue(d)
         counts = {}
         for r in out:
             counts[r["status"]] = counts.get(r["status"], 0) + 1
@@ -431,7 +509,12 @@ def _api_create():
             conn, est_type=d.get("est_type"), borough=d.get("borough"),
             client_org_id=d.get("client_org_id"), contact_id=d.get("contact_id"),
             building_address=d.get("building_address"), notes=d.get("notes"),
-            created_by=_uid())
+            created_by=_uid(),
+            # #276 lead expansion + the honest-backfill date (create/edit only —
+            # this endpoint is 'estimates' = admin/c_suite, so backfill is theirs)
+            division=d.get("division"), ra_subtype=d.get("ra_subtype"),
+            inquiry_kind=d.get("inquiry_kind"), bid_due_date=d.get("bid_due_date"),
+            in_stage_since=d.get("in_stage_since"))
         return jsonify({"data": est_public(est)})
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -439,8 +522,10 @@ def _api_create():
         conn.close()
 
 
-@requires_section('estimates')
+@requires_section('estimating')
 def _api_detail(est_id):
+    # #276 — the estimator works this lead too, so the section widened from
+    # 'estimates' to 'estimating' (admin/c_suite unchanged — they're in both).
     conn = _db()
     try:
         est = get_estimate(conn, est_id)
@@ -452,12 +537,17 @@ def _api_detail(est_id):
         if est["est_type"] == "IRA":
             r = conn.execute("SELECT * FROM estimate_ira WHERE estimate_id=?", (est_id,)).fetchone()
             ira = dict(r) if r else None
-        # the CRM strip: the linked client's recent timeline (estimate rows are on it)
-        acts = crm.list_activity(conn, entity_type="organization",
-                                 entity_id=est["client_org_id"], limit=10)
-        acts = [{"id": a["id"], "activity_type": a["activity_type"], "summary": a["summary"],
-                 "occurred_at": a["occurred_at"], "function_tag": a.get("function_tag")}
-                for a in acts]
+        # the CRM strip: the linked client's recent timeline — COMPANY ROLES ONLY.
+        # The estimator sees the lead, never the org's cross-estimate CRM breadth
+        # (blueprint §5: no CRM tab, no company timelines).
+        import access as _access
+        acts = []
+        if _access.can_access("estimates", (current_user() or {}).get("role")):
+            acts = crm.list_activity(conn, entity_type="organization",
+                                     entity_id=est["client_org_id"], limit=10)
+            acts = [{"id": a["id"], "activity_type": a["activity_type"], "summary": a["summary"],
+                     "occurred_at": a["occurred_at"], "function_tag": a.get("function_tag")}
+                    for a in acts]
         return jsonify({"data": {
             "estimate": est_public(est, (org or {}).get("name"),
                                    (contact or {}).get("full_name")),
@@ -502,6 +592,42 @@ def _api_update(est_id):
             if k in d:
                 sets.append(f"{k}=?")
                 params.append((str(d[k]).strip() or None) if d[k] is not None else None)
+        if _has_276(conn):
+            try:
+                div = (d.get("division") or "").strip().lower() or est.get("division")
+                _validate_lead_fields(
+                    division=d.get("division") and div,
+                    ra_subtype=d.get("ra_subtype"),
+                    inquiry_kind=d.get("inquiry_kind"),
+                    bid_due_date=d.get("bid_due_date"))
+            except ValueError as e:
+                return jsonify({"error": str(e)}), 400
+            if "division" in d and d["division"]:
+                sets.append("division=?"); params.append(div)
+                if div != "rope_access":
+                    sets.append("ra_subtype=?"); params.append(None)
+            if "ra_subtype" in d:
+                sets.append("ra_subtype=?")
+                params.append((d.get("ra_subtype") or "").strip().lower() or None)
+            if "inquiry_kind" in d and d["inquiry_kind"]:
+                sets.append("inquiry_kind=?")
+                params.append(str(d["inquiry_kind"]).strip().lower())
+            if "bid_due_date" in d:
+                sets.append("bid_due_date=?")
+                params.append((str(d["bid_due_date"]).strip() or None) if d["bid_due_date"] else None)
+            since = (d.get("in_stage_since") or "").strip()
+            if since:
+                # #276 HONEST BACKFILL — the paper backlog enters with TRUE aging:
+                # both the macro anchor and (when the sub-machine is live) the stage
+                # anchor move to the stated LOCAL date. admin/c_suite only (this
+                # endpoint's section), never reachable from the estimator queue.
+                try:
+                    datetime.strptime(since, "%Y-%m-%d")
+                except ValueError:
+                    return jsonify({"error": "in_stage_since must be YYYY-MM-DD"}), 400
+                sets.append("status_changed_at=?"); params.append(since)
+                if est.get("est_stage"):
+                    sets.append("est_stage_changed_at=?"); params.append(since)
         if "final_amount" in d:
             v = d["final_amount"]
             if v in (None, ""):
@@ -581,9 +707,10 @@ def _api_convert(est_id):
         conn.close()
 
 
-@requires_section('estimates')
+@requires_section('estimating')
 def _api_ira_put(est_id):
-    """PUT /api/estimates/<id>/ira — the IRA-only panel (400 for other types)."""
+    """PUT /api/estimates/<id>/ira — the IRA-only panel (400 for other types).
+    #276: 'estimating' section — the estimator fills scope numbers too."""
     d = request.get_json(silent=True) or {}
     conn = _db()
     try:
@@ -629,8 +756,9 @@ def _api_ira_put(est_id):
         conn.close()
 
 
-@requires_section('estimates')
+@requires_section('estimating')
 def _api_docs_list(est_id):
+    # #276: 'estimating' — the estimator reads the lead's drawings/bid forms.
     conn = _db()
     try:
         if not get_estimate(conn, est_id):
@@ -640,8 +768,9 @@ def _api_docs_list(est_id):
         conn.close()
 
 
-@requires_section('estimates')
+@requires_section('estimating')
 def _api_docs_upload(est_id):
+    # #276: 'estimating' — the estimator attaches walkthrough-adjacent paper too.
     if 'file' not in request.files:
         return jsonify({"error": "no file"}), 400
     conn = _db()
@@ -659,10 +788,11 @@ def _api_docs_upload(est_id):
         conn.close()
 
 
-@requires_section('estimates')
+@requires_section('estimating')
 def _api_doc_file(doc_id):
     """GET /api/estimates/documents/<id>/file — the ONLY way estimate paper is read.
-    Inline disposition (view, not print — #271 rule), no-store, path-contained."""
+    Inline disposition (view, not print — #271 rule), no-store, path-contained.
+    #276: 'estimating' — the estimator opens the lead's documents."""
     conn = _db()
     try:
         row = conn.execute("SELECT file_path, mime, file_name FROM estimate_document WHERE id=?",

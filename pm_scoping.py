@@ -105,6 +105,10 @@ def pm_can_access_project(role, user_id, code, conn=None) -> bool:
             # own curated surface (the client portal). Defense-in-depth behind the client
             # default-deny gate. Their per-resource access is checked there, not here.
             return False
+        if role == "estimator":
+            # #276 — the estimator works the estimating QUEUE (/estimating), never
+            # project dashboards: leads live pre-project; converted work is ops' world.
+            return False
         return status == "active"   # super (internal field tier): active projects
     finally:
         if own is not conn:
@@ -118,6 +122,8 @@ def filter_visible_projects(rows, role, user_id, conn):
       * other roles   -> active only."""
     if access.can_access_company(role):
         return rows
+    if role == "estimator":
+        return []   # #276 — no project list; the estimator's world is /estimating
     assigned = assigned_codes(user_id, conn) if role == "pm" else None
     out = []
     for r in rows:
