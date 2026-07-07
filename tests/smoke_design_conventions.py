@@ -20,6 +20,7 @@ button + raw date and PASSES on the fixed ones. Read-only; touches no data.
 import os
 import re
 import sys
+from html.parser import HTMLParser
 from pathlib import Path
 
 import requests
@@ -204,37 +205,135 @@ def selector_decl(css, selector, prop):
     return val
 
 
-def field_border_visible(html, css, field_id, root):
-    """Resolve a known modal field's effective border (from its `.wrapper tag`
-    rule and/or its own classes) the way a page-root modal would, and report
-    whether it is visible."""
-    tag = find_tag(html, field_id)
-    if not tag:
-        return None
-    tagname = re.match(r"<([a-zA-Z]+)", tag).group(1).lower()
-    classes = (re.search(r'class="([^"]*)"', tag).group(1).split()
-               if re.search(r'class="([^"]*)"', tag) else [])
-    # nearest preceding wrapper class matching *-field
-    pos = html.find('id="' + field_id + '"')
-    wrapper = None
-    for m in re.finditer(r'class="([^"]*)"', html[:pos]):
-        for c in m.group(1).split():
-            if re.match(r"^[\w-]+-field$", c):
-                wrapper = c
-    border = None
-    if wrapper:
-        b = (selector_decl(css, "." + wrapper + " " + tagname, "border-color")
-             or selector_decl(css, "." + wrapper + " " + tagname, "border"))
-        if b:
-            border = b
-    for c in classes:
-        b = class_decl(css, c, "border-color") or class_decl(css, c, "border")
-        if b:
-            border = b   # an explicit class on the field wins
-    bcol = border_color_of(border)
-    bres = resolve_color(bcol, root) if bcol else None
-    return {"visible": is_visible_bg(bres), "wrapper": wrapper, "tag": tagname,
-            "border": bcol, "border_resolved": bres}
+# (#275) field_border_visible — the per-ID resolver — was superseded by the
+# structural scanner (ModalFieldScanner + modal_field_boxed below), which applies
+# the same page-root resolution to EVERY dialog field instead of an enrolled list.
+
+
+# ---------- #275 — STRUCTURAL any-modal-field boxing ----------
+# The old guard enumerated field IDs per modal (#238 §6, #242 8d, #250 8d2) — every
+# new modal had to remember to enroll, and the Materials modals didn't (fields
+# shipped boxless: the .mt-overlay modals sat outside the wrapper defining the
+# --mt-* tokens, so var(--mt-line) computed away — the #230/#235 class, on fields).
+# This is the ROOT FIX: on EVERY registered surface, ANY <input|select|textarea>
+# whose ancestors include a dialog container MUST be provably boxed — either it
+# carries the shared component (.ssc-field) or its module CSS (wrapper `.X-fld tag`
+# rule / own class) resolves to a VISIBLE border the page-root way. No enumerated
+# ID lists for field boxing, ever again.
+#
+# A dialog container is: class/id containing 'modal'/'overlay'/'dialog', or
+# role="dialog" / aria-modal="true" (slide-in panels like #profile-panel carry the
+# semantic role — add it to any new drawer/panel with form fields).
+#
+# LIMIT (deliberate): JS-built modal bodies (CRM/EST template strings) are invisible
+# to a static scan; those modules build every field with .ssc-field and the browser-
+# level behavioral checks cover them. Static markup — where this class of regression
+# has actually shipped — is fully covered here.
+_DIALOG_MARKERS = ("modal", "overlay", "dialog")
+# native controls that are NOT text-entry boxes — the boxed-component rule doesn't apply
+FIELD_TYPE_EXEMPT = {"checkbox", "radio", "file", "hidden", "button", "submit",
+                     "reset", "range", "color", "image"}
+# deliberate per-id exceptions — keep SHORT, every entry carries its why
+FIELD_ID_EXEMPT = {
+    # (none — the day one lands, document the reason right here)
+}
+_VOID_TAGS = {"input", "br", "img", "hr", "meta", "link", "source", "wbr", "area",
+              "base", "col", "embed", "track", "param"}
+
+
+class ModalFieldScanner(HTMLParser):
+    """Collect every input/select/textarea whose ANCESTOR chain contains a dialog
+    container, with its own classes + the nearest `*-fld`/`*-field` wrapper class.
+    <script> content is data to HTMLParser, so JS-built template strings never
+    produce phantom fields."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.stack = []    # (tag, is_dialog, wrapper_cls)
+        self.fields = []
+
+    @staticmethod
+    def _is_dialog(a):
+        blob = ((a.get("class") or "") + " " + (a.get("id") or "")).lower()
+        if any(m in blob for m in _DIALOG_MARKERS):
+            return True
+        return (a.get("role") or "").lower() == "dialog" or (a.get("aria-modal") or "").lower() == "true"
+
+    def _record_if_field(self, tag, a):
+        if tag not in ("input", "select", "textarea"):
+            return
+        if not any(f[1] for f in self.stack):
+            return                              # not inside a dialog container
+        wrapper = next((f[2] for f in reversed(self.stack) if f[2]), None)
+        self.fields.append({
+            "tag": tag, "id": a.get("id") or "",
+            "type": (a.get("type") or "text").lower(),
+            "classes": (a.get("class") or "").split(),
+            "wrapper": wrapper,
+        })
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        self._record_if_field(tag, a)           # ancestors only — before any push
+        if tag in _VOID_TAGS:
+            return
+        # wrapper tokens: `x-fld` / `x-field` AND the bare `fld` / `field` (the
+        # admin-labor-rates page wraps modal fields in a plain `.field` whose
+        # `.field input` rule resolves via the page's own :root — a valid box).
+        wrapper = next((c for c in (a.get("class") or "").split()
+                        if re.match(r"^([\w-]+-)?(fld|field)$", c)), None)
+        self.stack.append((tag, self._is_dialog(a), wrapper))
+
+    def handle_startendtag(self, tag, attrs):
+        self._record_if_field(tag, dict(attrs))  # self-closed: record, never push
+
+    def handle_endtag(self, tag):
+        for i in range(len(self.stack) - 1, -1, -1):
+            if self.stack[i][0] == tag:
+                del self.stack[i:]
+                break
+
+
+def scan_modal_fields(html_text):
+    s = ModalFieldScanner()
+    s.feed(html_text)
+    return s.fields
+
+
+def modal_field_boxed(f, css_all, root):
+    """(passes, how). Shared component wins outright; otherwise the field must
+    resolve a VISIBLE border at page root via its wrapper rule or its own class."""
+    if f["type"] in FIELD_TYPE_EXEMPT:
+        return True, "type-exempt"
+    if f["id"] in FIELD_ID_EXEMPT:
+        return True, "id-exempt: " + str(FIELD_ID_EXEMPT[f["id"]])
+    if "ssc-field" in f["classes"]:
+        return True, "ssc-field"
+    if f["wrapper"]:
+        b = (selector_decl(css_all, f".{f['wrapper']} {f['tag']}", "border-color")
+             or selector_decl(css_all, f".{f['wrapper']} {f['tag']}", "border"))
+        if b and is_visible_bg(resolve_color(border_color_of(b), root)):
+            return True, f"wrapper .{f['wrapper']}"
+    for c in f["classes"]:
+        b = class_decl(css_all, c, "border-color") or class_decl(css_all, c, "border")
+        if b and is_visible_bg(resolve_color(border_color_of(b), root)):
+            return True, f"class .{c}"
+    return False, "boxless"
+
+
+def page_modal_field_violations(page_text, widgets_css):
+    """All (field, why) violations for one page, resolved against widgets.css +
+    the page's own inline styles (the exact stylesheet set the page loads)."""
+    inline = "\n".join(re.findall(r"<style[^>]*>(.*?)</style>", page_text, re.DOTALL))
+    css_all = widgets_css + "\n" + inline
+    root = parse_root_tokens(css_all)
+    fields = scan_modal_fields(page_text)
+    bad = []
+    for f in fields:
+        okd, how = modal_field_boxed(f, css_all, root)
+        if not okd:
+            bad.append(f"{f['tag']}#{f['id'] or '(no id)'}")
+    return fields, bad
 
 
 def main():
@@ -324,12 +423,9 @@ def main():
     ok("shared_field_rule_resolves",
        is_visible_bg(resolve_color(border_color_of(selector_decl(css, ".fp-field input", "border")), root)),
        f".fp-field input -> {selector_decl(css, '.fp-field input', 'border')}")
-    # real: known modal fields (input/select/textarea) render bordered
-    for fid in ("fp-up-drop", "fp-up-date", "fp-up-desc",
-                "pd-f-cat", "pd-f-title", "pd-f-eff", "pd-f-notes", "exp-f-date"):
-        fb = field_border_visible(html, css_all, fid, root)
-        ok("field_boxed_" + fid, bool(fb and fb["visible"]),
-           (f"{fb['tag']} in .{fb['wrapper']}: {fb['border']}->{fb['border_resolved']}") if fb else "(not found)")
+    # (#275) the per-ID modal-field list that lived here was GENERALIZED into the
+    # structural any-modal-field rule below — every dialog field on every registered
+    # surface is now scanned; nothing enrolls by ID anymore.
     # Field Photos: Description is a free-text textarea; Worker/Stage are gone
     ok("fp_description_is_textarea", bool(re.search(r'<textarea[^>]*id="fp-up-desc"', html)))
     ok("fp_worker_stage_removed",
@@ -421,22 +517,10 @@ def main():
     ok("console_date_fields_identified", not unlabeled,
        ("unlabeled: " + ", ".join(unlabeled)) if unlabeled else "all date fields labeled")
 
-    # 8d. intake-modal fields carry the shared boxed component (.ssc-field)
-    for fid in ("in-name", "in-dob", "in-trade", "in-phone", "in-hire-date", "in-email"):
-        fm = re.search(r'<(?:input|select|textarea)[^>]*id="' + re.escape(fid) + r'"[^>]*>', console_html)
-        ok("console_field_shared_" + fid, bool(fm) and "ssc-field" in (fm.group(0) if fm else ""),
-           (fm.group(0)[:80] if fm else "(not found)"))
-
-    # 8d2 (#250). worker-profile modal EDIT-state fields carry .ssc-field too —
-    # these were the #242-flagged hairline fields the guard's modal list missed
-    # (it only covered the intake modal). Same forcing function: a profile
-    # edit field that drops the shared component fails the build.
-    for fid in ("pp-edit-name", "pp-edit-trade", "pp-edit-lang", "pp-edit-phone",
-                "pp-edit-dob", "pp-edit-hire", "pp-edit-email", "pp-edit-ec-name",
-                "pp-edit-ec-phone", "pp-edit-ec-relation", "pp-edit-ec-relation-other"):
-        fm = re.search(r'<(?:input|select|textarea)[^>]*id="' + re.escape(fid) + r'"[^>]*>', console_html)
-        ok("console_field_shared_" + fid, bool(fm) and "ssc-field" in (fm.group(0) if fm else ""),
-           (fm.group(0)[:80] if fm else "(not found)"))
+    # 8d / 8d2 — (#275) the intake-modal + profile-edit per-ID lists were GENERALIZED
+    # into the structural any-modal-field rule (§9 below). #profile-panel carries
+    # role="dialog" so the slide-in stays covered structurally; sentinel assertions
+    # in §9 prove the #242/#250 fields are still scanned.
 
     # 8e. TEMPLATE REGISTRY — every repo-root page with form inputs must be
     # REGISTERED (a live operator surface this guard covers) or explicitly
@@ -457,6 +541,62 @@ def main():
     ok("templates_registered_or_exempt", not unregistered,
        ("REGISTER OR EXEMPT: " + ", ".join(unregistered)) if unregistered
        else f"{len(REGISTERED)} registered / {len(EXEMPT)} exempt")
+
+    # ---- 9) #275 — STRUCTURAL any-modal-field boxing on EVERY registered surface ----
+    # No enumerated-ID lists for field boxing ever again: any input/select/textarea
+    # inside a dialog container must be provably boxed (shared .ssc-field component,
+    # or module CSS that resolves a VISIBLE border at page root).
+    print("\n-- structural any-modal-field boxing (#275) --")
+    # self-test A (fail->pass): a planted BOXLESS field in a synthetic modal is
+    # caught — its wrapper rule borders with a module token no modal can resolve
+    # (the exact Materials regression: .mt-fld input + var(--mt-line) outside .mt-wrap).
+    _syn_bad = '<div class="x-modal"><div class="y-fld"><input id="plant"></div></div>'
+    _syn_css = ".y-fld input{border:1px solid var(--module-token);}"
+    _f, _bad = page_modal_field_violations("<style>" + _syn_css + "</style>" + _syn_bad, css)
+    ok("selftest_planted_boxless_caught", len(_f) == 1 and _bad == ["input#plant"], f"{_bad}")
+    # ...and the SAME field passes once it carries the shared component (the fix)
+    _syn_fixed = _syn_bad.replace('<input id="plant">', '<input class="ssc-field" id="plant">')
+    _f2, _bad2 = page_modal_field_violations("<style>" + _syn_css + "</style>" + _syn_fixed, css)
+    ok("selftest_planted_fixed_passes", len(_f2) == 1 and not _bad2, f"{_bad2}")
+    # module-CSS route: a wrapper rule that RESOLVES (literal color) is a valid box
+    _f3, _bad3 = page_modal_field_violations(
+        "<style>.y-fld input{border:1px solid #ccd;}</style>" + _syn_bad, css)
+    ok("selftest_css_boxed_passes", len(_f3) == 1 and not _bad3, f"{_bad3}")
+    # exemptions: native non-text controls are exempt BY TYPE (checkbox/file/...)
+    _f4, _bad4 = page_modal_field_violations(
+        '<div class="x-modal"><input type="checkbox" id="c"><input type="file" id="g"></div>', css)
+    ok("selftest_type_exemptions_pass", len(_f4) == 2 and not _bad4, f"{_bad4}")
+    # a field OUTSIDE any dialog container is out of scope (page-body forms have
+    # their own module styling; this rule is about modals at page root)
+    _f5, _ = page_modal_field_violations('<div class="plain"><input id="free"></div>', css)
+    ok("selftest_non_modal_not_scanned", len(_f5) == 0)
+    # role="dialog" (the slide-in panel marker) is a container too
+    _f6, _bad6 = page_modal_field_violations(
+        '<div role="dialog"><input id="drawer-field"></div>', css)
+    ok("selftest_role_dialog_scanned", len(_f6) == 1 and _bad6 == ["input#drawer-field"])
+
+    # THE SWEEP: every REGISTERED page, from disk (the same files the server serves;
+    # section-stripping only ever REMOVES markup, so disk is the superset).
+    total_fields = 0
+    all_ids = set()
+    for fn in sorted(REGISTERED):
+        p = root_dir / fn
+        if not p.exists():
+            ok(f"modal_fields_{fn}", False, "registered page missing on disk")
+            continue
+        fields, bad = page_modal_field_violations(
+            p.read_text(encoding="utf-8", errors="replace"), css)
+        total_fields += len(fields)
+        all_ids.update(f["id"] for f in fields if f["id"])
+        ok(f"modal_fields_boxed_{fn}", not bad,
+           (f"{len(fields)} scanned; BOXLESS: " + ", ".join(bad)) if bad
+           else f"{len(fields)} dialog field(s) scanned, all boxed")
+    # sentinels: the #242 intake, #250 profile-edit and #275 Materials fields are
+    # STILL COVERED by the structural scan (coverage can never silently shrink back
+    # to an ID list) — and the scan sees a real population of fields.
+    for sentinel in ("in-name", "pp-edit-name", "mt-log-qty", "mt-mat-name", "mt-tr-qty", "mt-ex-desc"):
+        ok(f"structural_covers_{sentinel}", sentinel in all_ids)
+    ok("structural_scan_population", total_fields >= 40, f"{total_fields} dialog fields scanned")
 
     # ---- #265 — SWAPPABLE CANONICAL LOGO: ONE asset slot, filled star; hollow star banned ----
     print("\n-- swappable canonical brand logo (asset slot, filled star, no hollow variant) --")

@@ -1715,8 +1715,8 @@
               <div class="full"><label>Name</label><input id="lam-name" class="ssc-field" type="text" placeholder="e.g. Interior cleaning — rain day"></div>
               <div><label>Type</label><select id="lam-type" class="ssc-field"><option value="work">Work</option><option value="stage">Stage</option><option value="delivery">Delivery</option><option value="inspection">Inspection</option></select></div>
               <div><label>Crew</label><input id="lam-crew" class="ssc-field" type="text" placeholder="e.g. Rope · 2"></div>
-              <div><label>Start</label><input id="lam-start" class="ssc-date" type="text" placeholder="MM-DD-YYYY"></div>
-              <div><label>Finish</label><input id="lam-finish" class="ssc-date" type="text" placeholder="MM-DD-YYYY"></div>
+              <div><label>Start</label><input id="lam-start" class="ssc-date ssc-field" type="text" placeholder="MM-DD-YYYY"></div>
+              <div><label>Finish</label><input id="lam-finish" class="ssc-date ssc-field" type="text" placeholder="MM-DD-YYYY"></div>
               <div class="full"><label>Notes</label><input id="lam-notes" class="ssc-field" type="text" placeholder="optional"></div>
             </div>
             <div class="la-foot">
@@ -3826,7 +3826,7 @@
           .mt-row a{flex:none;font-size:11px;font-weight:700;color:var(--mt-accent-ink);text-decoration:none;cursor:pointer;}
           .mt-count-row{display:flex;align-items:center;gap:10px;padding:6px 16px;font-size:12.5px;}
           .mt-count-row .cn{flex:1;font-weight:600;}
-          .mt-count-row input{width:96px;height:32px;border:1px solid var(--mt-line);border-radius:8px;padding:0 9px;font:inherit;font-size:13px;text-align:right;}
+          .mt-count-row input{width:96px;text-align:right;}   /* box via .ssc-field (#275) */
           .mt-count-row .cu{width:82px;font-size:10.5px;color:var(--mt-muted);font-weight:600;}
           .mt-count-row .drift{font-size:10.5px;font-weight:700;width:110px;text-align:right;}
           /* #272b — reorder chips (status colors only) + burn meta + count hint */
@@ -3846,7 +3846,9 @@
           .mt-msub{color:var(--mt-muted);font-size:12px;margin-bottom:14px;}
           .mt-fld{margin-bottom:11px;}
           .mt-fld label{display:block;color:var(--mt-muted);font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:5px;}
-          .mt-fld input,.mt-fld select{width:100%;height:36px;border:1px solid var(--mt-line);border-radius:9px;padding:0 11px;font:inherit;font-size:13px;background:#fff;color:var(--mt-ink);}
+          /* #275 — the BOX comes from the shared .ssc-field component (:root tokens,
+             resolves anywhere incl. modals); this rule keeps layout-only concerns. */
+          .mt-fld input,.mt-fld select{width:100%;}
           .mt-fld .hint{font-size:10.5px;color:var(--mt-muted);margin-top:4px;}
           .mt-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
           .mt-mfoot{display:flex;justify-content:flex-end;gap:9px;margin-top:16px;}
@@ -3882,23 +3884,26 @@
             <div class="ph">Material activity</div>
             <div id="mt-activity"></div>
           </div>
-          <div id="mt-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #272b · 2026-07-04 · Materials &amp; Deliveries — catalog · ledger · expected · weekly count + derived consumption, burn rates &amp; reorder alerts (operator-tuned maps; unmapped = honest absence)</div>
-        </div>
+          <div id="mt-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #275 · 2026-07-04 · Materials &amp; Deliveries — boxed-field fix: every modal/count field carries the shared .ssc-field component (catalog · ledger · expected · weekly count · consumption maps unchanged)</div>
 
-        <!-- modals -->
+        <!-- modals — INSIDE .mt-wrap (#275): the overlays previously sat outside the
+             wrapper that defines the --mt-* tokens, so var(--mt-line) didn't resolve in
+             a modal and every field border computed away — the #230/#235 class, on
+             fields. Fields now ALSO carry .ssc-field (the shared boxed component, :root
+             tokens), which the structural design guard enforces on every modal field. -->
         <div class="mt-overlay" id="mt-modal-log"><div class="mt-modal">
           <h3 id="mt-log-title">Log material in</h3><div class="mt-msub" id="mt-log-sub"></div>
           <div class="mt-seg" id="mt-log-seg">
             <span data-t="delivery" class="on">Delivery received</span><span data-t="pickup">Self-pickup</span><span data-t="return">Return / credit</span>
           </div>
-          <div class="mt-fld"><label>Material</label><select id="mt-log-mat"></select></div>
+          <div class="mt-fld"><label>Material</label><select class="ssc-field" id="mt-log-mat"></select></div>
           <div class="mt-grid2">
-            <div class="mt-fld"><label>Quantity</label><input id="mt-log-qty" inputmode="decimal"></div>
-            <div class="mt-fld"><label>Unit</label><select id="mt-log-unit"></select></div>
+            <div class="mt-fld"><label>Quantity</label><input class="ssc-field" id="mt-log-qty" inputmode="decimal"></div>
+            <div class="mt-fld"><label>Unit</label><select class="ssc-field" id="mt-log-unit"></select></div>
           </div>
           <div class="mt-grid2">
-            <div class="mt-fld"><label>Vendor</label><input id="mt-log-vendor" placeholder="optional"></div>
-            <div class="mt-fld"><label>Date</label><input type="date" id="mt-log-date"></div>
+            <div class="mt-fld"><label>Vendor</label><input class="ssc-field" id="mt-log-vendor" placeholder="optional"></div>
+            <div class="mt-fld"><label>Date</label><input type="date" class="ssc-field" id="mt-log-date"></div>
           </div>
           <div class="mt-fld"><label>Packing slip / receipt</label><input type="file" id="mt-log-slip" accept=".pdf,.jpg,.jpeg,.png,.heic,.heif"><div class="hint">optional — stored gated, viewable from the activity log</div></div>
           <div class="mt-err" id="mt-log-err"></div>
@@ -3907,35 +3912,35 @@
 
         <div class="mt-overlay" id="mt-modal-mat"><div class="mt-modal">
           <h3 id="mt-mat-title">Add material</h3><div class="mt-msub">Your catalog, your names — nothing is preloaded.</div>
-          <div class="mt-fld"><label>Name</label><input id="mt-mat-name" placeholder="e.g. what the crew calls it"></div>
+          <div class="mt-fld"><label>Name</label><input class="ssc-field" id="mt-mat-name" placeholder="e.g. what the crew calls it"></div>
           <div class="mt-grid2">
-            <div class="mt-fld"><label>Base unit (counted in)</label><select id="mt-mat-base"></select></div>
-            <div class="mt-fld"><label>Purchase unit (optional)</label><select id="mt-mat-purch"></select></div>
+            <div class="mt-fld"><label>Base unit (counted in)</label><select class="ssc-field" id="mt-mat-base"></select></div>
+            <div class="mt-fld"><label>Purchase unit (optional)</label><select class="ssc-field" id="mt-mat-purch"></select></div>
           </div>
           <div class="mt-grid2">
-            <div class="mt-fld"><label>Pack conversion</label><input id="mt-mat-pack" inputmode="decimal" placeholder="e.g. 56"><div class="hint" id="mt-mat-packhint">1 purchase unit = N base units</div></div>
-            <div class="mt-fld"><label>Lead time (days, optional)</label><input id="mt-mat-lead" inputmode="numeric"></div>
+            <div class="mt-fld"><label>Pack conversion</label><input class="ssc-field" id="mt-mat-pack" inputmode="decimal" placeholder="e.g. 56"><div class="hint" id="mt-mat-packhint">1 purchase unit = N base units</div></div>
+            <div class="mt-fld"><label>Lead time (days, optional)</label><input class="ssc-field" id="mt-mat-lead" inputmode="numeric"></div>
           </div>
           <div class="mt-grid2">
-            <div class="mt-fld"><label>Default vendor (optional)</label><input id="mt-mat-vendor"></div>
-            <div class="mt-fld"><label>Category (optional)</label><input id="mt-mat-cat"></div>
+            <div class="mt-fld"><label>Default vendor (optional)</label><input class="ssc-field" id="mt-mat-vendor"></div>
+            <div class="mt-fld"><label>Category (optional)</label><input class="ssc-field" id="mt-mat-cat"></div>
           </div>
           <div class="mt-fld"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:12.5px;color:var(--mt-ink);"><input type="checkbox" id="mt-mat-pinned" style="width:15px;height:15px;"> Pinned — show on the card board + weekly count</label></div>
           <div style="border-top:1px solid var(--mt-line);margin:14px 0 12px;padding-top:12px;">
             <div style="font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--mt-muted);margin-bottom:9px;">Consumption — optional (#272b)</div>
-            <div class="mt-fld"><label>Driver</label><select id="mt-mat-driver">
+            <div class="mt-fld"><label>Driver</label><select class="ssc-field" id="mt-mat-driver">
               <option value="">— none (no burn/forecast shown) —</option>
               <option value="volume_cf">CF placed (drop-plan volume)</option>
               <option value="area_sf">SF covered (drop-plan area)</option>
               <option value="manual_rate">Flat per-workday rate</option>
             </select></div>
             <div class="mt-grid2">
-              <div class="mt-fld"><label id="mt-mat-yieldlbl">Yield</label><input id="mt-mat-yield" inputmode="decimal"></div>
-              <div class="mt-fld"><label>Waste %</label><input id="mt-mat-waste" inputmode="decimal" placeholder="0"></div>
+              <div class="mt-fld"><label id="mt-mat-yieldlbl">Yield</label><input class="ssc-field" id="mt-mat-yield" inputmode="decimal"></div>
+              <div class="mt-fld"><label>Waste %</label><input class="ssc-field" id="mt-mat-waste" inputmode="decimal" placeholder="0"></div>
             </div>
             <div class="mt-grid2">
-              <div class="mt-fld"><label>Safety days</label><input id="mt-mat-safety" inputmode="numeric" placeholder="4"></div>
-              <div class="mt-fld"><label>Map notes (optional)</label><input id="mt-mat-mapnotes"></div>
+              <div class="mt-fld"><label>Safety days</label><input class="ssc-field" id="mt-mat-safety" inputmode="numeric" placeholder="4"></div>
+              <div class="mt-fld"><label>Map notes (optional)</label><input class="ssc-field" id="mt-mat-mapnotes"></div>
             </div>
             <div class="mt-map-preview" id="mt-mat-preview"></div>
           </div>
@@ -3945,15 +3950,15 @@
 
         <div class="mt-overlay" id="mt-modal-transfer"><div class="mt-modal">
           <h3>Transfer between projects</h3><div class="mt-msub">Writes both sides atomically — nothing is lost in transit.</div>
-          <div class="mt-fld"><label>Material</label><select id="mt-tr-mat"></select></div>
-          <div class="mt-fld"><label>To project</label><select id="mt-tr-dest"></select></div>
+          <div class="mt-fld"><label>Material</label><select class="ssc-field" id="mt-tr-mat"></select></div>
+          <div class="mt-fld"><label>To project</label><select class="ssc-field" id="mt-tr-dest"></select></div>
           <div class="mt-grid2">
-            <div class="mt-fld"><label>Quantity</label><input id="mt-tr-qty" inputmode="decimal"></div>
-            <div class="mt-fld"><label>Unit</label><select id="mt-tr-unit"></select></div>
+            <div class="mt-fld"><label>Quantity</label><input class="ssc-field" id="mt-tr-qty" inputmode="decimal"></div>
+            <div class="mt-fld"><label>Unit</label><select class="ssc-field" id="mt-tr-unit"></select></div>
           </div>
           <div class="mt-grid2">
-            <div class="mt-fld"><label>Date</label><input type="date" id="mt-tr-date"></div>
-            <div class="mt-fld"><label>Note (optional)</label><input id="mt-tr-note"></div>
+            <div class="mt-fld"><label>Date</label><input type="date" class="ssc-field" id="mt-tr-date"></div>
+            <div class="mt-fld"><label>Note (optional)</label><input class="ssc-field" id="mt-tr-note"></div>
           </div>
           <div class="mt-err" id="mt-tr-err"></div>
           <div class="mt-mfoot"><button class="mt-btn-ghost" data-close="mt-modal-transfer">Cancel</button><button class="btn-primary" id="mt-tr-save">Transfer</button></div>
@@ -3961,15 +3966,15 @@
 
         <div class="mt-overlay" id="mt-modal-expected"><div class="mt-modal">
           <h3>Expected delivery</h3><div class="mt-msub">A heads-up row — mark it received in one step when the truck shows up.</div>
-          <div class="mt-fld"><label>Material (optional — general orders allowed)</label><select id="mt-ex-mat"></select></div>
-          <div class="mt-fld"><label>Description</label><input id="mt-ex-desc" placeholder="what's coming"></div>
+          <div class="mt-fld"><label>Material (optional — general orders allowed)</label><select class="ssc-field" id="mt-ex-mat"></select></div>
+          <div class="mt-fld"><label>Description</label><input class="ssc-field" id="mt-ex-desc" placeholder="what's coming"></div>
           <div class="mt-grid2">
-            <div class="mt-fld"><label>Quantity (optional)</label><input id="mt-ex-qty" inputmode="decimal"></div>
-            <div class="mt-fld"><label>Unit (optional)</label><select id="mt-ex-unit"></select></div>
+            <div class="mt-fld"><label>Quantity (optional)</label><input class="ssc-field" id="mt-ex-qty" inputmode="decimal"></div>
+            <div class="mt-fld"><label>Unit (optional)</label><select class="ssc-field" id="mt-ex-unit"></select></div>
           </div>
           <div class="mt-grid2">
-            <div class="mt-fld"><label>Vendor</label><input id="mt-ex-vendor"></div>
-            <div class="mt-fld"><label>Expected date</label><input type="date" id="mt-ex-date"></div>
+            <div class="mt-fld"><label>Vendor</label><input class="ssc-field" id="mt-ex-vendor"></div>
+            <div class="mt-fld"><label>Expected date</label><input type="date" class="ssc-field" id="mt-ex-date"></div>
           </div>
           <div class="mt-err" id="mt-ex-err"></div>
           <div class="mt-mfoot"><button class="mt-btn-ghost" data-close="mt-modal-expected">Cancel</button><button class="btn-primary" id="mt-ex-save">Save expected</button></div>
@@ -3977,10 +3982,11 @@
 
         <div class="mt-overlay" id="mt-modal-copy"><div class="mt-modal">
           <h3>Copy catalog from another project</h3><div class="mt-msub">Copies the material definitions only — never transactions. Existing names are skipped.</div>
-          <div class="mt-fld"><label>Source project</label><select id="mt-cp-src"></select></div>
+          <div class="mt-fld"><label>Source project</label><select class="ssc-field" id="mt-cp-src"></select></div>
           <div class="mt-err" id="mt-cp-err"></div>
           <div class="mt-mfoot"><button class="mt-btn-ghost" data-close="mt-modal-copy">Cancel</button><button class="btn-primary" id="mt-cp-save">Copy catalog</button></div>
         </div></div>
+        </div>
       </section>
 
       <!-- MEETING MINUTES -->
@@ -7667,7 +7673,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     if(!pinned.length){host.innerHTML='<div class="mt-row" style="color:var(--mt-muted);">Pin materials to put them on the weekly count.</div>';return;}
     host.innerHTML=pinned.map(function(m){
       return '<div class="mt-count-row"><span class="cn">'+esc(m.name)+'</span>'
-        +'<input inputmode="decimal" data-count="'+m.id+'" placeholder="'+fmtQ(m.on_hand)+'">'
+        +'<input class="ssc-field" inputmode="decimal" data-count="'+m.id+'" placeholder="'+fmtQ(m.on_hand)+'">'
         +'<span class="cu">'+esc(m.base_unit)+'</span><span class="drift" data-drift="'+m.id+'"></span></div>';
     }).join('');
   }
