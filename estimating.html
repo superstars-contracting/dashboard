@@ -326,6 +326,7 @@
     var sel = (opts||[]).map(function(u){ return '<option value="'+u.id+'">'+esc(u.name)+'</option>'; }).join('');
     openModal('Schedule walkthrough',
       '<div class="fld"><label>Walkthrough date *</label><input class="ssc-date ssc-field" id="f-wd" placeholder="MM/DD/YYYY"></div>'
+      + '<div class="fld"><label>Time — blank = all-day</label><input class="ssc-field" id="f-wd-time" type="time"></div>'
       + '<div class="fld"><label>Attendee * — someone must physically go</label><select class="ssc-field" id="f-wd-att">'+sel+'</select></div>'
       + '<div class="fld"><label>Site point of contact (note)</label><input class="ssc-field" id="f-wd-poc" placeholder="name / phone — optional"></div>',
       async function(){
@@ -333,7 +334,8 @@
         if (!iso){ modalErr('Pick the walkthrough date.'); return false; }
         if (!q('f-wd-att').value){ modalErr('Pick the attendee — someone must go.'); return false; }
         await api('POST','/api/estimating/'+id+'/walkthroughs',
-          { visit_date: iso, attendee_user_id: +q('f-wd-att').value, poc_note: q('f-wd-poc').value.trim() || null });
+          { visit_date: iso, visit_time: q('f-wd-time').value || null,
+            attendee_user_id: +q('f-wd-att').value, poc_note: q('f-wd-poc').value.trim() || null });
         closeModal(); load(); return false;
       }, 'Schedule');
   }
@@ -394,7 +396,8 @@
     wrap.style.display = '';
     q('wt-upcoming').innerHTML = list.map(function(v){
       return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F2EFE7;font-size:12.5px;">'
-        + '<b>'+fmtD(v.visit_date)+'</b>'
+        + '<b>'+fmtD(v.visit_date)+(v.visit_time ? ' '+esc(v.visit_time) : '')+'</b>'
+        + (v.visit_time ? '' : '<span class="kind" style="font-size:8.5px;">ALL-DAY</span>')
         + '<span class="dchip">'+esc(v.attendee_initials||'?')+'</span>'
         + '<a href="#'+esc(v.code)+'" style="color:var(--brand-red);font-weight:700;text-decoration:none;" data-jump="'+esc(v.code)+'">'+esc(v.code)+'</a>'
         + '<span style="color:var(--muted);">'+esc(v.building_address||v.org_name||'')+'</span>'

@@ -58,6 +58,15 @@ def _valid_date(s):
     return s
 
 
+def _valid_time(s):
+    """LOCAL HH:MM (24h) or None — a visit without a time is ALL-DAY."""
+    s = (s or "").strip()
+    if not s:
+        return None
+    datetime.strptime(s, "%H:%M")
+    return s
+
+
 def _initials(name) -> str:
     parts = [p for p in (name or "").replace("@", " ").split() if p]
     return ("".join(p[0] for p in parts[:2]) or "?").upper()
@@ -77,11 +86,12 @@ def sync_walkthrough_date(conn, est_id) -> None:
     conn.commit()
 
 
-def create_visit(conn, est_id, *, visit_date, attendee_user_id, site_poc_contact_id=None,
-                 poc_note=None, actor_user_id=None) -> dict:
+def create_visit(conn, est_id, *, visit_date, attendee_user_id, visit_time=None,
+                 site_poc_contact_id=None, poc_note=None, actor_user_id=None) -> dict:
     """Schedule a walkthrough. attendee_user_id NOT NULL — someone from the company
-    MUST attend (400 without). Advances received -> walkthrough_scheduled when the
-    machine is at received; a later-stage estimate just gains a revisit row."""
+    MUST attend (400 without). visit_time LOCAL HH:MM optional (absent = all-day).
+    Advances received -> walkthrough_scheduled when the machine is at received; a
+    later-stage estimate just gains a revisit row."""
     est = estimates.get_estimate(conn, est_id)
     if not est:
         raise LookupError("estimate not found")
@@ -91,6 +101,7 @@ def create_visit(conn, est_id, *, visit_date, attendee_user_id, site_poc_contact
         # first (one click), THEN schedules; no stage/visit divergence possible.
         raise ValueError("walkthroughs are scheduled once estimating has started (status='scoping')")
     vd = _valid_date(visit_date)
+    vt = _valid_time(visit_time)
     if not attendee_user_id:
         raise ValueError("attendee_user_id is required — someone must attend the walkthrough")
     u = conn.execute("SELECT id FROM users WHERE id=? AND is_active=1",
@@ -100,10 +111,10 @@ def create_visit(conn, est_id, *, visit_date, attendee_user_id, site_poc_contact
     if site_poc_contact_id is not None and not crm.get_contact(conn, site_poc_contact_id):
         raise ValueError("site_poc_contact_id does not exist")
     conn.execute(
-        "INSERT INTO walkthrough_visit (estimate_id, visit_date, attendee_user_id, "
+        "INSERT INTO walkthrough_visit (estimate_id, visit_date, visit_time, attendee_user_id, "
         "site_poc_contact_id, poc_note, status, created_by, created_at, updated_at) "
-        "VALUES (?,?,?,?,?, 'scheduled', ?,?,?)",
-        (est_id, vd, attendee_user_id, site_poc_contact_id,
+        "VALUES (?,?,?,?,?,?, 'scheduled', ?,?,?)",
+        (est_id, vd, vt, attendee_user_id, site_poc_contact_id,
          (poc_note or "").strip() or None, actor_user_id, _now(), _now()))
     conn.commit()
     vid = conn.execute("SELECT MAX(id) AS m FROM walkthrough_visit").fetchone()["m"]
@@ -114,12 +125,13 @@ def create_visit(conn, est_id, *, visit_date, attendee_user_id, site_poc_contact
         crm.add_activity(conn, entity_type="organization", entity_id=est["client_org_id"],
                          activity_type="system", author_user_id=actor_user_id,
                          function_tag="sales",
-                         summary=f"Estimate {est['code']}: walkthrough scheduled {vd}")
+                         summary=f"Estimate {est['code']}: walkthrough scheduled {vd}"
+                                 + (f" {vt}" if vt else ""))
     sync_walkthrough_date(conn, est_id)
     if attendee_user_id != actor_user_id:
         notifications.notify_user(
             conn, kind="walkthrough", user_id=attendee_user_id,
-            subject=f"[SSC] Walkthrough {vd} — {est['code']}",
+            subject=f"[SSC] Walkthrough {vd}" + (f" {vt}" if vt else "") + f" — {est['code']}",
             estimate_code=est["code"],
             extra_line=f"{est.get('building_address') or ''}".strip())
     r = conn.execute("SELECT * FROM walkthrough_visit WHERE id=?", (vid,)).fetchone()
@@ -192,6 +204,7 @@ def visit_public(conn, v) -> dict:
         c = crm.get_contact(conn, v["site_poc_contact_id"])
         poc = (c or {}).get("full_name")
     return {"id": v["id"], "estimate_id": v["estimate_id"], "visit_date": v["visit_date"],
+            "visit_time": v.get("visit_time"),
             "attendee_user_id": v["attendee_user_id"],
             "attendee_name": nm, "attendee_initials": _initials(nm),
             "site_poc": poc, "poc_note": v.get("poc_note"), "status": v["status"],
@@ -298,7 +311,16 @@ def list_reports(conn, est_id) -> list:
 def company_schedule(conn, month=None):
     """The console month grid: ira_visit (kind 'inspection') + walkthrough_visit
     (kind 'walkthrough') merged, + the next-14-days list (both kinds) + the #274
-    waiting-on digest (unchanged source of truth in ira.py)."""
+    waiting-on digest (unchanged source of truth in ira.py).
+
+    EVENTS ARE CALENDAR-APP-SHAPED (amendment): every event carries
+      date (LOCAL YYYY-MM-DD), time (LOCAL HH:MM or None = ALL-DAY),
+      title (human summary), location (site address), attendee_name/initials,
+      plus kind/code/status/estimate_id for in-app routing.
+    A future per-person ICS subscription feed serializes these 1:1 with no
+    rework: DTSTART = date+time (or VALUE=DATE when time is None),
+    SUMMARY = title, LOCATION = location, ATTENDEE = attendee_name.
+    Within a day: all-day events first, then timed by time (calendar convention)."""
     import ira
     month = (month or "").strip() or date.today().isoformat()[:7]
     first = date.fromisoformat(month + "-01")
@@ -320,6 +342,9 @@ def company_schedule(conn, month=None):
 
     def _wt_event(v):
         return {"kind": "walkthrough", "id": v["id"], "date": v["visit_date"],
+                "time": v.get("visit_time"),
+                "title": f"Walkthrough — {v['est_code']} · {v.get('org_name') or ''}".strip(" ·"),
+                "location": v.get("building_address"),
                 "code": v["est_code"], "estimate_id": v["estimate_id"],
                 "label": v.get("building_address") or v.get("org_name"),
                 "attendee_initials": _initials(v.get("attendee_name")),
@@ -327,6 +352,9 @@ def company_schedule(conn, month=None):
 
     def _ira_event(v):
         return {"kind": "inspection", "id": v["id"], "date": v["visit_date"],
+                "time": None,   # inspection visits are day-granular (#274)
+                "title": f"Inspection — {v['project_code']} · {v.get('org_name') or ''}".strip(" ·"),
+                "location": v.get("building_address"),
                 "code": v["project_code"], "estimate_id": None,
                 "label": v.get("building_address") or v.get("org_name") or v.get("label"),
                 "attendee_initials": None, "attendee_name": None, "status": v["status"]}
@@ -346,12 +374,15 @@ def company_schedule(conn, month=None):
         "WHERE v.status='scheduled' AND v.visit_date >= ? AND v.visit_date <= ? "
         "ORDER BY v.visit_date, v.id", (today.isoformat(), horizon)).fetchall()]
 
+    def _order(e):
+        # within a day: all-day first, then timed by time (calendar convention)
+        return (e["date"], e["time"] is not None, e["time"] or "", e["kind"], e["id"])
     events = ([_wt_event(v) for v in _wt_rows(first.isoformat(), last.isoformat(), False)]
               + [_ira_event(v) for v in ira_month])
-    events.sort(key=lambda e: (e["date"], e["kind"], e["id"]))
+    events.sort(key=_order)
     upcoming = ([_wt_event(v) for v in _wt_rows(today.isoformat(), horizon, True)]
                 + [_ira_event(v) for v in ira_up])
-    upcoming.sort(key=lambda e: (e["date"], e["kind"], e["id"]))
+    upcoming.sort(key=_order)
 
     waiting = []
     for j in ira._jobs_with_estimate(conn):
@@ -378,9 +409,10 @@ def upcoming_walkthroughs(conn, days=14) -> list:
         "JOIN crm_organization o ON o.id = e.client_org_id "
         "LEFT JOIN users u ON u.id = v.attendee_user_id "
         "WHERE v.status='scheduled' AND v.visit_date >= ? AND v.visit_date <= ? "
-        "ORDER BY v.visit_date, v.id",
+        "ORDER BY v.visit_date, (v.visit_time IS NOT NULL), v.visit_time, v.id",
         (today.isoformat(), (today + timedelta(days=days)).isoformat())).fetchall()
-    return [{"id": v["id"], "visit_date": v["visit_date"], "code": v["est_code"],
+    return [{"id": v["id"], "visit_date": v["visit_date"], "visit_time": v["visit_time"],
+             "code": v["est_code"],
              "estimate_id": v["estimate_id"], "building_address": v["building_address"],
              "org_name": v["org_name"], "attendee_name": v["attendee_name"],
              "attendee_initials": _initials(v["attendee_name"])}
@@ -409,6 +441,7 @@ def _api_visit_create(est_id):
     conn = _db()
     try:
         v = create_visit(conn, est_id, visit_date=d.get("visit_date"),
+                         visit_time=d.get("visit_time"),
                          attendee_user_id=d.get("attendee_user_id"),
                          site_poc_contact_id=d.get("site_poc_contact_id"),
                          poc_note=d.get("poc_note"), actor_user_id=_uid())

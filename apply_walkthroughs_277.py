@@ -58,6 +58,7 @@ def ensure_walkthroughs_schema(conn) -> dict:
               {pk},
               estimate_id         INTEGER NOT NULL REFERENCES estimate(id),
               visit_date          TEXT    NOT NULL,
+              visit_time          TEXT,
               attendee_user_id    INTEGER NOT NULL,
               site_poc_contact_id INTEGER REFERENCES crm_contact(id),
               poc_note            TEXT,
@@ -66,6 +67,13 @@ def ensure_walkthroughs_schema(conn) -> dict:
               created_at          TEXT,
               updated_at          TEXT
             )""")
+    # amendment (pre-deploy, same migration): visit_time LOCAL HH:MM, NULL = all-day —
+    # additive for any DB that created the table before the amendment landed.
+    from apply_crm_266 import _columns
+    changed["visit_time"] = False
+    if "visit_time" not in _columns(conn, "walkthrough_visit"):
+        conn.execute("ALTER TABLE walkthrough_visit ADD COLUMN visit_time TEXT")
+        changed["visit_time"] = True
     conn.execute("CREATE INDEX IF NOT EXISTS idx_wtvisit_estimate ON walkthrough_visit(estimate_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_wtvisit_date ON walkthrough_visit(visit_date)")
 

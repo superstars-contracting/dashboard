@@ -5045,7 +5045,7 @@ applyLanguage();
           ? ' <button type="button" class="est-mini-btn" data-wtdone="'+v.id+'">Done</button>'
             + ' <button type="button" class="est-mini-btn" data-wtcancel="'+v.id+'">Cancel</button>' : '';
         return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #F2EFE7;font-size:12.5px;flex-wrap:wrap;">'
-          + '<b>'+fmtD(v.visit_date)+'</b>'
+          + '<b>'+fmtD(v.visit_date)+(v.visit_time ? ' '+esc(v.visit_time) : '')+'</b>'
           + '<span class="dchip" title="'+esc(v.attendee_name||'')+'">'+esc(v.attendee_initials||'?')+'</span>'
           + '<span class="est-badge '+(v.status==='done'?'st-approved':(v.status==='cancelled'?'st-lost':'st-scoping'))+'">'+esc(v.status)+'</span>'
           + (v.poc_note ? '<span style="color:var(--muted);">POC: '+esc(v.poc_note)+'</span>' : '')
@@ -5087,7 +5087,10 @@ applyLanguage();
       var atts = await api('GET','/api/estimating/attendees');
       var aopts = (atts||[]).map(function(u){ return '<option value="'+u.id+'">'+esc(u.name)+'</option>'; }).join('');
       openModal('Schedule walkthrough',
-        '<div class="est-field"><label>Date *</label><input class="ssc-date ssc-field" id="f-cwt-date" placeholder="MM/DD/YYYY"></div>'
+        '<div class="est-field-row">'
+        + '<div class="est-field"><label>Date *</label><input class="ssc-date ssc-field" id="f-cwt-date" placeholder="MM/DD/YYYY"></div>'
+        + '<div class="est-field"><label>Time — blank = all-day</label><input class="ssc-field" id="f-cwt-time" type="time"></div>'
+        + '</div>'
         + '<div class="est-field"><label>Attendee * — someone must physically go</label><select class="ssc-field" id="f-cwt-att">'+aopts+'</select></div>'
         + '<div class="est-field"><label>Site point of contact (note)</label><input class="ssc-field" id="f-cwt-poc" placeholder="name / phone — optional"></div>',
         async function(){
@@ -5095,7 +5098,8 @@ applyLanguage();
           if (!iso){ modalErr('Pick the date.'); return false; }
           if (!q('f-cwt-att').value){ modalErr('Pick the attendee.'); return false; }
           await api('POST','/api/estimating/'+curId+'/walkthroughs',
-            { visit_date: iso, attendee_user_id: +q('f-cwt-att').value, poc_note: q('f-cwt-poc').value.trim() || null });
+            { visit_date: iso, visit_time: q('f-cwt-time').value || null,
+              attendee_user_id: +q('f-cwt-att').value, poc_note: q('f-cwt-poc').value.trim() || null });
           closeModal(); openEst(curId); return false;
         }, 'Schedule');
     } catch(e){ alert(e.message); }
@@ -5763,7 +5767,7 @@ applyLanguage();
       q('ira-upcoming').innerHTML = (d.upcoming||[]).length ? d.upcoming.map(function(v){
         var chip = '<span class="dchip">'+(v.kind==='walkthrough'?'Walkthrough':'Inspection')+'</span>';
         var ini = v.attendee_initials ? ' <span class="kindchip" title="'+esc(v.attendee_name||'')+'">'+esc(v.attendee_initials)+'</span>' : '';
-        return '<div class="ira-wait-row"><b>'+fmtD(v.date)+'</b> '+chip+ini
+        return '<div class="ira-wait-row"><b>'+fmtD(v.date)+(v.time ? ' '+esc(v.time) : '')+'</b> '+chip+ini
           + ' <span class="ira-wait-code" data-goto="'+esc(v.code)+'" data-kind="'+esc(v.kind)+'" data-estid="'+(v.estimate_id||'')+'">'+esc(v.code)+'</span>'
           + (v.label ? ' <span style="color:var(--muted);">'+esc(v.label)+'</span>' : '')+'</div>';
       }).join('') : '<div class="est-empty">Nothing in the next 14 days.</div>';
@@ -5799,11 +5803,13 @@ applyLanguage();
       var uniqueJobs = {}; vs.forEach(function(v){ uniqueJobs[v.code]=1; });
       var nJobs = Object.keys(uniqueJobs).length;
       var chips = vs.slice(0,3).map(function(v){
-        // kind = a neutral LABEL (W/I prefix + attendee initials), never a color
+        // kind = a neutral LABEL (W/I prefix + attendee initials + optional time), never a color
         var pre = (v.kind==='walkthrough' ? 'W' : 'I') + (v.attendee_initials ? '·'+v.attendee_initials : '');
         return '<span class="ira-cal-chip '+esc(v.status==='performed'||v.status==='done'?'performed':(v.status==='cancelled'?'cancelled':''))+'"'
           + ' data-vgoto="'+esc(v.code)+'" data-kind="'+esc(v.kind)+'" data-estid="'+(v.estimate_id||'')+'"'
-          + ' title="'+esc((v.kind==='walkthrough'?'Walkthrough':'Inspection')+' — '+v.code+(v.label?' — '+v.label:''))+'">'
+          + ' title="'+esc((v.title || ((v.kind==='walkthrough'?'Walkthrough':'Inspection')+' — '+v.code))
+              + (v.time ? ' · '+v.time : ' · all-day') + (v.location ? ' — '+v.location : ''))+'">'
+          + (v.time ? '<b style="opacity:.8;">'+esc(v.time)+'</b> ' : '')
           + '<b style="opacity:.65;">'+esc(pre)+'</b> '+esc(v.code)+'</span>';
       }).join('') + (vs.length>3 ? '<span class="ira-cal-chip">+'+(vs.length-3)+' more</span>' : '');
       cells.push('<div class="ira-cal-day'+(iso===today?' today':'')+'" data-day="'+iso+'" data-count="'+vs.length+'">'
@@ -5869,12 +5875,14 @@ applyLanguage();
       var aopts = (atts||[]).map(function(u){ return '<option value="'+u.id+'">'+esc(u.name)+'</option>'; }).join('');
       openModal('Schedule walkthrough — '+fmtD(iso),
         '<div class="est-field"><label>Estimate *</label><select class="ssc-field" id="f-wt-est">'+eopts+'</select></div>'
+        + '<div class="est-field"><label>Time — blank = all-day</label><input class="ssc-field" id="f-wt-time" type="time"></div>'
         + '<div class="est-field"><label>Attendee * — someone must physically go</label><select class="ssc-field" id="f-wt-att">'+aopts+'</select></div>'
         + '<div class="est-field"><label>Site point of contact (note)</label><input class="ssc-field" id="f-wt-poc" placeholder="name / phone — optional"></div>',
         async function(){
           if (!q('f-wt-att').value){ modalErr('Pick the attendee.'); return false; }
           await api('POST','/api/estimating/'+q('f-wt-est').value+'/walkthroughs',
-            { visit_date: iso, attendee_user_id: +q('f-wt-att').value, poc_note: q('f-wt-poc').value.trim() || null });
+            { visit_date: iso, visit_time: q('f-wt-time').value || null,
+              attendee_user_id: +q('f-wt-att').value, poc_note: q('f-wt-poc').value.trim() || null });
           closeModal(); loadCalendar(); return false;
         }, 'Schedule');
     } catch(e){ alert(e.message); }

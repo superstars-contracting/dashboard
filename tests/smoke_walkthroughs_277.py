@@ -307,6 +307,38 @@ def main():
         st, _ = _sc(cs, "GET", "/api/ira/calendar")
         ok("ira_calendar_untouched_200", st == 200)
 
+        # ---------- (d2) AMENDMENT: visit_time + calendar-app event shape ----------
+        st, _ = _sc(es, "POST", f"/api/estimating/{a_id}/walkthroughs",
+                    json={"visit_date": d5, "visit_time": "25:99", "attendee_user_id": att})
+        ok("bad_time_400", st == 400)
+        st, body = _sc(es, "POST", f"/api/estimating/{a_id}/walkthroughs",
+                       json={"visit_date": d5, "visit_time": "14:30", "attendee_user_id": att})
+        tv = ((body or {}).get("data", {}) or {})
+        ok("timed_visit_200_time_verbatim", st == 200 and tv.get("visit_time") == "14:30")
+        st, body = _sc(cs, "GET", f"/api/company/schedule?month={d5[:7]}")
+        evs = ((body or {}).get("data", {}) or {}).get("events", [])
+        on_d5 = [(e["kind"], e["time"]) for e in evs if e["date"] == d5]
+        ok("allday_null_time_kept", (("walkthrough", None) in on_d5) and (("inspection", None) in on_d5))
+        ok("timed_event_carries_time", ("walkthrough", "14:30") in on_d5)
+        # within a day: ALL-DAY first, then timed (calendar convention)
+        ok("within_day_allday_first",
+           on_d5[-1] == ("walkthrough", "14:30") and all(t is None for _, t in on_d5[:-1]),
+           f"d5 order: {on_d5}")
+        # CALENDAR-APP SHAPE: date/time/title/location/attendee — the future
+        # per-person ICS feed serializes these 1:1 (DTSTART, SUMMARY, LOCATION,
+        # ATTENDEE) with no rework.
+        timed = next(e for e in evs if e["date"] == d5 and e["time"] == "14:30")
+        ok("event_ics_shape_keys",
+           all(k in timed for k in ("date", "time", "title", "location",
+                                    "attendee_name", "attendee_initials", "kind", "status")))
+        ok("event_title_is_summary", "Walkthrough" in timed["title"] and "FR-QN" in timed["title"])
+        ok("event_location_is_address", timed.get("location") == "SMK277 77 Walk Way")
+        # the estimator's upcoming list carries the time too
+        st, body = _sc(es, "GET", "/api/estimating/queue")
+        ups = ((body or {}).get("data", {}) or {}).get("walkthroughs_upcoming", [])
+        ok("upcoming_list_carries_time",
+           any(u.get("visit_time") == "14:30" for u in ups))
+
         # ---------- (e) report upload: GPS-strip + HEIC taken_at ----------
         heic = _img_bytes("HEIF", exif_dt="2026:07:05 10:15:00", gps=True)
         jpg = _img_bytes("JPEG", exif_dt="2026:07:05 09:00:00", gps=True)
