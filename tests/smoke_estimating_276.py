@@ -105,9 +105,20 @@ def _uid(conn, key):
 def _cleanup():
     conn = db_layer.connect(pragma_fk=True)
     try:
+        # #277 made the walkthrough_scheduled stage move create walkthrough_visit
+        # children — a DELIBERATE guard update (#263-class): clear them first when
+        # the tables exist (table-existence guarded for pre-277 DBs).
+        from apply_crm_266 import _table_exists
+        has_wt = _table_exists(conn, "walkthrough_visit")
         for t, b in SERIES:
             for r in conn.execute("SELECT id, code FROM estimate WHERE est_type=? AND borough=?",
                                   (t, b)).fetchall():
+                if has_wt:
+                    for rep in conn.execute("SELECT id FROM walkthrough_report WHERE estimate_id=?",
+                                            (r[0],)).fetchall():
+                        conn.execute("DELETE FROM walkthrough_photo WHERE report_id=?", (rep[0],))
+                        conn.execute("DELETE FROM walkthrough_report WHERE id=?", (rep[0],))
+                    conn.execute("DELETE FROM walkthrough_visit WHERE estimate_id=?", (r[0],))
                 conn.execute("DELETE FROM ira_visit WHERE project_code=?", (r[1],))
                 conn.execute("DELETE FROM ira_job WHERE project_code=?", (r[1],))
                 conn.execute("DELETE FROM estimate_document WHERE estimate_id=?", (r[0],))
