@@ -126,6 +126,12 @@
     </div>
   </div>
 
+  <!-- #277 — the estimator's schedule without console access -->
+  <div class="est-box-up" id="wt-upcoming-wrap" style="display:none;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 1px 2px rgba(30,35,60,.04), 0 8px 24px rgba(30,35,60,.06);">
+    <div style="font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:#54505A;font-weight:700;margin-bottom:8px;">Upcoming walkthroughs — next 14 days</div>
+    <div id="wt-upcoming"></div>
+  </div>
+
   <div id="queue"><div class="empty">Loading the queue…</div></div>
 </div>
 
@@ -233,7 +239,8 @@
       var chips = '<span class="dchip">'+esc(l.division_label||'—')+(l.ra_subtype?' · '+esc(l.ra_subtype):'')+'</span>'
         + '<span class="kind">'+esc((l.inquiry_kind||'undetermined').toUpperCase())+'</span>';
       var sub = esc(l.building_address||'—')
-        + (l.docs_count ? ' · <a href="#" data-docs="'+l.id+'">'+l.docs_count+' doc'+(l.docs_count===1?'':'s')+'</a>' : ' · no docs');
+        + (l.docs_count ? ' · <a href="#" data-docs="'+l.id+'">'+l.docs_count+' doc'+(l.docs_count===1?'':'s')+'</a>' : ' · no docs')
+        + (l.report_count ? ' · <a href="#" data-report="'+l.id+'">report ('+l.report_count+')</a>' : '');
       var act = '';
       if (l.action && l.action.action){
         act = '<button type="button" class="btn-primary" style="padding:7px 14px;font-size:11.5px;" data-act="'+esc(l.action.action)+'" data-id="'+l.id+'">'+esc(l.action.label)+'</button>';
@@ -242,6 +249,7 @@
       }
       var back = (l.status==='scoping' && BACK_OF[l.est_stage])
         ? '<button type="button" class="btn-back" data-back="'+esc(BACK_OF[l.est_stage])+'" data-id="'+l.id+'" title="One step back">←</button>' : '';
+      var repBtn = '<button type="button" class="btn-back" data-repform="'+l.id+'" title="Walkthrough report — photos + notes">+ Report</button>';
       return '<div class="qrow'+(l.overdue?' hl-red':'')+'" id="lead-'+esc(l.code)+'">'
         + '<div class="q-main">'
         +   '<div class="q-top"><span class="q-title"><span class="code">'+esc(l.code)+'</span> · '+esc(l.org_name||'—')+'</span>'+chips+'</div>'
@@ -251,7 +259,7 @@
         + '<div class="q-side">'
         +   '<span class="agepill '+(l.overdue?'late':'ok')+'">'+l.age_days+'d in stage</span>'
         +   dueHtml(l)
-        +   '<div class="row">'+back+act+'</div>'
+        +   '<div class="row">'+back+repBtn+act+'</div>'
         + '</div></div>';
     }).join('');
     host.querySelectorAll('[data-act]').forEach(function(b){
@@ -265,6 +273,12 @@
     });
     host.querySelectorAll('[data-docs]').forEach(function(a){
       a.addEventListener('click', function(ev){ ev.preventDefault(); showDocs(+a.getAttribute('data-docs')); });
+    });
+    host.querySelectorAll('[data-report]').forEach(function(a){
+      a.addEventListener('click', function(ev){ ev.preventDefault(); showReports(+a.getAttribute('data-report')); });
+    });
+    host.querySelectorAll('[data-repform]').forEach(function(b){
+      b.addEventListener('click', function(){ reportFormModal(+b.getAttribute('data-repform')); });
     });
     // deep link: /estimating#CODE scrolls to the card with a brief focus glow
     if (location.hash){
@@ -280,14 +294,7 @@
     if (act === 'start'){
       api('POST','/api/estimating/'+id+'/start').then(load).catch(function(e){ alert(e.message); });
     } else if (act === 'schedule_walkthrough'){
-      openModal('Schedule walkthrough',
-        '<div class="fld"><label>Walkthrough date *</label><input class="ssc-date ssc-field" id="f-wd" placeholder="MM/DD/YYYY"></div>',
-        async function(){
-          var iso = getISO(q('f-wd'));
-          if (!iso){ modalErr('Pick the walkthrough date.'); return false; }
-          await api('POST','/api/estimating/'+id+'/stage', { stage:'walkthrough_scheduled', walkthrough_date: iso });
-          closeModal(); load(); return false;
-        }, 'Schedule');
+      scheduleModal(id);
     } else if (act === 'walkthrough_done'){
       api('POST','/api/estimating/'+id+'/stage', { stage:'walkthrough_done' }).then(load).catch(function(e){ alert(e.message); });
     } else if (act === 'proposal_draft'){
@@ -304,6 +311,102 @@
           closeModal(); load(); return false;
         }, 'Send to VP');
     }
+  }
+
+  // ---------- #277: walkthrough scheduling (attendee REQUIRED) ----------
+  var ATTENDEES = null;
+  async function attendees(){
+    if (!ATTENDEES) ATTENDEES = await api('GET','/api/estimating/attendees');
+    return ATTENDEES;
+  }
+
+  async function scheduleModal(id){
+    var opts;
+    try { opts = await attendees(); } catch(e){ alert(e.message); return; }
+    var sel = (opts||[]).map(function(u){ return '<option value="'+u.id+'">'+esc(u.name)+'</option>'; }).join('');
+    openModal('Schedule walkthrough',
+      '<div class="fld"><label>Walkthrough date *</label><input class="ssc-date ssc-field" id="f-wd" placeholder="MM/DD/YYYY"></div>'
+      + '<div class="fld"><label>Attendee * — someone must physically go</label><select class="ssc-field" id="f-wd-att">'+sel+'</select></div>'
+      + '<div class="fld"><label>Site point of contact (note)</label><input class="ssc-field" id="f-wd-poc" placeholder="name / phone — optional"></div>',
+      async function(){
+        var iso = getISO(q('f-wd'));
+        if (!iso){ modalErr('Pick the walkthrough date.'); return false; }
+        if (!q('f-wd-att').value){ modalErr('Pick the attendee — someone must go.'); return false; }
+        await api('POST','/api/estimating/'+id+'/walkthroughs',
+          { visit_date: iso, attendee_user_id: +q('f-wd-att').value, poc_note: q('f-wd-poc').value.trim() || null });
+        closeModal(); load(); return false;
+      }, 'Schedule');
+  }
+
+  // ---------- #277: the iPad walkthrough report ----------
+  function reportFormModal(id){
+    openModal('Walkthrough report',
+      '<div class="fld"><label>Photos (camera or library — HEIC ok)</label>'
+      + '<input class="ssc-field" id="f-rep-files" type="file" accept="image/*,.heic,.heif" multiple style="padding:7px;height:auto;"></div>'
+      + '<div id="f-rep-caps"></div>'
+      + '<div class="fld"><label>Notes</label><textarea class="ssc-field" id="f-rep-note" rows="4" style="height:auto;" placeholder="scope, access, measurements…"></textarea></div>',
+      async function(){
+        var files = q('f-rep-files').files;
+        var note = q('f-rep-note').value.trim();
+        if (!files.length && !note){ modalErr('Add at least one photo or a note.'); return false; }
+        var fd = new FormData();
+        for (var i=0;i<files.length;i++) fd.append('photos', files[i]);
+        q('f-rep-caps').querySelectorAll('input[data-cap]').forEach(function(inp){ fd.append('captions', inp.value.trim()); });
+        if (note) fd.append('note', note);
+        var r = await fetch('/api/estimating/'+id+'/walkthrough-report', { method:'POST', credentials:'include', body: fd });
+        var j = null; try { j = await r.json(); } catch(e){}
+        if (!r.ok) throw new Error((j && j.error) || ('HTTP '+r.status));
+        closeModal(); load(); return false;
+      }, 'Save report');
+    q('f-rep-files').addEventListener('change', function(){
+      var host = q('f-rep-caps');
+      host.innerHTML = Array.from(q('f-rep-files').files).map(function(f, i){
+        return '<div class="fld"><label>Caption — '+esc(f.name)+'</label><input class="ssc-field" data-cap="'+i+'" placeholder="optional"></div>';
+      }).join('');
+    });
+  }
+
+  async function showReports(id){
+    try {
+      var reps = await api('GET','/api/estimating/'+id+'/walkthrough-reports');
+      var html = (reps||[]).map(function(r){
+        var grid = (r.photos||[]).map(function(p){
+          return '<a href="'+esc(p.file_url)+'" target="_blank" rel="noopener" style="display:block;">'
+            + '<img src="'+esc(p.thumb_url)+'" alt="" style="width:100%;height:86px;object-fit:cover;border-radius:8px;border:1px solid var(--line);">'
+            + (p.caption ? '<div style="font-size:10px;color:var(--muted);margin-top:2px;">'+esc(p.caption)+'</div>' : '')
+            + '</a>';
+        }).join('');
+        return '<div style="border-bottom:1px solid var(--line);padding:10px 0;">'
+          + '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">'+fmtD(r.created_at)
+          + (r.created_by_name ? ' · '+esc(r.created_by_name) : '')+' · '+r.photo_count+' photo'+(r.photo_count===1?'':'s')+'</div>'
+          + (grid ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;">'+grid+'</div>' : '')
+          + (r.note ? '<div style="font-size:12.5px;margin-top:8px;white-space:pre-wrap;">'+esc(r.note)+'</div>' : '')
+          + '</div>';
+      }).join('') || '<div style="color:var(--muted);font-size:12.5px;">No reports yet.</div>';
+      openModal('Walkthrough report', html, async function(){ return true; }, 'Close');
+      q('m-cancel').style.display = 'none';
+    } catch(e){ alert(e.message); }
+  }
+
+  function renderUpcoming(list){
+    var wrap = q('wt-upcoming-wrap');
+    if (!list || !list.length){ wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+    q('wt-upcoming').innerHTML = list.map(function(v){
+      return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F2EFE7;font-size:12.5px;">'
+        + '<b>'+fmtD(v.visit_date)+'</b>'
+        + '<span class="dchip">'+esc(v.attendee_initials||'?')+'</span>'
+        + '<a href="#'+esc(v.code)+'" style="color:var(--brand-red);font-weight:700;text-decoration:none;" data-jump="'+esc(v.code)+'">'+esc(v.code)+'</a>'
+        + '<span style="color:var(--muted);">'+esc(v.building_address||v.org_name||'')+'</span>'
+        + '<span style="margin-left:auto;color:var(--muted);font-size:11px;">'+esc(v.attendee_name||'')+'</span>'
+        + '</div>';
+    }).join('');
+    q('wt-upcoming').querySelectorAll('[data-jump]').forEach(function(a){
+      a.addEventListener('click', function(){
+        var el = document.getElementById('lead-'+a.getAttribute('data-jump'));
+        if (el) el.scrollIntoView({behavior:'smooth', block:'center'});
+      });
+    });
   }
 
   async function showDocs(id){
@@ -325,6 +428,7 @@
       var d = await api('GET','/api/estimating/queue');
       (d.leads||[]).forEach(function(l){ LEADS[l.id] = l; });
       renderQueue(d);
+      renderUpcoming(d.walkthroughs_upcoming);
     } catch(e){ q('queue').innerHTML = '<div class="empty">'+esc(e.message)+'</div>'; }
   }
 
@@ -354,6 +458,6 @@
   load();
 })();
 </script>
-<div style="text-align:center;color:#9aa3ae;font-size:11px;margin:10px 0 26px;">build #276 · 2026-07-07 · Estimating workspace — queue, pipeline strips, SLA aging (stage 7d · VP 3d), stage machine</div>
+<div style="text-align:center;color:#9aa3ae;font-size:11px;margin:10px 0 26px;">build #277 · 2026-07-07 · Estimating workspace — walkthrough scheduling (attendee-required, stage-synced), upcoming list, iPad walkthrough reports (GPS-stripped photos)</div>
 </body>
 </html>
