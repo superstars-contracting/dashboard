@@ -106,6 +106,12 @@ ira.register(app)
 import estimating  # noqa: E402
 estimating.register(app)
 
+# #277 — walkthrough scheduling (stage-synced, attendee-required) + iPad
+# walkthrough reports (GPS-stripped photos on the ESTIMATE) + the merged company
+# schedule (inspections + walkthroughs on one console calendar).
+import walkthroughs  # noqa: E402
+walkthroughs.register(app)
+
 # Security: cap upload size. Raised to 256 MB (#235) so a field-photo BATCH POST
 # (many images, several 8-12 MB) isn't rejected at the WSGI layer; the Field
 # Photos UI also uploads in chunks. A request over the cap returns a clean 413

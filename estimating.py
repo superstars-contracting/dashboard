@@ -146,51 +146,29 @@ def stage_action(row) -> dict:
 
 # ===================== the stage machine (shared with the smoke) =====================
 
-def advance_stage(conn, est_id, new_stage, *, walkthrough_date=None, final_amount=None,
-                  qb_estimate_ref=None, actor_user_id=None) -> dict:
-    """Apply one estimating sub-stage move. Server-validated: adjacency only;
-    walkthrough_scheduled REQUIRES a LOCAL date; active only while status='scoping'.
-    Amounts may ride along to proposal_draft / sent_to_vp (the estimator enters the
-    proposal amount — blueprint §5). Raises ValueError -> 400 at the endpoint."""
-    est = estimates.get_estimate(conn, est_id)
-    if not est:
-        raise LookupError("estimate not found")
-    if est["status"] != "scoping":
-        raise ValueError("the estimating stage machine is active only while status='scoping'")
+def _apply_stage(conn, est, new_stage, *, actor_user_id=None, extra_sets=None,
+                 extra_params=None) -> dict:
+    """The MACHINE PRIMITIVE: one adjacency-validated est_stage move + stamps +
+    activity + notifications. #277 splits this out of advance_stage so the
+    walkthrough-visit layer drives the SAME machine (schedule -> scheduled,
+    done -> done, cancel -> revert) with no parallel state. Raises ValueError."""
     old = est.get("est_stage") or "received"
     new_stage = (new_stage or "").strip().lower()
+    if est["status"] != "scoping":
+        raise ValueError("the estimating stage machine is active only while status='scoping'")
     if new_stage not in EST_STAGES:
         raise ValueError(f"unknown est_stage: {new_stage}")
     if new_stage not in _STAGE_MOVES.get(old, set()):
         raise ValueError(f"illegal stage move: {old} -> {new_stage}")
-
-    sets = ["est_stage=?", "est_stage_changed_at=?", "updated_at=?"]
-    params = [new_stage, _now(), _now()]
-    if new_stage == "walkthrough_scheduled":
-        wd = (walkthrough_date or "").strip()
-        try:
-            datetime.strptime(wd, "%Y-%m-%d")
-        except (ValueError, TypeError):
-            raise ValueError("walkthrough_scheduled requires walkthrough_date (YYYY-MM-DD)")
-        sets.append("walkthrough_date=?"); params.append(wd)
-    if new_stage in ("proposal_draft", "sent_to_vp"):
-        if final_amount is not None and str(final_amount).strip() != "":
-            amt = float(final_amount)
-            if amt < 0:
-                raise ValueError("final_amount must be >= 0")
-            sets.append("final_amount=?"); params.append(amt)
-        if qb_estimate_ref is not None and str(qb_estimate_ref).strip() != "":
-            sets.append("qb_estimate_ref=?"); params.append(str(qb_estimate_ref).strip())
-    params.append(est_id)
+    sets = ["est_stage=?", "est_stage_changed_at=?", "updated_at=?"] + list(extra_sets or [])
+    params = [new_stage, _now(), _now()] + list(extra_params or [])
+    params.append(est["id"])
     conn.execute(f"UPDATE estimate SET {', '.join(sets)} WHERE id=?", params)
     conn.commit()
     crm.add_activity(conn, entity_type="organization", entity_id=est["client_org_id"],
                      activity_type="system", author_user_id=actor_user_id, function_tag="sales",
                      summary=f"Estimate {est['code']}: estimating {old} → {new_stage}")
-
-    # blueprint §5 transition rule — queue events email the assigned estimator (with
-    # a deep link); the VP hears about a proposal landing on the table.
-    est2 = estimates.get_estimate(conn, est_id)
+    est2 = estimates.get_estimate(conn, est["id"])
     assignee = est2.get("assigned_estimator")
     if assignee and assignee != actor_user_id:
         notifications.notify_user(
@@ -204,6 +182,51 @@ def advance_stage(conn, est_id, new_stage, *, walkthrough_date=None, final_amoun
             subject=f"[SSC] {est2['code']} awaits your approval",
             estimate_code=est2["code"], path="/",
             extra_line=f"{est2.get('building_address') or ''}".strip())
+    return est2
+
+
+def advance_stage(conn, est_id, new_stage, *, walkthrough_date=None, final_amount=None,
+                  qb_estimate_ref=None, attendee_user_id=None, actor_user_id=None) -> dict:
+    """Apply one estimating sub-stage move. Server-validated: adjacency only;
+    active only while status='scoping'. Amounts may ride along to proposal_draft /
+    sent_to_vp (the estimator enters the proposal amount — blueprint §5).
+
+    #277: `walkthrough_scheduled` DELEGATES to the visit layer — it creates a real
+    walkthrough_visit (date required as before; attendee defaults to the actor —
+    someone from the company must attend) and the visit layer advances this machine
+    + derives estimate.walkthrough_date. `walkthrough_done` also marks the earliest
+    scheduled visit done, so visit state and stage never diverge."""
+    est = estimates.get_estimate(conn, est_id)
+    if not est:
+        raise LookupError("estimate not found")
+    new_stage = (new_stage or "").strip().lower()
+    if new_stage == "walkthrough_scheduled":
+        import walkthroughs   # lazy — walkthroughs imports this module at top level
+        wd = (walkthrough_date or "").strip()
+        try:
+            datetime.strptime(wd, "%Y-%m-%d")
+        except (ValueError, TypeError):
+            raise ValueError("walkthrough_scheduled requires walkthrough_date (YYYY-MM-DD)")
+        walkthroughs.create_visit(conn, est_id, visit_date=wd,
+                                  attendee_user_id=attendee_user_id or actor_user_id,
+                                  actor_user_id=actor_user_id)
+        return estimates.get_estimate(conn, est_id)
+
+    extra_sets, extra_params = [], []
+    if new_stage in ("proposal_draft", "sent_to_vp"):
+        if final_amount is not None and str(final_amount).strip() != "":
+            amt = float(final_amount)
+            if amt < 0:
+                raise ValueError("final_amount must be >= 0")
+            extra_sets.append("final_amount=?"); extra_params.append(amt)
+        if qb_estimate_ref is not None and str(qb_estimate_ref).strip() != "":
+            extra_sets.append("qb_estimate_ref=?"); extra_params.append(str(qb_estimate_ref).strip())
+    est2 = _apply_stage(conn, est, new_stage, actor_user_id=actor_user_id,
+                        extra_sets=extra_sets, extra_params=extra_params)
+    if new_stage == "walkthrough_done":
+        import walkthroughs   # lazy
+        walkthroughs.mark_next_scheduled_done(conn, est_id, actor_user_id=actor_user_id,
+                                              sync_stage=False)
     return est2
 
 
@@ -250,6 +273,7 @@ o.name AS org_name"""
 def lead_public(row, today=None) -> dict:
     r = dict(row)
     ndocs = r.pop("_ndocs", None)
+    nreports = r.pop("_nreports", None)
     age = lead_age_days(r, today)
     due = r.get("bid_due_date")
     due_days = None
@@ -271,7 +295,7 @@ def lead_public(row, today=None) -> dict:
         "final_amount": r.get("final_amount"), "qb_estimate_ref": r.get("qb_estimate_ref"),
         "age_days": age, "overdue": lead_overdue(r, today),
         "pipe": pipe_state(r, today), "action": stage_action(r),
-        "docs_count": ndocs,
+        "docs_count": ndocs, "report_count": nreports,
     }
 
 
@@ -288,6 +312,19 @@ def queue_payload(conn, today=None) -> dict:
         "SELECT estimate_id, COUNT(*) AS n FROM estimate_document GROUP BY estimate_id").fetchall()}
     for r in rows:
         r["_ndocs"] = ndocs.get(r["id"], 0)
+    # #277 — walkthrough report counts + the estimator's upcoming-walkthroughs list
+    # (table-existence guarded so a #276-only DB still serves the queue).
+    from apply_crm_266 import _table_exists
+    has_wt = _table_exists(conn, "walkthrough_report")
+    nreps = {}
+    wt_upcoming = []
+    if has_wt:
+        nreps = {r["estimate_id"]: r["n"] for r in conn.execute(
+            "SELECT estimate_id, COUNT(*) AS n FROM walkthrough_report GROUP BY estimate_id").fetchall()}
+        import walkthroughs
+        wt_upcoming = walkthroughs.upcoming_walkthroughs(conn)
+    for r in rows:
+        r["_nreports"] = nreps.get(r["id"], 0)
 
     intake = [r for r in rows if r["status"] == "intake"]
     scoping = [r for r in rows if r["status"] == "scoping"]
@@ -313,6 +350,7 @@ def queue_payload(conn, today=None) -> dict:
             "bids_due_week": len(due_week),
         },
         "leads": [lead_public(r, today) for r in cards],
+        "walkthroughs_upcoming": wt_upcoming,   # #277 — the estimator's schedule
         "sla": {"stage_days": STAGE_SLA_DAYS, "vp_days": VP_SLA_DAYS},
     }
 
@@ -325,6 +363,13 @@ def vp_table_payload(conn, today=None) -> dict:
     rows = [dict(r) for r in conn.execute(
         f"SELECT {_LEAD_COLS} FROM estimate e JOIN crm_organization o ON o.id=e.client_org_id "
         "WHERE e.status IN ('intake','scoping','submitted')").fetchall()]
+    # #277 — the VP reviews the walkthrough report beside the amount
+    from apply_crm_266 import _table_exists
+    if _table_exists(conn, "walkthrough_report"):
+        nreps = {r["estimate_id"]: r["n"] for r in conn.execute(
+            "SELECT estimate_id, COUNT(*) AS n FROM walkthrough_report GROUP BY estimate_id").fetchall()}
+        for r in rows:
+            r["_nreports"] = nreps.get(r["id"], 0)
     awaiting = [r for r in rows if r["status"] == "scoping" and r.get("est_stage") == "sent_to_vp"]
     stalled = [r for r in rows if r["status"] == "scoping" and r.get("est_stage") != "sent_to_vp"
                and lead_age_days(r, today) > STAGE_SLA_DAYS]
