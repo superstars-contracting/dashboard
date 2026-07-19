@@ -56,6 +56,7 @@ GATE = [
     "smoke_ira_pipeline_274.py",  # #274 — IRA pipeline (convert-hook, CD-5, COI expiry, visits, payment, role gates)
     "smoke_estimating_276.py",    # #276 — estimating core (stage machine, macro/micro, SLA aging, estimator role, notifications)
     "smoke_walkthroughs_277.py",  # #277 — walkthrough visits (stage sync, derivation), calendar merge, GPS-stripped reports
+    "smoke_expenses_widget_278.py",  # #278 — cost widget (rate-boundary penny math, unrated bucket) + expense ledger + role omission
     "smoke_dropplan_api.py",
     "smoke_worker_lifecycle.py",
     "smoke_dcr214_lifecycle.py",

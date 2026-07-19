@@ -173,11 +173,17 @@ def _seed():
         conn.execute("INSERT INTO report_index (report_date, project_code, report_type, status, "
                      "created_at, no_work) VALUES ('2026-06-30', ?, 'DCR', 'issued', ?, 1)",
                      (PROJ_A, _now_iso()))
-        # schedule: one activity in the visible window
+        # schedule: one activity in the visible window. RELATIVE dates (#278 guard
+        # fix, deliberate): the original hardcoded '2026-07-02..06' aged OUT of the
+        # portal's today-7..today+28 window on 2026-07-13 and the suite became a
+        # time bomb — the fixture now tracks today, like every other date fixture.
+        from datetime import date as _date, timedelta as _td
+        _ps = (_date.today() - _td(days=1)).isoformat()
+        _pf = (_date.today() + _td(days=3)).isoformat()
         conn.execute("INSERT INTO lookahead_activity (project_code, name, activity_type, "
                      "planned_start, planned_finish, source) "
-                     "VALUES (?, 'Synthetic parge coat', 'stage', '2026-07-02', '2026-07-06', 'manual')",
-                     (PROJ_A,))
+                     "VALUES (?, 'Synthetic parge coat', 'stage', ?, ?, 'manual')",
+                     (PROJ_A, _ps, _pf))
         conn.commit()
         visibility.share(conn, "photo", IDS["ph_shared"], "client", admin_id)
         visibility.share(conn, "photo", IDS["ph_flagged"], "client", admin_id)
