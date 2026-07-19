@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="/files/static/vendor/gridstack.min.css">
 <link rel="stylesheet" href="/files/static/css/widgets.css?v=245">
 <script src="/files/static/vendor/gridstack-all.js"></script>
-<script src="/files/static/js/dash_layout.js" defer></script>
+<script src="/files/static/js/dash_layout.js?v=278" defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Superstars Contracting · Office Console</title>
 <style>
@@ -4542,6 +4542,11 @@ applyLanguage();
     {id:'on-site',x:9,y:0,w:3,h:4},
     {id:'quick-actions',x:0,y:3,w:5,h:2},
     {id:'recent-activity',x:5,y:3,w:7,h:3},
+    // #278 — widgets added after the original five (dash_layout's merge keeps them
+    // for users with older saved layouts; listed here so fresh users + Reset get
+    // the intentional placement)
+    {id:'material-alerts',x:0,y:7,w:5,h:3},
+    {id:'project-costs',x:5,y:7,w:7,h:4},
   ];
   const ACTION_LABELS={dropplan_stage_update:'Drop stage updated',dropplan_drop_update:'Drop updated',dropplan_quantity_add:'Patch added',dropplan_quantity_edit:'Patch edited',dropplan_quantity_delete:'Patch removed',dropplan_reset:'Drop plan reset',cof_issue:'CoF card issued',cof_issue_override:'CoF issued (override)',cof_metadata_refresh:'CoF metadata refresh',company_id_issue:'Company ID issued',face_photo_restore:'Photo restored',pin_backfill:'PIN backfilled',signin_operator_insert:'Sign-in recorded'};
   const esc=(s)=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

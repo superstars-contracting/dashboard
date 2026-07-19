@@ -51,7 +51,26 @@
           .catch(function () { hint('Save failed — will retry on next move'); });
       };
       var schedule = function () { if (suppress) return; clearTimeout(timer); timer = setTimeout(save, 500); };
-      var apply = function (layout) { suppress = true; grid.load(layout); setTimeout(function () { suppress = false; if (cfg.onChange) cfg.onChange(); }, 60); };
+      // #278 ROOT FIX — a layout array must never DELETE widgets it predates.
+      // GridStack.load(layout) treats the array as the complete desired state and
+      // REMOVES grid items missing from it, so a per-user layout saved before a
+      // new widget shipped silently erased that widget for that user (hit live
+      // with the #272b/#278 additions: markup present, widget gone on restore).
+      // Merge instead: saved/default positions win for known ids; any grid item
+      // the layout doesn't know is APPENDED BELOW at its own width/height. The
+      // next drag persists the merged result, adopting the new widget forever.
+      var mergeUnknown = function (layout) {
+        var known = {}, maxY = 0;
+        (layout || []).forEach(function (n) {
+          known[n.id] = true;
+          maxY = Math.max(maxY, (n.y || 0) + (n.h || 1));
+        });
+        var extras = grid.save(false)
+          .filter(function (n) { return n.id && !known[n.id]; })
+          .map(function (n) { var e = { id: n.id, x: n.x || 0, y: maxY, w: n.w, h: n.h }; maxY += (n.h || 1); return e; });
+        return (layout || []).concat(extras);
+      };
+      var apply = function (layout) { suppress = true; grid.load(mergeUnknown(layout)); setTimeout(function () { suppress = false; if (cfg.onChange) cfg.onChange(); }, 60); };
 
       grid.on('change', function () { schedule(); if (cfg.onChange) cfg.onChange(); });
 
