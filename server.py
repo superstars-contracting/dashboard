@@ -112,6 +112,12 @@ estimating.register(app)
 import walkthroughs  # noqa: E402
 walkthroughs.register(app)
 
+# #278 — Project Cost "Spent to Date" (C-Suite) + the project expense ledger.
+# Comp data: every endpoint admin/c_suite; cost keys OMITTED for every other role
+# (403, never zeroed payloads); company console only — no field-reachable surface.
+import project_costs  # noqa: E402
+project_costs.register(app)
+
 # Security: cap upload size. Raised to 256 MB (#235) so a field-photo BATCH POST
 # (many images, several 8-12 MB) isn't rejected at the WSGI layer; the Field
 # Photos UI also uploads in chunks. A request over the cap returns a clean 413
