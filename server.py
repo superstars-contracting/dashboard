@@ -6,6 +6,7 @@ from datetime import datetime, date, timedelta
 import logging
 import json
 import os
+import re
 import uuid
 
 # #259 — env-driven DB layer (SSC_DB_URL): SQLite default (unchanged) or Postgres.
@@ -312,21 +313,27 @@ def legacy_dashboard():
 # + one JS module. PII discipline: layout_json is sanitized to a list of
 # {id,x,y,w,h} — widget ids + grid positions ONLY, never names/rates/PINs.
 _LAYOUT_PAGE_KEYS = {'project_health', 'company_console'}
-_LAYOUT_WIDGET_IDS = {
-    'project_health': {'active-drops', 'drops-status', 'progress-elevation',
-                       'weather', 'roster', 'certs'},
-    'company_console': {'active-project', 'compliance', 'on-site',
-                        'quick-actions', 'recent-activity'},  # #210 reuse
-}
+# #278 ROOT FIX — the per-page widget-id ALLOWLIST is gone. It was frozen at the
+# original widgets, so the sanitizer SILENTLY STRIPPED every newer widget
+# (material-alerts #272b, project-costs #278) from saved layouts: drags "saved"
+# but the new widgets' positions were discarded server-side (operator-reported
+# live). Enumerated lists rot — the #275 lesson, server-side edition. The
+# security property (layout_json can never carry injected data) is preserved
+# STRUCTURALLY instead: ids must match a strict charset/length pattern; whether
+# an id corresponds to a real widget is the client's concern (dash_layout drops
+# ids with no matching grid item on load).
+_LAYOUT_ID_RE = re.compile(r'^[a-z0-9][a-z0-9-]{0,39}$')
 
 
 def _sanitize_layout(page_key, raw):
     """Coerce arbitrary input into a safe layout: a list of {id,x,y,w,h} with
-    integer positions and known widget ids only. Returns None if not a list.
-    Unknown ids are dropped so layout_json can never carry injected data."""
+    integer positions and pattern-safe widget ids (see _LAYOUT_ID_RE — no
+    enumerated per-widget allowlist, it silently ate new widgets). Returns None
+    if not a list. layout_json still can never carry injected data: ids are
+    charset/length-bound, positions are clamped ints."""
     if not isinstance(raw, list):
         return None
-    allowed = _LAYOUT_WIDGET_IDS.get(page_key)
+    allowed = None   # pattern-validated below; no enumeration
 
     def _int(v, lo, hi, dflt):
         try:
@@ -342,6 +349,8 @@ def _sanitize_layout(page_key, raw):
             continue
         wid = it.get('id')
         if not isinstance(wid, str) or wid in seen:
+            continue
+        if not _LAYOUT_ID_RE.match(wid):
             continue
         if allowed is not None and wid not in allowed:
             continue

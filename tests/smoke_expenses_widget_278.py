@@ -255,6 +255,54 @@ def main():
             ok(f"field_surface_no_cost_keys {path}", not (keys & COST_KEYS),
                f"leaked: {keys & COST_KEYS}")
 
+        # ---------- (g2) WIDGET UPDATES AS DATA ARRIVES (operator-requested):
+        # add an expense over HTTP + one more worked day in the DB -> the widget
+        # payload moves by EXACTLY the hand-computed delta. ----------
+        r = cs.post(f"{BASE}/api/costs/{PROJ}/expenses", json={
+            "expense_date": "2026-07-03", "vendor": "SMK Vendor 2",
+            "category": "materials", "amount": 89.50}, timeout=10)
+        ok("delta_expense_201", r.status_code == 201)
+        conn = db_layer.connect()
+        try:
+            conn.execute("INSERT INTO sign_in_log (date, employee_id, project_code, time_in, time_out) "
+                         "VALUES ('2026-07-03', ?, ?, '07:00', '15:30')", (EMP_A, PROJ))
+            conn.commit()
+        finally:
+            conn.close()
+        r = cs.get(f"{BASE}/api/costs/widget?project={PROJ}", timeout=15)
+        p2 = (r.json().get("data") or {}).get("selected") or {}
+        # deltas: +8h x $50 = $400 labor; +$89.50 materials -> 2010.50+489.50 = 2500.00
+        ok("delta_total_moves_exactly", p2.get("total") == 2500.00, f"got {p2.get('total')}")
+        ok("delta_labor_moves", p2.get("labor", {}).get("total") == 2160.00,
+           f"got {p2.get('labor', {}).get('total')}")
+        ok("delta_hours_move", p2.get("labor", {}).get("hours_worked") == 48.0)
+        ok("delta_expenses_move", p2.get("expenses", {}).get("total") == 340.00)
+
+        # ---------- (h2) LAYOUT ROUND-TRIP (the live #278 regression): saving a
+        # layout containing post-#210 widget ids must KEEP them (the old
+        # enumerated allowlist silently stripped material-alerts/project-costs);
+        # charset-unsafe ids are still dropped (injection safety preserved). ----------
+        LAYOUT = [
+            {"id": "active-project", "x": 0, "y": 0, "w": 5, "h": 3},
+            {"id": "project-costs", "x": 5, "y": 0, "w": 7, "h": 4},
+            {"id": "material-alerts", "x": 0, "y": 3, "w": 5, "h": 3},
+            {"id": "<script>alert(1)</script>", "x": 0, "y": 9, "w": 4, "h": 2},
+            {"id": "UPPER_case_bad", "x": 0, "y": 9, "w": 4, "h": 2},
+        ]
+        r = cs.put(f"{BASE}/api/dashboard/layout",
+                   json={"page_key": "company_console", "layout": LAYOUT}, timeout=10)
+        ok("layout_put_200", r.status_code == 200)
+        r = cs.get(f"{BASE}/api/dashboard/layout?page_key=company_console", timeout=10)
+        saved = ((r.json().get("data") or {}).get("layout") or [])
+        ids = {n["id"] for n in saved}
+        ok("layout_keeps_new_widget_ids", {"project-costs", "material-alerts"} <= ids,
+           f"saved ids: {sorted(ids)}")
+        ok("layout_drops_unsafe_ids", not any("<" in i or i != i.lower() for i in ids),
+           f"saved ids: {sorted(ids)}")
+        pc_saved = next((n for n in saved if n["id"] == "project-costs"), {})
+        ok("layout_position_roundtrip", pc_saved.get("x") == 5 and pc_saved.get("w") == 7)
+        cs.delete(f"{BASE}/api/dashboard/layout?page_key=company_console", timeout=10)
+
         # ---------- (f) the #275 structural guard passes WITH the expense modal ----------
         sys.path.insert(0, str(SCRIPT_DIR))
         import smoke_design_conventions as sdc

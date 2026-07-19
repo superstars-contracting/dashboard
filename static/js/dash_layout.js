@@ -60,15 +60,21 @@
       // the layout doesn't know is APPENDED BELOW at its own width/height. The
       // next drag persists the merged result, adopting the new widget forever.
       var mergeUnknown = function (layout) {
+        // real widgets = what's actually in the grid right now; a saved id with
+        // no matching grid item (a widget removed in a later build) is DROPPED —
+        // GridStack.load would otherwise create an empty box for it.
+        var real = {};
+        grid.save(false).forEach(function (n) { if (n.id) real[n.id] = true; });
+        var kept = (layout || []).filter(function (n) { return n && real[n.id]; });
         var known = {}, maxY = 0;
-        (layout || []).forEach(function (n) {
+        kept.forEach(function (n) {
           known[n.id] = true;
           maxY = Math.max(maxY, (n.y || 0) + (n.h || 1));
         });
         var extras = grid.save(false)
           .filter(function (n) { return n.id && !known[n.id]; })
           .map(function (n) { var e = { id: n.id, x: n.x || 0, y: maxY, w: n.w, h: n.h }; maxY += (n.h || 1); return e; });
-        return (layout || []).concat(extras);
+        return kept.concat(extras);
       };
       var apply = function (layout) { suppress = true; grid.load(mergeUnknown(layout)); setTimeout(function () { suppress = false; if (cfg.onChange) cfg.onChange(); }, 60); };
 
