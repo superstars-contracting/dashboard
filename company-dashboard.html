@@ -468,6 +468,24 @@
         <!-- #272b — materials reorder alerts across ALL projects (admin/c_suite console;
              rows appear only for materials whose operator-set consumption map says
              order-by/order-now — no map, no row; nothing fabricated) -->
+        <!-- #278 — PROJECT COST, SPENT TO DATE (C-SUITE; comp data — CLAUDE.md).
+             Built to MOCKUP_payroll_widget_csuite_v2. The /api/costs/widget call
+             403s for every non-c_suite/admin role and this item is then REMOVED
+             (hidden entirely, never empty-rendered); the console page itself is
+             already admin/c_suite-only (#263) — defense in depth. -->
+        <div class="grid-stack-item" gs-id="project-costs" gs-x="5" gs-y="7" gs-w="7" gs-h="4">
+          <div class="grid-stack-item-content">
+            <section class="ph-widget" data-widget="project-costs">
+              <div class="ph-widget-head"><h3>Project Cost — Spent to Date</h3>
+                <span class="pc-lockchip">C-Suite</span>
+                <button type="button" class="est-mini-btn" id="pc-btn-log" style="margin-left:auto;">Expenses</button>
+                <button type="button" class="btn-primary" id="pc-btn-add" style="padding:5px 11px;font-size:11.5px;">+ Expense</button>
+                <span class="ph-grip" title="Drag to move">⠿</span></div>
+              <div class="ph-widget-body" id="pc-body"><div class="ph-loading">Loading…</div></div>
+            </section>
+          </div>
+        </div>
+
         <div class="grid-stack-item" gs-id="material-alerts" gs-x="0" gs-y="7" gs-w="5" gs-h="3">
           <div class="grid-stack-item-content">
             <section class="ph-widget" data-widget="material-alerts">
@@ -792,6 +810,45 @@
     .vprow .vp-t .code { color:var(--brand-red); }
     .vprow .vp-s { font-size:11px; color:var(--muted); margin-top:2px; }
     .vprow .amount { flex:none; font-size:14px; font-weight:800; font-variant-numeric:tabular-nums; }
+    /* ===== #278 — Project Cost widget (MOCKUP_payroll_widget_csuite_v2, binding).
+       COLOR-LAW AMENDMENT: the segmented DISTRIBUTION BAR wears the drop-plan four
+       as segment tones (the bar IS the drop-plan language); materials/equipment/
+       other = neutral ink/greys; chips/borders/labels stay status-only. ===== */
+    .pc-lockchip { font-size:9px; font-weight:800; letter-spacing:.6px; text-transform:uppercase;
+                   color:#7a6f5c; background:var(--status-oat-soft); border:1px solid #e8e2d6;
+                   border-radius:6px; padding:2px 8px; margin-left:8px; }
+    .pc-heroline { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+    .pc-big { font-size:30px; font-weight:800; font-variant-numeric:tabular-nums; }
+    .pc-proj { font-size:12px; font-weight:700; color:var(--brand-red); }
+    .pc-subline { font-size:12px; color:var(--muted); margin-top:6px; }
+    .pc-costbar { height:13px; border-radius:99px; overflow:hidden; display:flex;
+                  background:var(--status-oat-soft); margin-top:15px; }
+    .pc-costbar i { display:block; height:100%; }
+    .pc-legend { display:flex; gap:14px; margin-top:9px; flex-wrap:wrap; }
+    .pc-legend span { font-size:11px; font-weight:600; color:var(--muted); display:inline-flex; align-items:center; gap:6px; }
+    .pc-legend i { width:9px; height:9px; border-radius:99px; display:inline-block; }
+    .pc-legend b { color:var(--ink); font-variant-numeric:tabular-nums; }
+    .pc-statrow { display:flex; gap:0; margin-top:15px; border-top:1px solid var(--line); padding-top:13px; }
+    .pc-stat { flex:1; text-align:center; }
+    .pc-stat + .pc-stat { border-left:1px solid var(--line); }
+    .pc-stat .v { font-size:15.5px; font-weight:800; font-variant-numeric:tabular-nums; }
+    .pc-stat .k { font-size:9.5px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); margin-top:3px; }
+    .pc-weekbars { display:flex; align-items:flex-end; gap:4px; height:34px; margin-top:15px; }
+    .pc-weekbars i { flex:1; border-radius:3px 3px 0 0; background:linear-gradient(180deg,#5d7bee,var(--accent)); }
+    .pc-weekbars i.now { opacity:.45; }
+    .pc-wb-lbl { display:flex; gap:4px; margin-top:4px; }
+    .pc-wb-lbl span { flex:1; text-align:center; font-size:8px; font-weight:700; color:#c3c8d2; text-transform:uppercase; }
+    .pc-attn { display:inline-flex; align-items:center; gap:6px; margin-top:13px; font-size:11px; font-weight:700;
+               color:#a23b30; background:var(--status-behind-soft); border-radius:8px; padding:6px 11px; }
+    .pc-tail { font-size:11px; color:var(--muted); margin-top:12px; }
+    .pc-selchips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+    .pc-selchip { font-size:10px; font-weight:800; letter-spacing:.4px; border:1px solid var(--line);
+                  border-radius:999px; padding:3px 10px; cursor:pointer; background:#fff; color:var(--muted); }
+    .pc-selchip.on { color:var(--accent-ink); border-color:var(--accent-edge); background:var(--accent-soft); }
+    .pc-exp-row { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid #F2EFE7; font-size:12.5px; flex-wrap:wrap; }
+    .pc-exp-row:last-child { border-bottom:none; }
+    .pc-exp-row.voided { opacity:.5; text-decoration:line-through; }
+    .pc-exp-amt { margin-left:auto; font-weight:800; font-variant-numeric:tabular-nums; }
   </style>
   <div class="panel" data-panel="estimates">
     <div class="section">
@@ -907,6 +964,55 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- #278 — expense-entry modal (STATIC markup: the #275 structural guard scans
+       every field; all boxed .ssc-field). C-Suite comp surface. -->
+  <div class="est-modal-bg" id="pc-modal-bg">
+    <div class="est-modal" role="dialog" aria-modal="true">
+      <div class="est-modal-head"><h3 id="pc-modal-title">Log expense</h3><button type="button" class="est-modal-x" id="pc-modal-x">&times;</button></div>
+      <div class="est-modal-body">
+        <div class="est-field"><label>Project</label><select class="ssc-field" id="pc-f-project"></select></div>
+        <div class="est-field-row">
+          <div class="est-field"><label>Date *</label><input class="ssc-date ssc-field" id="pc-f-date" placeholder="MM/DD/YYYY"></div>
+          <div class="est-field"><label>Amount * ($)</label><input class="ssc-field" id="pc-f-amount" type="number" step="0.01" min="0.01" placeholder="0.00"></div>
+        </div>
+        <div class="est-field-row">
+          <div class="est-field"><label>Vendor</label><input class="ssc-field" id="pc-f-vendor" placeholder="optional"></div>
+          <div class="est-field"><label>Category *</label><select class="ssc-field" id="pc-f-category">
+            <option value="materials">Materials</option>
+            <option value="equipment">Equipment</option>
+            <option value="other">Other</option>
+          </select></div>
+        </div>
+        <div class="est-field"><label>Note</label><input class="ssc-field" id="pc-f-note" placeholder="optional"></div>
+        <div class="est-err" id="pc-modal-err"></div>
+      </div>
+      <div class="est-modal-foot">
+        <button type="button" class="btn-ghost" id="pc-modal-cancel">Cancel</button>
+        <button type="button" class="btn-primary" id="pc-modal-save">Log expense</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- #278 — expense log modal (rows + void-not-delete; body rows are JS-filled,
+       the shell + void-note field are static and boxed) -->
+  <div class="est-modal-bg" id="pc-log-bg">
+    <div class="est-modal" role="dialog" aria-modal="true" style="max-width:560px;">
+      <div class="est-modal-head"><h3 id="pc-log-title">Expenses</h3><button type="button" class="est-modal-x" id="pc-log-x">&times;</button></div>
+      <div class="est-modal-body">
+        <div id="pc-log-rows"><div class="est-empty">Loading…</div></div>
+        <div class="est-field" id="pc-void-wrap" style="display:none;margin-top:12px;">
+          <label>Void note * — why this entry is being voided</label>
+          <input class="ssc-field" id="pc-void-note" placeholder="e.g. duplicate of #12">
+        </div>
+        <div class="est-err" id="pc-log-err"></div>
+      </div>
+      <div class="est-modal-foot">
+        <button type="button" class="btn-ghost" id="pc-log-close">Close</button>
+        <button type="button" class="btn-primary" id="pc-void-confirm" style="display:none;">Void entry</button>
       </div>
     </div>
   </div>
@@ -4418,7 +4524,7 @@ applyLanguage();
 })();
 </script>
 
-<div class="container"><div class="ph-build" id="cc-build-stamp">build #277 · 2026-07-07 · Company schedule — inspections + walkthroughs on one calendar (attendee-required, stage-synced) + iPad walkthrough reports with GPS-stripped photos on the estimate</div></div>
+<div class="container"><div class="ph-build" id="cc-build-stamp">build #278 · 2026-07-19 · Project Cost — Spent to Date (C-Suite): day-accurate labor × rate history with unrated attention bucket + the project expense ledger (void-not-delete); comp data omitted below c_suite</div></div>
 
 <script>
 /* ===== Company console widgets (#210) — live data + reused #209 drag framework.
@@ -4928,6 +5034,214 @@ applyLanguage();
   window.CRM = {
     enter: function(){ wireOnce(); showView('orgs'); loadConsole(); loadOrgs(); }
   };
+})();
+</script>
+
+<!-- #278 — PROJECT COST widget (C-Suite; MOCKUP_payroll_widget_csuite_v2 binding).
+     Comp data: /api/costs/* 403s below c_suite -> the grid item is REMOVED entirely. -->
+<script>
+(function(){
+  var q = function(id){ return document.getElementById(id); };
+  function esc(s){ if(s==null) return ''; return String(s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  function money(v){ if(v==null) return '—'; return '$'+Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function moneyK(v){ if(v==null) return '—'; return Math.abs(v)>=1000 ? '$'+(v/1000).toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1})+'K' : money(v); }
+  function fmtMD(iso){ if(!iso) return '—'; var p=iso.split('-'); return p[1].replace(/^0/,'')+'/'+p[2].replace(/^0/,''); }
+  function getISO(el){ return el ? (window.SSCDatePicker ? (SSCDatePicker.getISO(el)||'') : (el.value||'').trim()) : ''; }
+  async function api(method, path, body){
+    var opts = { method: method, credentials: 'include', headers: {} };
+    if (body !== undefined){ opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify(body); }
+    var r = await fetch(path, opts);
+    var j = null; try { j = await r.json(); } catch(e){}
+    if (!r.ok){ var err = new Error((j && j.error) || ('HTTP '+r.status)); err.status = r.status; throw err; }
+    return j ? j.data : null;
+  }
+
+  // COLOR-LAW AMENDMENT: the bar wears the drop-plan four for LABOR trades;
+  // materials/equipment/other are the neutral family. Unknown trades -> greys.
+  var TRADE_TONE = { 'Mechanic':'var(--status-complete)', 'Laborer':'var(--accent)',
+                     'Rope Access':'var(--status-behind)', 'Superintendent':'var(--status-oat)' };
+  var EXTRA_GREYS = ['#6b7080', '#9aa0ad', '#b3b8c2'];
+  var CAT_TONE = { materials:'#3a3f4e', equipment:'#565b6b', other:'#8a8f9c' };
+  var CAT_LABEL = { materials:'Materials', equipment:'Equipment', other:'Other' };
+
+  var CUR = null;   // selected project payload
+  var LIST = [];
+
+  function removeWidget(){
+    var it = document.querySelector('.grid-stack-item[gs-id="project-costs"]');
+    if (it) it.remove();
+  }
+
+  async function load(project){
+    var body = q('pc-body');
+    if (!body) return;
+    try {
+      var d = await api('GET','/api/costs/widget'+(project?'?project='+encodeURIComponent(project):''));
+      LIST = d.projects || [];
+      CUR = d.selected;
+      render();
+    } catch(e){
+      if (e.status === 403 || e.status === 401){ removeWidget(); return; }   // hidden, never empty-rendered
+      body.innerHTML = '<div class="ph-empty"><div class="ph-empty-title">'+esc(e.message)+'</div></div>';
+    }
+  }
+
+  function render(){
+    var body = q('pc-body');
+    if (!CUR){ body.innerHTML = '<div class="ph-empty"><div class="ph-empty-title">No project activity yet</div><div class="ph-empty-sub">Costs appear once sign-ins or expenses exist.</div></div>'; return; }
+    var p = CUR;
+    var sel = LIST.length > 1
+      ? '<div class="pc-selchips">'+LIST.map(function(x){
+          return '<span class="pc-selchip'+(x.project_code===p.project_code?' on':'')+'" data-pc-sel="'+esc(x.project_code)+'">'+esc(x.project_code)+'</span>';
+        }).join('')+'</div>' : '';
+    // segments: labor trades (amendment tones) + expense categories (neutral family)
+    var segs = [], legend = [];
+    var greyIdx = 0;
+    (p.labor.by_trade||[]).forEach(function(t){
+      var tone = TRADE_TONE[t.trade] || EXTRA_GREYS[(greyIdx++) % EXTRA_GREYS.length];
+      segs.push({amt: t.amount, tone: tone, label: t.trade});
+      legend.push({tone: tone, label: (t.trade==='Superintendent'?'Super':t.trade), amt: t.amount});
+    });
+    Object.keys(p.expenses.by_category||{}).forEach(function(c){
+      var amt = p.expenses.by_category[c];
+      if (amt > 0){ segs.push({amt: amt, tone: CAT_TONE[c]||'#8a8f9c', label: CAT_LABEL[c]||c});
+                    legend.push({tone: CAT_TONE[c]||'#8a8f9c', label: CAT_LABEL[c]||c, amt: amt}); }
+    });
+    var segTotal = segs.reduce(function(s,x){ return s+x.amt; }, 0) || 1;
+    var barHtml = segs.map(function(x){
+      return '<i style="width:'+(100*x.amt/segTotal)+'%;background:'+x.tone+';" title="'+esc(x.label)+'"></i>';
+    }).join('');
+    var legHtml = legend.map(function(x){
+      return '<span><i style="background:'+x.tone+';"></i>'+esc(x.label)+' <b>'+moneyK(x.amt)+'</b></span>';
+    }).join('');
+    var maxWk = Math.max.apply(null, (p.weeks||[]).map(function(w){ return w.amount; }).concat([1]));
+    var wkHtml = (p.weeks||[]).map(function(w){
+      return '<i'+(w.current?' class="now"':'')+' style="height:'+Math.max(4, Math.round(100*w.amount/maxWk))+'%;" title="'+money(w.amount)+'"></i>';
+    }).join('');
+    var wkLbl = (p.weeks||[]).map(function(w,i){
+      return '<span>'+(w.current?'wk':esc(w.label))+'</span>';
+    }).join('');
+    var subline = 'Labor '+money(p.labor.total)+' ('+p.labor.hours_worked.toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1})
+      +' h worked · '+p.labor.workers+' worker'+(p.labor.workers===1?'':'s')+')'
+      + (p.expenses.has_any ? ' + Expenses '+money(p.expenses.total) : '')
+      + ' · through Fri '+fmtMD(p.through_friday);
+    var stats = '<div class="pc-statrow">'
+      + '<div class="pc-stat"><div class="v">'+money(p.last_full_week_total)+'</div><div class="k">Last full week</div></div>'
+      + '<div class="pc-stat"><div class="v">'+(p.labor_cost_per_hr!=null?money(p.labor_cost_per_hr):'—')+'</div><div class="k">Labor cost / hr</div></div>'
+      + '<div class="pc-stat"><div class="v">'+(p.materials_share_pct!=null?(p.materials_share_pct.toLocaleString('en-US',{maximumFractionDigits:1})+'%'):'—')+'</div><div class="k">Materials share</div></div>'
+      + '</div>';
+    var attn = p.unrated
+      ? '<div class="pc-attn">⚠ '+p.unrated.hours.toLocaleString('en-US',{maximumFractionDigits:1})+' h unrated — '
+        + p.unrated.workers+' worker'+(p.unrated.workers===1?'':'s')+' missing an effective rate'
+        + (p.unrated.earliest ? ' before '+fmtMD(p.unrated.earliest) : '')+'</div>'
+      : '';
+    var tail = p.expenses.has_any ? '' : '<div class="pc-tail">No materials costs logged yet — the bar shows the labor split.</div>';
+    body.innerHTML = sel
+      + '<div class="pc-heroline"><span class="pc-big">'+money(p.total)+'</span>'
+      + '<span class="pc-proj">'+esc(p.project_code)+'</span></div>'
+      + '<div class="pc-subline">'+subline+'</div>'
+      + '<div class="pc-costbar">'+barHtml+'</div>'
+      + '<div class="pc-legend">'+legHtml+'</div>'
+      + stats
+      + '<div class="pc-weekbars">'+wkHtml+'</div>'
+      + '<div class="pc-wb-lbl">'+wkLbl+'</div>'
+      + attn + tail;
+    body.querySelectorAll('[data-pc-sel]').forEach(function(ch){
+      ch.addEventListener('click', function(){ load(ch.getAttribute('data-pc-sel')); });
+    });
+  }
+
+  // ---------- expense entry (static modal; boxed fields) ----------
+  function openAdd(){
+    var sel = q('pc-f-project');
+    sel.innerHTML = (LIST.length ? LIST : (CUR ? [{project_code: CUR.project_code}] : []))
+      .map(function(x){ return '<option value="'+esc(x.project_code)+'"'+(CUR && x.project_code===CUR.project_code?' selected':'')+'>'+esc(x.project_code)+'</option>'; }).join('');
+    q('pc-f-amount').value = ''; q('pc-f-vendor').value = ''; q('pc-f-note').value = '';
+    q('pc-f-category').value = 'materials';
+    var de = q('pc-f-date'); de.value = ''; if (de.dataset) delete de.dataset.iso;
+    q('pc-modal-err').classList.remove('show');
+    q('pc-modal-bg').classList.add('show');
+    if (window.SSCDatePicker) SSCDatePicker.wire(de);
+  }
+  function closeAdd(){ q('pc-modal-bg').classList.remove('show'); }
+  async function saveAdd(){
+    var iso = getISO(q('pc-f-date'));
+    var amt = q('pc-f-amount').value.trim();
+    var err = q('pc-modal-err');
+    if (!iso){ err.textContent='Pick the expense date.'; err.classList.add('show'); return; }
+    if (!amt || +amt <= 0){ err.textContent='Enter the amount.'; err.classList.add('show'); return; }
+    try {
+      await api('POST','/api/costs/'+encodeURIComponent(q('pc-f-project').value)+'/expenses', {
+        expense_date: iso, amount: +amt,
+        vendor: q('pc-f-vendor').value.trim() || null,
+        category: q('pc-f-category').value,
+        note: q('pc-f-note').value.trim() || null
+      });
+      closeAdd(); load(q('pc-f-project').value);
+    } catch(e){ err.textContent = e.message; err.classList.add('show'); }
+  }
+
+  // ---------- expense log + void-not-delete ----------
+  var VOID_ID = null;
+  async function openLog(){
+    if (!CUR) return;
+    q('pc-log-title').textContent = 'Expenses — '+CUR.project_code;
+    q('pc-log-bg').classList.add('show');
+    VOID_ID = null; q('pc-void-wrap').style.display='none'; q('pc-void-confirm').style.display='none';
+    q('pc-log-err').classList.remove('show');
+    var host = q('pc-log-rows');
+    host.innerHTML = '<div class="est-empty">Loading…</div>';
+    try {
+      var rows = await api('GET','/api/costs/'+encodeURIComponent(CUR.project_code)+'/expenses');
+      host.innerHTML = rows.length ? rows.map(function(r){
+        return '<div class="pc-exp-row'+(r.voided?' voided':'')+'">'
+          + '<b>'+fmtMD(r.expense_date)+'</b>'
+          + '<span class="kindchip">'+esc(CAT_LABEL[r.category]||r.category)+'</span>'
+          + '<span>'+esc(r.vendor||'—')+'</span>'
+          + (r.note ? '<span style="color:var(--muted);">'+esc(r.note)+'</span>' : '')
+          + (r.voided ? '<span style="color:var(--muted);font-size:10px;">voided: '+esc(r.void_note||'')+'</span>' : '')
+          + '<span class="pc-exp-amt">'+money(r.amount)+'</span>'
+          + (!r.voided ? '<button type="button" class="est-mini-btn" data-pc-void="'+r.id+'">Void</button>' : '')
+          + '</div>';
+      }).join('') : '<div class="est-empty">No expenses logged yet.</div>';
+      host.querySelectorAll('[data-pc-void]').forEach(function(b){
+        b.addEventListener('click', function(){
+          VOID_ID = +b.getAttribute('data-pc-void');
+          q('pc-void-wrap').style.display=''; q('pc-void-confirm').style.display='';
+          q('pc-void-note').value=''; q('pc-void-note').focus();
+        });
+      });
+    } catch(e){ host.innerHTML = '<div class="est-empty">'+esc(e.message)+'</div>'; }
+  }
+  function closeLog(){ q('pc-log-bg').classList.remove('show'); }
+  async function confirmVoid(){
+    var err = q('pc-log-err');
+    var note = q('pc-void-note').value.trim();
+    if (!VOID_ID) return;
+    if (!note){ err.textContent='A void needs an audit note (why).'; err.classList.add('show'); return; }
+    try {
+      await api('POST','/api/costs/expenses/'+VOID_ID+'/void', { note: note });
+      openLog(); load(CUR ? CUR.project_code : null);
+    } catch(e){ err.textContent = e.message; err.classList.add('show'); }
+  }
+
+  function wire(){
+    var add = q('pc-btn-add'), log = q('pc-btn-log');
+    if (add) add.addEventListener('click', openAdd);
+    if (log) log.addEventListener('click', openLog);
+    var x = q('pc-modal-x'), c = q('pc-modal-cancel'), s = q('pc-modal-save');
+    if (x) x.addEventListener('click', closeAdd);
+    if (c) c.addEventListener('click', closeAdd);
+    if (s) s.addEventListener('click', saveAdd);
+    var lx = q('pc-log-x'), lc = q('pc-log-close'), vc = q('pc-void-confirm');
+    if (lx) lx.addEventListener('click', closeLog);
+    if (lc) lc.addEventListener('click', closeLog);
+    if (vc) vc.addEventListener('click', confirmVoid);
+  }
+
+  wire();
+  load(null);
+  window.PC_reload = load;
 })();
 </script>
 
