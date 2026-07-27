@@ -1226,11 +1226,26 @@
         </div>
       </section>
 
-      <!-- DRAWING MARKUP -->
+      <!-- DRAWING MARKUP — #280. The Fieldwire "Pending" placeholder is RETIRED; this
+           slot now hands off to the real page at /drawing-markup (the traced north
+           elevation with per-drop, per-floor status). There is exactly one thing called
+           "Drawing Markup" and this is the way in.
+
+           NOTE (UI v2 #279): this is the ONE deliberate edit to a v1 template, made on
+           the operator's explicit instruction that the new page REPLACES the stub rather
+           than sitting beside it. Two surfaces with the same name was the worse outcome.
+           The phase-0 byte-identity gate is unaffected — there is no v2 twin of
+           dashboard-static.html, so ui_version 1 and 2 both serve this same file. -->
       <section class="view" data-view="drawings">
         <div class="section">
           <h2>Drawing Markup</h2>
-          <div class="placeholder-card">Drawing markup integration with Fieldwire · Pending</div>
+          <p style="color:#76777E;font-size:13px;line-height:1.6;margin:0 0 14px;max-width:60ch">
+            Mark drop status by floor on the traced elevation. Shared with the architect
+            and the owner — they see the same drawing you do.
+          </p>
+          <a href="/drawing-markup" class="btn-primary" style="text-decoration:none">
+            Open Drawing Markup &rarr;
+          </a>
         </div>
       </section>
 
