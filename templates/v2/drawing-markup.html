@@ -87,6 +87,10 @@
   .swatch i { width:9px; height:9px; border-radius:50%; display:inline-block; }
   .cell-hit { cursor:pointer; }
   .cell-hit:hover { stroke:var(--v2-accent); stroke-width:2; }
+  .dropmark { cursor:pointer; }
+  .dropmark:hover { fill:var(--v2-accent); }
+  .dropmark:hover + text { fill:#fff; }
+  .dropmark:focus-visible { outline:2px solid var(--v2-accent); outline-offset:2px; }
 
   dialog.rsn { border:1px solid var(--v2-hairline); border-radius:var(--v2-r-card);
                padding:var(--v2-s-4); max-width:420px; width:92vw; font-family:var(--v2-font); }
@@ -191,11 +195,46 @@
 
   // ---------- geometry transform -------------------------------------------
   // Feet -> SVG units. y is measured UP from grade in the trace and DOWN in SVG.
-  // PAD_T carries two stacked header bands: the DROP tab row at the very top, then the
-  // grid bubble row in its standard position directly above the drawing. The gap between
-  // them is deliberate — see dropMarkers().
-  var PPF = 4.0, PAD_L = 66, PAD_R = 26, PAD_T = 78, PAD_B = 84;
-  var DROP_BAND_TOP = 12, DROP_BAND_H = 20, DROP_TAB_W = 30;
+  // PAD_T carries two stacked header bands: the DROP marker row at the very top, then
+  // the grid bubble row in its standard position directly above the drawing.
+  // PAD_L is NOT a constant — it is MEASURED from the datum labels at render time (see
+  // measureTextWidth). A guessed left margin is what clipped "SECOND FLOOR" to "OOR":
+  // the text elements were at correct coordinates, so every position check passed while
+  // the glyphs ran off the viewBox. Margin must come from the rendered text, not a hunch.
+  var PPF = 4.0, PAD_L = 66, PAD_R = 26, PAD_T = 78, PAD_B = 48;
+  var DROP_BAND_CY = 22, DROP_R = 12;
+  var DATUM_STUB = 44;      // how far the datum line runs left of the facade
+  var LABEL_GAP = 5;        // between the label's right edge and that stub
+  var EDGE_PAD = 10;        // between the label's left edge and the viewBox edge
+
+  // Widest rendered width across `strings`, measured with the SAME font attributes the
+  // real labels use. Off-screen but IN the document, because getComputedTextLength()
+  // returns 0 for a detached node — the measurement has to be of laid-out text, not of
+  // an estimate.
+  function measureTextWidth(strings, attrs) {
+    var probe = el('svg', { width: 0, height: 0,
+      style: 'position:absolute;left:-99999px;top:0;visibility:hidden' });
+    var nodes = strings.map(function (s) {
+      var t = el('text', attrs, s);
+      probe.appendChild(t);
+      return t;
+    });
+    document.body.appendChild(probe);
+    var max = 0;
+    nodes.forEach(function (t) {
+      var w = 0;
+      try { w = t.getComputedTextLength() || 0; } catch (e) { w = 0; }
+      if (w > max) max = w;
+    });
+    document.body.removeChild(probe);
+    // Fallback only if measurement is impossible (headless edge case): a generous
+    // per-character estimate, never a bare magic number.
+    if (!max) {
+      var longest = strings.reduce(function (a, b) { return b.length > a.length ? b : a; }, '');
+      max = longest.length * 6.2;
+    }
+    return max;
+  }
   function X(ft) { return PAD_L + ft * PPF; }
   function Y(ft) { return PAD_T + (S.data.geometry.facade.draw_top_ft - ft) * PPF; }
 
@@ -221,8 +260,20 @@
   }
 
   // ---------- the drawing ---------------------------------------------------
+  // The font attrs the datum name uses. Declared once so the measuring probe and the
+  // real label can never drift apart — if they did, the margin would be measured for a
+  // font that is not the one being drawn.
+  var DATUM_FONT = { 'font-size': 8, 'letter-spacing': '.05em', 'text-anchor': 'end' };
+
   function render() {
     var g = S.data.geometry, f = g.facade;
+
+    // MEASURE the left margin before computing a single coordinate. The longest datum
+    // name ("SECOND FLOOR" / "FOURTH FLOOR") sets it; everything else fits inside.
+    var labelW = measureTextWidth((g.datums || []).map(function (d) { return d.name; }),
+                                  DATUM_FONT);
+    PAD_L = Math.ceil(DATUM_STUB + LABEL_GAP + labelW + EDGE_PAD);
+
     var W = X(f.width_ft) + PAD_R, H = Y(0) + PAD_B;
     var svg = el('svg', { class:'elev', viewBox:'0 0 ' + W + ' ' + H,
                           role:'img', 'aria-label':'North elevation drop plan' });
@@ -324,11 +375,13 @@
     // ---- datum lines. SOLID hairlines, never dashed. ----
     var dg = el('g');
     (g.datums || []).forEach(function (d) {
-      dg.appendChild(el('line', { x1:X(0) - 44, y1:Y(d.y), x2:X(f.width_ft), y2:Y(d.y),
-        stroke:'#d9d4cb', 'stroke-width':0.8 }));
-      dg.appendChild(el('text', { x:X(0) - 48, y:Y(d.y) - 3, 'text-anchor':'end',
-        'font-size':8, fill:'var(--v2-ink-mute)', 'letter-spacing':'.05em' }, d.name));
-      dg.appendChild(el('text', { x:X(0) - 48, y:Y(d.y) + 7, 'text-anchor':'end',
+      var labelRight = X(0) - DATUM_STUB - LABEL_GAP;
+      dg.appendChild(el('line', { x1:X(0) - DATUM_STUB, y1:Y(d.y), x2:X(f.width_ft),
+        y2:Y(d.y), stroke:'#d9d4cb', 'stroke-width':0.8 }));
+      dg.appendChild(el('text', { x:labelRight, y:Y(d.y) - 3, 'text-anchor':'end',
+        'font-size':DATUM_FONT['font-size'], fill:'var(--v2-ink-mute)',
+        'letter-spacing':DATUM_FONT['letter-spacing'], class:'datum-name' }, d.name));
+      dg.appendChild(el('text', { x:labelRight, y:Y(d.y) + 7, 'text-anchor':'end',
         'font-size':7.5, fill:'var(--v2-ink-mute)', class:'v2-num' },
         d.y.toFixed(2) + "'"));
     });
@@ -346,13 +399,15 @@
     });
     svg.appendChild(gg);
 
-    // ---- DROP TABS. The bay IS the drop, so the number belongs in the middle of the
+    // ---- DROP MARKERS. The bay IS the drop, so the number belongs in the middle of the
     // bay, not on a grid line.
     //
-    // SHAPE carries the distinction: grid bubbles are CIRCLES sitting ON the lines and
-    // are left exactly as standard convention requires; drop tabs are SQUARES sitting
-    // BETWEEN them. 13 circles, 12 squares, on two bands that never vertically align —
-    // the count mismatch stops reading as an error and starts explaining itself.
+    // BOTH ROWS ARE CIRCLES. The distinction is WEIGHT, not shape: the grid bubbles are
+    // the architect's drawing and stay exactly as drawn (white fill, hairline grey), while
+    // ours are tinted in the interface accent and sit slightly larger. That reads as our
+    // overlay on their drawing — which is precisely what it is. Two bands that never
+    // vertically align, so 13 circles above 12 circles explains itself instead of looking
+    // like a miscount.
     //
     // x is the SPAN midpoint computed from elevation_drop.x0/x1 — NOT the grid-to-grid
     // midpoint. Drops 1 and 12 include corner returns and genuinely sit off-centre from
@@ -360,27 +415,38 @@
     // makes those two land correctly.
     //
     // Labelling only: no rope, no hanger, no anchor point, no vertical drop line.
+    // These are the ONLY drop labels on the drawing now — the bottom tab row was removed
+    // so the bay dimension strings, which is what an architect actually reads down there,
+    // are not crowded.
     var dm = el('g', { class:'dropmarks' });
-    dm.appendChild(el('text', { x:X(0) - 12, y:DROP_BAND_TOP + 14, 'text-anchor':'end',
-      'font-size':8, 'font-weight':700, fill:'var(--v2-ink-mute)',
-      'letter-spacing':'.10em' }, 'DROPS'));
+    dm.appendChild(el('text', { x:X(0) - DATUM_STUB - LABEL_GAP, y:DROP_BAND_CY + 4,
+      'text-anchor':'end', 'font-size':8, 'font-weight':700,
+      fill:'var(--v2-ink-mute)', 'letter-spacing':'.10em' }, 'DROPS'));
     (S.data.drops || []).forEach(function (d) {
       var cx = X((d.x0 + d.x1) / 2);
-      var tab = el('rect', { x:cx - DROP_TAB_W / 2, y:DROP_BAND_TOP, width:DROP_TAB_W,
-        height:DROP_BAND_H, rx:4, fill:'var(--v2-surface)',
-        stroke:'var(--v2-ink-soft)', 'stroke-width':1.1 });
+      var sel = (S.drop === d.id);
+      var c = el('circle', { cx:cx, cy:DROP_BAND_CY, r:DROP_R,
+        fill:'var(--v2-accent-chip)', stroke:'var(--v2-accent)',
+        'stroke-width': sel ? 2.6 : 1.5,
+        class:'dropmark' + (sel ? ' is-sel' : ''), 'data-drop':d.id,
+        role:'button', tabindex:0,
+        'aria-label':'Select drop ' + d.idx });
       var ttl = document.createElementNS(SVGNS, 'title');
       ttl.textContent = 'DROP ' + d.idx + ' · GL ' + d.grid_from + '–' + d.grid_to;
-      tab.appendChild(ttl);
-      dm.appendChild(tab);
-      dm.appendChild(el('text', { x:cx, y:DROP_BAND_TOP + 14.5, 'text-anchor':'middle',
-        'font-size':11, 'font-weight':700, fill:'var(--v2-ink)',
+      c.appendChild(ttl);
+      dm.appendChild(c);
+      dm.appendChild(el('text', { x:cx, y:DROP_BAND_CY + 4, 'text-anchor':'middle',
+        'font-size':11.5, 'font-weight':700, fill:'var(--v2-accent-ink)',
         'pointer-events':'none' }, d.idx));
     });
     svg.appendChild(dm);
 
-    // ---- drop boundaries + DROP n labels + clear-bay dimension strings ----
-    var yDim = Y(0) + 26, yLab = Y(0) + 52;
+    // ---- drop boundaries + clear-bay dimension strings ----
+    // The bottom DROP tab row was REMOVED: three sets of drop labels was clutter, and it
+    // crowded the dimension strings — the thing an architect actually reads down here.
+    // Drop identity now lives in exactly two places: the circles on the drawing and the
+    // selector row above the card. This band is dimensions only.
+    var yDim = Y(0) + 26;
     var bg = el('g');
     (S.data.drops || []).forEach(function (d) {
       var gd = (g.drops || []).filter(function (x) { return x.idx === d.idx; })[0] || {};
@@ -391,14 +457,6 @@
         stroke:'var(--v2-ink-mute)', 'stroke-width':0.8 }));
       bg.appendChild(el('text', { x:X((d.x0+d.x1)/2), y:yDim - 4, 'text-anchor':'middle',
         'font-size':8.5, fill:'var(--v2-ink-soft)', class:'v2-num' }, gd.clear_bay || ''));
-      var dst = statusOf(d.derived_status);
-      bg.appendChild(el('rect', { x:X(d.x0)+3, y:yLab-13, width:(d.x1-d.x0)*PPF-6, height:19,
-        rx:5, fill:toneChip(dst.tone), stroke:toneVar(dst.tone), 'stroke-width':1 }));
-      bg.appendChild(el('text', { x:X((d.x0+d.x1)/2), y:yLab, 'text-anchor':'middle',
-        'font-size':9.5, 'font-weight':700, fill:'var(--v2-ink)' }, 'DROP ' + d.idx));
-      bg.appendChild(el('text', { x:X((d.x0+d.x1)/2), y:yLab + 14, 'text-anchor':'middle',
-        'font-size':8, fill:'var(--v2-ink-mute)', class:'v2-num' },
-        'GL ' + d.grid_from + '–' + d.grid_to));
     });
     bg.appendChild(el('line', { x1:X(S.data.geometry.facade.width_ft), y1:Y(0),
       x2:X(S.data.geometry.facade.width_ft), y2:yDim + 6, stroke:'#cfc9be', 'stroke-width':0.8 }));
@@ -409,6 +467,18 @@
 
     Array.prototype.forEach.call(svg.querySelectorAll('.cell-hit'), function (r) {
       r.addEventListener('click', function () { onCell(r.getAttribute('data-cell')); });
+    });
+    // The drop circles are the drawing's selector now that the bottom tab row is gone,
+    // so they must actually select. Keyboard too — they carry role=button/tabindex.
+    Array.prototype.forEach.call(svg.querySelectorAll('.dropmark'), function (c) {
+      var pick = function () {
+        S.drop = parseInt(c.getAttribute('data-drop'), 10);
+        renderTabs(); render(); renderPanel();
+      };
+      c.addEventListener('click', pick);
+      c.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(); }
+      });
     });
   }
 
