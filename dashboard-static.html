@@ -499,6 +499,22 @@
     .view { display: none; padding: 32px; }
     .view.active { display: block; }
 
+    /* #280 — the Drawing Markup view is full-bleed: the embedded v2 page brings its own
+       padding, header and tokens, so the v1 32px gutter would double it. The frame owns
+       the height and the drawing scrolls INSIDE it — the dashboard itself must never
+       scroll sideways because the elevation is wide. */
+    .view[data-view="drawings"] { padding: 0; }
+    .view[data-view="drawings"].active { display: flex; flex-direction: column; min-height: 0; }
+    .drawings-frame {
+      flex: 1 1 auto; display: block; width: 100%; border: 0;
+      height: calc(100vh - 56px); min-height: 560px; background: #fcfcfb;
+    }
+    @media (max-width: 900px) {
+      /* the sidebar stacks above the content at this breakpoint, so the frame cannot
+         claim the whole viewport height without pushing the page */
+      .drawings-frame { height: calc(100vh - 150px); min-height: 460px; }
+    }
+
     /* Common Styles */
     .hero {
       background-color: #FAF7F1;
@@ -871,7 +887,7 @@
       <div class="nav-group" data-group="field">
         <div class="nav-group-label"><span class="nav-group-name">Field</span><svg class="nav-chev"><use href="#i-chev"/></svg></div>
         <div class="nav-items">
-          <a class="nav-link" href="/drawing-markup"><svg class="nav-ic"><use href="#i-pencil"/></svg>Drawing Markup</a>
+          <a class="nav-link" data-view="drawings"><svg class="nav-ic"><use href="#i-pencil"/></svg>Drawing Markup</a>
           <a class="nav-link" data-view="documents"><svg class="nav-ic"><use href="#i-file"/></svg>Project Documents</a>
           <a class="nav-link" data-view="field-photos"><svg class="nav-ic"><use href="#i-camera"/></svg>Field Photos</a>
           <a class="nav-link" data-view="drop-report" title="Drop Report — auto-pulled from the Drop Plan (one report per drop)"><svg class="nav-ic"><use href="#i-layers"/></svg>Drop Report</a>
@@ -1226,16 +1242,28 @@
         </div>
       </section>
 
-      <!-- DRAWING MARKUP — #280. No in-page view here on purpose.
-           The sidebar entry is a plain href to /drawing-markup, so the nav goes STRAIGHT
-           to the drawing: no interstitial, no explainer, no second click. The shared
-           .nav-link handler already allows this — it returns early when a link has no
-           data-view and lets the browser navigate (the #195 external-href gate).
-           The Fieldwire "Pending" placeholder that used to live here is retired.
+      <!-- DRAWING MARKUP — #280. Behaves like every other module: the nav item swaps this
+           view in place via the standard data-view dispatch, the sidebar and frame stay
+           put, and the user never leaves the dashboard.
+
+           WHY AN IFRAME, deliberately and not as a shortcut:
+           the markup page is ~600 lines of SVG renderer built on the v2 token set.
+           Inlining it here would be a large modification to a v1 template, would bloat a
+           file that already needs migrating, and would tangle v2 tokens with v1 styles.
+           The iframe IS the boundary between the v1 shell and a v2 page — the smallest
+           v1 edit that produces the behaviour, and it forecloses nothing: when this shell
+           is itself migrated, the frame is deleted and the page is embedded natively.
+
+           /drawing-markup remains a working standalone URL for the architect's direct
+           link, for printing, and for deep-linking to a specific elevation.
 
            NOTE (UI v2 #279): dashboard-static.html is a v1 template, edited here on the
            operator's explicit instruction. The phase-0 byte-identity gate is unaffected —
            there is no v2 twin of this file, so ui_version 1 and 2 serve the same bytes. -->
+      <section class="view" data-view="drawings">
+        <iframe class="drawings-frame" src="/drawing-markup" loading="lazy"
+                title="Drawing Markup — north elevation drop status"></iframe>
+      </section>
 
       <!-- DOCUMENTS -->
       <section class="view" data-view="documents">
