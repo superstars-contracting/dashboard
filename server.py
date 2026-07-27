@@ -121,6 +121,14 @@ estimating.register(app)
 import walkthroughs  # noqa: E402
 walkthroughs.register(app)
 
+# #280 — the drawing markup page (north elevation, per-drop per-floor work status) +
+# the architect containment gate. Separate from /dropplan (#201/#256), which is the
+# per-drop LIFECYCLE schedule and is untouched. MUST follow apply_auth_gate, the #263
+# scoping hook and the client gate: the architect gate is a before_request that assumes
+# g.auth_user is already set.
+import elevation  # noqa: E402
+elevation.register(app)
+
 # #278 — Project Cost "Spent to Date" (C-Suite) + the project expense ledger.
 # Comp data: every endpoint admin/c_suite; cost keys OMITTED for every other role
 # (403, never zeroed payloads); company console only — no field-reachable surface.

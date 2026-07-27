@@ -48,19 +48,31 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import db_layer  # noqa: E402
 from apply_crm_266 import _columns, _table_exists  # noqa: E402
 
-# The five elevation statuses, in the vocabulary the brief defines. `reason_required`
-# is enforced SERVER-SIDE on every write (see elevation.py) — a hold or a rework with
-# no reason is exactly the row that is useless three weeks later.
-# client_visible=1 across the board: per the operator's correction, the external view
-# is IDENTICAL to the internal one for status. Rework included — it is a field
-# condition, not an internal metric.
+# The five elevation statuses. `reason_required` is enforced SERVER-SIDE on every write
+# (see elevation.py) — a hold or a rework with no reason is exactly the row that is
+# useless three weeks later.
+#
+# client_visible=1 across the board: per the operator's correction, the external view is
+# IDENTICAL to the internal one for status. Rework included — it is a field condition,
+# not an internal metric.
+#
+# severity_rank orders ALERTS, not progress. It answers "which of these wins the last
+# slot in a decision band", and it is also what derives a drop's roll-up status from its
+# five cells (see elevation.derive_drop_status) — so the ordering lives in the status
+# table, never in a template or a JS switch.
+#
+# client_key is the CLIENT-SAFE STABLE KEY. External payloads carry it; the internal key
+# never ships. For elevation the two happen to spell the same words — every one of these
+# five is safe to show an owner — but the PLUMBING is what matters: the external payload
+# is built from client_key, so a module whose internal keys are not client-safe inherits
+# a working mechanism instead of needing one invented.
 ELEVATION_STATUSES = [
-    # key,                     module,      label,          tone,      c_vis, sort
-    ("elevation.not_started",  "elevation", "Not started",  "neutral",     1, 10),
-    ("elevation.in_progress",  "elevation", "In progress",  "blue",        1, 20),
-    ("elevation.on_hold",      "elevation", "On hold",      "gold",        1, 30),
-    ("elevation.rework",       "elevation", "Rework",       "coral",       1, 40),
-    ("elevation.complete",     "elevation", "Complete",     "green",       1, 50),
+    # key,                     module,      label,         tone,      c_vis, sev, sort, client_key
+    ("elevation.not_started",  "elevation", "Not started", "neutral",     1,   0,  10, "not_started"),
+    ("elevation.in_progress",  "elevation", "In progress", "blue",        1,  20,  20, "in_progress"),
+    ("elevation.on_hold",      "elevation", "On hold",     "gold",        1,  60,  30, "on_hold"),
+    ("elevation.rework",       "elevation", "Rework",      "coral",       1,  80,  40, "rework"),
+    ("elevation.complete",     "elevation", "Complete",    "green",       1,  10,  50, "complete"),
 ]
 
 # The short keys the API and UI speak. Mapped to status_tone keys so the drawing never
@@ -70,26 +82,57 @@ REASON_REQUIRED = ("on_hold", "rework")
 
 
 def ensure_status_tone(conn) -> bool:
-    """Create status_tone (phase-2 shape) + seed the elevation statuses. Idempotent."""
+    """Create status_tone in its FULL phase-2 shape + seed the elevation statuses.
+
+    THE SHAPE IS FIXED HERE ON PURPOSE. Tonight is the only cheap moment: adding
+    severity_rank or client_key after phase 2 has seeded ~61 rows across a dozen modules
+    is a second migration plus a re-seed. So the table lands complete —
+
+      escalates_to / escalates_days   phase-2 read-time escalation (never a stored write)
+      client_visible                  DEFAULT 0, default-deny
+      client_label / client_fallback  what the client sees instead, or falls back to
+      severity_rank                   which alert wins a decision-band slot; also derives
+                                      a drop's roll-up from its cells
+      client_key                      client-safe stable key — the internal key never
+                                      ships to a client payload
+
+    PHASE 2 MUST BE WRITTEN TO EXPECT THIS TABLE ALREADY EXISTS and to seed the
+    remaining modules into it — not to CREATE it. Its migration should call this
+    function (or mirror it) and then insert its own rows.
+    """
     created = not _table_exists(conn, "status_tone")
     conn.execute(
         """CREATE TABLE IF NOT EXISTS status_tone (
-             key             TEXT PRIMARY KEY,
+             key             TEXT PRIMARY KEY,   -- 'elevation.on_hold'
              module          TEXT NOT NULL,
              label           TEXT NOT NULL,
-             tone            TEXT NOT NULL,
-             escalates_to    TEXT,
-             escalates_days  INTEGER,
+             tone            TEXT NOT NULL,      -- green|blue|gold|coral|neutral
+             escalates_to    TEXT,               -- tone to become after the threshold
+             escalates_days  INTEGER,            -- NULL = never escalates
              client_visible  INTEGER NOT NULL DEFAULT 0,
              client_label    TEXT,
              client_fallback TEXT,
+             severity_rank   INTEGER NOT NULL DEFAULT 0,
+             client_key      TEXT,
              sort_order      INTEGER NOT NULL DEFAULT 0
            )""")
-    for key, module, label, tone, cvis, sort in ELEVATION_STATUSES:
+    # Idempotent top-up for a status_tone created before these two columns existed.
+    cols = _columns(conn, "status_tone")
+    if "severity_rank" not in cols:
+        conn.execute("ALTER TABLE status_tone ADD COLUMN severity_rank INTEGER NOT NULL DEFAULT 0")
+    if "client_key" not in cols:
+        conn.execute("ALTER TABLE status_tone ADD COLUMN client_key TEXT")
+
+    for key, module, label, tone, cvis, sev, sort, ckey in ELEVATION_STATUSES:
         conn.execute(
             "INSERT OR IGNORE INTO status_tone "
-            "(key, module, label, tone, client_visible, client_label, sort_order) "
-            "VALUES (?,?,?,?,?,?,?)", (key, module, label, tone, cvis, label, sort))
+            "(key, module, label, tone, client_visible, client_label, severity_rank, "
+            " client_key, sort_order) VALUES (?,?,?,?,?,?,?,?,?)",
+            (key, module, label, tone, cvis, label, sev, ckey, sort))
+        # Re-running must correct a row seeded before the shape was complete.
+        conn.execute(
+            "UPDATE status_tone SET severity_rank=?, client_key=?, client_label=?, tone=? "
+            "WHERE key=?", (sev, ckey, label, tone, key))
     conn.commit()
     return created
 
@@ -190,12 +233,16 @@ def ensure_collab_schema(conn) -> dict:
           if db_layer.is_postgres() else "id INTEGER PRIMARY KEY AUTOINCREMENT")
     changed = {}
 
+    # target_type is CONSTRAINED, not conventional. 'drop_report' was removed before a
+    # single row existed: it named a deliverable that turned out to be something else
+    # entirely, and a wrong name baked into a schema outlives the misunderstanding that
+    # created it. The CHECK means a stray value fails at the database, not in review.
     changed["comment"] = not _table_exists(conn, "comment")
     conn.execute(
         f"""CREATE TABLE IF NOT EXISTS comment (
               {pk},
               project_code TEXT NOT NULL,
-              target_type  TEXT NOT NULL,      -- 'drop' | 'photo' | 'drop_report' | 'rfi'
+              target_type  TEXT NOT NULL CHECK (target_type IN ('drop','photo','rfi')),
               target_id    TEXT,
               body         TEXT NOT NULL,
               author_uid   INTEGER,

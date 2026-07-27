@@ -104,6 +104,20 @@ def _client_gate():
         return redirect("/portal")      # granted clients land on the portal (#269 routing)
     if path == "/portal" or path.startswith("/api/portal/"):
         return None                     # per-endpoint section grants enforced below
+    # #280 — the drawing markup surface. Per the operator's correction, a client and an
+    # architect see the IDENTICAL view, so the client gate has to let a client reach it.
+    # Deliberately placed in the >=1-GRANT branch, never above it: a zero-grant client is
+    # still hard-stopped on /welcome (#267 intact). Project scope is enforced separately
+    # by elevation._require_project, which for a client resolves to the single project
+    # their portal is bound to — reaching the route is not reaching another job's data.
+    #
+    # OPEN DECISION for Amit: this surface currently sits OUTSIDE the #269 per-section
+    # grant system, so any client with at least one grant sees the drawing. If it should
+    # be independently grantable, it needs a 'drawing' section in client_grants.SECTIONS
+    # and a require_section on the elevation endpoints.
+    if path == "/drawing-markup" or path.startswith("/drawing-markup/") \
+            or path.startswith("/api/elevation/") or path == "/api/elevations":
+        return None
     logging.info(f"client_portal: contain block (granted) path={path}")
     if path.startswith("/api/"):
         return jsonify({"error": "forbidden"}), 403
