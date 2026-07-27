@@ -42,6 +42,76 @@ access enforcement is not a v1 behaviour a v2 page gets to opt out of.
 
 ---
 
+## AMENDMENT (operator, 2026-07-27) — THE LEAK TEST TARGETS API RESPONSES
+
+Supersedes the brief's "renders every client-reachable template" formulation. Binding on
+phase 2 onward.
+
+> This app serves static pages + `/api/*` JSON. Client-safe filtering MUST happen
+> server-side, in the API layer, **before serialisation**. Client-side filtering is not
+> filtering — the data already left the building.
+>
+> The leak test asserts against **JSON response bodies** for every client-reachable
+> `/api/*` endpoint, with a fixture containing every status key. Fail if any internal
+> label, hold reason, loss reason, `W-####` owner, or ungranted value appears anywhere in
+> the payload — **regardless of whether the page would have displayed it.**
+>
+> Keep the HTML check too; it is now the second line, not the first.
+
+This is the correct shape for this codebase. A v2 twin consumes exactly the same `/api/*`
+endpoints its v1 original does, so a payload-level assertion covers both UIs at once and
+cannot be defeated by a template change. It also means the leak test does not depend on any
+v2 template existing — **it can be built and made green in phase 2 before a single v2 page
+ships.**
+
+### The client-reachable surface — the leak test's actual target set
+
+Established by reading `client_portal._client_gate` + `_CLIENT_ALLOW_*`, not assumed.
+
+**Tier 1 — portal JSON payloads (6).** Reachable with ≥1 grant; each additionally
+section-gated:
+
+`/api/portal/context` · `/api/portal/project` · `/api/portal/photos` ·
+`/api/portal/documents` · `/api/portal/daily` · `/api/portal/schedule`
+
+**Tier 2 — portal binary responses (3).** Not JSON, but client-reachable. The leak vector is
+`Content-Disposition` filenames and any metadata header, not a body string:
+
+`/api/portal/photos/<id>/thumb` · `/api/portal/photos/<id>/file` ·
+`/api/portal/documents/<id>/file`
+
+**Tier 3 — always-allowed, reachable BEFORE any grant exists (`_CLIENT_ALLOW_*`).** These
+bypass `_client_gate` entirely, so a zero-grant contained client still reaches them. **The
+brief's framing would have missed this tier — it is not a portal endpoint and renders no
+client template:**
+
+`/api/auth/*` · `/api/health` · `/api/today` · `/set-password` · `/files/static/*`
+
+`/api/auth/me` is the one that matters: it returns role and
+`access.section_visibility(role)`. It must be in the target set.
+
+### Two requirements the amendment implies
+
+1. **Run the whole suite twice — as a real `client` login AND via `?preview_client=<id>`.**
+   Both paths hit the same endpoints through `_resolve_portal_client`, and preview-as-client
+   is phase 7's stated acceptance method. A leak that only reproduces under preview is still
+   a leak, and only testing one path proves half the system.
+
+2. **Assert on the payload, not on a rendered string.** A forbidden value nested in an
+   unused key, an internal `est_stage`, a `voided_by_uid`, or a `W-####` in a `note` field
+   all count as failures even when no template reads them.
+
+### Reusable architecture already in the repo
+
+`tests/_smoke_auth.py` already installs a **response hook that walks every JSON body**
+flowing through the patched session (`_scan_json_for_paths`, `PATH_GUARD_HITS`, the #247
+`*_path` guard). The leak test is the same traversal with the predicate inverted: scan
+**values** against a forbidden-string set instead of **key names** against a path pattern.
+Build it on that hook rather than a second bespoke walker, so any endpoint added later is
+covered automatically instead of needing to be remembered.
+
+---
+
 ## PHASE 0 — Safety rails · `#279` · tag `ui-v2-phase-0` · no user-visible change
 
 ### What shipped
