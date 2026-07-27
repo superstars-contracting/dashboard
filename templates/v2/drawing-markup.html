@@ -195,15 +195,20 @@
 
   // ---------- geometry transform -------------------------------------------
   // Feet -> SVG units. y is measured UP from grade in the trace and DOWN in SVG.
-  // PAD_T now carries ONE header band — the drop markers (cy 22, r 12, so 10..34) plus
-  // clearance for the bulkhead labels that sit just above the parapet. It used to carry
-  // a second band for the grid bubbles; those are gone.
+  // PAD_T carries ONE header band — the drop markers — sitting as low as they can go.
+  // HOW LOW IS CAPPED BY THE ROOF: the drawing reserves the space between the parapet
+  // (67.00 ft) and draw_top (79.80 ft) for the bulkheads, and drops 6, 7 and 10 sit
+  // directly beneath one. Dropping the numbers a full half-inch would land them on that
+  // roof structure, so they sit just clear of the bulkhead line instead — the lowest
+  // position that does not collide with the building.
+  // PAD_B is small now: the bay dimension band that used to live below the drawing is
+  // gone, so all that is needed is breathing room under the grade line.
   // PAD_L is NOT a constant — it is MEASURED from the datum labels at render time (see
   // measureTextWidth). A guessed left margin is what clipped "SECOND FLOOR" to "OOR":
   // the text elements were at correct coordinates, so every position check passed while
   // the glyphs ran off the viewBox. Margin must come from the rendered text, not a hunch.
-  var PPF = 4.0, PAD_L = 66, PAD_R = 26, PAD_T = 52, PAD_B = 48;
-  var DROP_BAND_CY = 22, DROP_R = 12;
+  var PPF = 4.0, PAD_L = 66, PAD_R = 26, PAD_T = 62, PAD_B = 18;
+  var DROP_BAND_CY = 40, DROP_R = 12;
   var DATUM_STUB = 44;      // how far the datum line runs left of the facade
   var LABEL_GAP = 5;        // between the label's right edge and that stub
   var EDGE_PAD = 10;        // between the label's left edge and the viewBox edge
@@ -440,8 +445,11 @@
     (S.data.drops || []).forEach(function (d) {
       var cx = X((d.x0 + d.x1) / 2);
       var sel = (S.drop === d.id);
+      // SHADING MEANS SELECTED, and nothing else. An unselected marker is an outline
+      // only — `transparent` rather than `none` so the whole disc stays clickable
+      // instead of just the 1.5px ring.
       var c = el('circle', { cx:cx, cy:DROP_BAND_CY, r:DROP_R,
-        fill: sel ? 'var(--v2-accent)' : 'var(--v2-accent-chip)',
+        fill: sel ? 'var(--v2-accent)' : 'transparent',
         stroke:'var(--v2-accent)', 'stroke-width': sel ? 2.5 : 1.5,
         class:'dropmark' + (sel ? ' is-sel' : ''), 'data-drop':d.id,
         role:'button', tabindex:0,
@@ -457,25 +465,20 @@
     });
     svg.appendChild(dm);
 
-    // ---- drop boundaries + clear-bay dimension strings ----
-    // The bottom DROP tab row was REMOVED: three sets of drop labels was clutter, and it
-    // crowded the dimension strings — the thing an architect actually reads down here.
-    // Drop identity now lives in exactly two places: the circles on the drawing and the
-    // selector row above the card. This band is dimensions only.
-    var yDim = Y(0) + 26;
+    // ---- drop boundaries ----
+    // The bay dimension band below the drawing is REMOVED — no dimension strings, no
+    // extension lines. The short boundary ticks stay: without them nothing marks where
+    // one drop ends and the next begins along the grade line.
+    // The clear-bay figures are still carried in the payload
+    // (geometry.drops[].clear_bay), just not drawn — so putting the band back is a
+    // render change, never a re-trace.
     var bg = el('g');
     (S.data.drops || []).forEach(function (d) {
-      var gd = (g.drops || []).filter(function (x) { return x.idx === d.idx; })[0] || {};
-      bg.appendChild(el('line', { x1:X(d.x0), y1:Y(0), x2:X(d.x0), y2:yDim + 6,
+      bg.appendChild(el('line', { x1:X(d.x0), y1:Y(0), x2:X(d.x0), y2:Y(0) + 7,
         stroke:'#cfc9be', 'stroke-width':0.8 }));
-      // dimension string AS WRITTEN on the sheet — never recomputed from scaled widths
-      bg.appendChild(el('line', { x1:X(d.x0)+2, y1:yDim, x2:X(d.x1)-2, y2:yDim,
-        stroke:'var(--v2-ink-mute)', 'stroke-width':0.8 }));
-      bg.appendChild(el('text', { x:X((d.x0+d.x1)/2), y:yDim - 4, 'text-anchor':'middle',
-        'font-size':8.5, fill:'var(--v2-ink-soft)', class:'v2-num' }, gd.clear_bay || ''));
     });
-    bg.appendChild(el('line', { x1:X(S.data.geometry.facade.width_ft), y1:Y(0),
-      x2:X(S.data.geometry.facade.width_ft), y2:yDim + 6, stroke:'#cfc9be', 'stroke-width':0.8 }));
+    bg.appendChild(el('line', { x1:X(f.width_ft), y1:Y(0),
+      x2:X(f.width_ft), y2:Y(0) + 7, stroke:'#cfc9be', 'stroke-width':0.8 }));
     svg.appendChild(bg);
 
     // ---- SELECTION OUTLINE. Drawn LAST so cells, openings, piers and features cannot
@@ -541,7 +544,6 @@
   function renderPanel() {
     var d = S.byDrop[S.drop];
     if (!d) { return; }
-    var gd = (S.data.geometry.drops || []).filter(function (x) { return x.idx === d.idx; })[0] || {};
     var ds = statusOf(d.derived_status);
     $('p-title').textContent = 'DROP ' + d.idx;
     $('p-sub').innerHTML = 'GL ' + esc(d.grid_from) + '–' + esc(d.grid_to) +
@@ -551,11 +553,10 @@
     var rows = cellsOf(d.id).slice().sort(function (a, b) {
       return a.level_id < b.level_id ? 1 : -1;     // top floor first, as drawn
     });
-    var html = '<dl class="dl">' +
-      '<dt>Width</dt><dd>' + esc((d.width_ft || 0).toFixed(2)) + ' ft</dd>' +
-      '<dt>Area</dt><dd>' + esc(d.area_sf) + ' sf</dd>' +
-      '<dt>Clear bay</dt><dd>' + esc(gd.clear_bay || '—') + '</dd>' +
-      '</dl>';
+    // Width / Area / Clear bay removed from the panel — the drop's identity and its
+    // status by floor are what this panel is for. The figures remain in the payload,
+    // unchanged and unrecomputed.
+    var html = '';
     if (d.note) html += '<p class="reason">' + esc(d.note) + '</p>';
 
     html += '<table class="floors"><thead><tr><th>Floor</th><th>Status</th></tr></thead><tbody>';
