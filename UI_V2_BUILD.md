@@ -112,6 +112,97 @@ covered automatically instead of needing to be remembered.
 
 ---
 
+## AMENDMENT 2 (operator, 2026-07-27) — THE LEAK TEST ASSERTS PROVENANCE, NOT VOCABULARY
+
+Supersedes the denylist framing in AMENDMENT 1. Binding on phase 2 onward.
+
+> Denylist scanning is the second line, not the first.
+>
+> **FIRST LINE:** any value in a client-reachable payload must trace to a source marked
+> client-safe. Columns that are internal by nature — `*_reason`, `*_note`, `internal_*`,
+> owner/`W-####`, and any status row with `client_visible = 0` — are asserted **ABSENT BY
+> COLUMN, never by string**. A free-text reason can never be safely string-matched; it can
+> only be excluded at the source.
+>
+> **Practical form:** tag internal columns in one place, and have the serialiser refuse to
+> emit them to a client audience. The test then asserts **the serialiser was used**, not
+> that a particular sentence didn't appear.
+>
+> Keep the forbidden-string scan — it catches the case where an internal value was copied
+> into a safe field by hand.
+
+The reasoning is correct and decides the architecture: a hold reason is arbitrary operator
+prose. Denylisting "client budget" does nothing about "waiting on their funding call."
+String matching over free text is unbounded — you must enumerate every bad sentence, forever,
+and you lose. Exclusion at the source is bounded: you enumerate the safe fields once.
+
+### RESOLVED AMBIGUITY — allowlist is the gate; the internal-column patterns guard the registry
+
+The amendment states the principle as an **allowlist** ("must trace to a source marked
+client-safe") and the practical form as a **denylist** ("tag internal columns"). These are not
+the same, and the difference decides what happens to a column nobody has thought of yet.
+
+A column denylist inherits the weakness it was written to escape, one grain coarser: a future
+`hold_category`, `sla_breach_days`, `assigned_estimator`, `margin_pct`, or `voided_by_uid`
+matches none of `*_reason` / `*_note` / `internal_*`, and would ship to clients until somebody
+noticed the name.
+
+**Built as: default-deny allowlist is the gate. The internal-name patterns are a SECOND
+assertion over the registry itself** — they fail loudly if anyone ever registers a column
+matching them as client-safe. So the patterns guard the allowlist rather than substitute for
+it, and a new column is internal until explicitly registered.
+
+This is the posture the rest of the codebase already takes — #264 per-item visibility is
+default-deny, #269 section grants are default-OFF, and `status_tone.client_visible` defaults
+to `0`. A client-field registry that defaulted to *allow* would be the only opt-out gate in
+the system. **Flagging rather than assuming: if the intent really was a name-pattern denylist
+as the primary gate, say so and it changes in one place.**
+
+### What this requires in this codebase — the serialiser does not exist yet
+
+Every portal endpoint today hand-builds a dict and calls `jsonify` directly. `_portal_daily`
+is representative:
+
+```python
+days = [{"date": r["report_date"], "no_work": bool(r["no_work"]), "label": ...} for r in rows]
+return _no_store(jsonify({"data": {"days": days}}))
+```
+
+The curation is real but it lives in a **narrow hand-written SELECT and a docstring**
+("NO labor, NO worker identities, NO report internals"). That is precisely the convention this
+amendment says to replace with a mechanism. Phase 2 introduces:
+
+1. **One registry module** — the single source naming, per table, the columns emittable to a
+   `client` audience. Same role `access.py` plays for section→roles.
+2. **One serialiser** — `client_payload(...)`, the only sanctioned way a portal response is
+   built. Given an audience of `client`, it emits registered fields and drops everything else.
+   Status values resolve through `status_tone` here, not at the template.
+3. **Endpoints rewritten to route through it** — no behaviour change intended; the narrow
+   SELECTs stay as defence in depth.
+
+### The three layers the test asserts, in order
+
+1. **Provenance (first line).** Every key in every client-reachable payload is registered
+   client-safe for that endpoint. An unregistered key fails — which is how "the serialiser was
+   used" is proven structurally: a hand-built dict shows up as unregistered keys.
+2. **Structural non-bypass.** No portal endpoint may call `jsonify` except through
+   `client_payload`. Asserted over the source, the way #275 enforces boxed modal fields
+   structurally rather than by an ID list — conventions decay, structure does not.
+3. **Forbidden-string scan (second line).** Retained exactly as AMENDMENT 1 specified, over
+   the same three tiers, run both as a real client login and via `?preview_client=<id>`.
+   It exists to catch an internal value **hand-copied into a registered-safe field** — the one
+   failure provenance cannot see.
+
+### Consequence worth deciding in phase 2, not phase 7
+
+Under column-level exclusion a client payload **must not carry the internal status key at
+all** — not even as an id alongside a translated label. `{"status": "on_hold", "label": "On
+hold"}` fails: `on_hold` is internal vocabulary that happens to be short enough to look
+harmless. Client payloads carry the client label and tone only. Any client-side grouping or
+filtering that wants a stable key needs a **separate client-safe key** minted for the purpose.
+
+---
+
 ## PHASE 0 — Safety rails · `#279` · tag `ui-v2-phase-0` · no user-visible change
 
 ### What shipped
