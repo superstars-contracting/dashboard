@@ -115,8 +115,15 @@ def _client_gate():
     # grant system, so any client with at least one grant sees the drawing. If it should
     # be independently grantable, it needs a 'drawing' section in client_grants.SECTIONS
     # and a require_section on the elevation endpoints.
+    # #280 steps 4/5 — comments and RFIs ride with the markup surface. The client is
+    # READ-ONLY on both, enforced at the endpoint (client is absent from
+    # elevation.COLLAB_WRITE_ROLES, so any POST/PATCH/DELETE is 403) — never by keeping
+    # them off the route, which would also blind them to the thread. The architect works
+    # for the owner, so their comments are not confidential from the client; that is a
+    # confirmed relationship decision, not a technical default.
     if path == "/drawing-markup" or path.startswith("/drawing-markup/") \
-            or path.startswith("/api/elevation/") or path == "/api/elevations":
+            or path.startswith("/api/elevation/") or path == "/api/elevations" \
+            or path.startswith("/api/comments") or path.startswith("/api/rfis"):
         return None
     logging.info(f"client_portal: contain block (granted) path={path}")
     if path.startswith("/api/"):

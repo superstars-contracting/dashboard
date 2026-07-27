@@ -656,6 +656,344 @@ def _architect_gate():
     return redirect("/drawing-markup")
 
 
+# ============================================================================
+# STEP 4 — COMMENTS
+# ============================================================================
+#
+# Architect and internal roles post; the CLIENT IS READ-ONLY but SEES everything. That
+# is a relationship assumption, not a technical one — the architect works for the owner,
+# so their comments are not confidential from the client. Confirmed with the operator.
+#
+# PLAIN TEXT ONLY. No HTML, no markdown, no auto-linking. Bodies are stored raw and
+# escaped at every render, and the API never emits HTML. This surface is reachable by
+# parties outside the company, so a stored-XSS here would execute in an SSC operator's
+# session — the cheapest correct answer is that markup is never interpreted at all.
+#
+# SOFT DELETE ONLY: deleted_at is stamped, the row stays. A comment thread an architect
+# can silently rewrite is not a record of anything.
+
+COMMENT_TARGETS = ("drop", "photo", "rfi")
+_RATE_WINDOW_SECONDS = 60
+_RATE_MAX_COMMENTS = 10
+
+
+def _target_project(conn, target_type, target_id):
+    """The project a comment target belongs to, or None if the target does not exist.
+    Resolving through the target — never trusting a project_code from the client — is
+    what stops a caller attaching a comment to another job's drop.
+
+    comment.target_id is TEXT (it has to span several target tables) but every id it
+    points at is INTEGER. SQLite would coerce silently; POSTGRES WOULD RAISE. Coerce
+    here so the comparison is int-to-int on both backends, and treat a non-numeric id
+    as simply not found rather than as an error."""
+    try:
+        target_id = int(str(target_id).strip())
+    except (TypeError, ValueError):
+        return None
+    if target_type == "drop":
+        row = conn.execute(
+            "SELECT e.project_code AS code FROM elevation_drop d "
+            "JOIN elevation e ON e.id = d.elevation_id WHERE d.id = ?", (target_id,)).fetchone()
+    elif target_type == "rfi":
+        row = conn.execute("SELECT project_code AS code FROM rfi WHERE id = ?",
+                           (target_id,)).fetchone()
+    elif target_type == "photo":
+        row = conn.execute("SELECT project_code AS code FROM field_photos WHERE id = ?",
+                           (target_id,)).fetchone()
+    else:
+        return None
+    return row["code"] if row else None
+
+
+def _rate_limited(conn, uid) -> bool:
+    """A crude per-user window. Enough to stop a runaway client or a stuck retry loop
+    from filling the table; not a security boundary (the auth gate is)."""
+    since = (datetime.now().timestamp() - _RATE_WINDOW_SECONDS)
+    rows = conn.execute(
+        "SELECT created_at FROM comment WHERE author_uid = ? ORDER BY id DESC LIMIT ?",
+        (uid, _RATE_MAX_COMMENTS)).fetchall()
+    if len(rows) < _RATE_MAX_COMMENTS:
+        return False
+    try:
+        oldest = datetime.fromisoformat(rows[-1]["created_at"]).timestamp()
+    except (TypeError, ValueError):
+        return False
+    return oldest > since
+
+
+def _comment_row(conn, r, internal_viewer):
+    return {
+        "id": r["id"],
+        "target_type": r["target_type"],
+        "target_id": r["target_id"],
+        "body": r["body"],                 # RAW text; the client escapes on render
+        "at": r["created_at"],
+        "author": display_actor(conn, r["author_uid"], internal_viewer),
+        "mine": r["author_uid"] == _uid(),
+    }
+
+
+def _api_comments_list():
+    """GET /api/comments?target_type=&target_id= — the thread, oldest first.
+    Soft-deleted rows are omitted entirely rather than shown as tombstones."""
+    ttype = (request.args.get("target_type") or "").strip()
+    tid = (request.args.get("target_id") or "").strip()
+    if ttype not in COMMENT_TARGETS or not tid:
+        return _err("target_type and target_id are required", 400)
+    conn = _db()
+    try:
+        code = _target_project(conn, ttype, tid)
+        if code is None:
+            return _err("not found", 404)
+        blocked = _require_project(conn, code)
+        if blocked:
+            return blocked
+        rows = conn.execute(
+            "SELECT id, target_type, target_id, body, author_uid, created_at "
+            "FROM comment WHERE project_code=? AND target_type=? AND target_id=? "
+            "AND deleted_at IS NULL ORDER BY id", (code, ttype, str(tid))).fetchall()
+        internal = is_internal()
+        return jsonify({"data": [_comment_row(conn, r, internal) for r in rows],
+                        "can_post": _role() in COLLAB_WRITE_ROLES})
+    finally:
+        conn.close()
+
+
+def _api_comments_post():
+    """POST /api/comments — {target_type, target_id, body}. Client is READ-ONLY here."""
+    if _role() not in COLLAB_WRITE_ROLES:
+        return _err("forbidden", 403)
+    data = request.get_json(silent=True) or {}
+    ttype = (data.get("target_type") or "").strip()
+    tid = str(data.get("target_id") or "").strip()
+    body = (data.get("body") or "").strip()
+    if ttype not in COMMENT_TARGETS or not tid:
+        return _err(f"target_type must be one of {', '.join(COMMENT_TARGETS)}", 400)
+    if not body:
+        return _err("a comment body is required", 400)
+    if len(body) > MAX_COMMENT:
+        return _err(f"a comment must be {MAX_COMMENT} characters or fewer", 400)
+    conn = _db()
+    try:
+        code = _target_project(conn, ttype, tid)
+        if code is None:
+            return _err("not found", 404)
+        blocked = _require_project(conn, code)
+        if blocked:
+            return blocked
+        if _rate_limited(conn, _uid()):
+            return _err("too many comments just now — wait a moment and try again", 429)
+        cur = conn.execute(
+            "INSERT INTO comment (project_code, target_type, target_id, body, author_uid, "
+            "created_at) VALUES (?,?,?,?,?,?)", (code, ttype, tid, body, _uid(), _now()))
+        conn.commit()
+        row = conn.execute(
+            "SELECT id, target_type, target_id, body, author_uid, created_at "
+            "FROM comment WHERE id=?", (cur.lastrowid,)).fetchone()
+        logging.info(f"comment: uid={_uid()} {ttype}/{tid} on {code}")   # never the body
+        return jsonify({"data": _comment_row(conn, row, is_internal())}), 201
+    finally:
+        conn.close()
+
+
+def _api_comment_delete(comment_id):
+    """DELETE /api/comments/<id> — SOFT delete. Author may remove their own; an admin may
+    remove any. Nothing is ever hard-deleted."""
+    conn = _db()
+    try:
+        row = conn.execute(
+            "SELECT id, project_code, author_uid, deleted_at FROM comment WHERE id=?",
+            (comment_id,)).fetchone()
+        if row is None:
+            return _err("not found", 404)
+        blocked = _require_project(conn, row["project_code"])
+        if blocked:
+            return blocked
+        if not (row["author_uid"] == _uid() or _role() == "admin"):
+            return _err("forbidden", 403)
+        if row["deleted_at"] is None:
+            conn.execute("UPDATE comment SET deleted_at=? WHERE id=?", (_now(), comment_id))
+            conn.commit()
+        return jsonify({"data": {"id": comment_id, "deleted": True}})
+    finally:
+        conn.close()
+
+
+# ============================================================================
+# STEP 5 — RFIs
+# ============================================================================
+#
+# An architect may RAISE an RFI; internal roles raise and respond (respond = close, plus
+# the comment thread from step 4). drop_id and level_id are NULLABLE AND EDITABLE AFTER
+# CREATION — an RFI is often raised before anyone knows which drop it belongs to, and
+# forcing that decision at creation time is how RFIs end up filed against the wrong bay.
+
+RFI_STATUSES = ("open", "closed")
+MAX_RFI_TITLE = 200
+MAX_RFI_BODY = 4000
+
+
+def _next_rfi_number(conn, code) -> str:
+    """RFI-001, RFI-002, … per project. Numeric max, never lexicographic — 'RFI-010'
+    sorts before 'RFI-9' as text (the CLAUDE.md zero-padded-id rule)."""
+    rows = conn.execute("SELECT number FROM rfi WHERE project_code=?", (code,)).fetchall()
+    top = 0
+    for r in rows:
+        m = re.match(r"^RFI-(\d+)$", (r["number"] or "").strip())
+        if m:
+            top = max(top, int(m.group(1)))
+    return f"RFI-{top + 1:03d}"
+
+
+def _rfi_row(conn, r, internal_viewer):
+    return {
+        "id": r["id"],
+        "number": r["number"],
+        "title": r["title"],
+        "body": r["body"],
+        "status": r["status"],
+        "drop_id": r["drop_id"],
+        "level_id": r["level_id"],
+        "raised_at": r["raised_at"],
+        "closed_at": r["closed_at"],
+        "raised_by": display_actor(conn, r["raised_by_uid"], internal_viewer),
+    }
+
+
+def _api_rfi_list():
+    """GET /api/rfis?elevation_id= — the RFI list beside the drawing. Those carrying a
+    drop_id render as a pin on that drop, for every role."""
+    elev_id = request.args.get("elevation_id")
+    conn = _db()
+    try:
+        if elev_id:
+            row = conn.execute("SELECT project_code FROM elevation WHERE id=?",
+                               (elev_id,)).fetchone()
+            if row is None:
+                return _err("not found", 404)
+            code = row["project_code"]
+        else:
+            return _err("elevation_id is required", 400)
+        blocked = _require_project(conn, code)
+        if blocked:
+            return blocked
+        rows = conn.execute(
+            "SELECT id, number, title, body, status, drop_id, level_id, raised_by_uid, "
+            "       raised_at, closed_at FROM rfi WHERE project_code=? "
+            "ORDER BY (status='closed'), id DESC", (code,)).fetchall()
+        internal = is_internal()
+        return jsonify({"data": [_rfi_row(conn, r, internal) for r in rows],
+                        "can_raise": _role() in COLLAB_WRITE_ROLES,
+                        "can_close": is_internal()})
+    finally:
+        conn.close()
+
+
+def _api_rfi_create():
+    """POST /api/rfis — {elevation_id, title, body?, drop_id?, level_id?}."""
+    if _role() not in COLLAB_WRITE_ROLES:
+        return _err("forbidden", 403)
+    data = request.get_json(silent=True) or {}
+    elev_id = data.get("elevation_id")
+    title = (data.get("title") or "").strip()
+    body = (data.get("body") or "").strip() or None
+    drop_id = data.get("drop_id")
+    level_id = (data.get("level_id") or "").strip() or None
+    if not elev_id:
+        return _err("elevation_id is required", 400)
+    if not title:
+        return _err("a title is required", 400)
+    if len(title) > MAX_RFI_TITLE:
+        return _err(f"title must be {MAX_RFI_TITLE} characters or fewer", 400)
+    if body and len(body) > MAX_RFI_BODY:
+        return _err(f"body must be {MAX_RFI_BODY} characters or fewer", 400)
+    conn = _db()
+    try:
+        row = conn.execute("SELECT id, project_code FROM elevation WHERE id=?",
+                           (elev_id,)).fetchone()
+        if row is None:
+            return _err("not found", 404)
+        code = row["project_code"]
+        blocked = _require_project(conn, code)
+        if blocked:
+            return blocked
+        if drop_id and not _drop_in_elevation(conn, drop_id, elev_id):
+            return _err("that drop is not on this elevation", 400)
+        number = _next_rfi_number(conn, code)
+        cur = conn.execute(
+            "INSERT INTO rfi (project_code, elevation_id, drop_id, level_id, number, title, "
+            "body, raised_by_uid, raised_at, status) VALUES (?,?,?,?,?,?,?,?,?,'open')",
+            (code, elev_id, drop_id or None, level_id, number, title, body, _uid(), _now()))
+        conn.commit()
+        new = conn.execute(
+            "SELECT id, number, title, body, status, drop_id, level_id, raised_by_uid, "
+            "raised_at, closed_at FROM rfi WHERE id=?", (cur.lastrowid,)).fetchone()
+        logging.info(f"rfi: {number} raised uid={_uid()} on {code}")
+        return jsonify({"data": _rfi_row(conn, new, is_internal())}), 201
+    finally:
+        conn.close()
+
+
+def _drop_in_elevation(conn, drop_id, elev_id) -> bool:
+    return bool(conn.execute("SELECT 1 FROM elevation_drop WHERE id=? AND elevation_id=?",
+                             (drop_id, elev_id)).fetchone())
+
+
+def _api_rfi_update(rfi_id):
+    """PATCH /api/rfis/<id> — {drop_id?, level_id?, status?}.
+
+    ATTACHING LATER IS THE POINT: drop_id/level_id are editable after creation, so an RFI
+    raised before anyone knew the bay can be filed to it once they do. Only an INTERNAL
+    role may close one — an architect raising and then closing their own question would
+    make the log meaningless."""
+    data = request.get_json(silent=True) or {}
+    conn = _db()
+    try:
+        row = conn.execute(
+            "SELECT id, project_code, elevation_id, status FROM rfi WHERE id=?",
+            (rfi_id,)).fetchone()
+        if row is None:
+            return _err("not found", 404)
+        blocked = _require_project(conn, row["project_code"])
+        if blocked:
+            return blocked
+
+        sets, params = [], []
+        if "drop_id" in data:
+            d = data.get("drop_id")
+            if d and not _drop_in_elevation(conn, d, row["elevation_id"]):
+                return _err("that drop is not on this elevation", 400)
+            sets.append("drop_id=?")
+            params.append(d or None)
+        if "level_id" in data:
+            sets.append("level_id=?")
+            params.append((data.get("level_id") or "").strip() or None)
+        if "status" in data:
+            st = (data.get("status") or "").strip()
+            if st not in RFI_STATUSES:
+                return _err(f"status must be one of {', '.join(RFI_STATUSES)}", 400)
+            if not is_internal():
+                return _err("only an internal role may open or close an RFI", 403)
+            sets.append("status=?")
+            params.append(st)
+            sets.append("closed_at=?")
+            params.append(_now() if st == "closed" else None)
+        if not sets:
+            return _err("nothing to update", 400)
+        if _role() not in COLLAB_WRITE_ROLES:
+            return _err("forbidden", 403)
+
+        params.append(rfi_id)
+        conn.execute(f"UPDATE rfi SET {', '.join(sets)} WHERE id=?", tuple(params))
+        conn.commit()
+        new = conn.execute(
+            "SELECT id, number, title, body, status, drop_id, level_id, raised_by_uid, "
+            "raised_at, closed_at FROM rfi WHERE id=?", (rfi_id,)).fetchone()
+        return jsonify({"data": _rfi_row(conn, new, is_internal())})
+    finally:
+        conn.close()
+
+
 def register(app) -> None:
     """MUST follow apply_auth_gate (current_user populated) and the #263 scoping hook."""
     app.before_request(_architect_gate)
@@ -671,3 +1009,13 @@ def register(app) -> None:
                      _api_post_drop, methods=["POST"])
     app.add_url_rule("/api/elevation/cell/<int:cell_id>/history", "elevation_cell_history",
                      _api_cell_history, methods=["GET"])
+    # step 4 — comments
+    app.add_url_rule("/api/comments", "comments_list", _api_comments_list, methods=["GET"])
+    app.add_url_rule("/api/comments", "comments_post", _api_comments_post, methods=["POST"])
+    app.add_url_rule("/api/comments/<int:comment_id>", "comment_delete",
+                     _api_comment_delete, methods=["DELETE"])
+    # step 5 — RFIs
+    app.add_url_rule("/api/rfis", "rfi_list", _api_rfi_list, methods=["GET"])
+    app.add_url_rule("/api/rfis", "rfi_create", _api_rfi_create, methods=["POST"])
+    app.add_url_rule("/api/rfis/<int:rfi_id>", "rfi_update", _api_rfi_update,
+                     methods=["PATCH"])

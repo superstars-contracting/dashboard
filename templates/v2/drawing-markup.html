@@ -111,6 +111,32 @@
   dialog.rsn textarea { width:100%; font:inherit; font-size:var(--v2-t-small); padding:8px 10px;
                         border:1px solid var(--v2-hairline); border-radius:var(--v2-r-ctl);
                         resize:vertical; min-height:64px; }
+  /* comment + RFI thread */
+  .thread { margin-top:var(--v2-s-4); border-top:1px solid var(--v2-hairline);
+            padding-top:var(--v2-s-3); }
+  .thead { display:flex; align-items:baseline; justify-content:space-between;
+           font-size:var(--v2-t-micro); text-transform:uppercase; letter-spacing:.07em;
+           color:var(--v2-ink-mute); margin:var(--v2-s-3) 0 var(--v2-s-2); }
+  .thead:first-child { margin-top:0; }
+  .linkbtn { background:none; border:none; padding:0; font:inherit;
+             font-size:var(--v2-t-micro); font-weight:600; color:var(--v2-accent);
+             cursor:pointer; text-transform:none; letter-spacing:0; }
+  .linkbtn:hover { text-decoration:underline; }
+  ul.rfis, ul.comments { list-style:none; margin:0; padding:0; }
+  ul.rfis li, ul.comments li { border-top:1px solid var(--v2-hairline);
+                               padding:var(--v2-s-2) 0; }
+  ul.rfis li:first-child, ul.comments li:first-child { border-top:0; }
+  ul.rfis li.closed { opacity:.6; }
+  .rfinum { font-weight:700; color:var(--v2-accent-ink); font-size:var(--v2-t-micro); }
+  .rfititle { font-size:var(--v2-t-small); font-weight:600; margin-right:6px; }
+  .byline { color:var(--v2-ink-mute); font-size:10.5px; margin-top:3px; }
+  /* word-break so a pasted URL or an unbroken string cannot widen the panel */
+  .cbody { font-size:var(--v2-t-small); line-height:1.55; margin-top:2px;
+           white-space:pre-wrap; overflow-wrap:anywhere; }
+  .cpost { display:flex; gap:var(--v2-s-2); align-items:flex-end; margin-top:var(--v2-s-3); }
+  .cpost textarea { flex:1 1 auto; min-width:0; font:inherit; font-size:var(--v2-t-small);
+    padding:7px 9px; border:1px solid var(--v2-hairline); border-radius:var(--v2-r-ctl);
+    resize:vertical; }
   .err { color:var(--v2-coral-ink); font-size:var(--v2-t-micro); margin-top:6px; }
   .empty { color:var(--v2-ink-mute); font-size:var(--v2-t-small); padding:var(--v2-s-3) 0; }
 
@@ -482,6 +508,34 @@
     });
     svg.appendChild(dm);
 
+    // ---- RFI PINS. An RFI carrying a drop_id shows on that drop, for EVERY role —
+    // an open question about a bay is a field condition, not internal traffic.
+    // Unattached RFIs draw nothing: a pin with no drop would have to be parked
+    // somewhere arbitrary, and an arbitrary position on a drawing reads as a location.
+    var open = (S.rfis || []).filter(function (r) {
+      return r.drop_id && r.status !== 'closed';
+    });
+    if (open.length) {
+      var byDrop = {};
+      open.forEach(function (r) { byDrop[r.drop_id] = (byDrop[r.drop_id] || 0) + 1; });
+      var pg = el('g', { class:'rfipins' });
+      Object.keys(byDrop).forEach(function (did) {
+        var d = S.byDrop[did]; if (!d) return;
+        var cx = X((d.x0 + d.x1) / 2), cy = Y(0) + 15;
+        pg.appendChild(el('circle', { cx:cx, cy:cy, r:8.5, fill:'var(--v2-gold-chip)',
+          stroke:'var(--v2-gold-mark)', 'stroke-width':1.4 }));
+        var t = el('text', { x:cx, y:cy + 3.4, 'text-anchor':'middle', 'font-size':9,
+          'font-weight':700, fill:'var(--v2-gold-ink)', 'pointer-events':'none' },
+          byDrop[did] > 1 ? String(byDrop[did]) : '?');
+        var ttl = document.createElementNS(SVGNS, 'title');
+        ttl.textContent = byDrop[did] + ' open RFI' + (byDrop[did] > 1 ? 's' : '') +
+                          ' · DROP ' + d.idx;
+        pg.appendChild(t);
+        pg.appendChild(ttl);
+      });
+      svg.appendChild(pg);
+    }
+
     // ---- drop boundaries ----
     // The bay dimension band below the drawing is REMOVED — no dimension strings, no
     // extension lines. The short boundary ticks stay: without them nothing marks where
@@ -589,7 +643,135 @@
     // No "Drawing basis" disclosure here. The one-line provenance under the title is the
     // whole statement the page makes about how it was drawn. SCALE_NOTE and source stay
     // in the payload (geometry.scale_note, geometry.source) — carried, just not rendered.
+    html += '<div id="thread"></div>';
     $('p-body').innerHTML = html;
+    loadThread(d);
+  }
+
+  // ---------- comments + RFIs (steps 4 & 5) ---------------------------------
+  // EVERY value from the API is escaped through esc() before it reaches innerHTML.
+  // Bodies are stored and returned as RAW TEXT and are never interpreted as markup —
+  // this surface is reachable by parties outside the company, so a stored <script> must
+  // render as the literal characters an architect typed, not execute in an operator's
+  // session.
+
+  function threadHtml(d, rfis, comments, canPost, canRaise, canClose) {
+    var h = '<div class="thread">';
+
+    h += '<div class="thead"><b>RFIs</b>' +
+         (canRaise ? '<button type="button" class="linkbtn" id="rfi-new">Raise an RFI</button>' : '') +
+         '</div>';
+    if (!rfis.length) {
+      h += '<p class="empty">No RFIs on this drop.</p>';
+    } else {
+      h += '<ul class="rfis">';
+      rfis.forEach(function (r) {
+        h += '<li class="' + (r.status === 'closed' ? 'closed' : '') + '">' +
+             '<span class="rfinum v2-num">' + esc(r.number) + '</span> ' +
+             '<span class="rfititle">' + esc(r.title) + '</span>' +
+             '<span class="v2-chip-cat">' + esc(r.status) + '</span>' +
+             (r.body ? '<div class="reason">' + esc(r.body) + '</div>' : '') +
+             '<div class="byline">' + esc(r.raised_by.label) + ' · ' + esc(fmt(r.raised_at)) +
+             (canClose && r.status === 'open'
+               ? ' · <button type="button" class="linkbtn" data-close-rfi="' + r.id + '">Close</button>'
+               : '') + '</div></li>';
+      });
+      h += '</ul>';
+    }
+
+    h += '<div class="thead"><b>Comments</b></div>';
+    if (!comments.length) {
+      h += '<p class="empty">No comments on this drop.</p>';
+    } else {
+      h += '<ul class="comments">';
+      comments.forEach(function (c) {
+        h += '<li><div class="byline">' + esc(c.author.label) + ' · ' + esc(fmt(c.at)) +
+             (c.mine ? ' · <button type="button" class="linkbtn" data-del-c="' + c.id + '">Delete</button>' : '') +
+             '</div><div class="cbody">' + esc(c.body) + '</div></li>';
+      });
+      h += '</ul>';
+    }
+    if (canPost) {
+      h += '<div class="cpost"><textarea id="c-body" maxlength="2000" rows="2" ' +
+           'placeholder="Add a comment…"></textarea>' +
+           '<button type="button" class="v2-btn" id="c-send">Post</button></div>';
+    }
+    return h + '</div>';
+  }
+
+  function fmt(iso) { return usDate(iso) || '—'; }
+
+  function loadThread(d) {
+    var box = document.getElementById('thread');
+    if (!box) return;
+    Promise.all([
+      fetch('/api/rfis?elevation_id=' + S.elevId, { credentials:'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : { data: [] }; }),
+      fetch('/api/comments?target_type=drop&target_id=' + d.id, { credentials:'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : { data: [] }; })
+    ]).then(function (res) {
+      var allRfis = res[0].data || [];
+      // Only this drop's RFIs in the panel; unattached ones stay off it until filed.
+      var mine = allRfis.filter(function (r) { return r.drop_id === d.id; });
+      S.rfis = allRfis;
+      box.innerHTML = threadHtml(d, mine, res[1].data || [],
+        res[1].can_post, res[0].can_raise, res[0].can_close);
+      wireThread(d);
+      render();     // RFI pins on the drawing
+    }).catch(function () { box.innerHTML = '<p class="empty">Could not load the thread.</p>'; });
+  }
+
+  function wireThread(d) {
+    var send = document.getElementById('c-send');
+    if (send) {
+      send.addEventListener('click', function () {
+        var t = document.getElementById('c-body');
+        var body = (t.value || '').trim();
+        if (!body) return;
+        send.disabled = true;
+        fetch('/api/comments', { method:'POST', headers:{'Content-Type':'application/json'},
+          credentials:'same-origin',
+          body: JSON.stringify({ target_type:'drop', target_id: d.id, body: body }) })
+          .then(function (r) { return r.json().then(function (j) { return { ok:r.ok, j:j }; }); })
+          .then(function (res) {
+            send.disabled = false;
+            if (!res.ok) { alert(res.j.error || 'Could not post'); return; }
+            t.value = ''; loadThread(d);
+          })
+          .catch(function () { send.disabled = false; alert('Could not post.'); });
+      });
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('[data-del-c]'), function (b) {
+      b.addEventListener('click', function () {
+        fetch('/api/comments/' + b.getAttribute('data-del-c'),
+              { method:'DELETE', credentials:'same-origin' })
+          .then(function () { loadThread(d); });
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-close-rfi]'), function (b) {
+      b.addEventListener('click', function () {
+        fetch('/api/rfis/' + b.getAttribute('data-close-rfi'),
+          { method:'PATCH', headers:{'Content-Type':'application/json'},
+            credentials:'same-origin', body: JSON.stringify({ status:'closed' }) })
+          .then(function () { loadThread(d); });
+      });
+    });
+    var nw = document.getElementById('rfi-new');
+    if (nw) {
+      nw.addEventListener('click', function () {
+        var title = window.prompt('RFI title — what is the question?');
+        if (!title || !title.trim()) return;
+        fetch('/api/rfis', { method:'POST', headers:{'Content-Type':'application/json'},
+          credentials:'same-origin',
+          body: JSON.stringify({ elevation_id:S.elevId, title:title.trim(), drop_id:d.id }) })
+          .then(function (r) { return r.json().then(function (j) { return { ok:r.ok, j:j }; }); })
+          .then(function (res) {
+            if (!res.ok) { alert(res.j.error || 'Could not raise the RFI'); return; }
+            loadThread(d);
+          })
+          .catch(function () { alert('Could not raise the RFI.'); });
+      });
+    }
   }
 
   // ---------- painting ------------------------------------------------------
