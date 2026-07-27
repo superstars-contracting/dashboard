@@ -99,6 +99,18 @@
                         resize:vertical; min-height:64px; }
   .err { color:var(--v2-coral-ink); font-size:var(--v2-t-micro); margin-top:6px; }
   .empty { color:var(--v2-ink-mute); font-size:var(--v2-t-small); padding:var(--v2-s-3) 0; }
+
+  /* PRINT — the drop tabs are part of the drawing, so they must survive the print
+     pipeline exactly as the grid bubbles do. Three things break a printed elevation:
+     the scroll container clipping it at the viewport edge, the two-column layout
+     squeezing it, and the browser dropping SVG fills to save ink. All three handled. */
+  @media print {
+    .cols { grid-template-columns:1fr; gap:var(--v2-s-3); }
+    .stage { overflow:visible; max-width:none; }
+    svg.elev { min-width:0; width:100%; }
+    .v2-card { padding:var(--v2-s-2); }
+    * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
 </style>
 </head>
 <body class="v2">
@@ -179,7 +191,11 @@
 
   // ---------- geometry transform -------------------------------------------
   // Feet -> SVG units. y is measured UP from grade in the trace and DOWN in SVG.
-  var PPF = 4.0, PAD_L = 66, PAD_R = 26, PAD_T = 44, PAD_B = 84;
+  // PAD_T carries two stacked header bands: the DROP tab row at the very top, then the
+  // grid bubble row in its standard position directly above the drawing. The gap between
+  // them is deliberate — see dropMarkers().
+  var PPF = 4.0, PAD_L = 66, PAD_R = 26, PAD_T = 78, PAD_B = 84;
+  var DROP_BAND_TOP = 12, DROP_BAND_H = 20, DROP_TAB_W = 30;
   function X(ft) { return PAD_L + ft * PPF; }
   function Y(ft) { return PAD_T + (S.data.geometry.facade.draw_top_ft - ft) * PPF; }
 
@@ -329,6 +345,39 @@
         'font-size':9.5, 'font-weight':700, fill:'var(--v2-ink)' }, gr.id));
     });
     svg.appendChild(gg);
+
+    // ---- DROP TABS. The bay IS the drop, so the number belongs in the middle of the
+    // bay, not on a grid line.
+    //
+    // SHAPE carries the distinction: grid bubbles are CIRCLES sitting ON the lines and
+    // are left exactly as standard convention requires; drop tabs are SQUARES sitting
+    // BETWEEN them. 13 circles, 12 squares, on two bands that never vertically align —
+    // the count mismatch stops reading as an error and starts explaining itself.
+    //
+    // x is the SPAN midpoint computed from elevation_drop.x0/x1 — NOT the grid-to-grid
+    // midpoint. Drops 1 and 12 include corner returns and genuinely sit off-centre from
+    // their grids (12.04 vs 12.95, and 256.00 vs 254.46). Deriving from the data is what
+    // makes those two land correctly.
+    //
+    // Labelling only: no rope, no hanger, no anchor point, no vertical drop line.
+    var dm = el('g', { class:'dropmarks' });
+    dm.appendChild(el('text', { x:X(0) - 12, y:DROP_BAND_TOP + 14, 'text-anchor':'end',
+      'font-size':8, 'font-weight':700, fill:'var(--v2-ink-mute)',
+      'letter-spacing':'.10em' }, 'DROPS'));
+    (S.data.drops || []).forEach(function (d) {
+      var cx = X((d.x0 + d.x1) / 2);
+      var tab = el('rect', { x:cx - DROP_TAB_W / 2, y:DROP_BAND_TOP, width:DROP_TAB_W,
+        height:DROP_BAND_H, rx:4, fill:'var(--v2-surface)',
+        stroke:'var(--v2-ink-soft)', 'stroke-width':1.1 });
+      var ttl = document.createElementNS(SVGNS, 'title');
+      ttl.textContent = 'DROP ' + d.idx + ' · GL ' + d.grid_from + '–' + d.grid_to;
+      tab.appendChild(ttl);
+      dm.appendChild(tab);
+      dm.appendChild(el('text', { x:cx, y:DROP_BAND_TOP + 14.5, 'text-anchor':'middle',
+        'font-size':11, 'font-weight':700, fill:'var(--v2-ink)',
+        'pointer-events':'none' }, d.idx));
+    });
+    svg.appendChild(dm);
 
     // ---- drop boundaries + DROP n labels + clear-bay dimension strings ----
     var yDim = Y(0) + 26, yLab = Y(0) + 52;
