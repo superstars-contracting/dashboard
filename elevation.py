@@ -64,6 +64,20 @@ PAINT_ROLES = INTERNAL_ROLES
 # The client is READ-ONLY by design and is absent here.
 COLLAB_WRITE_ROLES = INTERNAL_ROLES | {"architect"}
 
+# The elevation picker's canonical entries, in header order.
+#
+# FULL-SET SCHEMA CHOICE: 'ALL' is carried as a fifth `elevation.face` VALUE, not as a
+# new `kind` column. elevation.face has NO CHECK constraint (the allowed values live in a
+# comment), so a fifth value costs zero migration on either backend, where a new column
+# would cost one on both. If the full set later needs its own attributes it can graduate
+# to a column; nothing here forecloses that.
+#
+# The full-set VIEW IS NOT DESIGNED — rendering four elevations together is a different
+# problem (shared scale? stacked? wrapped? one continuous developed elevation?) and has
+# not been specified. The entry exists in the picker and reports itself untraced; picking
+# it does not attempt a render.
+FACES = (("N", "North"), ("S", "South"), ("E", "East"), ("W", "West"), ("ALL", "Full set"))
+
 STATUS_KEYS = ("not_started", "in_progress", "on_hold", "rework", "complete")
 REASON_REQUIRED = frozenset({"on_hold", "rework"})
 MAX_REASON = 500
@@ -287,9 +301,29 @@ def _api_get_elevation(elev_id):
         except ValueError:
             geom = {}
 
+        # AS-OF DATE. The page is a progress view now, and a progress view with no
+        # "updated" stamp cannot be trusted by whoever is reading it — an architect has
+        # no way to tell yesterday's picture from last month's. Derived from the most
+        # recent cell edit; None when nothing has ever been marked, which the page
+        # renders as "not started yet" rather than inventing a date.
+        upd = conn.execute(
+            "SELECT MAX(c.updated_at) AS m FROM elevation_cell c "
+            "JOIN elevation_drop d ON d.id = c.drop_id WHERE d.elevation_id = ?",
+            (elev_id,)).fetchone()
+        last_marked = conn.execute(
+            "SELECT MAX(ev.created_at) AS m FROM elevation_cell_event ev "
+            "JOIN elevation_cell c ON c.id = ev.cell_id "
+            "JOIN elevation_drop d ON d.id = c.drop_id WHERE d.elevation_id = ?",
+            (elev_id,)).fetchone()
+        pname = conn.execute("SELECT name FROM projects WHERE project_code=?",
+                             (row["project_code"],)).fetchone()
+
         return jsonify({"data": {
             "id": row["id"],
             "project_code": row["project_code"],
+            "project_name": (pname["name"] if pname else None),
+            "updated_at": (upd["m"] if upd else None),
+            "last_marked_at": (last_marked["m"] if last_marked else None),
             "face": row["face"],
             "name": row["name"],
             "source_sheet": row["source_sheet"],
@@ -519,8 +553,13 @@ def _markup_page(elev_id=None):
 
 
 def _api_my_elevations():
-    """GET /api/elevations — the elevations this user may open. The page uses it to find
-    its default; it is also the check that an architect sees ONLY assigned projects."""
+    """GET /api/elevations — the elevation picker, and the check that an architect sees
+    ONLY assigned projects.
+
+    Returns the FULL canonical face list per project, not just the rows that exist. An
+    untraced elevation comes back with id=None and traced=False so the picker can grey it
+    out as "not traced yet" — absent would read as "this building has no south side",
+    which is wrong and quietly hides the roadmap."""
     conn = _db()
     try:
         user = current_user()
@@ -529,13 +568,35 @@ def _api_my_elevations():
             return jsonify({"data": []})
         marks = ",".join("?" for _ in codes)
         rows = conn.execute(
-            f"SELECT e.id, e.project_code, e.face, e.name, p.name AS project_name "
+            f"SELECT e.id, e.project_code, e.face, e.name, e.geometry_json, "
+            f"       p.name AS project_name "
             f"FROM elevation e LEFT JOIN projects p ON p.project_code = e.project_code "
-            f"WHERE e.project_code IN ({marks}) ORDER BY e.project_code, e.face",
-            tuple(codes)).fetchall()
-        return jsonify({"data": [
-            {"id": r["id"], "project_code": r["project_code"], "face": r["face"],
-             "name": r["name"], "project_name": r["project_name"]} for r in rows]})
+            f"WHERE e.project_code IN ({marks})", tuple(codes)).fetchall()
+        if not rows:
+            return jsonify({"data": []})
+
+        by_project = {}
+        for r in rows:
+            by_project.setdefault(r["project_code"], {})[r["face"]] = r
+        pnames = {r["project_code"]: r["project_name"] for r in rows}
+
+        out = []
+        for code in sorted(by_project):
+            existing = by_project[code]
+            for face, label in FACES:
+                r = existing.get(face)
+                # "traced" means there is geometry to draw, not merely that a row exists.
+                traced = bool(r and (r["geometry_json"] or "").strip() not in ("", "{}"))
+                out.append({
+                    "id": (r["id"] if r else None),
+                    "project_code": code,
+                    "project_name": pnames.get(code),
+                    "face": face,
+                    "label": label,
+                    "name": (r["name"] if r else label),
+                    "traced": traced,
+                })
+        return jsonify({"data": out})
     finally:
         conn.close()
 

@@ -22,8 +22,18 @@
   .wrap { max-width: 1400px; margin: 0 auto; padding: var(--v2-s-5) var(--v2-s-4) 64px; }
   header.top { display:flex; align-items:flex-start; gap:var(--v2-s-4); flex-wrap:wrap;
                margin-bottom:var(--v2-s-3); }
-  h1 { font-size:var(--v2-t-title); font-weight:700; margin:0 0 2px; letter-spacing:-.2px; }
-  .sub { color:var(--v2-ink-mute); font-size:var(--v2-t-small); margin:0; }
+  h1 { font-size:var(--v2-t-title); font-weight:700; margin:0; letter-spacing:-.2px; }
+  .titlerow { display:flex; align-items:center; gap:var(--v2-s-3); flex-wrap:wrap; }
+  .elevpick { font:inherit; font-size:var(--v2-t-small); font-weight:600;
+              padding:5px 10px; border-radius:var(--v2-r-ctl);
+              border:1px solid var(--v2-hairline); background:var(--v2-surface);
+              color:var(--v2-ink); cursor:pointer; }
+  .elevpick:hover { border-color:var(--v2-accent-edge); }
+  .elevpick option:disabled { color:var(--v2-ink-mute); }
+  .sub { color:var(--v2-ink-mute); font-size:var(--v2-t-small); margin:3px 0 0; }
+  .provenance { color:var(--v2-ink-mute); font-size:var(--v2-t-micro); margin:3px 0 0;
+                line-height:1.5; }
+  .updated { color:var(--v2-ink-soft); font-weight:600; }
   .meta { margin-left:auto; text-align:right; color:var(--v2-ink-mute);
           font-size:var(--v2-t-micro); line-height:1.7; }
   .meta b { color:var(--v2-ink-soft); font-weight:600; }
@@ -101,6 +111,12 @@
   dialog.rsn textarea { width:100%; font:inherit; font-size:var(--v2-t-small); padding:8px 10px;
                         border:1px solid var(--v2-hairline); border-radius:var(--v2-r-ctl);
                         resize:vertical; min-height:64px; }
+  details.basis { margin-top:var(--v2-s-3); border-top:1px solid var(--v2-hairline);
+                  padding-top:var(--v2-s-2); }
+  details.basis summary { font-size:var(--v2-t-micro); font-weight:600;
+                          color:var(--v2-ink-mute); cursor:pointer; }
+  details.basis p { font-size:var(--v2-t-micro); color:var(--v2-ink-soft);
+                    line-height:1.55; margin:var(--v2-s-2) 0 0; }
   .err { color:var(--v2-coral-ink); font-size:var(--v2-t-micro); margin-top:6px; }
   .empty { color:var(--v2-ink-mute); font-size:var(--v2-t-small); padding:var(--v2-s-3) 0; }
 
@@ -122,13 +138,20 @@
 
   <header class="top">
     <div>
-      <h1 id="title">Drawing Markup</h1>
+      <div class="titlerow">
+        <h1 id="title">Drawing Markup</h1>
+        <select id="elevpick" class="elevpick v2-no-print" aria-label="Elevation"></select>
+      </div>
       <p class="sub" id="subtitle">Loading…</p>
+      <!-- One quiet line. This page shows WHERE work is, not how big anything is —
+           the field team dimensions off the approved set. A large amber block warning
+           about takeoff accuracy would be warning about numbers the page no longer
+           displays, and on a client's screen it reads as "something is wrong". The full
+           SCALE_NOTE stays in the payload and in the panel for the architect. -->
+      <p class="provenance" id="provenance"></p>
     </div>
     <div class="meta" id="sheetmeta"></div>
   </header>
-
-  <div id="basisnote" class="v2-note v2-no-print" hidden></div>
 
   <div class="toolbar v2-no-print">
     <button type="button" class="v2-btn-ghost" id="patterns" aria-pressed="false">Patterns</button>
@@ -569,6 +592,18 @@
       html += '</td></tr>';
     });
     html += '</tbody></table>';
+
+    // The full SCALE_NOTE lives HERE now, not in a banner across the page. An architect
+    // who wants the basis of the drawing will look at the drop detail; a client glancing
+    // at progress should not be met with a paragraph about takeoff tolerances.
+    var g2 = (S.data.geometry || {});
+    if (g2.scale_note) {
+      html += '<details class="basis"><summary>Drawing basis</summary>' +
+              '<p>' + esc(g2.scale_note) + '</p>' +
+              ((g2.source && g2.source.scope_note)
+                ? '<p>' + esc(g2.source.scope_note) + '</p>' : '') +
+              '</details>';
+    }
     $('p-body').innerHTML = html;
   }
 
@@ -645,6 +680,12 @@
   }
 
   // ---------- boot ----------------------------------------------------------
+  function usDate(iso) {
+    if (!iso) return null;
+    var m = String(iso).slice(0, 10).split('-');
+    return m.length === 3 ? (m[1] + '/' + m[2] + '/' + m[0]) : String(iso).slice(0, 10);
+  }
+
   function paintHeader() {
     var d = S.data;
     $('title').textContent = (d.name || 'Drawing Markup');
@@ -657,16 +698,20 @@
       (d.sheet_date ? 'Issued ' + esc(d.sheet_date) + '<br>' : '') +
       (d.dob_job ? 'DOB ' + esc(d.dob_job) : '');
 
-    // DIMENSION-BASIS NOTE. Wording is deliberate: "scaled — confirm against your current
-    // set" is professional caution an engineer expects. "Provisional/placeholder" would
-    // read as a red flag about the data itself, which would be both wrong and corrosive.
-    if (g.dimension_basis === 'scaled' && g.scale_note) {
-      var n = $('basisnote');
-      n.innerHTML = '<b>Widths are scaled off the 2022 approved set</b> — confirm ' +
-                    'against your current set before using for takeoff.<br>' +
-                    '<span style="font-size:var(--v2-t-micro)">' + esc(g.scale_note) + '</span>';
-      n.hidden = false;
+    // Provenance + AS-OF, one quiet line. The as-of matters most: this is a progress
+    // view, so a reader with no update date cannot tell today's picture from last
+    // month's. "Not marked yet" when nothing has been touched — never a fabricated date.
+    var sheet = (d.source_sheet || '').split(' ')[0];
+    var bits = [];
+    if (sheet) {
+      bits.push('Traced from ' + esc(sheet) +
+                (d.sheet_date ? ', ' + esc(usDate(d.sheet_date)) : '') +
+                ' · indicative, not for takeoff');
     }
+    var upd = usDate(d.updated_at);
+    bits.push(upd ? '<span class="updated">Updated ' + esc(upd) + '</span>'
+                  : '<span class="updated">Not marked yet</span>');
+    $('provenance').innerHTML = bits.join(' &nbsp;·&nbsp; ');
   }
 
   function load(id) {
@@ -690,22 +735,71 @@
   });
   $('printbtn').addEventListener('click', function () { window.print(); });
 
-  var m = location.pathname.match(/\/drawing-markup\/(\d+)/);
-  if (m) { load(parseInt(m[1], 10)); }
-  else {
-    fetch('/api/elevations', { credentials:'same-origin' })
-      .then(function (r) { return r.json(); })
-      .then(function (j) {
-        var list = (j && j.data) || [];
-        if (!list.length) {
-          $('subtitle').textContent = 'No elevation is available for your projects.';
-          return;
-        }
-        S.data = S.data || {};
-        load(list[0].id);
-      })
-      .catch(function () { $('subtitle').textContent = 'Could not load.'; });
+  // ---------- elevation picker ------------------------------------------------
+  var LS_KEY = 'ssc.drawingMarkup.elevationId';
+
+  function renderPicker(list, currentId) {
+    var sel = $('elevpick');
+    sel.innerHTML = '';
+    list.forEach(function (e) {
+      var o = document.createElement('option');
+      o.value = e.id === null ? '' : e.id;
+      // An untraced elevation is SHOWN and disabled, never omitted. Absent would read as
+      // "this building has no south side"; greyed reads as "coming, not here yet".
+      o.textContent = e.label + (e.traced ? '' : ' — not traced yet');
+      o.disabled = !e.traced;
+      if (e.id && e.id === currentId) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.hidden = list.length < 2;
   }
+
+  function rememberChoice(id) {
+    try { window.localStorage.setItem(LS_KEY, String(id)); } catch (e) { /* private mode */ }
+    // Reflect in the URL too, so a refresh — or a copied link — lands on the same
+    // elevation even when localStorage is unavailable.
+    try { history.replaceState(null, '', '/drawing-markup/' + id); } catch (e) { /* no-op */ }
+  }
+
+  $('elevpick').addEventListener('change', function () {
+    var id = parseInt(this.value, 10);
+    if (!id) return;
+    S.drop = null;                  // a different elevation has different drops
+    rememberChoice(id);
+    load(id);
+  });
+
+  // ---------- boot --------------------------------------------------------------
+  fetch('/api/elevations', { credentials:'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      S.elevations = (j && j.data) || [];
+      var traced = S.elevations.filter(function (e) { return e.traced; });
+      if (!S.elevations.length) {
+        $('subtitle').textContent = 'No elevation is available for your projects.';
+        $('elevpick').hidden = true;
+        return;
+      }
+      // URL wins (a shared link is explicit), then the remembered choice, then the first
+      // traced elevation. Anything remembered but no longer traceable falls through.
+      var m = location.pathname.match(/\/drawing-markup\/(\d+)/);
+      var want = m ? parseInt(m[1], 10) : null;
+      if (!want) {
+        try { want = parseInt(window.localStorage.getItem(LS_KEY), 10) || null; }
+        catch (e) { want = null; }
+      }
+      var ok = traced.some(function (e) { return e.id === want; });
+      if (!ok) want = traced.length ? traced[0].id : null;
+      if (!want) {
+        $('subtitle').textContent = 'No elevation has been traced yet.';
+        renderPicker(S.elevations, null);
+        return;
+      }
+      renderPicker(S.elevations, want);
+      rememberChoice(want);
+      load(want);
+    })
+    .catch(function () { $('subtitle').textContent = 'Could not load.'; });
 })();
 </script>
 </body>
