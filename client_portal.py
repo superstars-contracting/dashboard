@@ -229,7 +229,8 @@ def _welcome_page():
     user (the auth gate enforces login; the client gate routes clients here). No-store."""
     if not WELCOME_PAGE.exists():
         return ("welcome page missing", 500)
-    resp = send_file(str(WELCOME_PAGE))
+    import ui_version                                    # #279
+    resp = send_file(str(ui_version.resolve_page(WELCOME_PAGE)))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
@@ -271,7 +272,8 @@ def _portal_page():
         conn.close()
     if not PORTAL_PAGE.exists():
         return ("client portal page missing", 500)
-    return _no_store(send_file(str(PORTAL_PAGE)))
+    import ui_version                                    # #279
+    return _no_store(send_file(str(ui_version.resolve_page(PORTAL_PAGE))))
 
 
 def _portal_context():

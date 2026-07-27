@@ -1,0 +1,7 @@
+v2 CSS and JS live here. Served publicly at /files/static/v2/... like every other
+vendored shell asset (#248) — UI chrome only, never data.
+
+  switch-back.js   the persistent "You're on the new interface · Switch back" bar
+
+static/tokens.css sits OUTSIDE this directory on purpose: it is readable by either UI,
+so it must survive rollback layer 4 (deleting static/v2/).

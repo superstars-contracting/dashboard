@@ -262,7 +262,8 @@ def _reset_password(user_id: int):
 def _admin_users_page():
     if not ADMIN_USERS_PAGE.exists():
         return jsonify({"error": "admin page not found"}), 404
-    resp = send_file(str(ADMIN_USERS_PAGE))
+    import ui_version                                        # #279
+    resp = send_file(str(ui_version.resolve_page(ADMIN_USERS_PAGE)))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"

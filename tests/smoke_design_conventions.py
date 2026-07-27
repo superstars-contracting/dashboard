@@ -531,7 +531,8 @@ def main():
                   "login.html", "worker-app.html", "dropplan.html", "rfi_submission_form.html",
                   "admin_users.html", "set_password.html",   # #257 multi-user accounts & roles
                   "admin_projects.html",   # #263 PM project-scoping (assignment + close screen)
-                  "estimating.html"}       # #276 estimating workspace (estimator/admin/c_suite)
+                  "estimating.html",       # #276 estimating workspace (estimator/admin/c_suite)
+                  "ui_settings.html"}      # #279 UI v2 interface switch (Classic / New)
     EXEMPT = {"facade-dashboard.html", "facade-dashboard-presentation.html"}  # pre-rebuild legacy
     unregistered = []
     for page in sorted(root_dir.glob("*.html")):

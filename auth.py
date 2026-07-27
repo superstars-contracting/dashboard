@@ -422,7 +422,11 @@ def _before_request_gate():
 
 def _login_page():
     if LOGIN_PAGE_PATH.exists():
-        return send_file(str(LOGIN_PAGE_PATH))
+        # #279 — the toggle resolves to v1 here in practice (nobody is signed in on the
+        # login page, so there is no stored preference to read), but ?ui=2 still lets the
+        # operator preview a v2 login twin once one exists.
+        import ui_version
+        return send_file(str(ui_version.resolve_page(LOGIN_PAGE_PATH)))
     return ("login page missing", 500)
 
 
@@ -503,7 +507,8 @@ def _set_password_page():
     """The forced first-login 'set your password' screen. Reached only by an
     authenticated user (the before_request gate redirects must_reset users here)."""
     if SET_PASSWORD_PAGE_PATH.exists():
-        resp = send_file(str(SET_PASSWORD_PAGE_PATH))
+        import ui_version                                              # #279
+        resp = send_file(str(ui_version.resolve_page(SET_PASSWORD_PAGE_PATH)))
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         return resp
     return ("set-password page missing", 500)

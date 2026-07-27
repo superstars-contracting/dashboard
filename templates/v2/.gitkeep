@@ -1,0 +1,12 @@
+v2 page twins live here, mirroring the v1 filenames at the dashboard root.
+
+A file dropped in here as `<name>.html` is served instead of `<root>/<name>.html`
+to any user whose interface resolves to v2. Nothing else is required — no route
+change, no registration. A page with no file here silently serves v1, which is
+why partial migration is always in a shippable state.
+
+Deleting one file here = rollback layer 3 (one page, all users).
+Deleting this directory = rollback layer 4 (all of v2).
+
+Empty in phase 0 BY DESIGN: the phase-0 gate is that every page is byte-identical
+with the toggle in either position, which is only provable with no twins present.

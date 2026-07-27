@@ -310,7 +310,8 @@ def _admin_projects_page():
     """GET /admin/projects — the admin/c_suite assignment + project-close screen."""
     if not ADMIN_PROJECTS_PAGE.exists():
         return jsonify({"error": "admin projects page not found"}), 404
-    resp = send_file(str(ADMIN_PROJECTS_PAGE))
+    import ui_version                                            # #279
+    resp = send_file(str(ui_version.resolve_page(ADMIN_PROJECTS_PAGE)))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"

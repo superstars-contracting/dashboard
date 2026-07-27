@@ -411,7 +411,8 @@ def _serve_estimating_page():
     role = (current_user() or {}).get("role")
     if not access.can_access("estimating", role):
         return Response(_FORBIDDEN_HTML, status=403, mimetype="text/html")
-    html = ESTIMATING_PAGE.read_text(encoding="utf-8")
+    import ui_version                                        # #279
+    html = ui_version.resolve_page(ESTIMATING_PAGE).read_text(encoding="utf-8")
     resp = Response(html, mimetype="text/html")
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"

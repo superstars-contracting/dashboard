@@ -50,6 +50,14 @@ import access  # #262 — central section→roles map (RBAC single source of tru
 import crm  # #266 — CRM/ops core logic (shared by the endpoints + the guard smoke)
 apply_auth_gate(app)
 
+# #279 (UI v2 phase 0) — the interface toggle. MUST follow apply_auth_gate: the
+# stored per-user preference is read off current_user(). Sets g.ui_version on page
+# routes; every UI route serves its page through ui_version.serve_ui, which returns
+# the v2 twin when one exists and the untouched v1 file when it does not.
+import ui_version  # noqa: E402
+ui_version.apply(app)
+ui_version.register(app)
+
 # Admin account management — multi-user accounts & roles, Phase 1 (#257). Every
 # endpoint is admin-only, gated server-side (the before_request gate runs first).
 import auth_admin  # noqa: E402
@@ -224,7 +232,7 @@ def index():
     if not access.can_access_company(role):
         return Response(_COMPANY_FORBIDDEN_HTML, status=403, mimetype="text/html")
     page = COMPANY_DASHBOARD_PATH if COMPANY_DASHBOARD_PATH.exists() else DASHBOARD_PATH
-    return _serve_html_no_store(page)
+    return ui_version.serve_ui(page, _serve_html_no_store)   # #279
 
 
 # #263 — a pm/super (non-company role) that reaches the company console gets this 403,
@@ -249,7 +257,7 @@ def pm_projects_landing():
     the company console but may view this too. The list itself is server-scoped, so a pm
     never sees a project they aren't assigned."""
     if PM_PROJECTS_PATH.exists():
-        return _serve_html_no_store(PM_PROJECTS_PATH)
+        return ui_version.serve_ui(PM_PROJECTS_PATH, _serve_html_no_store)   # #279
     return ("projects page missing", 500)
 
 
@@ -279,7 +287,10 @@ def _serve_dashboard_no_store():
     Hiding a menu item is not access control — the project-ASSIGNMENT before_request hook
     rejects an unassigned /projects/<code> regardless; this just makes the menu match."""
     role = (current_user() or {}).get("role")
-    html = DASHBOARD_PATH.read_text(encoding="utf-8")
+    # #279 — v2 twin when one exists, the untouched v1 file otherwise. The role-based
+    # SECTION stripping below runs on WHICHEVER file was chosen: server-side access
+    # enforcement is not a v1 behaviour a v2 page gets to opt out of.
+    html = ui_version.resolve_page(DASHBOARD_PATH).read_text(encoding="utf-8")
     html = access.render_sections(html, role)   # #262 — strip gated SECTION blocks
     html = access.render_role_nav(html, role)   # #263 — role-correct sidebar nav
     resp = Response(html, mimetype="text/html")
@@ -5663,7 +5674,7 @@ def admin_labor_rates_page():
     page = SCRIPT_DIR / 'admin_labor_rates.html'
     if not page.exists():
         return jsonify({"error": "admin page not found"}), 404
-    resp = send_file(str(page))
+    resp = send_file(str(ui_version.resolve_page(page)))   # #279
     # comp-data page — never cache (no-store) anywhere
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     resp.headers['Pragma'] = 'no-cache'
@@ -9377,7 +9388,7 @@ def api_project_sov(project_code):
 def dropplan_page():
     """Serve the project-scoped Drop Plan UI (Batch C #201). Login + the four
     operational roles; dollar fields are omitted by the API for pm/super."""
-    page = SCRIPT_DIR / 'dropplan.html'
+    page = ui_version.resolve_page(SCRIPT_DIR / 'dropplan.html')   # #279
     if not page.exists():
         return jsonify({"error": "drop plan page not found"}), 404
     # Serve no-store with NO ETag/conditional handling (#205): the operator's
