@@ -111,12 +111,6 @@
   dialog.rsn textarea { width:100%; font:inherit; font-size:var(--v2-t-small); padding:8px 10px;
                         border:1px solid var(--v2-hairline); border-radius:var(--v2-r-ctl);
                         resize:vertical; min-height:64px; }
-  details.basis { margin-top:var(--v2-s-3); border-top:1px solid var(--v2-hairline);
-                  padding-top:var(--v2-s-2); }
-  details.basis summary { font-size:var(--v2-t-micro); font-weight:600;
-                          color:var(--v2-ink-mute); cursor:pointer; }
-  details.basis p { font-size:var(--v2-t-micro); color:var(--v2-ink-soft);
-                    line-height:1.55; margin:var(--v2-s-2) 0 0; }
   .err { color:var(--v2-coral-ink); font-size:var(--v2-t-micro); margin-top:6px; }
   .empty { color:var(--v2-ink-mute); font-size:var(--v2-t-small); padding:var(--v2-s-3) 0; }
 
@@ -592,18 +586,9 @@
       html += '</td></tr>';
     });
     html += '</tbody></table>';
-
-    // The full SCALE_NOTE lives HERE now, not in a banner across the page. An architect
-    // who wants the basis of the drawing will look at the drop detail; a client glancing
-    // at progress should not be met with a paragraph about takeoff tolerances.
-    var g2 = (S.data.geometry || {});
-    if (g2.scale_note) {
-      html += '<details class="basis"><summary>Drawing basis</summary>' +
-              '<p>' + esc(g2.scale_note) + '</p>' +
-              ((g2.source && g2.source.scope_note)
-                ? '<p>' + esc(g2.source.scope_note) + '</p>' : '') +
-              '</details>';
-    }
+    // No "Drawing basis" disclosure here. The one-line provenance under the title is the
+    // whole statement the page makes about how it was drawn. SCALE_NOTE and source stay
+    // in the payload (geometry.scale_note, geometry.source) — carried, just not rendered.
     $('p-body').innerHTML = html;
   }
 
