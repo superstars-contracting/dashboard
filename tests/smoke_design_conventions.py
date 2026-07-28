@@ -531,7 +531,13 @@ def main():
                   "login.html", "worker-app.html", "dropplan.html", "rfi_submission_form.html",
                   "admin_users.html", "set_password.html",   # #257 multi-user accounts & roles
                   "admin_projects.html",   # #263 PM project-scoping (assignment + close screen)
-                  "estimating.html"}       # #276 estimating workspace (estimator/admin/c_suite)
+                  "estimating.html",       # #276 estimating workspace (estimator/admin/c_suite)
+                  "ui_settings.html"}      # #279 UI v2 interface switch (Classic / New)
+    # #283 — surfaces that live OUTSIDE the repo root still get the structural
+    # sweep. drawing-markup is served from templates/v2 (the #279 v2 tree), so the
+    # root glob above cannot see it; registering it by path keeps the "guard never
+    # looked here" gap closed for the v2 tree too.
+    REGISTERED_PATHS = {"templates/v2/drawing-markup.html"}   # #280 drawing markup
     EXEMPT = {"facade-dashboard.html", "facade-dashboard-presentation.html"}  # pre-rebuild legacy
     unregistered = []
     for page in sorted(root_dir.glob("*.html")):
@@ -542,6 +548,23 @@ def main():
     ok("templates_registered_or_exempt", not unregistered,
        ("REGISTER OR EXEMPT: " + ", ".join(unregistered)) if unregistered
        else f"{len(REGISTERED)} registered / {len(EXEMPT)} exempt")
+
+    # #283 — the SAME forcing function for the v2 template tree. A new page under
+    # templates/v2 with form inputs must register in REGISTERED_PATHS or fail here;
+    # otherwise the v2 tree would silently repeat the gap the root registry closed.
+    v2_dir = root_dir / "templates" / "v2"
+    v2_unregistered = []
+    if v2_dir.exists():
+        for page in sorted(v2_dir.glob("*.html")):
+            rel = page.relative_to(root_dir).as_posix()
+            if rel in REGISTERED_PATHS:
+                continue
+            if re.search(r"<(?:input|select|textarea)\b",
+                         page.read_text(encoding="utf-8", errors="replace")):
+                v2_unregistered.append(rel)
+    ok("v2_templates_registered", not v2_unregistered,
+       ("REGISTER IN REGISTERED_PATHS: " + ", ".join(v2_unregistered)) if v2_unregistered
+       else f"{len(REGISTERED_PATHS)} v2 path(s) registered")
 
     # ---- 9) #275 — STRUCTURAL any-modal-field boxing on EVERY registered surface ----
     # No enumerated-ID lists for field boxing ever again: any input/select/textarea
@@ -580,7 +603,7 @@ def main():
     # section-stripping only ever REMOVES markup, so disk is the superset).
     total_fields = 0
     all_ids = set()
-    for fn in sorted(REGISTERED):
+    for fn in sorted(REGISTERED) + sorted(REGISTERED_PATHS):
         p = root_dir / fn
         if not p.exists():
             ok(f"modal_fields_{fn}", False, "registered page missing on disk")

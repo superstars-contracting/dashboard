@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<!-- DRAWING MARKUP — north elevation, per-drop per-floor work status (#280).
+
+     Distinct from /dropplan (#201/#256), which is the per-drop LIFECYCLE schedule and is
+     untouched by this build. This page is the interactive drawing.
+
+     TWO AUDIENCES, ONE VIEW. Internal (admin/c_suite/pm/super/estimator) and external
+     (architect/client) see the SAME drawing: same DROP n labels, same grid bubbles, same
+     dimension strings, same statuses including rework, same reason text. They differ only
+     in WRITE rights — internal roles get paint mode; architect writes comments/RFIs;
+     client is read-only. The server decides all of it; nothing here is a visibility check.
+
+     Everything drawn comes from the API: geometry from elevation.geometry_json, status
+     colours from status_tone via tone names. No status hex appears in this file. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drawing Markup · Superstars Contracting</title>
+<link rel="stylesheet" href="/files/static/v2/v2.css">
+<style>
+  .wrap { max-width: 1400px; margin: 0 auto; padding: var(--v2-s-5) var(--v2-s-4) 64px; }
+  header.top { display:flex; align-items:flex-start; gap:var(--v2-s-4); flex-wrap:wrap;
+               margin-bottom:var(--v2-s-3); }
+  h1 { font-size:var(--v2-t-title); font-weight:700; margin:0; letter-spacing:-.2px; }
+  .titlerow { display:flex; align-items:center; gap:var(--v2-s-3); flex-wrap:wrap; }
+  .elevpick { font:inherit; font-size:var(--v2-t-small); font-weight:600;
+              padding:5px 10px; border-radius:var(--v2-r-ctl);
+              border:1px solid var(--v2-hairline); background:var(--v2-surface);
+              color:var(--v2-ink); cursor:pointer; }
+  .elevpick:hover { border-color:var(--v2-accent-edge); }
+  .elevpick option:disabled { color:var(--v2-ink-mute); }
+  .sub { color:var(--v2-ink-mute); font-size:var(--v2-t-small); margin:3px 0 0; }
+  .provenance { color:var(--v2-ink-mute); font-size:var(--v2-t-micro); margin:3px 0 0;
+                line-height:1.5; }
+  .updated { color:var(--v2-ink-soft); font-weight:600; }
+  .meta { margin-left:auto; text-align:right; color:var(--v2-ink-mute);
+          font-size:var(--v2-t-micro); line-height:1.7; }
+  .meta b { color:var(--v2-ink-soft); font-weight:600; }
+
+  .toolbar { display:flex; gap:var(--v2-s-2); align-items:center; flex-wrap:wrap;
+             margin:var(--v2-s-3) 0; }
+  .spacer { flex:1 1 auto; }
+
+  /* drop tabs — DROP n for EVERY role, with the grid span beneath */
+  .tabs { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; }
+  .tab { flex:none; min-width:74px; border:1px solid var(--v2-hairline); background:var(--v2-surface);
+         border-radius:var(--v2-r-ctl); padding:6px 9px; cursor:pointer; font:inherit;
+         text-align:center; line-height:1.25; }
+  .tab:hover { border-color:var(--v2-accent-edge); }
+  .tab[aria-selected="true"] { border-color:var(--v2-accent); background:var(--v2-accent-chip); }
+  .tab .n { display:block; font-size:var(--v2-t-micro); font-weight:700; letter-spacing:.04em; }
+  .tab .g { display:block; font-size:10px; color:var(--v2-ink-mute); font-variant-numeric:tabular-nums; }
+  .tab .dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin-top:3px; }
+
+  /* The drawing is intrinsically wide (265 ft at 4 px/ft). It must scroll INSIDE its own
+     container — the page body must never scroll horizontally.
+     A grid/flex child defaults to min-width:auto, which means it refuses to shrink below
+     its content and pushes the whole page wide instead of letting overflow-x engage.
+     min-width:0 on the track is what actually makes the scroller work. */
+  .stage { overflow-x:auto; max-width:100%; }
+  svg.elev { display:block; min-width:900px; height:auto; }
+
+  .legend { display:flex; gap:var(--v2-s-3); flex-wrap:wrap; align-items:center;
+            margin-top:var(--v2-s-3); }
+
+  .cols { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:var(--v2-s-4);
+          align-items:start; margin-top:var(--v2-s-4); }
+  .cols > * { min-width:0; }          /* let the drawing column shrink so .stage scrolls */
+  @media (max-width: 1000px) { .cols { grid-template-columns:minmax(0,1fr); } }
+  .tabs::-webkit-scrollbar, .stage::-webkit-scrollbar { height:8px; }
+  .tabs::-webkit-scrollbar-thumb, .stage::-webkit-scrollbar-thumb {
+    background:var(--v2-hairline); border-radius:4px; }
+
+  .panel h2 { font-size:var(--v2-t-lead); font-weight:700; margin:0 0 2px; }
+  .panel .psub { color:var(--v2-ink-mute); font-size:var(--v2-t-small); margin:0 0 var(--v2-s-3); }
+  table.floors { width:100%; border-collapse:collapse; font-size:var(--v2-t-small); }
+  table.floors th { text-align:left; font-size:var(--v2-t-micro); color:var(--v2-ink-mute);
+                    font-weight:600; padding:0 0 6px; }
+  table.floors td { padding:7px 0; border-top:1px solid var(--v2-hairline); vertical-align:top; }
+  table.floors td.lv { font-weight:600; white-space:nowrap; padding-right:10px; }
+  .reason { color:var(--v2-ink-soft); font-size:var(--v2-t-micro); margin-top:3px;
+            line-height:1.5; word-break:break-word; }
+  .inote { color:var(--v2-gold-ink); background:var(--v2-gold-chip);
+           border-radius:5px; padding:3px 7px; font-size:10.5px; margin-top:4px;
+           display:inline-block; word-break:break-word; }
+  .dl { display:grid; grid-template-columns:auto 1fr; gap:3px 12px; font-size:var(--v2-t-small);
+        margin:var(--v2-s-3) 0; }
+  .dl dt { color:var(--v2-ink-mute); font-size:var(--v2-t-micro); }
+  .dl dd { margin:0; font-variant-numeric:tabular-nums; }
+
+  .paintbar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .swatch { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--v2-hairline);
+            background:var(--v2-surface); border-radius:999px; padding:4px 11px 4px 8px;
+            cursor:pointer; font:inherit; font-size:var(--v2-t-micro); font-weight:600; }
+  .swatch[aria-pressed="true"] { border-color:var(--v2-accent); background:var(--v2-accent-chip); }
+  .swatch i { width:9px; height:9px; border-radius:50%; display:inline-block; }
+  .cell-hit { cursor:pointer; }
+  .cell-hit:hover { stroke:var(--v2-accent); stroke-width:2; }
+  .dropmark { cursor:pointer; }
+  .dropmark:hover { fill:var(--v2-accent); }
+  .dropmark:hover + text { fill:#fff; }
+  .dropmark:focus-visible { outline:2px solid var(--v2-accent); outline-offset:2px; }
+
+  dialog.rsn { border:1px solid var(--v2-hairline); border-radius:var(--v2-r-card);
+               padding:var(--v2-s-4); max-width:420px; width:92vw; font-family:var(--v2-font); }
+  dialog.rsn::backdrop { background:rgba(35,33,29,.35); }
+  dialog.rsn h3 { margin:0 0 4px; font-size:var(--v2-t-lead); }
+  dialog.rsn p { margin:0 0 var(--v2-s-3); color:var(--v2-ink-mute); font-size:var(--v2-t-small); }
+  dialog.rsn label { display:block; font-size:var(--v2-t-micro); font-weight:600; margin:0 0 4px; }
+  dialog.rsn textarea { width:100%; font:inherit; font-size:var(--v2-t-small); padding:8px 10px;
+                        border:1px solid var(--v2-hairline); border-radius:var(--v2-r-ctl);
+                        resize:vertical; min-height:64px; }
+  /* comment + RFI thread */
+  .thread { margin-top:var(--v2-s-4); border-top:1px solid var(--v2-hairline);
+            padding-top:var(--v2-s-3); }
+  .thead { display:flex; align-items:baseline; justify-content:space-between;
+           font-size:var(--v2-t-micro); text-transform:uppercase; letter-spacing:.07em;
+           color:var(--v2-ink-mute); margin:var(--v2-s-3) 0 var(--v2-s-2); }
+  .thead:first-child { margin-top:0; }
+  .linkbtn { background:none; border:none; padding:0; font:inherit;
+             font-size:var(--v2-t-micro); font-weight:600; color:var(--v2-accent);
+             cursor:pointer; text-transform:none; letter-spacing:0; }
+  .linkbtn:hover { text-decoration:underline; }
+  ul.rfis, ul.comments { list-style:none; margin:0; padding:0; }
+  ul.rfis li, ul.comments li { border-top:1px solid var(--v2-hairline);
+                               padding:var(--v2-s-2) 0; }
+  ul.rfis li:first-child, ul.comments li:first-child { border-top:0; }
+  ul.rfis li.closed { opacity:.6; }
+  .rfinum { font-weight:700; color:var(--v2-accent-ink); font-size:var(--v2-t-micro); }
+  .rfititle { font-size:var(--v2-t-small); font-weight:600; margin-right:6px; }
+  .byline { color:var(--v2-ink-mute); font-size:10.5px; margin-top:3px; }
+  /* word-break so a pasted URL or an unbroken string cannot widen the panel */
+  .cbody { font-size:var(--v2-t-small); line-height:1.55; margin-top:2px;
+           white-space:pre-wrap; overflow-wrap:anywhere; }
+  .cpost { display:flex; gap:var(--v2-s-2); align-items:flex-end; margin-top:var(--v2-s-3); }
+  .cpost textarea { flex:1 1 auto; min-width:0; font:inherit; font-size:var(--v2-t-small);
+    padding:7px 9px; border:1px solid var(--v2-hairline); border-radius:var(--v2-r-ctl);
+    resize:vertical; }
+  .err { color:var(--v2-coral-ink); font-size:var(--v2-t-micro); margin-top:6px; }
+  .empty { color:var(--v2-ink-mute); font-size:var(--v2-t-small); padding:var(--v2-s-3) 0; }
+
+  /* PRINT — the drop tabs are part of the drawing, so they must survive the print
+     pipeline exactly as the grid bubbles do. Three things break a printed elevation:
+     the scroll container clipping it at the viewport edge, the two-column layout
+     squeezing it, and the browser dropping SVG fills to save ink. All three handled. */
+  @media print {
+    .cols { grid-template-columns:1fr; gap:var(--v2-s-3); }
+    .stage { overflow:visible; max-width:none; }
+    svg.elev { min-width:0; width:100%; }
+    .v2-card { padding:var(--v2-s-2); }
+    * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
+</style>
+</head>
+<body class="v2">
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <div class="titlerow">
+        <h1 id="title">Drawing Markup</h1>
+        <select id="elevpick" class="elevpick v2-no-print" aria-label="Elevation"></select>
+      </div>
+      <p class="sub" id="subtitle">Loading…</p>
+      <!-- One quiet line. This page shows WHERE work is, not how big anything is —
+           the field team dimensions off the approved set. A large amber block warning
+           about takeoff accuracy would be warning about numbers the page no longer
+           displays, and on a client's screen it reads as "something is wrong". The full
+           SCALE_NOTE stays in the payload and in the panel for the architect. -->
+      <p class="provenance" id="provenance"></p>
+    </div>
+    <div class="meta" id="sheetmeta"></div>
+  </header>
+
+  <div class="toolbar v2-no-print">
+    <button type="button" class="v2-btn-ghost" id="patterns" aria-pressed="false">Patterns</button>
+    <button type="button" class="v2-btn-ghost" id="printbtn">Print</button>
+    <div class="spacer"></div>
+    <div class="paintbar" id="paintbar" hidden></div>
+  </div>
+
+  <div class="tabs v2-no-print" id="tabs" role="tablist"></div>
+
+  <div class="cols">
+    <div class="v2-card">
+      <div class="stage" id="stage"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="v2-card panel" id="panel">
+      <h2 id="p-title">Select a drop</h2>
+      <p class="psub" id="p-sub">Choose a drop above to see status by floor.</p>
+      <div id="p-body"></div>
+    </div>
+  </div>
+</div>
+
+<dialog class="rsn" id="rsnDlg">
+  <h3 id="rsn-h">Reason required</h3>
+  <p id="rsn-p">This status needs a reason. It is shown to the architect and the client.</p>
+  <label for="rsn-t">Reason</label>
+  <textarea id="rsn-t" maxlength="500" placeholder="What you would say to the architect's face."></textarea>
+  <div id="rsn-inote-wrap" style="margin-top:12px">
+    <label for="rsn-i">Internal note <span style="font-weight:400;color:var(--v2-ink-mute)">— never leaves the building</span></label>
+    <textarea id="rsn-i" maxlength="2000" placeholder="Anything you would not say to their face."></textarea>
+  </div>
+  <div class="err" id="rsn-err" hidden></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+    <button type="button" class="v2-btn-ghost" id="rsn-cancel">Cancel</button>
+    <button type="button" class="v2-btn" id="rsn-ok">Apply</button>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  'use strict';
+
+  var S = { data:null, elevId:null, drop:null, patterns:false, paint:null, byDrop:{}, meta:{} };
+  var $ = function (id) { return document.getElementById(id); };
+  var SVGNS = 'http://www.w3.org/2000/svg';
+
+  // Glyph per status. THE GLYPH IS ALWAYS RENDERED, never colour alone — colour alone is
+  // unreadable to a protanope and vanishes in a black-and-white print of the sheet.
+  var GLYPH = { not_started:'', in_progress:'/', on_hold:'=', rework:'X', complete:'*' };
+
+  function esc(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
+  function toneVar(tone) { return 'var(--v2-' + (tone || 'neutral') + '-mark)'; }
+  function toneChip(tone) { return 'var(--v2-' + (tone || 'neutral') + '-chip)'; }
+  function statusOf(k) { return (S.data && S.data.statuses && S.data.statuses[k]) || { key:k, label:k||'—', tone:'neutral' }; }
+
+  function el(tag, attrs, text) {
+    var n = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) if (attrs[k] !== null && attrs[k] !== undefined) n.setAttribute(k, attrs[k]);
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  // ---------- geometry transform -------------------------------------------
+  // Feet -> SVG units. y is measured UP from grade in the trace and DOWN in SVG.
+  // PAD_T carries ONE header band — the drop markers — sitting as low as they can go.
+  // HOW LOW IS CAPPED BY THE ROOF: the drawing reserves the space between the parapet
+  // (67.00 ft) and draw_top (79.80 ft) for the bulkheads, and drops 6, 7 and 10 sit
+  // directly beneath one. Dropping the numbers a full half-inch would land them on that
+  // roof structure, so they sit just clear of the bulkhead line instead — the lowest
+  // position that does not collide with the building.
+  // PAD_B is small now: the bay dimension band that used to live below the drawing is
+  // gone, so all that is needed is breathing room under the grade line.
+  // PAD_L is NOT a constant — it is MEASURED from the datum labels at render time (see
+  // measureTextWidth). A guessed left margin is what clipped "SECOND FLOOR" to "OOR":
+  // the text elements were at correct coordinates, so every position check passed while
+  // the glyphs ran off the viewBox. Margin must come from the rendered text, not a hunch.
+  var PPF = 4.0, PAD_L = 66, PAD_R = 26, PAD_T = 62, PAD_B = 18;
+  var DROP_BAND_CY = 40, DROP_R = 12;
+  var DATUM_STUB = 44;      // how far the datum line runs left of the facade
+  var LABEL_GAP = 5;        // between the label's right edge and that stub
+  var EDGE_PAD = 10;        // between the label's left edge and the viewBox edge
+
+  // Widest rendered width across `strings`, measured with the SAME font attributes the
+  // real labels use. Off-screen but IN the document, because getComputedTextLength()
+  // returns 0 for a detached node — the measurement has to be of laid-out text, not of
+  // an estimate.
+  function measureTextWidth(strings, attrs) {
+    var probe = el('svg', { width: 0, height: 0,
+      style: 'position:absolute;left:-99999px;top:0;visibility:hidden' });
+    var nodes = strings.map(function (s) {
+      var t = el('text', attrs, s);
+      probe.appendChild(t);
+      return t;
+    });
+    document.body.appendChild(probe);
+    var max = 0;
+    nodes.forEach(function (t) {
+      var w = 0;
+      try { w = t.getComputedTextLength() || 0; } catch (e) { w = 0; }
+      if (w > max) max = w;
+    });
+    document.body.removeChild(probe);
+    // Fallback only if measurement is impossible (headless edge case): a generous
+    // per-character estimate, never a bare magic number.
+    if (!max) {
+      var longest = strings.reduce(function (a, b) { return b.length > a.length ? b : a; }, '');
+      max = longest.length * 6.2;
+    }
+    return max;
+  }
+  function X(ft) { return PAD_L + ft * PPF; }
+  function Y(ft) { return PAD_T + (S.data.geometry.facade.draw_top_ft - ft) * PPF; }
+
+  function defs() {
+    var d = el('defs');
+    // CMU coursing — the field pattern, drawn light so status reads over it.
+    var cmu = el('pattern', { id:'cmu', width:32, height:8, patternUnits:'userSpaceOnUse' });
+    cmu.appendChild(el('rect', { width:32, height:8, fill:'var(--v2-surface)' }));
+    cmu.appendChild(el('path', { d:'M0 8 H32 M16 0 V8', stroke:'#e9e5de', 'stroke-width':1 }));
+    d.appendChild(cmu);
+    // Status hatches for the patterns toggle: distinct ANGLE per status, so the fill is
+    // still distinguishable in greyscale and under any colour-vision deficiency.
+    var angles = { in_progress:45, on_hold:0, rework:-45, complete:90, not_started:null };
+    Object.keys(angles).forEach(function (k) {
+      if (angles[k] === null) return;
+      var p = el('pattern', { id:'h-'+k, width:8, height:8, patternUnits:'userSpaceOnUse',
+                              patternTransform:'rotate(' + angles[k] + ')' });
+      p.appendChild(el('rect', { width:8, height:8, fill:toneChip(statusOf(k).tone) }));
+      p.appendChild(el('path', { d:'M0 0 V8', stroke:toneVar(statusOf(k).tone), 'stroke-width':2.4 }));
+      d.appendChild(p);
+    });
+    return d;
+  }
+
+  // ---------- the drawing ---------------------------------------------------
+  // The font attrs the datum name uses. Declared once so the measuring probe and the
+  // real label can never drift apart — if they did, the margin would be measured for a
+  // font that is not the one being drawn.
+  var DATUM_FONT = { 'font-size': 8, 'letter-spacing': '.05em', 'text-anchor': 'end' };
+
+  function render() {
+    var g = S.data.geometry, f = g.facade;
+
+    // MEASURE the left margin before computing a single coordinate. The longest datum
+    // name ("SECOND FLOOR" / "FOURTH FLOOR") sets it; everything else fits inside.
+    var labelW = measureTextWidth((g.datums || []).map(function (d) { return d.name; }),
+                                  DATUM_FONT);
+    PAD_L = Math.ceil(DATUM_STUB + LABEL_GAP + labelW + EDGE_PAD);
+
+    var W = X(f.width_ft) + PAD_R, H = Y(0) + PAD_B;
+    var svg = el('svg', { class:'elev', viewBox:'0 0 ' + W + ' ' + H,
+                          role:'img', 'aria-label':'North elevation drop plan' });
+    svg.appendChild(defs());
+
+    // facade field
+    svg.appendChild(el('rect', { x:X(0), y:Y(f.height_ft), width:f.width_ft*PPF,
+                                 height:f.height_ft*PPF, fill:'url(#cmu)',
+                                 stroke:'var(--v2-ink-soft)', 'stroke-width':1.2 }));
+
+    // ---- SELECTION: the WHOLE drop lights up, parapet to grade ----
+    // A marker ring going 1.5px -> 2.5px was invisible; with DROP 8 selected nothing on
+    // the drawing said so. The selected drop now reads from across the room.
+    // The WASH goes here — BEFORE the cells — so per-floor status colour renders on top
+    // of it and still reads. The OUTLINE is drawn last (see below) so nothing overlaps it.
+    var selD = S.byDrop[S.drop];
+    var selBox = selD ? { x: X(selD.x0), y: Y(f.height_ft),
+                          w: (selD.x1 - selD.x0) * PPF, h: f.height_ft * PPF } : null;
+    if (selBox) {
+      svg.appendChild(el('rect', { x:selBox.x, y:selBox.y, width:selBox.w, height:selBox.h,
+        fill:'var(--v2-accent)', opacity:0.10, 'pointer-events':'none', class:'sel-wash' }));
+    }
+
+    // ---- status cells: one per (drop, level) ----
+    var lv = {}; g.levels.forEach(function (l) { lv[l.id] = l; });
+    var cellsG = el('g', { class:'cells' });
+    (S.data.cells || []).forEach(function (c) {
+      var d = S.byDrop[c.drop_id]; if (!d) return;
+      var L = lv[c.level_id]; if (!L) return;
+      var st = statusOf(c.status);
+      var x = X(d.x0), y = Y(L.top), w = (d.x1 - d.x0) * PPF, h = (L.top - L.bot) * PPF;
+      var fill = c.status === 'not_started' ? 'transparent'
+               : (S.patterns ? 'url(#h-' + c.status + ')' : toneChip(st.tone));
+      var r = el('rect', { x:x, y:y, width:w, height:h, fill:fill,
+                           stroke:toneVar(st.tone),
+                           'stroke-width': c.status === 'not_started' ? 0.6 : 1.4,
+                           'stroke-opacity': c.status === 'not_started' ? 0.5 : 1,
+                           class:'cell-hit', 'data-cell':c.id, 'data-drop':c.drop_id });
+      var t = document.createElementNS(SVGNS, 'title');
+      t.textContent = 'DROP ' + d.idx + ' · ' + c.level_name + ' · ' + st.label +
+                      (c.reason ? ' — ' + c.reason : '');
+      r.appendChild(t);
+      cellsG.appendChild(r);
+      // glyph — always drawn alongside the fill
+      if (GLYPH[c.status]) {
+        cellsG.appendChild(el('text', { x:x + w/2, y:y + h/2 + 4, 'text-anchor':'middle',
+          'font-size':12, 'font-weight':700, fill:toneVar(st.tone),
+          'pointer-events':'none' }, GLYPH[c.status]));
+      }
+    });
+    svg.appendChild(cellsG);
+
+    // ---- window openings (punched) ----
+    var op = el('g', { class:'openings' });
+    (g.openings || []).forEach(function (o) {
+      op.appendChild(el('rect', { x:X(o.x0), y:Y(o.top), width:(o.x1-o.x0)*PPF,
+        height:(o.top-o.bot)*PPF, fill:'#f4f1ea', stroke:'var(--v2-ink-soft)',
+        'stroke-width':0.9, 'pointer-events':'none' }));
+    });
+    svg.appendChild(op);
+
+    // ---- structural columns. Grid 13 is deliberately absent: it lands mid-window in
+    //      the stair tower, not on a pier, so no column is drawn there. ----
+    var cg = el('g');
+    (g.columns || []).forEach(function (c) {
+      cg.appendChild(el('rect', { x:X(c.x0), y:Y(g.facade.height_ft),
+        width:(c.x1-c.x0)*PPF, height:g.facade.height_ft*PPF,
+        fill:'#ded9d0', stroke:'var(--v2-ink-soft)', 'stroke-width':0.7,
+        'pointer-events':'none' }));
+    });
+    svg.appendChild(cg);
+
+    // ---- features: bulkheads (above parapet), overhead door, stair tower ----
+    var fg = el('g');
+    (g.features.bulkheads || []).forEach(function (b) {
+      fg.appendChild(el('rect', { x:X(b.x0), y:Y(b.top), width:(b.x1-b.x0)*PPF,
+        height:(b.top - g.constants.parapet_top)*PPF, fill:'#f2efe9',
+        stroke:'var(--v2-ink-mute)', 'stroke-width':0.9, 'stroke-dasharray':'0' }));
+      fg.appendChild(el('text', { x:X((b.x0+b.x1)/2), y:Y(b.top) - 5, 'text-anchor':'middle',
+        'font-size':8.5, fill:'var(--v2-ink-mute)', 'letter-spacing':'.06em' }, b.label));
+    });
+    var od = g.features.overhead_door;
+    if (od) {
+      fg.appendChild(el('rect', { x:X(od.x0), y:Y(od.top), width:(od.x1-od.x0)*PPF,
+        height:(od.top-od.bot)*PPF, fill:'#e6e1d8', stroke:'var(--v2-ink-soft)',
+        'stroke-width':1.1 }));
+      fg.appendChild(el('text', { x:X((od.x0+od.x1)/2), y:Y(od.bot) - 9, 'text-anchor':'middle',
+        'font-size':8.5, fill:'var(--v2-ink-soft)' }, 'OVERHEAD DOOR'));
+    }
+    var st = g.features.stair_tower;
+    if (st) {
+      var bands = st.bands || 1, bh = (st.top - st.bot) / bands;
+      for (var i = 0; i < bands; i++) {
+        fg.appendChild(el('rect', { x:X(st.x0), y:Y(st.bot + (i+1)*bh),
+          width:(st.x1-st.x0)*PPF, height:bh*PPF - 1.2, fill:'#f4f1ea',
+          stroke:'var(--v2-ink-soft)', 'stroke-width':0.7 }));
+      }
+    }
+    var ep = g.features.east_pier;
+    if (ep) {
+      fg.appendChild(el('rect', { x:X(ep.x0), y:Y(g.facade.height_ft),
+        width:(ep.x1-ep.x0)*PPF, height:g.facade.height_ft*PPF, fill:'#ded9d0',
+        stroke:'var(--v2-ink-soft)', 'stroke-width':0.7 }));
+    }
+    svg.appendChild(fg);
+
+    // ---- parapet ----
+    svg.appendChild(el('line', { x1:X(0), y1:Y(g.constants.parapet_top),
+      x2:X(f.width_ft), y2:Y(g.constants.parapet_top),
+      stroke:'var(--v2-ink)', 'stroke-width':1.6 }));
+
+    // ---- datum lines. SOLID hairlines, never dashed. ----
+    var dg = el('g');
+    (g.datums || []).forEach(function (d) {
+      var labelRight = X(0) - DATUM_STUB - LABEL_GAP;
+      dg.appendChild(el('line', { x1:X(0) - DATUM_STUB, y1:Y(d.y), x2:X(f.width_ft),
+        y2:Y(d.y), stroke:'#d9d4cb', 'stroke-width':0.8 }));
+      dg.appendChild(el('text', { x:labelRight, y:Y(d.y) - 3, 'text-anchor':'end',
+        'font-size':DATUM_FONT['font-size'], fill:'var(--v2-ink-mute)',
+        'letter-spacing':DATUM_FONT['letter-spacing'], class:'datum-name' }, d.name));
+      dg.appendChild(el('text', { x:labelRight, y:Y(d.y) + 7, 'text-anchor':'end',
+        'font-size':7.5, fill:'var(--v2-ink-mute)', class:'v2-num' },
+        d.y.toFixed(2) + "'"));
+    });
+    svg.appendChild(dg);
+
+    // ---- grid LINES only. The numbered bubble row is GONE. ----
+    // 13 bubbles above 12 drop circles was the confusion, twice reported. There is now
+    // exactly ONE row of circles at the top and nothing to reconcile it against.
+    // The lines still divide the bays, and grid REFERENCES stay where they are actually
+    // read: the panel ("GL 8–9") and the selector row. Lines run on the building only —
+    // they used to overhang the top to meet the bubbles, and there is nothing up there
+    // to meet any more.
+    var gg = el('g');
+    (g.grids || []).forEach(function (gr) {
+      gg.appendChild(el('line', { x1:X(gr.x), y1:Y(f.height_ft), x2:X(gr.x), y2:Y(0),
+        stroke:'#ddd8cf', 'stroke-width':0.7 }));
+    });
+    svg.appendChild(gg);
+
+    // ---- DROP MARKERS. The bay IS the drop, so the number belongs in the middle of the
+    // bay, not on a grid line.
+    //
+    // BOTH ROWS ARE CIRCLES. The distinction is WEIGHT, not shape: the grid bubbles are
+    // the architect's drawing and stay exactly as drawn (white fill, hairline grey), while
+    // ours are tinted in the interface accent and sit slightly larger. That reads as our
+    // overlay on their drawing — which is precisely what it is. Two bands that never
+    // vertically align, so 13 circles above 12 circles explains itself instead of looking
+    // like a miscount.
+    //
+    // x is the SPAN midpoint computed from elevation_drop.x0/x1 — NOT the grid-to-grid
+    // midpoint. Drops 1 and 12 include corner returns and genuinely sit off-centre from
+    // their grids (12.04 vs 12.95, and 256.00 vs 254.46). Deriving from the data is what
+    // makes those two land correctly.
+    //
+    // Labelling only: no rope, no hanger, no anchor point, no vertical drop line.
+    // These are the ONLY drop labels on the drawing now — the bottom tab row was removed
+    // so the bay dimension strings, which is what an architect actually reads down there,
+    // are not crowded.
+    // The 'DROPS' caption is gone with the bubble row — with one row of circles there is
+    // nothing left to disambiguate, and the caption was only ever there to do that.
+    var dm = el('g', { class:'dropmarks' });
+    (S.data.drops || []).forEach(function (d) {
+      var cx = X((d.x0 + d.x1) / 2);
+      var sel = (S.drop === d.id);
+      // SHADING MEANS SELECTED, and nothing else. An unselected marker is an outline
+      // only — `transparent` rather than `none` so the whole disc stays clickable
+      // instead of just the 1.5px ring.
+      var c = el('circle', { cx:cx, cy:DROP_BAND_CY, r:DROP_R,
+        fill: sel ? 'var(--v2-accent)' : 'transparent',
+        stroke:'var(--v2-accent)', 'stroke-width': sel ? 2.5 : 1.5,
+        class:'dropmark' + (sel ? ' is-sel' : ''), 'data-drop':d.id,
+        role:'button', tabindex:0,
+        'aria-label':'Select drop ' + d.idx });
+      var ttl = document.createElementNS(SVGNS, 'title');
+      ttl.textContent = 'DROP ' + d.idx + ' · GL ' + d.grid_from + '–' + d.grid_to;
+      c.appendChild(ttl);
+      dm.appendChild(c);
+      dm.appendChild(el('text', { x:cx, y:DROP_BAND_CY + 4, 'text-anchor':'middle',
+        'font-size':11.5, 'font-weight':700,
+        fill: sel ? '#fff' : 'var(--v2-accent-ink)',
+        'pointer-events':'none' }, d.idx));
+    });
+    svg.appendChild(dm);
+
+    // ---- RFI PINS. An RFI carrying a drop_id shows on that drop, for EVERY role —
+    // an open question about a bay is a field condition, not internal traffic.
+    // Unattached RFIs draw nothing: a pin with no drop would have to be parked
+    // somewhere arbitrary, and an arbitrary position on a drawing reads as a location.
+    var open = (S.rfis || []).filter(function (r) {
+      return r.drop_id && r.status !== 'closed';
+    });
+    if (open.length) {
+      var byDrop = {};
+      open.forEach(function (r) { byDrop[r.drop_id] = (byDrop[r.drop_id] || 0) + 1; });
+      var pg = el('g', { class:'rfipins' });
+      Object.keys(byDrop).forEach(function (did) {
+        var d = S.byDrop[did]; if (!d) return;
+        var cx = X((d.x0 + d.x1) / 2), cy = Y(0) + 15;
+        pg.appendChild(el('circle', { cx:cx, cy:cy, r:8.5, fill:'var(--v2-gold-chip)',
+          stroke:'var(--v2-gold-mark)', 'stroke-width':1.4 }));
+        var t = el('text', { x:cx, y:cy + 3.4, 'text-anchor':'middle', 'font-size':9,
+          'font-weight':700, fill:'var(--v2-gold-ink)', 'pointer-events':'none' },
+          byDrop[did] > 1 ? String(byDrop[did]) : '?');
+        var ttl = document.createElementNS(SVGNS, 'title');
+        ttl.textContent = byDrop[did] + ' open RFI' + (byDrop[did] > 1 ? 's' : '') +
+                          ' · DROP ' + d.idx;
+        pg.appendChild(t);
+        pg.appendChild(ttl);
+      });
+      svg.appendChild(pg);
+    }
+
+    // ---- drop boundaries ----
+    // The bay dimension band below the drawing is REMOVED — no dimension strings, no
+    // extension lines. The short boundary ticks stay: without them nothing marks where
+    // one drop ends and the next begins along the grade line.
+    // The clear-bay figures are still carried in the payload
+    // (geometry.drops[].clear_bay), just not drawn — so putting the band back is a
+    // render change, never a re-trace.
+    var bg = el('g');
+    (S.data.drops || []).forEach(function (d) {
+      bg.appendChild(el('line', { x1:X(d.x0), y1:Y(0), x2:X(d.x0), y2:Y(0) + 7,
+        stroke:'#cfc9be', 'stroke-width':0.8 }));
+    });
+    bg.appendChild(el('line', { x1:X(f.width_ft), y1:Y(0),
+      x2:X(f.width_ft), y2:Y(0) + 7, stroke:'#cfc9be', 'stroke-width':0.8 }));
+    svg.appendChild(bg);
+
+    // ---- SELECTION OUTLINE. Drawn LAST so cells, openings, piers and features cannot
+    // break its edges — the outline has to be a single unbroken column or it stops
+    // reading as one thing. ----
+    if (selBox) {
+      svg.appendChild(el('rect', { x:selBox.x, y:selBox.y, width:selBox.w, height:selBox.h,
+        fill:'none', stroke:'var(--v2-accent)', 'stroke-width':2.5,
+        'pointer-events':'none', class:'sel-outline' }));
+    }
+
+    $('stage').innerHTML = '';
+    $('stage').appendChild(svg);
+
+    Array.prototype.forEach.call(svg.querySelectorAll('.cell-hit'), function (r) {
+      r.addEventListener('click', function () { onCell(r.getAttribute('data-cell')); });
+    });
+    // The drop circles are the drawing's selector now that the bottom tab row is gone,
+    // so they must actually select. Keyboard too — they carry role=button/tabindex.
+    Array.prototype.forEach.call(svg.querySelectorAll('.dropmark'), function (c) {
+      var pick = function () {
+        S.drop = parseInt(c.getAttribute('data-drop'), 10);
+        renderTabs(); render(); renderPanel();
+      };
+      c.addEventListener('click', pick);
+      c.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(); }
+      });
+    });
+  }
+
+  // ---------- legend, tabs, panel -------------------------------------------
+  function renderLegend() {
+    var box = $('legend'); box.innerHTML = '';
+    Object.keys(S.data.statuses).forEach(function (k) {
+      var s = S.data.statuses[k];
+      var c = document.createElement('span');
+      c.className = 'v2-chip v2-tone-' + s.tone;
+      c.textContent = s.label + (GLYPH[k] ? '  ' + GLYPH[k] : '');
+      box.appendChild(c);
+    });
+  }
+
+  function renderTabs() {
+    var t = $('tabs'); t.innerHTML = '';
+    (S.data.drops || []).forEach(function (d) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'tab'; b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', String(S.drop === d.id));
+      var s = statusOf(d.derived_status);
+      b.innerHTML = '<span class="n">DROP ' + d.idx + '</span>' +
+                    '<span class="g">GL ' + esc(d.grid_from) + '–' + esc(d.grid_to) + '</span>' +
+                    '<span class="dot" style="background:' + toneVar(s.tone) + '"></span>';
+      b.addEventListener('click', function () { S.drop = d.id; renderTabs(); renderPanel(); });
+      t.appendChild(b);
+    });
+  }
+
+  function cellsOf(dropId) {
+    return (S.data.cells || []).filter(function (c) { return c.drop_id === dropId; });
+  }
+
+  function renderPanel() {
+    var d = S.byDrop[S.drop];
+    if (!d) { return; }
+    var ds = statusOf(d.derived_status);
+    $('p-title').textContent = 'DROP ' + d.idx;
+    $('p-sub').innerHTML = 'GL ' + esc(d.grid_from) + '–' + esc(d.grid_to) +
+      ' · <span class="v2-chip v2-tone-' + ds.tone + '">' + esc(ds.label) + '</span>' +
+      ' <span style="color:var(--v2-ink-mute)">(from floors)</span>';
+
+    var rows = cellsOf(d.id).slice().sort(function (a, b) {
+      return a.level_id < b.level_id ? 1 : -1;     // top floor first, as drawn
+    });
+    // Width / Area / Clear bay removed from the panel — the drop's identity and its
+    // status by floor are what this panel is for. The figures remain in the payload,
+    // unchanged and unrecomputed.
+    var html = '';
+    if (d.note) html += '<p class="reason">' + esc(d.note) + '</p>';
+
+    html += '<table class="floors"><thead><tr><th>Floor</th><th>Status</th></tr></thead><tbody>';
+    rows.forEach(function (c) {
+      var s = statusOf(c.status);
+      html += '<tr><td class="lv">' + esc(c.level_name) + '</td><td>' +
+              '<span class="v2-chip v2-tone-' + s.tone + '">' + esc(s.label) + '</span>';
+      if (c.reason) html += '<div class="reason">' + esc(c.reason) + '</div>';
+      if (c.internal_note) html += '<div class="inote">Internal: ' + esc(c.internal_note) + '</div>';
+      html += '</td></tr>';
+    });
+    html += '</tbody></table>';
+    // No "Drawing basis" disclosure here. The one-line provenance under the title is the
+    // whole statement the page makes about how it was drawn. SCALE_NOTE and source stay
+    // in the payload (geometry.scale_note, geometry.source) — carried, just not rendered.
+    html += '<div id="thread"></div>';
+    $('p-body').innerHTML = html;
+    loadThread(d);
+  }
+
+  // ---------- comments + RFIs (steps 4 & 5) ---------------------------------
+  // EVERY value from the API is escaped through esc() before it reaches innerHTML.
+  // Bodies are stored and returned as RAW TEXT and are never interpreted as markup —
+  // this surface is reachable by parties outside the company, so a stored <script> must
+  // render as the literal characters an architect typed, not execute in an operator's
+  // session.
+
+  function threadHtml(d, rfis, comments, canPost, canRaise, canClose) {
+    var h = '<div class="thread">';
+
+    h += '<div class="thead"><b>RFIs</b>' +
+         (canRaise ? '<button type="button" class="linkbtn" id="rfi-new">Raise an RFI</button>' : '') +
+         '</div>';
+    if (!rfis.length) {
+      h += '<p class="empty">No RFIs on this drop.</p>';
+    } else {
+      h += '<ul class="rfis">';
+      rfis.forEach(function (r) {
+        h += '<li class="' + (r.status === 'closed' ? 'closed' : '') + '">' +
+             '<span class="rfinum v2-num">' + esc(r.number) + '</span> ' +
+             '<span class="rfititle">' + esc(r.title) + '</span>' +
+             '<span class="v2-chip-cat">' + esc(r.status) + '</span>' +
+             (r.body ? '<div class="reason">' + esc(r.body) + '</div>' : '') +
+             '<div class="byline">' + esc(r.raised_by.label) + ' · ' + esc(fmt(r.raised_at)) +
+             (canClose && r.status === 'open'
+               ? ' · <button type="button" class="linkbtn" data-close-rfi="' + r.id + '">Close</button>'
+               : '') + '</div></li>';
+      });
+      h += '</ul>';
+    }
+
+    h += '<div class="thead"><b>Comments</b></div>';
+    if (!comments.length) {
+      h += '<p class="empty">No comments on this drop.</p>';
+    } else {
+      h += '<ul class="comments">';
+      comments.forEach(function (c) {
+        h += '<li><div class="byline">' + esc(c.author.label) + ' · ' + esc(fmt(c.at)) +
+             (c.mine ? ' · <button type="button" class="linkbtn" data-del-c="' + c.id + '">Delete</button>' : '') +
+             '</div><div class="cbody">' + esc(c.body) + '</div></li>';
+      });
+      h += '</ul>';
+    }
+    if (canPost) {
+      h += '<div class="cpost"><textarea id="c-body" maxlength="2000" rows="2" ' +
+           'placeholder="Add a comment…"></textarea>' +
+           '<button type="button" class="v2-btn" id="c-send">Post</button></div>';
+    }
+    return h + '</div>';
+  }
+
+  function fmt(iso) { return usDate(iso) || '—'; }
+
+  function loadThread(d) {
+    var box = document.getElementById('thread');
+    if (!box) return;
+    Promise.all([
+      fetch('/api/rfis?elevation_id=' + S.elevId, { credentials:'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : { data: [] }; }),
+      fetch('/api/comments?target_type=drop&target_id=' + d.id, { credentials:'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : { data: [] }; })
+    ]).then(function (res) {
+      var allRfis = res[0].data || [];
+      // Only this drop's RFIs in the panel; unattached ones stay off it until filed.
+      var mine = allRfis.filter(function (r) { return r.drop_id === d.id; });
+      S.rfis = allRfis;
+      box.innerHTML = threadHtml(d, mine, res[1].data || [],
+        res[1].can_post, res[0].can_raise, res[0].can_close);
+      wireThread(d);
+      render();     // RFI pins on the drawing
+    }).catch(function () { box.innerHTML = '<p class="empty">Could not load the thread.</p>'; });
+  }
+
+  function wireThread(d) {
+    var send = document.getElementById('c-send');
+    if (send) {
+      send.addEventListener('click', function () {
+        var t = document.getElementById('c-body');
+        var body = (t.value || '').trim();
+        if (!body) return;
+        send.disabled = true;
+        fetch('/api/comments', { method:'POST', headers:{'Content-Type':'application/json'},
+          credentials:'same-origin',
+          body: JSON.stringify({ target_type:'drop', target_id: d.id, body: body }) })
+          .then(function (r) { return r.json().then(function (j) { return { ok:r.ok, j:j }; }); })
+          .then(function (res) {
+            send.disabled = false;
+            if (!res.ok) { alert(res.j.error || 'Could not post'); return; }
+            t.value = ''; loadThread(d);
+          })
+          .catch(function () { send.disabled = false; alert('Could not post.'); });
+      });
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('[data-del-c]'), function (b) {
+      b.addEventListener('click', function () {
+        fetch('/api/comments/' + b.getAttribute('data-del-c'),
+              { method:'DELETE', credentials:'same-origin' })
+          .then(function () { loadThread(d); });
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-close-rfi]'), function (b) {
+      b.addEventListener('click', function () {
+        fetch('/api/rfis/' + b.getAttribute('data-close-rfi'),
+          { method:'PATCH', headers:{'Content-Type':'application/json'},
+            credentials:'same-origin', body: JSON.stringify({ status:'closed' }) })
+          .then(function () { loadThread(d); });
+      });
+    });
+    var nw = document.getElementById('rfi-new');
+    if (nw) {
+      nw.addEventListener('click', function () {
+        var title = window.prompt('RFI title — what is the question?');
+        if (!title || !title.trim()) return;
+        fetch('/api/rfis', { method:'POST', headers:{'Content-Type':'application/json'},
+          credentials:'same-origin',
+          body: JSON.stringify({ elevation_id:S.elevId, title:title.trim(), drop_id:d.id }) })
+          .then(function (r) { return r.json().then(function (j) { return { ok:r.ok, j:j }; }); })
+          .then(function (res) {
+            if (!res.ok) { alert(res.j.error || 'Could not raise the RFI'); return; }
+            loadThread(d);
+          })
+          .catch(function () { alert('Could not raise the RFI.'); });
+      });
+    }
+  }
+
+  // ---------- painting ------------------------------------------------------
+  function renderPaintbar() {
+    if (!S.data.can_paint) return;
+    var bar = $('paintbar'); bar.hidden = false; bar.innerHTML = '';
+    var lab = document.createElement('span');
+    lab.style.cssText = 'font-size:var(--v2-t-micro);color:var(--v2-ink-mute);font-weight:600';
+    lab.textContent = 'Paint:';
+    bar.appendChild(lab);
+    Object.keys(S.data.statuses).forEach(function (k) {
+      var s = S.data.statuses[k];
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'swatch';
+      b.setAttribute('aria-pressed', String(S.paint === k));
+      b.innerHTML = '<i style="background:' + toneVar(s.tone) + '"></i>' + esc(s.label);
+      b.addEventListener('click', function () {
+        S.paint = (S.paint === k) ? null : k; renderPaintbar();
+      });
+      bar.appendChild(b);
+    });
+    var whole = document.createElement('button');
+    whole.type = 'button'; whole.className = 'v2-btn-ghost';
+    whole.textContent = 'Apply to whole drop';
+    whole.addEventListener('click', function () {
+      if (!S.paint) { alert('Pick a status first.'); return; }
+      if (!S.drop) { alert('Pick a drop first.'); return; }
+      askAndSend({ drop_id: S.drop }, S.paint, 'DROP ' + S.byDrop[S.drop].idx + ' — every floor');
+    });
+    bar.appendChild(whole);
+  }
+
+  function onCell(cellId) {
+    var c = (S.data.cells || []).filter(function (x) { return String(x.id) === String(cellId); })[0];
+    if (!c) return;
+    S.drop = c.drop_id; renderTabs(); renderPanel();
+    if (!S.data.can_paint || !S.paint) return;
+    askAndSend({ cell_id: c.id }, S.paint,
+               'DROP ' + S.byDrop[c.drop_id].idx + ' — ' + c.level_name);
+  }
+
+  function askAndSend(target, status, whatText) {
+    var s = S.data.statuses[status] || {};
+    if (!s.reason_required) { send(target, status, null, null); return; }
+    var dlg = $('rsnDlg');
+    $('rsn-h').textContent = s.label + ' — reason required';
+    $('rsn-p').textContent = whatText + '. This reason is shown to the architect and the client.';
+    $('rsn-t').value = ''; $('rsn-i').value = ''; $('rsn-err').hidden = true;
+    dlg.showModal();
+    $('rsn-t').focus();
+    $('rsn-ok').onclick = function () {
+      var r = $('rsn-t').value.trim();
+      if (!r) { $('rsn-err').textContent = 'A reason is required.'; $('rsn-err').hidden = false; return; }
+      dlg.close();
+      send(target, status, r, $('rsn-i').value.trim() || null);
+    };
+    $('rsn-cancel').onclick = function () { dlg.close(); };
+  }
+
+  function send(target, status, reason, internalNote) {
+    var url = target.cell_id ? '/api/elevation/cell' : '/api/elevation/drop';
+    var body = Object.assign({ status_key: status }, target);
+    if (reason) body.reason = reason;
+    if (internalNote) body.internal_note = internalNote;
+    fetch(url, { method:'POST', headers:{'Content-Type':'application/json'},
+                 credentials:'same-origin', body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (j) { return { ok:r.ok, j:j }; }); })
+      .then(function (res) {
+        if (!res.ok) { alert(res.j && res.j.error ? res.j.error : 'Could not save'); return; }
+        load(S.elevId);
+      })
+      .catch(function () { alert('Could not save — check your connection and try again.'); });
+  }
+
+  // ---------- boot ----------------------------------------------------------
+  function usDate(iso) {
+    if (!iso) return null;
+    var m = String(iso).slice(0, 10).split('-');
+    return m.length === 3 ? (m[1] + '/' + m[2] + '/' + m[0]) : String(iso).slice(0, 10);
+  }
+
+  function paintHeader() {
+    var d = S.data;
+    $('title').textContent = (d.name || 'Drawing Markup');
+    $('subtitle').textContent = (d.project_code || '') +
+      (d.project_name ? ' · ' + d.project_name : '');
+    var g = d.geometry || {}, src = g.source || {};
+    $('sheetmeta').innerHTML =
+      (d.source_sheet ? '<b>' + esc(d.source_sheet) + '</b><br>' : '') +
+      (src.architect ? esc(src.architect) + '<br>' : '') +
+      (d.sheet_date ? 'Issued ' + esc(d.sheet_date) + '<br>' : '') +
+      (d.dob_job ? 'DOB ' + esc(d.dob_job) : '');
+
+    // Provenance + AS-OF, one quiet line. The as-of matters most: this is a progress
+    // view, so a reader with no update date cannot tell today's picture from last
+    // month's. "Not marked yet" when nothing has been touched — never a fabricated date.
+    var sheet = (d.source_sheet || '').split(' ')[0];
+    var bits = [];
+    if (sheet) {
+      bits.push('Traced from ' + esc(sheet) +
+                (d.sheet_date ? ', ' + esc(usDate(d.sheet_date)) : '') +
+                ' · indicative, not for takeoff');
+    }
+    var upd = usDate(d.updated_at);
+    bits.push(upd ? '<span class="updated">Updated ' + esc(upd) + '</span>'
+                  : '<span class="updated">Not marked yet</span>');
+    $('provenance').innerHTML = bits.join(' &nbsp;·&nbsp; ');
+  }
+
+  function load(id) {
+    fetch('/api/elevation/' + id, { credentials:'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (j) {
+        S.data = j.data; S.elevId = id;
+        S.byDrop = {}; (S.data.drops || []).forEach(function (d) { S.byDrop[d.id] = d; });
+        if (!S.drop && S.data.drops && S.data.drops.length) S.drop = S.data.drops[0].id;
+        paintHeader(); renderLegend(); renderTabs(); render(); renderPanel(); renderPaintbar();
+      })
+      .catch(function () {
+        $('subtitle').textContent = 'Could not load this elevation.';
+      });
+  }
+
+  $('patterns').addEventListener('click', function () {
+    S.patterns = !S.patterns;
+    this.setAttribute('aria-pressed', String(S.patterns));
+    render();
+  });
+  $('printbtn').addEventListener('click', function () { window.print(); });
+
+  // ---------- elevation picker ------------------------------------------------
+  var LS_KEY = 'ssc.drawingMarkup.elevationId';
+
+  function renderPicker(list, currentId) {
+    var sel = $('elevpick');
+    sel.innerHTML = '';
+    list.forEach(function (e) {
+      var o = document.createElement('option');
+      o.value = e.id === null ? '' : e.id;
+      // An untraced elevation is SHOWN and disabled, never omitted. Absent would read as
+      // "this building has no south side"; greyed reads as "coming, not here yet".
+      o.textContent = e.label + (e.traced ? '' : ' — not traced yet');
+      o.disabled = !e.traced;
+      if (e.id && e.id === currentId) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.hidden = list.length < 2;
+  }
+
+  function rememberChoice(id) {
+    try { window.localStorage.setItem(LS_KEY, String(id)); } catch (e) { /* private mode */ }
+    // Reflect in the URL too, so a refresh — or a copied link — lands on the same
+    // elevation even when localStorage is unavailable.
+    try { history.replaceState(null, '', '/drawing-markup/' + id); } catch (e) { /* no-op */ }
+  }
+
+  $('elevpick').addEventListener('change', function () {
+    var id = parseInt(this.value, 10);
+    if (!id) return;
+    S.drop = null;                  // a different elevation has different drops
+    rememberChoice(id);
+    load(id);
+  });
+
+  // ---------- boot --------------------------------------------------------------
+  fetch('/api/elevations', { credentials:'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      S.elevations = (j && j.data) || [];
+      var traced = S.elevations.filter(function (e) { return e.traced; });
+      if (!S.elevations.length) {
+        $('subtitle').textContent = 'No elevation is available for your projects.';
+        $('elevpick').hidden = true;
+        return;
+      }
+      // URL wins (a shared link is explicit), then the remembered choice, then the first
+      // traced elevation. Anything remembered but no longer traceable falls through.
+      var m = location.pathname.match(/\/drawing-markup\/(\d+)/);
+      var want = m ? parseInt(m[1], 10) : null;
+      if (!want) {
+        try { want = parseInt(window.localStorage.getItem(LS_KEY), 10) || null; }
+        catch (e) { want = null; }
+      }
+      var ok = traced.some(function (e) { return e.id === want; });
+      if (!ok) want = traced.length ? traced[0].id : null;
+      if (!want) {
+        $('subtitle').textContent = 'No elevation has been traced yet.';
+        renderPicker(S.elevations, null);
+        return;
+      }
+      renderPicker(S.elevations, want);
+      rememberChoice(want);
+      load(want);
+    })
+    .catch(function () { $('subtitle').textContent = 'Could not load.'; });
+})();
+</script>
+</body>
+</html>

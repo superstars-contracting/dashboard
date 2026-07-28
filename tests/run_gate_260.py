@@ -57,6 +57,11 @@ GATE = [
     "smoke_estimating_276.py",    # #276 — estimating core (stage machine, macro/micro, SLA aging, estimator role, notifications)
     "smoke_walkthroughs_277.py",  # #277 — walkthrough visits (stage sync, derivation), calendar merge, GPS-stripped reports
     "smoke_expenses_widget_278.py",  # #278 — cost widget (rate-boundary penny math, unrated bucket) + expense ledger + role omission
+    "smoke_ui_v2_phase0.py",      # #279 — UI v2 toggle: byte-identity, resolution order, kill switch
+    "smoke_external_scrub_281.py",# #281 — external hard gate: no internal links/build stamps/baked project, expenses is financial
+    "smoke_client_registry_281.py",# #281 — client field registry: default-deny allowlist + the guard on the registry itself
+    "smoke_markup_280.py",        # #283 guard — elevation scoping/vocabulary/derivation, comments, RFIs, drawing+rfis grants
+    "smoke_portal_shell_281.py",  # #283 guard — /portal/<code> lock, preview, served-shell scrub, catalog, fail-closed registry
     "smoke_dropplan_api.py",
     "smoke_worker_lifecycle.py",
     "smoke_dcr214_lifecycle.py",

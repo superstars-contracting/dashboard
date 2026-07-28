@@ -105,6 +105,7 @@
         <option value="pm">PM — project ops + job cost (no individual rates)</option>
         <option value="client">Client — external; lands on the welcome page until access is granted</option>
         <option value="estimator">Estimator — works the estimating queue; lands on /estimating</option>
+        <option value="architect">Architect / Engineer — project view, comments and RFIs, no cost or workforce</option>
       </select>
       <div class="m-err" id="create-err"></div>
       <div class="modal-foot">
@@ -131,9 +132,15 @@
     <h3>Change role</h3>
     <div class="msub" id="role-for">—</div>
     <label for="r-role">New role</label>
+    <!-- #281 — `architect` added. NOTE: this dropdown has only ever offered c_suite and
+         pm, while the server's ASSIGNABLE_ROLES is every role except admin — so client,
+         estimator, super and vendor are assignable by API but not offered here. That gap
+         predates this change and is left alone deliberately rather than widened by
+         accident; flagged separately. -->
     <select id="r-role" class="ssc-field">
       <option value="c_suite">C-Suite</option>
       <option value="pm">PM</option>
+      <option value="architect">Architect / Engineer</option>
     </select>
     <label for="r-reason">Reason (optional)</label>
     <input id="r-reason" class="ssc-field" type="text" autocomplete="off" placeholder="e.g. promoted to operations lead">

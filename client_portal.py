@@ -102,8 +102,33 @@ def _client_gate():
     # ---- >=1 grant: the portal is home ----
     if path == "/welcome":
         return redirect("/portal")      # granted clients land on the portal (#269 routing)
-    if path == "/portal" or path.startswith("/api/portal/"):
+    if path == "/portal" or path.startswith("/portal/") or path.startswith("/api/portal/"):
         return None                     # per-endpoint section grants enforced below
+    # #280/#283 — the drawing markup surface, now grant-wired (the #281 open decision,
+    # decided): 'drawing' gates the page, the elevation APIs, and their comment threads;
+    # 'rfis' gates RFI reads. Same #269 posture as every section — re-derived per request,
+    # a revoke takes effect on the next request. Kept in the >=1-GRANT branch: a
+    # zero-grant client is still hard-stopped on /welcome (#267 intact). Project scope is
+    # enforced separately by elevation._require_project. The architect is NOT grant-gated
+    # here (their own gate + project assignment scope them); the client stays READ-ONLY on
+    # comments/RFIs at the endpoint (absent from elevation.COLLAB_WRITE_ROLES).
+    # Comments ride the section that hosts them: drop/photo threads live on the drawing
+    # (this gate); an RFI thread additionally requires the rfis grant, enforced in
+    # elevation._api_comments_list where the target type is known.
+    if path == "/drawing-markup" or path.startswith("/drawing-markup/") \
+            or path.startswith("/api/elevation/") or path == "/api/elevations" \
+            or path.startswith("/api/comments"):
+        if "drawing" in granted:
+            return None
+        logging.info(f"client_portal: drawing grant missing path={path}")
+        if path.startswith("/api/"):
+            return jsonify({"error": "forbidden"}), 403
+        return redirect("/portal")
+    if path.startswith("/api/rfis"):
+        if "rfis" in granted:
+            return None
+        logging.info(f"client_portal: rfis grant missing path={path}")
+        return jsonify({"error": "forbidden"}), 403
     logging.info(f"client_portal: contain block (granted) path={path}")
     if path.startswith("/api/"):
         return jsonify({"error": "forbidden"}), 403
@@ -229,7 +254,8 @@ def _welcome_page():
     user (the auth gate enforces login; the client gate routes clients here). No-store."""
     if not WELCOME_PAGE.exists():
         return ("welcome page missing", 500)
-    resp = send_file(str(WELCOME_PAGE))
+    import ui_version                                    # #279
+    resp = send_file(str(ui_version.resolve_page(WELCOME_PAGE)))
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
@@ -271,7 +297,8 @@ def _portal_page():
         conn.close()
     if not PORTAL_PAGE.exists():
         return ("client portal page missing", 500)
-    return _no_store(send_file(str(PORTAL_PAGE)))
+    import ui_version                                    # #279
+    return _no_store(send_file(str(ui_version.resolve_page(PORTAL_PAGE))))
 
 
 def _portal_context():

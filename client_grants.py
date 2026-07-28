@@ -40,17 +40,73 @@ from auth import _db, _now_iso, current_user, requires_company
 # The grantable client sections, in portal display order. A future section is an
 # additive change HERE (+ its portal endpoint/UI) — no schema change (no CHECK by
 # design, see schema_client_grants_269.sql).
-SECTIONS = ("progress", "photos", "documents", "daily", "schedule")
+SECTIONS = ("progress", "photos", "documents", "daily", "schedule",
+            # #281 — the shared-shell sections. All DEFAULT OFF like every other grant:
+            # adding a key here grants nobody anything, it only makes the toggle exist.
+            "drawing", "weekly", "materials", "rfis")
+
+# Labels travel WITH the catalog now. They used to live only in admin_projects.html, so a
+# new key rendered as its raw slug until someone remembered to add it in a second place.
+SECTION_LABELS = {
+    "progress": "Progress", "photos": "Photos", "documents": "Documents",
+    "daily": "Daily Reports", "schedule": "Schedule",
+    "drawing": "Drawing Markup", "weekly": "Weekly Summary",
+    "materials": "Materials", "rfis": "RFIs",
+}
+
+# #283 — sections whose portal payload actually EXISTS today. A toggle for a section
+# that opens to nothing is a broken promise (the deliberate-empty-state rule), so the
+# admin UI hides catalog keys that are not yet served. SECTIONS is what MAY be granted;
+# SERVED_SECTIONS is what a grant OPENS today. weekly/materials stay catalogued but
+# hidden until their payloads ship — adding a payload later means adding its key HERE.
+SERVED_SECTIONS = ("progress", "photos", "documents", "daily", "schedule",
+                   "drawing", "rfis")
 
 # #270 — access presets: named bundles an admin applies in one click. IN CODE, no
 # schema — applying one REPLACES the client's grant set with these sections (the
 # per-section toggles remain the fine-grained control). Order = SECTIONS order.
+# #281 — every preset is an EXPLICIT tuple, never a reference to SECTIONS.
+#
+# "full" used to BE the SECTIONS tuple, so adding a grantable key silently added it to
+# the Full preset — every client on Full would have been granted new sections the moment
+# the catalog grew, with nobody deciding that. A preset is an editorial choice about
+# what a bundle means; the catalog is just what exists. _assert_preset_integrity()
+# below enforces the distinction at import.
+#
+# #283 — drawing + rfis joined FULL (explicitly, by decision) and stay OUT of Standard.
+# weekly / materials remain in NO preset: they are not even served yet.
 PRESETS = {
     "minimal": ("progress",),
     "standard": ("progress", "photos", "daily"),
-    "full": SECTIONS,
+    "full": ("progress", "photos", "documents", "daily", "schedule", "drawing", "rfis"),
 }
 PRESET_LABELS = {"minimal": "Minimal", "standard": "Standard", "full": "Full view"}
+
+
+def _assert_preset_integrity() -> None:
+    """Import-time guard (the #281 lesson, made structural). VALUE-based on purpose:
+    identity checks on literal tuples are defeated by CPython constant interning
+    (two equal literals can be ONE object). The property that matters is the value
+    contract — if a preset ever aliases the catalog again, the unserved keys it
+    would inherit (weekly, materials) trip these assertions at import."""
+    for name, bundle in PRESETS.items():
+        unknown = [s for s in bundle if s not in SECTIONS]
+        if unknown:
+            raise RuntimeError(f"preset {name!r} bundles unknown section(s): {unknown}")
+        unserved = [s for s in bundle if s not in SERVED_SECTIONS]
+        if unserved:
+            raise RuntimeError(
+                f"preset {name!r} bundles unserved section(s) {unserved} — a preset "
+                f"must never grant a section that opens to nothing")
+    for s in ("drawing", "rfis", "weekly", "materials"):
+        if s in PRESETS["standard"]:
+            raise RuntimeError(f"'standard' must not bundle {s!r} — Full-only by decision")
+    for s in ("drawing", "rfis"):
+        if s not in PRESETS["full"]:
+            raise RuntimeError(f"'full' must bundle {s!r} explicitly (#283 decision)")
+
+
+_assert_preset_integrity()
 
 
 _TABLE_READY = False   # cached once True — a created table never disappears in-process
@@ -166,7 +222,22 @@ def _api_list_grants():
             clients.append({"user_id": uid,
                             "project_code": pr[0] if pr else None,
                             "sections": per_user.get(uid, [])})
-        return jsonify({"data": {"sections": list(SECTIONS), "clients": clients}})
+        # `sections` is kept for anything already reading it. `grantable_sections`,
+        # `section_labels` and `presets` are what the admin UI actually reads — it was
+        # written to be data-driven but looked for `grantable_sections`, which nothing
+        # emitted, so it silently fell back to a hard-coded list and a new key here would
+        # never have reached the screen. Serving the catalog closes that.
+        return jsonify({"data": {
+            "sections": list(SECTIONS),
+            "grantable_sections": list(SECTIONS),
+            # #283 — the UI renders toggles only for grantable ∩ served; a catalogued
+            # key with no payload yet stays invisible rather than opening to nothing.
+            "served_sections": list(SERVED_SECTIONS),
+            "section_labels": dict(SECTION_LABELS),
+            "presets": {k: list(v) for k, v in PRESETS.items()},
+            "preset_labels": dict(PRESET_LABELS),
+            "clients": clients,
+        }})
     finally:
         conn.close()
 

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<!-- Interface settings — the Classic / New switch (#279, UI v2 phase 0).
+
+     A NEW, ADDITIVE page. It exists as its own screen rather than as a control bolted
+     into an existing one because no v1 file may be modified and the phase-0 gate is
+     byte-identity on every existing page. Rollback layer 1 ("flip users.ui_version to 1")
+     has to be something the operator can do from a browser on day one — this is it.
+
+     Server-enforced throughout: the blanket login gate authenticates, /api/ui/version
+     only ever writes the CALLER's own row, and the admin control below posts to
+     /api/admin/ui/version/<id>, which is @requires_role('admin'). The admin card is
+     hidden for non-admins as a courtesy — the 403 is what actually stops them. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interface · Superstars Contracting</title>
+<link rel="stylesheet" href="/files/static/css/widgets.css">
+<style>
+  body { margin:0; background:var(--canvas,#fafbfd); color:var(--ink,#222633);
+         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  .wrap { max-width:640px; margin:0 auto; padding:40px 20px 64px; }
+  h1 { font-size:19px; font-weight:700; margin:0 0 4px; letter-spacing:-.2px; }
+  .sub { color:var(--muted,#8c92a0); font-size:13px; margin:0 0 26px; line-height:1.6; }
+  .card { background:#fff; border:1px solid var(--line,#eceef3); border-radius:10px;
+          padding:20px; margin-bottom:16px; }
+  .card h2 { font-size:14px; font-weight:700; margin:0 0 3px; }
+  .card p.hint { color:var(--muted,#8c92a0); font-size:12.5px; margin:0 0 16px; line-height:1.6; }
+  .opts { display:flex; gap:10px; flex-wrap:wrap; }
+  .opt { flex:1 1 200px; display:flex; gap:11px; align-items:flex-start; cursor:pointer;
+         border:1px solid var(--line,#eceef3); border-radius:8px; padding:13px 14px; background:#fff; }
+  .opt:hover { border-color:var(--accent-edge,rgba(67,100,220,.30)); }
+  .opt input { margin:2px 0 0; accent-color:var(--accent,#4364dc); flex:none; }
+  .opt b { display:block; font-size:13px; font-weight:600; margin-bottom:2px; }
+  .opt span { color:var(--muted,#8c92a0); font-size:12px; line-height:1.5; }
+  .row { display:flex; align-items:center; gap:12px; margin-top:18px; flex-wrap:wrap; }
+  .status { font-size:12.5px; color:var(--muted,#8c92a0); }
+  .status.ok { color:#0c6d55; }
+  .status.err { color:var(--brand-red,#B11E2E); }
+  .banner { background:#fdf4e0; border:1px solid #f0b429; color:#8a6000;
+            border-radius:8px; padding:11px 14px; font-size:12.5px; line-height:1.6; margin-bottom:16px; }
+  label.fld { display:block; font-size:12px; font-weight:600; margin:0 0 5px; }
+  select, input[type=number] { font:inherit; font-size:13px; padding:8px 10px; border-radius:8px;
+          border:1px solid var(--line,#eceef3); background:#fff; color:inherit; min-width:180px; }
+  .back { display:inline-block; margin-top:8px; font-size:12.5px; color:var(--accent,#4364dc);
+          text-decoration:none; font-weight:600; }
+  .back:hover { text-decoration:underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Interface</h1>
+  <p class="sub">Choose which version of the dashboard you see. This changes presentation only —
+     the data, and who is allowed to see it, are identical either way.</p>
+
+  <div id="forced" class="banner" hidden>
+    The new interface is currently switched off for everyone
+    (<code>SSC_UI_FORCE_V1</code> is set on the server). Your preference is saved, but
+    everyone will keep seeing Classic until that is cleared and the server restarts.
+  </div>
+
+  <div class="card">
+    <h2>Your interface</h2>
+    <p class="hint">Pages that have not been rebuilt yet stay on Classic automatically,
+       so nothing disappears while the new interface is being built out.</p>
+    <div class="opts">
+      <label class="opt"><input type="radio" name="uiv" value="1">
+        <span><b>Classic</b><span>The current dashboard.</span></span></label>
+      <label class="opt"><input type="radio" name="uiv" value="2">
+        <span><b>New</b><span>The rebuilt interface, page by page as it ships.</span></span></label>
+    </div>
+    <div class="row">
+      <button type="button" class="btn-primary" id="save">Save</button>
+      <span class="status" id="status"></span>
+    </div>
+  </div>
+
+  <div class="card" id="admin-card" hidden>
+    <h2>Set for another user</h2>
+    <p class="hint">Admin only. Changing someone else's interface is recorded in the audit log.</p>
+    <label class="fld" for="who">User</label>
+    <select id="who"></select>
+    <div class="row">
+      <label class="opt" style="flex:0 0 auto"><input type="radio" name="auiv" value="1"> <span><b>Classic</b></span></label>
+      <label class="opt" style="flex:0 0 auto"><input type="radio" name="auiv" value="2"> <span><b>New</b></span></label>
+    </div>
+    <div class="row">
+      <button type="button" class="btn-ghost" id="asave">Apply</button>
+      <span class="status" id="astatus"></span>
+    </div>
+  </div>
+
+  <a class="back" href="/">&larr; Back to the dashboard</a>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+
+  function setStatus(el, msg, kind) {
+    el.textContent = msg || '';
+    el.className = 'status' + (kind ? ' ' + kind : '');
+  }
+
+  function pick(name, value) {
+    var r = document.querySelector('input[name="' + name + '"][value="' + value + '"]');
+    if (r) r.checked = true;
+  }
+
+  function chosen(name) {
+    var r = document.querySelector('input[name="' + name + '"]:checked');
+    return r ? parseInt(r.value, 10) : null;
+  }
+
+  // ---- current state -------------------------------------------------------
+  fetch('/api/ui/version', { credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      var d = (j && j.data) || {};
+      pick('uiv', d.ui_version === 2 ? 2 : 1);
+      if (d.forced_v1) $('forced').hidden = false;
+    })
+    .catch(function () { setStatus($('status'), "Couldn't load your current setting", 'err'); });
+
+  $('save').addEventListener('click', function () {
+    var v = chosen('uiv');
+    if (!v) return;
+    var btn = this;
+    btn.disabled = true;
+    setStatus($('status'), 'Saving…');
+    fetch('/api/ui/version', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ ui_version: v })
+    }).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    }).then(function (j) {
+      var d = (j && j.data) || {};
+      btn.disabled = false;
+      setStatus($('status'),
+        d.forced_v1 ? 'Saved — Classic is still forced on for everyone'
+                    : 'Saved — open any page to see it', 'ok');
+    }).catch(function () {
+      btn.disabled = false;
+      setStatus($('status'), "Couldn't save — try again", 'err');
+    });
+  });
+
+  // ---- admin: set for another user ----------------------------------------
+  // The list endpoint is admin-gated; a non-admin simply gets a 403 here and the
+  // card stays hidden. That is a courtesy, not the control — the POST is gated too.
+  fetch('/api/admin/users', { credentials: 'same-origin' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) {
+      if (!j || !j.data) return;
+      var sel = $('who');
+      j.data.forEach(function (u) {
+        var o = document.createElement('option');
+        o.value = u.id;
+        o.textContent = u.display_name + ' — ' + u.role;
+        sel.appendChild(o);
+      });
+      pick('auiv', 1);
+      $('admin-card').hidden = false;
+    })
+    .catch(function () { /* not an admin — card stays hidden */ });
+
+  $('asave').addEventListener('click', function () {
+    var uid = $('who').value, v = chosen('auiv');
+    if (!uid || !v) return;
+    var btn = this;
+    btn.disabled = true;
+    setStatus($('astatus'), 'Applying…');
+    fetch('/api/admin/ui/version/' + encodeURIComponent(uid), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ ui_version: v })
+    }).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      btn.disabled = false;
+      setStatus($('astatus'), 'Applied', 'ok');
+    }).catch(function () {
+      btn.disabled = false;
+      setStatus($('astatus'), "Couldn't apply — try again", 'err');
+    });
+  });
+})();
+</script>
+</body>
+</html>

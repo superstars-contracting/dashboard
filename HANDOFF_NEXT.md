@@ -15,19 +15,33 @@ real roster. Server runs unattended under a Windows scheduled task and is
 exposed to the operator's phone/tablet via Tailscale (private serve, not
 public funnel).
 
+Real external users are on the live system: two **clients** and one
+**architect**. Everything they can see is default-deny and re-derived
+per request — see "Access model" below before touching any portal,
+grant, or elevation code.
+
 ### Architecture in one paragraph
 
-Flask (Python 3.12) + waitress on `127.0.0.1:5050`, SQLite (`superstars.db`)
-with WAL mode, vanilla HTML/JS frontend (no build step). PDF render is
-headless Microsoft Edge (`pdf_export.py`) — WeasyPrint/GTK won't install
-on Windows Home and is no longer used. Three surfaces:
+Flask (Python 3.12) + waitress on `127.0.0.1:5050`, vanilla HTML/JS
+frontend (no build step). Data access goes through **`db_layer`**, driven
+by `SSC_DB_URL`: SQLite (`superstars.db`, WAL) is the default and what
+production runs; Postgres is supported and the gate runs on both. PDF
+render is headless Microsoft Edge (`pdf_export.py`) — WeasyPrint/GTK won't
+install on Windows Home and is no longer used. Surfaces:
 
 - **Company console** (`company-dashboard.html`) — workforce list, cert
   health, Weekly Hours Log. Hosts comp-side data; **field-restricted**.
 - **Project dashboard** (`dashboard-static.html`) — per-project DCR
   entry + archive, sign-ins, photos. Field-reachable via Tailscale.
+  Rendered **per role**: gated SECTION blocks are stripped server-side.
 - **Worker app** (`worker-app.html`) — mobile PWA, PIN sign-in (PIN =
   last 4 of phone). Field-reachable.
+- **Client portal** (`client_portal.html`, "Classic") — what real clients
+  see today. Per-item visibility engine (`visibility.py`): a document or
+  photo is invisible unless explicitly shared to the client audience, and
+  ownership is re-derived from the row on every by-id fetch.
+- **Drawing markup** (`templates/v2/drawing-markup.html`) — the #280
+  elevation surface, shared by internal roles, architect and client.
 
 DCR renderer (`render_dcr_html.py`) emits 11-section SSC-branded HTML
 with inline-SVG logo, print-CSS that mirrors screen layout (0.55in
@@ -35,9 +49,80 @@ insets, two-column paired sections, `break-inside:avoid` on `.sec`),
 and a `beforeprint` JS that fits-to-one-page when a report is
 ≤1.25× a page (Chromium `zoom` — paint-only `transform` was wrong).
 
-### DB clean baseline
+### Access model (read before touching portal / grants / elevation)
+
+Three independent axes, each enforced server-side on every request. Hiding
+a nav item is never access control.
+
+1. **ROLE → sections** (`access.py SECTION_ACCESS`). One source feeds both
+   sidebar stripping and endpoint gates. Eight roles: `admin`, `c_suite`,
+   `pm`, `super`, `estimator`, `client`, `architect`, `vendor`.
+2. **ASSIGNMENT → projects** (`pm_project_assignment`). pm/super/estimator/
+   architect see assigned projects only; a client sees the single project
+   their portal is bound to.
+3. **GRANT → portal sections** (`client_section_grant`, #269). Per-client,
+   per-section, **default OFF**. Zero grants = the #267 hard-stop: the
+   client is contained on `/welcome` and every API 403s.
+
+**Grant wiring as of #283.** `client_grants.SECTIONS` is what MAY be
+granted; `SERVED_SECTIONS` is what a grant actually OPENS today. The admin
+UI renders toggles for the intersection, so a section whose portal payload
+does not exist yet (`weekly`, `materials`) is catalogued but shows no
+toggle — never a grant that opens to nothing. `drawing` gates the drawing
+markup page, `/api/elevations`, `/api/elevation/*` and drop/photo comment
+threads; `rfis` gates `/api/rfis` and RFI comment threads. Presets are
+explicit copies, never the catalog object (an import-time guard enforces
+it): Standard excludes drawing/rfis, Full includes them.
+
+The architect is contained by an **allowlist** (`elevation._architect_gate`)
+— a route added tomorrow is closed to them until someone opens it — plus
+normal project scoping. Architects are not grant-gated on their own
+drawing surface.
+
+`/portal/<code>` (the #281 shared shell) is an **admin-preview surface
+only** until the nav is grant-driven: every external role landing there is
+redirected to Classic. That lock is committed and asserted by
+`tests/smoke_portal_shell_281.py`.
+
+### Two invariants that are load-bearing
+
+**DCR numbers are immutable.** A DCR's number is its identity (report_id,
+render dir, anything printed). `next_dcr_sequence` allocates strictly
+`MAX(seq)+1`; issuing a report NEVER renumbers an existing one regardless
+of date order; a deleted number stays retired (no gap-fill reuse). Date
+ordering is a *display* concern — sort by `report_date`. The old
+date-positional allocator + `shift_dcrs_for_backdate` renumbered two real
+issued reports during normal operator use and were removed in the #282
+repair pass; `renumber_dcrs_by_date.py` was deleted in #283 for the same
+reason. Do not reintroduce either.
+
+**Status colour comes from the status table, never from a template.**
+`status_tone` holds the five-tone ladder used by the elevation module,
+keyed `elevation.<key>`, ordered by `severity_rank`:
+
+| key | label | tone | severity | client-visible |
+|---|---|---|---|---|
+| `not_started` | Not started | neutral | 0 | yes |
+| `complete` | Complete | green | 10 | yes |
+| `in_progress` | In progress | blue | 20 | yes |
+| `on_hold` | On hold | gold | 60 | yes |
+| `rework` | Rework | coral | 80 | yes |
+
+`on_hold` and `rework` are alert statuses (severity ≥ 60) and **require a
+reason** (400 without one). A drop's work status is **derived** from its
+cells and never stored: any rework → rework; any on_hold → on_hold; all
+complete → complete; any movement → in_progress; else not_started.
+`reason` is external by construction; `internal_note` is a separate column
+that never enters an external payload. Phase 2 seeds more modules into
+this table — it must not recreate it.
+
+### DB baseline
+
+103 tables (SQLite live; Postgres `ssc_test` mirrors it for the gate).
+The old 42-table/77-row "clean slate" figure below is historical.
 
 ```
+(historical — 2026-05-20 clean slate)
 42 tables, 77 rows total
 
 reference (preserved):
@@ -106,6 +191,32 @@ foreach ($conn in $c) { cmd /c "taskkill /F /T /PID $($conn.OwningProcess)" }
 `Popen.terminate()` and `Stop-Process` don't reliably kill Flask on
 Windows. Use the tree-kill. (See CLAUDE.md operational-discipline rule.)
 
+### Run THE GATE (the thing to run before any deploy)
+
+Never against live — the runner refuses without `SSC_DB_URL`:
+
+```powershell
+# SQLite, isolated copy of live
+python -c "import sqlite3; s=sqlite3.connect('file:superstars.db?mode=ro',uri=True); d=sqlite3.connect('../snapshots/ssc_gate.db'); s.backup(d)"
+$env:SSC_DB_URL="sqlite:///C:/Users/SSC-Admin/Superstars/snapshots/ssc_gate.db"
+venv\Scripts\python.exe tests\run_gate_260.py
+```
+
+```powershell
+# Postgres (portable dev instance; pg_ctl gets its OWN command — never
+# chained with a python DB step, that wedges it)
+.pgdev\pgsql\bin\pg_ctl.exe -D .pgdev\data -o "-p 5433" -l .pgdev\pg_start.log -w start
+```
+
+```powershell
+venv\Scripts\python.exe migrate_sqlite_to_pg_259.py ..\snapshots\ssc_gate.db postgresql://postgres@127.0.0.1:5433/ssc_test --reset
+$env:SSC_DB_URL="postgresql://postgres@127.0.0.1:5433/ssc_test"
+venv\Scripts\python.exe tests\run_gate_260.py
+```
+
+31 suites, both backends, ~2 min (SQLite) / ~5 min (PG). A single suite:
+pass its filename as an argument.
+
 ### Run a smoke test
 
 Repository has two volume smokes in `tests/`:
@@ -129,7 +240,73 @@ cp superstars.db "../snapshots/superstars-pre-<op>-$(date +%Y%m%d-%H%M%S).db"
 
 ---
 
+## Builds #279–#283 (the current arc)
+
+- **#279 — UI v2 toggle, phase 0.** Per-user Classic/New switch with silent
+  fallback. There is **no Jinja in this app**: a v2 page is a twin file at
+  `templates/v2/<name>`, resolved by `ui_version.resolve_page`, and the
+  role-based SECTION stripping runs on whichever file is chosen.
+- **#280 — Drawing markup / North elevation.** Traced North elevation, 12
+  drops × 5 levels = 60 cells, per-cell work status with append-only
+  events, plus comments (step 4) and RFIs (step 5). Introduced the
+  `architect` role and its containment gate.
+- **#281 — Portal foundation.** One shell served from two namespaces
+  (`access.render_api_base`), the `client_payload()` field registry
+  (provenance, not vocabulary — a field absent from the registry is never
+  emitted), the Classic/New preview switch, four new grantable sections.
+- **#282 — Verification + repair.** Audited what #280/#281 shipped
+  straight to production. Found the containment lock existing only in a
+  working tree (now committed), proved the Classic documents/photos chain
+  untouched, and root-caused + fixed the DCR resequencer that had
+  renumbered two real reports. Live numbering restored and re-rendered.
+- **#283 — Fold-in (this build).** Grant wiring (above), two new guard
+  suites, design-guard registration for the v2 tree, DCR artifact cleanup,
+  `renumber_dcrs_by_date.py` retired, merge to main.
+
+### Guard coverage added in #283
+
+- `tests/smoke_markup_280.py` — elevation scoping, internal-vs-external
+  vocabulary split, `internal_note` absence asserted **by key, recursively**,
+  status-write validation and the reason law, drop-status derivation
+  (five planted cell mixes), cell history audience filtering, comments
+  (client read-only, rate limit, soft delete), RFIs (numeric allocation,
+  role split, attach-later), and the grant wiring end to end.
+- `tests/smoke_portal_shell_281.py` — the containment lock, pm scope,
+  preview validation + audit on both paths, served-shell scrub asserted
+  on the **DOM** (scripts stripped first — a view name inside a guarded
+  `querySelector` is not a section), catalog shape, fail-closed registry.
+
+Both are wired into `tests/run_gate_260.py` and both were proven by
+planted regression: a payload leak and a fail-open registry each turn the
+relevant suite red, and the code restores clean.
+
+## Known gaps / operator decisions pending
+
+- **2026-07-16 and 2026-07-17 have no DCR at all.** Each day has 17
+  sign-ins (real crew on site) but zero `report_index` rows. Two orphan
+  PDFs sat in the numbering slots those days would have occupied; their
+  index rows were destroyed during the 07-23 resequencer churn. The PDFs
+  are preserved at `snapshots/dcr_quarantine_283/054|055`. Re-issuing
+  would create genuine reports from surviving sign-in data, but under the
+  immutability rule they would take the next free numbers (not 054/055) —
+  **operator decision, not a cleanup step.**
+- **DCR-041 (2026-06-29)** has issued index rows but no render directory;
+  its artifacts were lost in the same churn. Re-issuing regenerates them.
+- `.orphan_dst_058_*` — a PDF-only remnant whose identity could not be
+  established (Edge PDFs use subset font encodings, so the text is not
+  extractable). Quarantined, not destroyed.
+
 ## Pending work (by priority — pick from the top)
+
+### The portal-flip track (sequenced next, deliberately NOT in #283)
+
+- Nav rendered from the grant list, so `/portal/<code>` can come off its
+  admin-preview lock.
+- The six portal section payloads (progress, photos, documents, daily,
+  schedule, weekly/materials when they exist) served through
+  `client_payload()` on the `/api/portal/<code>/*` namespace — the
+  registry currently has **no production consumers**.
+- The role × section matrix, and S/E/W elevation tracing.
 
 ### Field-blocking before tomorrow's site test
 
@@ -188,7 +365,12 @@ cp superstars.db "../snapshots/superstars-pre-<op>-$(date +%Y%m%d-%H%M%S).db"
 
 ---
 
-## Recent commits orientation (last ~15 most useful to read first)
+## Recent commits orientation — HISTORICAL (pre-#248 rebuild era)
+
+The list below predates the auth/portal/estimating arc. For current
+orientation use `git log --oneline -25` and the build summaries above.
+
+### Older list (kept for the DCR-renderer context)
 
 ```
 51ff3dc feat(deploy): continuous-run scheduled task — Path A, no `op run` (task #54)
@@ -219,16 +401,31 @@ restore from CSV).
 ## What to do on session start
 
 1. Read CLAUDE.md (rules) + this file (state).
-2. `git status` — should be clean.
-3. `git log --oneline -10` — orient on the last batch.
+2. `git status` — should be clean, on `main`. **If anything is
+   uncommitted, find out why before touching it**: #282 found production
+   running a security lock that existed only in the working tree.
+3. `git log --oneline -15` — orient on the last batch.
 4. `Get-ScheduledTask "SSC Dashboard Server"` — confirm State: Running.
-5. `Invoke-WebRequest http://127.0.0.1:5050/` — should be 200.
-6. If port 5050 is in use by an unexpected python.exe, taskkill the
-   tree-kill way (CLAUDE.md operational-discipline rule).
+5. `Invoke-WebRequest http://127.0.0.1:5050/api/health` — should be 200.
+6. If port 5050 is in use by an unexpected python.exe, tree-kill it
+   (CLAUDE.md operational-discipline rule).
 7. Wait for the user's first task — don't speculate.
+
+### Non-negotiables when working in this codebase
+
+- **Never run a suite or a migration against live.** Isolated copy via
+  `SSC_DB_URL`, always. The gate runner refuses to start without it.
+- **Snapshot before any live write** (`..\snapshots`, outside the served
+  tree). A DB snapshot does NOT cover rendered artifacts — deleting a
+  render dir is irreversible, so verify identity first or quarantine.
+- **A running server has already imported the code.** On-disk edits do
+  not reach it; restart per the #244 zombie-safe procedure and verify by
+  API behaviour, never by the build stamp.
+- New code goes through `db_layer` (never `sqlite3.connect` directly) and
+  must pass on **both** backends.
 
 ---
 
-*Last updated: end of 2026-05-20 session. Next operator session expected
-to start with field testing FR-BX-001 (real DCR entry, real labor) on
-2026-05-21.*
+*Last updated: end of the 2026-07-28 session (#282 verification/repair +
+#283 fold-in). Live: two clients + one architect with real logins;
+`/portal/<code>` still admin-preview-only pending the portal-flip track.*

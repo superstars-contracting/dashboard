@@ -37,6 +37,18 @@ SECTION_ACCESS = {
     # Estimates section above (board, VP table, CRM links, rollup $) stays admin/c_suite.
     # pm/super/client get 403 on ALL estimating surfaces.
     "estimating": frozenset({"admin", "c_suite", "estimator"}),
+    # #281 — workforce figures on the Project Health page: the "Workers on site" and
+    # "Certs expiring <=30d" KPI tiles and the "Today on site · roster" widget. Internal
+    # tier only. They are on Amit's never-visible list for client/architect, and unlisted
+    # would NOT have been enough: an unlisted key defaults to DASHBOARD_ROLES, which is
+    # already internal-only — but naming it makes the intent explicit and lets the marker
+    # strip the markup rather than relying on the widget's loader failing quietly.
+    "workforce_kpi": frozenset({"admin", "c_suite", "pm", "super"}),
+    # #281 — the internal-ops sections on Amit's never-visible list: Employees & Certs,
+    # Subcontractors & COIs, Site Closure, Equipment Log, Toolbox Talks. One key because
+    # they share one rule (internal tier, never an outside party), which keeps the strip
+    # legible; split it the day one of them needs a different answer.
+    "internal_ops": frozenset({"admin", "c_suite", "pm", "super"}),
 }
 
 # #263 — COMPANY axis. The company overview console (`/`) and its company-level tabs
@@ -128,3 +140,83 @@ def render_role_nav(html: str, role) -> str:
     html = _strip_named_block(html, "BACKLINK_PROJECTS", keep=not company)
     html = _strip_named_block(html, "COMPANYLINK", keep=company)
     return html
+
+
+# ===================== #281 — project identity, filled per request =====================
+# The shell used to carry "890 E 135th St · FR-BX-001" and the client's org name HARD-CODED
+# in three headers. That bound one file to one job and one client: a second project, or a
+# second client, would have needed a second file. It is now filled here, from the
+# project_code in the URL, on every request.
+#
+# SERVER-SIDE rather than a fetch, deliberately: the page already renders per role through
+# this pipeline, so there is no new endpoint to gate (and every /projects/<code> API is
+# behind the #263 hook, which external roles do not currently pass); the header is correct
+# in the first byte, with no empty flash; and it cannot be wrong for a role whose JS never
+# ran. Escaped, because a project name is operator-entered text landing in markup.
+
+def _esc(s) -> str:
+    return (str(s or "")
+            .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace('"', "&quot;"))
+
+
+# Text placeholders: <tag data-project-X>…</tag> gets its TEXT replaced.
+# Attribute placeholder: the literal __PROJECT_CODE__ token, for places where the value
+# has to live in an attribute (a <option value="…">) rather than in element text.
+_PROJECT_CODE_TOKEN = "__PROJECT_CODE__"
+_API_BASE_TOKEN = "__API_BASE__"
+
+# #281 — the shell is ONE file served from two namespaces. Which namespace a session
+# fetches from is decided HERE, server-side, and injected as a single variable:
+#
+#   internal roles  ->  /api/projects/<code>   the internal project namespace
+#   external roles  ->  /api/portal/<code>     the CURATED portal namespace
+#
+# This is what lets client and architect have the same shell, same layout and same visual
+# language WITHOUT opening #264's routing-layer boundary: an external session simply never
+# forms an internal URL. pm_scoping.pm_can_access_project still returns False for every
+# external role, and that stays the enforcement — this only decides what the page asks for.
+EXTERNAL_API_ROLES = frozenset({"client", "architect", "vendor"})
+
+
+def api_base_for(role, project_code) -> str:
+    code = str(project_code or "")
+    ns = "/api/portal/" if role in EXTERNAL_API_ROLES else "/api/projects/"
+    return ns + code
+
+
+def render_project_identity(html: str, project) -> str:
+    """Fill every data-project-* placeholder and __PROJECT_CODE__ token from `project`
+    (a mapping with project_code / name / client_name, any of them optional).
+
+    A no-op when the project is unknown: placeholders stay blank rather than showing a
+    stale or guessed name, and the token resolves to empty rather than to another job's
+    code. Blank is the honest failure here — a wrong project on a header is worse than
+    no project."""
+    if not project:
+        return html.replace(_PROJECT_CODE_TOKEN, "")
+    code = _esc(project.get("project_code"))
+    name = _esc(project.get("name"))
+    client = _esc(project.get("client_name"))
+    fills = {
+        "data-project-title":  " · ".join(x for x in (name, code) if x),
+        "data-project-client": client,
+        "data-project-line":   " · ".join(x for x in (code, name) if x),
+        "data-project-code":   code,
+        "data-project-name":   name,
+    }
+    for attr, value in fills.items():
+        # <tag ... attr ...>ANYTHING</tag>  ->  same tag with `value` as its text.
+        # The \b before the attribute name keeps data-project-code from matching inside
+        # data-project-client (they share a prefix); the optional ="…" lets a placeholder
+        # carry a value attribute as well as being a fill target.
+        html = re.sub(
+            r"(<(\w+)([^>]*\b" + re.escape(attr) + r")((?:=\"[^\"]*\")?[^>]*)>)(.*?)(</\2>)",
+            lambda m, v=value: m.group(1) + v + m.group(6),
+            html, flags=re.DOTALL)
+    return html.replace(_PROJECT_CODE_TOKEN, code)
+
+
+def render_api_base(html: str, role, project_code) -> str:
+    """Fill __API_BASE__ with the namespace this role is allowed to fetch from."""
+    return html.replace(_API_BASE_TOKEN, _esc(api_base_for(role, project_code)))

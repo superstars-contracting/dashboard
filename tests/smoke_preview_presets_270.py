@@ -349,8 +349,14 @@ def run():
         return sess.post(f"{BASE}/api/admin/client-grants/preset",
                          json={"user_id": uid, "preset": name}, timeout=15)
     r = _preset(admin, client_uid, "full")
-    ok("preset_full_200", r.status_code == 200 and (r.json()["data"]["sections"] == sorted(SECTIONS)),
-       f"got {r.status_code}")
+    # #281 — assert the preset delivers ITS OWN bundle, not that "full" is a synonym for
+    # the whole catalog. PRESETS["full"] used to BE the SECTIONS tuple, so this passed by
+    # identity; decoupling them (so a new grantable key is not silently bundled into Full)
+    # made that equivalence false, and it was never the property worth asserting.
+    from client_grants import PRESETS as _PRESETS
+    ok("preset_full_200",
+       r.status_code == 200 and (r.json()["data"]["sections"] == sorted(_PRESETS["full"])),
+       f"got {r.status_code} sections={r.json().get('data', {}).get('sections')}")
     ok("preview_schedule_after_full_200",
        _sc(admin, "GET", _pv(SECTION_API["schedule"], client_uid)) == 200,
        "full preset must unlock schedule for the preview too")

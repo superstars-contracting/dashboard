@@ -50,6 +50,14 @@ import access  # #262 — central section→roles map (RBAC single source of tru
 import crm  # #266 — CRM/ops core logic (shared by the endpoints + the guard smoke)
 apply_auth_gate(app)
 
+# #279 (UI v2 phase 0) — the interface toggle. MUST follow apply_auth_gate: the
+# stored per-user preference is read off current_user(). Sets g.ui_version on page
+# routes; every UI route serves its page through ui_version.serve_ui, which returns
+# the v2 twin when one exists and the untouched v1 file when it does not.
+import ui_version  # noqa: E402
+ui_version.apply(app)
+ui_version.register(app)
+
 # Admin account management — multi-user accounts & roles, Phase 1 (#257). Every
 # endpoint is admin-only, gated server-side (the before_request gate runs first).
 import auth_admin  # noqa: E402
@@ -112,6 +120,14 @@ estimating.register(app)
 # schedule (inspections + walkthroughs on one console calendar).
 import walkthroughs  # noqa: E402
 walkthroughs.register(app)
+
+# #280 — the drawing markup page (north elevation, per-drop per-floor work status) +
+# the architect containment gate. Separate from /dropplan (#201/#256), which is the
+# per-drop LIFECYCLE schedule and is untouched. MUST follow apply_auth_gate, the #263
+# scoping hook and the client gate: the architect gate is a before_request that assumes
+# g.auth_user is already set.
+import elevation  # noqa: E402
+elevation.register(app)
 
 # #278 — Project Cost "Spent to Date" (C-Suite) + the project expense ledger.
 # Comp data: every endpoint admin/c_suite; cost keys OMITTED for every other role
@@ -224,7 +240,7 @@ def index():
     if not access.can_access_company(role):
         return Response(_COMPANY_FORBIDDEN_HTML, status=403, mimetype="text/html")
     page = COMPANY_DASHBOARD_PATH if COMPANY_DASHBOARD_PATH.exists() else DASHBOARD_PATH
-    return _serve_html_no_store(page)
+    return ui_version.serve_ui(page, _serve_html_no_store)   # #279
 
 
 # #263 — a pm/super (non-company role) that reaches the company console gets this 403,
@@ -249,7 +265,7 @@ def pm_projects_landing():
     the company console but may view this too. The list itself is server-scoped, so a pm
     never sees a project they aren't assigned."""
     if PM_PROJECTS_PATH.exists():
-        return _serve_html_no_store(PM_PROJECTS_PATH)
+        return ui_version.serve_ui(PM_PROJECTS_PATH, _serve_html_no_store)   # #279
     return ("projects page missing", 500)
 
 
@@ -267,7 +283,35 @@ def _serve_html_no_store(path):
     return resp
 
 
-def _serve_dashboard_no_store():
+def _project_identity(code):
+    """{project_code, name, client_name} for the shell header, or None. Read-only, and
+    NOT access control — the #263 before_request hook has already rejected a project this
+    user may not open by the time we get here."""
+    if not code:
+        return None
+    conn = db()
+    try:
+        row = conn.execute(
+            "SELECT project_code, name FROM projects WHERE project_code = ?", (code,)).fetchone()
+        if row is None:
+            return None
+        out = {"project_code": row["project_code"], "name": row["name"], "client_name": None}
+        # client org is optional (#266 added projects.client_org_id); absent is fine.
+        try:
+            crow = conn.execute(
+                "SELECT o.name AS client_name FROM projects p "
+                "JOIN crm_organization o ON o.id = p.client_org_id "
+                "WHERE p.project_code = ?", (code,)).fetchone()
+            if crow:
+                out["client_name"] = crow["client_name"]
+        except Exception:
+            pass          # pre-#266 database — header simply omits the client line
+        return out
+    finally:
+        conn.close()
+
+
+def _serve_dashboard_no_store(project_code=None, role_override=None):
     """Project Health surface (per-project dashboard), served no-store. The sidebar is
     RENDERED PER ROLE here:
       * #262 — gated SECTION blocks (Financial) the role can't access are STRIPPED, so a
@@ -278,10 +322,21 @@ def _serve_dashboard_no_store():
         which would 403 anyway).
     Hiding a menu item is not access control — the project-ASSIGNMENT before_request hook
     rejects an unassigned /projects/<code> regardless; this just makes the menu match."""
-    role = (current_user() or {}).get("role")
-    html = DASHBOARD_PATH.read_text(encoding="utf-8")
+    # role_override is the PREVIEW-AS-CLIENT path (#281): the shell renders as the target
+    # client would see it, so what Amit verifies is what the client gets.
+    role = role_override or (current_user() or {}).get("role")
+    # #279 — v2 twin when one exists, the untouched v1 file otherwise. The role-based
+    # SECTION stripping below runs on WHICHEVER file was chosen: server-side access
+    # enforcement is not a v1 behaviour a v2 page gets to opt out of.
+    html = ui_version.resolve_page(DASHBOARD_PATH).read_text(encoding="utf-8")
     html = access.render_sections(html, role)   # #262 — strip gated SECTION blocks
     html = access.render_role_nav(html, role)   # #263 — role-correct sidebar nav
+    # #281 — project identity was hard-coded into three headers, binding one file to one
+    # job and one client. Filled here instead, from the code in the URL.
+    html = access.render_project_identity(html, _project_identity(project_code))
+    # #281 — and WHERE this shell fetches from: the internal project namespace for
+    # internal roles, the curated portal namespace for external ones.
+    html = access.render_api_base(html, role, project_code)
     resp = Response(html, mimetype="text/html")
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
@@ -294,7 +349,95 @@ def project_dashboard(project_code):
     """Project-specific dashboard. Project context passed via URL → JS reads it from
     location.pathname. Access is enforced by the #263 before_request scoping hook: a pm
     opening an unassigned or closed project gets 403 here, server-side."""
-    return _serve_dashboard_no_store()
+    return _serve_dashboard_no_store(project_code)
+
+
+@app.route('/portal/<project_code>')
+def portal_project_shell(project_code):
+    """#281 — THE SAME SHELL, served from the portal namespace.
+
+    Client and architect get dashboard-static.html: same file, same layout, same widgets,
+    same CSS. What differs is injected, not forked — window.SSC_API_BASE points this
+    session at /api/portal/<code> instead of /api/projects/<code>, and the SECTION markers
+    strip what the role may not see.
+
+    WHY A SEPARATE ROUTE rather than letting external roles onto /projects/<code>:
+    #264's boundary is a single routing-layer rule — pm_scoping.pm_can_access_project
+    returns False for every external role on any path carrying a project code, which
+    covers /projects/<code> AND every /api/projects/<code>/… in one place. Opening it
+    would have made ~26 internal endpoint families reachable for external sessions with
+    only per-endpoint gates behind them. This route spends no security decision to save
+    work: the boundary is untouched and an external session never forms an internal URL.
+
+    Access here is the external user's own binding — the same pm_project_assignment /
+    client grant machinery the portal already uses — checked server-side, every request."""
+    actor = current_user() or {}
+    role = actor.get("role")
+    effective = actor
+
+    # ---- TEMPORARY LOCK (#281, removed at flip time) ----------------------------
+    # STEP 2 (nav rendered from the grant list) is NOT built yet, so this shell still
+    # shows every nav item that has no SECTION marker — around eleven that are not on
+    # any external role's list and would open to internal surfaces that 403. That is a
+    # bad first impression, not a data leak (every endpoint behind them is still gated),
+    # but an outside party must not meet a half-finished menu.
+    #
+    # So until the nav is grant-driven and verified, this route is an ADMIN PREVIEW
+    # SURFACE ONLY. An external role landing here directly goes to Classic, which is
+    # complete and is still what they are meant to be using.
+    if role in access.EXTERNAL_API_ROLES:
+        logging.info(f"portal_shell: external role sent to Classic (pre-STEP2 lock) "
+                     f"role={role} code={project_code}")
+        return redirect("/portal")
+
+    # PREVIEW-AS-CLIENT (#270 pattern). Without this the shell would render with the
+    # ADMIN's role and show Amit everything — a preview that disagrees with what the
+    # client actually gets is worse than no preview at all, which is the whole reason
+    # this is an explicit switch rather than a silent repoint.
+    raw_preview = request.args.get("preview_client")
+    if raw_preview and role in ("admin", "c_suite"):
+        conn = db()
+        try:
+            try:
+                target_id = int(raw_preview)
+            except (TypeError, ValueError):
+                return jsonify({"error": "forbidden"}), 403
+            trow = conn.execute(
+                "SELECT id, role, status, is_active FROM users WHERE id=?",
+                (target_id,)).fetchone()
+            if (not trow or trow["role"] not in access.EXTERNAL_API_ROLES
+                    or trow["status"] != "active" or not trow["is_active"]):
+                return jsonify({"error": "forbidden"}), 403
+            effective = {"id": trow["id"], "role": trow["role"]}
+            conn.execute(
+                "INSERT INTO audit_log (action, actor_user_id, actor_role, target_type, "
+                "target_id, note, created_at) VALUES (?,?,?,?,?,?,?)",
+                ("portal_shell_preview", actor.get("id"), role, "user", str(target_id),
+                 f"read-only new-shell preview of {project_code}",
+                 datetime.now().isoformat(timespec="seconds")))
+            conn.commit()
+        finally:
+            conn.close()
+        role = effective["role"]
+
+    conn = db()
+    try:
+        allowed = elevation.accessible_codes(conn, effective)
+    finally:
+        conn.close()
+    if project_code not in allowed:
+        logging.info(f"portal_shell: scope block role={role} code={project_code}")
+        # A bare 403 — deliberately NOT the company-console message, which offers a link
+        # to /projects that an external role cannot use and would not understand.
+        return Response(
+            "<!doctype html><meta charset=utf-8><title>Not authorized</title>"
+            "<div style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;"
+            "max-width:420px;margin:18vh auto;text-align:center;color:#23211d\">"
+            "<div style=\"font-size:15px;font-weight:700;color:#B11E2E;letter-spacing:.5px\">"
+            "NOT AUTHORIZED</div><p style=\"color:#8a8378;font-size:14px;line-height:1.6\">"
+            "This project is not available on your account.</p></div>",
+            status=403, mimetype="text/html")
+    return _serve_dashboard_no_store(project_code, role_override=role)
 
 
 @app.route('/dashboard')
@@ -2154,29 +2297,17 @@ def lookup_existing_dcr_sequence(conn, project_code, report_date):
     return row['dcr_sequence'] if row else None
 
 
-def next_dcr_sequence(conn, project_code, report_date=None):
-    """Return the next DCR sequence for a project, in DATE order.
+def next_dcr_sequence(conn, project_code):
+    """Next DCR sequence = MAX(existing) + 1, numerically. Always.
 
-    A DCR's sequence reflects its position chronologically across the
-    project: earliest date = 1, next = 2, etc. When called with
-    `report_date` set, returns (count of existing DCR dates < report_date)
-    + 1 — so a backdated entry slots in BEFORE later-dated ones (call
-    `shift_dcrs_for_backdate` first to push the laters up).
-
-    Backward-compat: callers that omit report_date get max(seq)+1 (append
-    at the tail). The Phase-2 RFI allocator + a couple of legacy code
-    paths use the no-arg shape.
-    """
-    if report_date:
-        n = conn.execute(
-            "SELECT COUNT(DISTINCT report_date) FROM report_index "
-            "WHERE project_code = ? AND report_type = 'DCR' "
-            "AND dcr_sequence IS NOT NULL AND report_date < ?",
-            (project_code, report_date)
-        ).fetchone()[0]
-        return n + 1
-    # Legacy fallback: max+1 (tail-append). Used by callers that didn't
-    # yet adopt the date-ordered allocator.
+    A DCR's number is IMMUTABLE once issued (repair pass, decided policy):
+    issuing a new report NEVER renumbers an existing one, regardless of date
+    order — the number is the report's identity (report_id, artifact dir,
+    anything already printed), and identity does not move. A backdated entry
+    therefore takes the next number even though its date sorts earlier;
+    chronological ordering is a display concern (sort by report_date). A
+    deleted report's number stays retired — no gap-fill reuse (same posture
+    as the Worker-ID rule)."""
     row = conn.execute(
         "SELECT COALESCE(MAX(dcr_sequence), 0) FROM report_index "
         "WHERE project_code = ? AND report_type = 'DCR' AND dcr_sequence IS NOT NULL",
@@ -2185,115 +2316,7 @@ def next_dcr_sequence(conn, project_code, report_date=None):
     return int(row[0]) + 1
 
 
-# Trailing -NNN-{audience} matcher — used by shift_dcrs_for_backdate
-# to rewrite report_id strings without colliding with an inner
-# project_code "-NNN-" (the bug renumber_dcrs_by_date.py hit on FR-BX-001).
 import re as _re  # local-alias to avoid touching the top-of-file imports
-import time as _time
-_DCR_SEQ_TAIL_RE = _re.compile(r"-(\d{3})-(internal|client)$")
-
-
-def shift_dcrs_for_backdate(conn, project_code, threshold_seq):
-    """Push every existing DCR with dcr_sequence >= `threshold_seq` up by 1.
-
-    Updates report_index (sequence + report_id string) and renames the
-    on-disk sequence dirs (data_room/reports/dcr/<project>/<NNN>/) to
-    match. Uses the standard two-step negative-temp swap so a
-    (project_code, sequence) collision can't happen mid-shift.
-
-    Called from issue_dcr when a backdated date wants a seq <= an
-    existing seq, so the chronological order stays intact.
-
-    Re-run-safe in the sense that calling it with a threshold no row
-    matches is a no-op. NOT transactional with the on-disk renames —
-    if a rename fails partway, the DB still commits; the operator gets
-    a warning and can re-sync via renumber_dcrs_by_date.py.
-    """
-    impacted = conn.execute(
-        "SELECT id, dcr_sequence, report_id FROM report_index "
-        "WHERE project_code = ? AND report_type = 'DCR' "
-        "AND dcr_sequence IS NOT NULL AND dcr_sequence >= ? "
-        "ORDER BY dcr_sequence DESC",  # DESC so renames happen high→low and don't collide
-        (project_code, threshold_seq),
-    ).fetchall()
-    if not impacted:
-        return 0
-    # Step A — DB: bump each impacted row to its negative twin
-    for r in impacted:
-        conn.execute(
-            "UPDATE report_index SET dcr_sequence = ? WHERE id = ?",
-            (-int(r["dcr_sequence"]), r["id"]),
-        )
-    # Step B — DB: write the new positive seq + new report_id string
-    for r in impacted:
-        old_seq = int(r["dcr_sequence"])
-        new_seq = old_seq + 1
-        old_rid = r["report_id"] or ""
-        m = _DCR_SEQ_TAIL_RE.search(old_rid)
-        if m:
-            audience = m.group(2)
-            new_rid = _DCR_SEQ_TAIL_RE.sub(f"-{new_seq:03d}-{audience}", old_rid)
-        else:
-            audience = "internal" if old_rid.endswith("internal") else (
-                "client" if old_rid.endswith("client") else "internal"
-            )
-            new_rid = f"DCR-{project_code}-{new_seq:03d}-{audience}"
-        conn.execute(
-            "UPDATE report_index SET dcr_sequence = ?, report_id = ?, "
-            "       updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (new_seq, new_rid, r["id"]),
-        )
-    # On-disk dirs — same two-step (NNN → .tmp_NNN → MMM). Walk
-    # DESC-by-old-seq so existing high dirs free up their target slot
-    # before a lower seq tries to take it.
-    #
-    # Hardening: a stale .tmp_NNN from a PRIOR failed run will block
-    # Step A's `src.rename(.tmp_NNN)` on Windows (rename is
-    # non-overwriting → WinError 183). Pre-clean any pre-existing
-    # .tmp_NNN before each Step A move. Symmetric guard at Step B for
-    # the destination NNN — if it somehow exists with content, log +
-    # rename it to .orphan_NNN_<ts> so the operator can recover, but
-    # never silently overwrite real DCR HTML/PDF.
-    project_root = SCRIPT_DIR / "data_room" / "reports" / "dcr" / project_code
-    if project_root.exists():
-        seen_old = []
-        for r in impacted:
-            o = int(r["dcr_sequence"])  # this was the OLD seq before the bump
-            if o not in seen_old:
-                seen_old.append(o)
-        # Step A: to .tmp_NNN — pre-clean stale temp first.
-        for o in seen_old:
-            src = project_root / f"{o:03d}"
-            tmp = project_root / f".tmp_{o:03d}"
-            if tmp.exists():
-                # Stale orphan from a prior aborted run. Quarantine it
-                # rather than delete in case it holds operator data.
-                quarantine = project_root / f".orphan_{o:03d}_{int(_time.time())}"
-                logging.warning(
-                    f"shift_dcrs_for_backdate: pre-existing {tmp.name} "
-                    f"quarantined to {quarantine.name} before Step A rename."
-                )
-                tmp.rename(quarantine)
-            if src.exists():
-                src.rename(tmp)
-        # Step B: to (o+1)
-        for o in seen_old:
-            tmp = project_root / f".tmp_{o:03d}"
-            dst = project_root / f"{o+1:03d}"
-            if tmp.exists():
-                if dst.exists():
-                    # The target slot is occupied by a stale dir — quarantine
-                    # it instead of silently overwriting (operator may need
-                    # those files). Then complete the Step B rename.
-                    quarantine = project_root / f".orphan_dst_{o+1:03d}_{int(_time.time())}"
-                    logging.warning(
-                        f"shift_dcrs_for_backdate: target {dst} exists at "
-                        f"Step B; quarantining to {quarantine.name} so the "
-                        f"shift can complete without data loss."
-                    )
-                    dst.rename(quarantine)
-                tmp.rename(dst)
-    return len(impacted)
 
 
 def _issue_one_dcr(conn, project_code, report_date, audience, seq):
@@ -2655,18 +2678,10 @@ def issue_dcr(project_code, report_date):
             # Re-issue path — sequence is preserved.
             seq = existing_seq
         else:
-            # NEW DCR: place it by chronological position. If the date
-            # isn't the latest, push later DCRs up by 1 first so the
-            # whole chain stays date-ordered (5-04 must be -001 even if
-            # 5-18..5-21 already exist as -001..-004 — they become
-            # -002..-005 and the new 5-04 slots in as -001).
-            seq = next_dcr_sequence(conn, project_code, report_date)
-            shifted = shift_dcrs_for_backdate(conn, project_code, seq)
-            if shifted:
-                logging.info(
-                    f"issue_dcr: backdate {report_date} got seq {seq} — "
-                    f"shifted {shifted} later-dated audience rows up by 1."
-                )
+            # NEW DCR: strictly max+1. Numbers are immutable identity — a
+            # backdated date still appends numerically; existing reports are
+            # never renumbered by an issue (see next_dcr_sequence).
+            seq = next_dcr_sequence(conn, project_code)
         display_id = f"DCR-{project_code}-{seq:03d}"
         generated_at = datetime.utcnow().isoformat() + 'Z'
         if audience == 'both':
@@ -5663,7 +5678,7 @@ def admin_labor_rates_page():
     page = SCRIPT_DIR / 'admin_labor_rates.html'
     if not page.exists():
         return jsonify({"error": "admin page not found"}), 404
-    resp = send_file(str(page))
+    resp = send_file(str(ui_version.resolve_page(page)))   # #279
     # comp-data page — never cache (no-store) anywhere
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     resp.headers['Pragma'] = 'no-cache'
@@ -9377,7 +9392,7 @@ def api_project_sov(project_code):
 def dropplan_page():
     """Serve the project-scoped Drop Plan UI (Batch C #201). Login + the four
     operational roles; dollar fields are omitted by the API for pm/super."""
-    page = SCRIPT_DIR / 'dropplan.html'
+    page = ui_version.resolve_page(SCRIPT_DIR / 'dropplan.html')   # #279
     if not page.exists():
         return jsonify({"error": "drop plan page not found"}), 404
     # Serve no-store with NO ETag/conditional handling (#205): the operator's

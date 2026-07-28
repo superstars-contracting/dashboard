@@ -2,7 +2,7 @@
 """200-DCR volume smoke test.
 
 Confidence check for the DCR ID allocation, entry-row save path, and atomic
-delete + gap-fill behavior under sustained load. Invoke manually; not wired
+delete + re-issue behavior under sustained load. Invoke manually; not wired
 into the regular dashboard launch.
 
   python tests/smoke_dcr_volume.py
@@ -17,7 +17,8 @@ What it does:
              - per-iteration timing tracked
   Phase 2: deletes 30 random sequences via DELETE /by-sequence/<seq>, after
            each delete issues a new DCR for a fresh date and asserts that the
-           new sequence == the just-deleted one (gap-fill).
+           new sequence == max+1 — a deleted number stays RETIRED, never
+           reused (immutable-number policy from the repair pass).
   Phase 3: full cleanup — wipes all FR-BX-001 report_index rows, work_log,
            deliveries, and per-sequence HTML directories. Verifies post-state
            matches baseline (0 DCRs, 0 work_log, 0 deliveries).
@@ -256,10 +257,10 @@ def main():
                 continue
             used.discard(seq_to_delete)
 
-            # Expected gap-fill: lowest positive int not in `used`
-            expected_seq = 1
-            while expected_seq in used:
-                expected_seq += 1
+            # Numbers are immutable identity and a deleted number stays
+            # RETIRED (repair-pass policy; same posture as Worker-IDs):
+            # every new issue takes max+1, the gap stays a gap.
+            expected_seq = (max(used) if used else 0) + 1
 
             # Issue for a fresh date
             d = (reissue_base_date + timedelta(days=j)).isoformat()
@@ -276,15 +277,15 @@ def main():
             j_body = json.loads(body)
             new_seq = j_body.get("data", {}).get("sequence")
             if new_seq != expected_seq:
-                FAIL.append(f"phase2 j={j}: gap-fill expected seq={expected_seq}, got {new_seq} (deleted {seq_to_delete})")
+                FAIL.append(f"phase2 j={j}: expected max+1 seq={expected_seq}, got {new_seq} (deleted {seq_to_delete} stays retired)")
             else:
-                PASS.append(f"phase2 j={j}: gap-fill reused seq={expected_seq}")
+                PASS.append(f"phase2 j={j}: max+1 allocated seq={expected_seq}, gap {seq_to_delete} retired")
             used.add(new_seq if new_seq is not None else expected_seq)
 
             if (j + 1) % 10 == 0 or j + 1 == N_DELETE_REISSUE:
-                print(f"  phase2 cycle {j+1}/{N_DELETE_REISSUE}  last gap-fill: seq {seq_to_delete} -> {new_seq}")
+                print(f"  phase2 cycle {j+1}/{N_DELETE_REISSUE}  last: deleted seq {seq_to_delete}, new issue took {new_seq}")
 
-        expect(f"phase 2: all {N_DELETE_REISSUE} gap-fill cycles produced expected sequences",
+        expect(f"phase 2: all {N_DELETE_REISSUE} delete+re-issue cycles produced expected sequences",
                not any("phase2" in x and "FAIL" in x for x in FAIL),
                extra=f"failures={[x for x in FAIL if 'phase2' in x][:5]}")
 

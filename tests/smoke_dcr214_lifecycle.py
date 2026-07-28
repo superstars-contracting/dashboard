@@ -22,13 +22,15 @@ What it proves (data layer behind the restyled list view):
 Operator-live safety (the 16 real 2026 DCRs are REAL DATA):
   - Snapshot the DB before any write.
   - EVERY synthetic report lives on a 2099+ report_date — a value no real
-    construction report can have — so the chronological DCR numbering
-    (next_dcr_sequence counts DISTINCT dates < X) never renumbers the
-    real 2026 reports, and cleanup can scope purely on the date.
+    construction report can have — so cleanup can scope purely on the date.
   - Cleanup is DATE-SCOPED: report_date >= '2099-01-01'. It can NEVER
     match a real 2026 row. NO blanket delete, ever.
-  - Asserts the exact set of (display_id, report_date) for the 16 real
-    DCRs is byte-identical before and after (16 -> ... -> 16).
+  - DCR numbers are IMMUTABLE at the server (issue never renumbers an
+    existing report — repair pass after the 07-20/21 drift).
+    cleanup_real_set_identical asserts exactly that invariant; if it ever
+    trips again, cleanup RESTORES the captured (display_id, report_date)
+    numbering — report_index rows only, never render dirs — so downstream
+    suites see clean state while the failure still reports loudly.
 
 127.0.0.1 only. PII-safe (W-#### + counts only). Idempotent cleanup in a
 finally block so a mid-run failure still restores baseline.
@@ -268,8 +270,43 @@ def scale_cleanup_and_assert(real_set, real_n):
     # The 16 real DCRs: exact same set, count restored.
     now_set, now_n = real_baseline()
     ok("cleanup_real_count_restored", now_n == real_n, f"{real_n} -> {now_n}")
-    ok("cleanup_real_set_identical", now_set == real_set,
-       f"added={len(now_set - real_set)} removed={len(real_set - now_set)}")
+    drifted = not ok("cleanup_real_set_identical", now_set == real_set,
+                     f"added={len(now_set - real_set)} removed={len(real_set - now_set)}")
+    if drifted:
+        # Server-side renumbering is a BUG (numbers are immutable identity) —
+        # the assertion above already recorded the failure. Restore the
+        # captured numbering so the drift does not cascade into later suites
+        # or, worse, survive on a real DB. DB rows only; render dirs are the
+        # corruption-repair workflow's problem, not a smoke's.
+        conn = db()
+        try:
+            restored = 0
+            for display_id, rdate in real_set:
+                want_seq = int(display_id.rsplit("-", 1)[1])
+                rows = conn.execute(
+                    "SELECT id, report_id, dcr_sequence FROM report_index "
+                    "WHERE project_code=? AND report_type='DCR' AND report_date=?",
+                    (PROJECT, rdate)).fetchall()
+                for r in rows:
+                    aud = "client" if str(r["report_id"]).endswith("client") else "internal"
+                    want_rid = f"{display_id}-{aud}"
+                    if r["report_id"] != want_rid or int(r["dcr_sequence"] or 0) != want_seq:
+                        # two-step via a placeholder id so a transient collision
+                        # with another not-yet-restored row cannot occur
+                        conn.execute("UPDATE report_index SET report_id=? WHERE id=?",
+                                     (f"RESTORE-TMP-{r['id']}", r["id"]))
+                        conn.execute(
+                            "UPDATE report_index SET report_id=?, dcr_sequence=? WHERE id=?",
+                            (want_rid, want_seq, r["id"]))
+                        restored += 1
+            conn.commit()
+            print(f"    [restore] re-pointed {restored} drifted audience row(s) "
+                  f"back to their captured numbering")
+        finally:
+            conn.close()
+        now_set2, _ = real_baseline()
+        ok("cleanup_drift_restored", now_set2 == real_set,
+           f"still-off={len(now_set2 ^ real_set)}")
     # No synthetic residue anywhere in report_index.
     conn = db()
     try:
