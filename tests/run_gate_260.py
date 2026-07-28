@@ -58,6 +58,7 @@ GATE = [
     "smoke_walkthroughs_277.py",  # #277 — walkthrough visits (stage sync, derivation), calendar merge, GPS-stripped reports
     "smoke_expenses_widget_278.py",  # #278 — cost widget (rate-boundary penny math, unrated bucket) + expense ledger + role omission
     "smoke_ui_v2_phase0.py",      # #279 — UI v2 toggle: byte-identity, resolution order, kill switch
+    "smoke_external_scrub_281.py",# #281 — external hard gate: no internal links/build stamps/baked project, expenses is financial
     "smoke_dropplan_api.py",
     "smoke_worker_lifecycle.py",
     "smoke_dcr214_lifecycle.py",

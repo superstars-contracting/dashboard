@@ -797,6 +797,11 @@
 <link rel="stylesheet" href="/files/static/css/widgets.css?v=272">
 </head>
 <body>
+<!-- #281 — ONE source for the project code, filled server-side from the URL.
+     Every script below reads window.SSC_PROJECT_CODE instead of carrying its own
+     hard-coded (window.SSC_PROJECT_CODE||'') fallback, which is what bound this shell to one job. -->
+<script>window.SSC_PROJECT_CODE = "__PROJECT_CODE__";</script>
+
 <!-- #212 nav icons — inline SVG <symbol> defs (defined ONCE, used via <use>).
      No icon font / CDN, so they always render (offline-safe). -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
@@ -951,6 +956,7 @@
       <!-- #218 Expenses — its own section. Cost data: hidden until the gate
            script reveals it for admin/c_suite (server @requires_role is the
            real authority — non-cost roles 403 + this stays omitted). -->
+      <!-- SECTION:financial:start -->
       <div class="nav-group" data-group="expenses" id="exp-nav-group" style="display:none;">
         <div class="nav-group-label"><span class="nav-group-name">Expenses</span><svg class="nav-chev"><use href="#i-chev"/></svg></div>
         <div class="nav-items">
@@ -960,6 +966,7 @@
           <a class="nav-link" data-view="product-usage"><svg class="nav-ic"><use href="#i-layers"/></svg>Product Usage</a>
         </div>
       </div>
+      <!-- SECTION:financial:end -->
       <div class="nav-group" data-group="setup">
         <div class="nav-group-label"><span class="nav-group-name">Setup</span><svg class="nav-chev"><use href="#i-chev"/></svg></div>
         <div class="nav-items">
@@ -1025,12 +1032,23 @@
         <div class="ph-wrap">
           <div class="ph-head">
             <div class="ph-eyebrow">Project Health</div>
-            <h1>890 E 135th St · FR-BX-001</h1>
-            <div class="ph-sub">Compass Point, LLC</div>
+            <!-- #281 SCRUB: project identity is FILLED SERVER-SIDE per request from the
+                 project_code in the URL (access.render_project_identity). The address, project code and client
+                 org name used to be hard-coded here, binding the whole shell to one job
+                 and one client. Empty by design — a second project, or a second client,
+                 must not require a second file. -->
+            <h1 data-project-title>&nbsp;</h1>
+            <div class="ph-sub" data-project-client>&nbsp;</div>
             <div class="ph-actions">
               <button class="ph-btn" data-link="/dropplan">Drop Plan</button>
-              <button class="ph-btn ghost" data-link="/WPS-FR-BX-001-2026-05-01-internal.html">Weekly Summary</button>
-              <button class="ph-btn ghost" data-link="/LA-FR-BX-001-2026-05-07.html">2-Week Lookahead</button>
+              <!-- #281 SCRUB: the "Weekly Summary" and "2-Week Lookahead" buttons are REMOVED.
+                   Each pointed at a per-project report FILENAME hard-coded into a shared
+                   shell, and one of them named the INTERNAL variant of a document that
+                   also has a client variant. Neither file exists for this project, so both
+                   were dead links; the danger was that generating them would silently turn
+                   an externally-visible button into a live internal-document link. They
+                   return only as generated, per-project, audience-correct links — never as
+                   static markup. -->
               <button class="ph-btn ghost" data-link="/rfi_submission_form.html">Submit RFI</button>
             </div>
           </div>
@@ -1125,8 +1143,6 @@
               </div>
             </div>
           </div>
-
-          <div class="ph-build" id="ph-build-stamp">build #265 · 2026-06-30 · Brand consistency — ONE canonical filled-star logo lockup (brand.py) across every surface + all NEW report templates; the "rinky dink" hollow/outline star is removed everywhere and banned by the design guard; the star is identical light/dark, only the wordmark text colour adapts</div>
         </div>
       </section>
 
@@ -1228,7 +1244,6 @@
             </table>
           </div>
           <div class="ec-empty ec-hide" id="ec-none">No workers match.</div>
-          <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:18px;" id="ec-build-stamp">build #223 · 2026-06-02 · Employees &amp; Certifications — crafted cards · compliance rings · readiness hero</div>
         </div>
       </section>
 
@@ -1408,7 +1423,6 @@
             <button class="pd-bb-clear" id="pd-bb-clear" type="button">Clear</button>
           </div>
           <div id="pd-checklist"></div>
-          <div id="pd-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #271 · 2026-07-02 · Project Documents — versioning (Update keeps History, Replace fixes wrong files) · always-on status pills · view-not-print</div>
         </div>
         <div class="pd-overlay" id="pd-modal">
           <div class="pd-modal">
@@ -1614,7 +1628,6 @@
           </div>
           <div id="dp-elev"></div>
           <div id="dp-stage" class="dp-hide"></div>
-          <div style="text-align:center;color:#9aa3ae;font-size:11px;margin-top:18px;" id="dp-build-stamp">build #256 · 2026-06-20 · Drop Plan — stage Complete (backdatable date) + un-complete; per-drop &amp; overall % derived live from completion (single source)</div>
         </div>
       </section>
 
@@ -1713,7 +1726,7 @@
             @page{
               margin:14mm 12mm 16mm 12mm;
               @top-left{content:"Two-Week Look-Ahead";font:bold 10px Inter,sans-serif;color:#222}
-              @top-right{content:"890 E 135th St · FR-BX-001";font:10px Inter,sans-serif;color:#666}
+              @top-right{content:"";font:10px Inter,sans-serif;color:#666}
               @bottom-center{content:"Page " counter(page) " of " counter(pages);font:10px Inter,sans-serif;color:#666}
             }
           }
@@ -1762,7 +1775,7 @@
       // Drop Plan, drag-to-edit (move/resize bars + drag milestone diamonds),
       // add/remove (incl. custom no-drop), Refresh, paginated Print. LOCAL dates.
       (function() {
-        const PROJECT = (typeof PROJECT_CODE !== 'undefined') ? PROJECT_CODE : 'FR-BX-001';
+        const PROJECT = (typeof PROJECT_CODE !== 'undefined') ? PROJECT_CODE : (window.SSC_PROJECT_CODE||'');
         const startEl=document.getElementById('la-start');
         const board=document.getElementById('la-board');
         const hero=document.getElementById('la-hero');
@@ -1925,7 +1938,7 @@
           <div class="dcr-head">
             <div>
               <h1>Daily Construction Reports</h1>
-              <div class="sub">FR-BX-001 · 890 E 135th St · <span id="dcr-head-count">—</span> reports</div>
+              <div class="sub"><span data-project-line></span> · <span id="dcr-head-count">—</span> reports</div>
             </div>
             <button id="dcr-new-btn" class="dcr-primary" type="button"><svg class="dcr-ic"><use href="#i-plus"/></svg>Issue New DCR</button>
           </div>
@@ -2124,7 +2137,7 @@
         (function() {
           function getProjectCode() {
             const m = window.location.pathname.match(/\/projects\/([^\/]+)/);
-            return m ? decodeURIComponent(m[1]) : 'FR-BX-001';
+            return m ? decodeURIComponent(m[1]) : (window.SSC_PROJECT_CODE||'');
           }
           const PROJECT_CODE = getProjectCode();
 
@@ -3760,7 +3773,7 @@
       </section>
       <script>
       (function() {
-        const PROJECT = (typeof PROJECT_CODE !== 'undefined') ? PROJECT_CODE : 'FR-BX-001';
+        const PROJECT = (typeof PROJECT_CODE !== 'undefined') ? PROJECT_CODE : (window.SSC_PROJECT_CODE||'');
         const weekEl   = document.getElementById('ws-week');
         const audEl    = document.getElementById('ws-audience');
         const frame    = document.getElementById('ws-frame');
@@ -3915,7 +3928,6 @@
             <div class="ph">Material activity</div>
             <div id="mt-activity"></div>
           </div>
-          <div id="mt-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:16px 0;">build #275 · 2026-07-04 · Materials &amp; Deliveries — boxed-field fix: every modal/count field carries the shared .ssc-field component (catalog · ledger · expected · weekly count · consumption maps unchanged)</div>
 
         <!-- modals — INSIDE .mt-wrap (#275): the overlays previously sat outside the
              wrapper that defines the --mt-* tokens, so var(--mt-line) didn't resolve in
@@ -4060,12 +4072,13 @@
       </section>
 
       <!-- #218 EXPENSES (cost data — admin/c_suite only; server-gated) -->
+      <!-- SECTION:financial:start -->
       <section class="view" data-view="expenses">
         <div class="section">
           <!-- State 1: LIST (Screen 1) -->
           <div id="exp-list-view">
             <div class="exp-head">
-              <div><h1>Expenses</h1><div class="sub">FR-BX-001 · 890 E 135th St · receipts on file + job costing</div></div>
+              <div><h1>Expenses</h1><div class="sub"><span data-project-line></span> · receipts on file + job costing</div></div>
               <div class="exp-hbtns">
                 <button id="exp-scan-btn" class="exp-primary" type="button"><svg class="exp-ic"><use href="#i-scan"/></svg>Scan Receipt</button>
                 <button id="exp-addmanual-btn" class="exp-ghost" type="button"><svg class="exp-ic"><use href="#i-plus"/></svg>Add Manually</button>
@@ -4146,7 +4159,7 @@
                 </div>
                 <div class="exp-frow">
                   <div class="exp-field"><label>Order #</label><input id="exp-f-order" placeholder="optional"></div>
-                  <div class="exp-field"><label>Project / Job</label><select id="exp-f-project"><option value="FR-BX-001">FR-BX-001 · 890 E 135th St</option></select></div>
+                  <div class="exp-field"><label>Project / Job</label><select id="exp-f-project"><option value="__PROJECT_CODE__" data-project-line>&nbsp;</option></select></div>
                 </div>
                 <div class="exp-frow">
                   <div class="exp-field"><label>Category</label><select id="exp-f-category"><option>Materials</option><option>Delivery</option><option>Equipment</option><option>Labor</option><option>Other</option></select></div>
@@ -4175,11 +4188,13 @@
       </section>
 
       <!-- #218 PRODUCT USAGE rollup (Screen 4) -->
+      <!-- SECTION:financial:end -->
+      <!-- SECTION:financial:start -->
       <section class="view" data-view="product-usage">
         <div class="section">
           <div class="exp-head">
-            <div><h1>Product Usage</h1><div class="sub">FR-BX-001 · what we actually bought &amp; used — by product class · feeds estimating</div></div>
-            <div class="exp-hbtns"><select class="exp-sel" id="exp-pu-project"><option value="FR-BX-001">This project</option><option value="" disabled>All projects (company-wide soon)</option></select></div>
+            <div><h1>Product Usage</h1><div class="sub"><span data-project-code></span> · what we actually bought &amp; used — by product class · feeds estimating</div></div>
+            <div class="exp-hbtns"><select class="exp-sel" id="exp-pu-project"><option value="__PROJECT_CODE__">This project</option><option value="" disabled>All projects (company-wide soon)</option></select></div>
           </div>
           <div class="exp-card">
             <table class="exp-table">
@@ -4192,6 +4207,7 @@
       </section>
 
       <!-- RFI LOG -->
+      <!-- SECTION:financial:end -->
       <section class="view" data-view="rfis">
         <div class="section">
           <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
@@ -4299,7 +4315,7 @@
           if (!body) return;
           function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
           var code = (typeof PROJECT_CODE !== 'undefined' && PROJECT_CODE) ||
-                     decodeURIComponent((location.pathname.match(/\/projects\/([^\/]+)/) || [])[1] || 'FR-BX-001');
+                     decodeURIComponent((location.pathname.match(/\/projects\/([^\/]+)/) || [])[1] || (window.SSC_PROJECT_CODE||''));
           fetch('/api/projects/' + encodeURIComponent(code) + '/sov', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
             .then(function (r) { if (r.status === 403) { body.className = 'placeholder-card'; body.textContent = 'Not authorized.'; return null; } return r.json(); })
             .then(function (j) {
@@ -4585,7 +4601,6 @@
             <div id="fp-clusters"></div>
             <div id="fp-sort-empty" class="fp-empty fp-hide">Nothing to sort — every photo is filed to a drop. 🎉</div>
           </div>
-          <div id="fp-build-stamp" style="text-align:center;color:#9aa3ae;font-size:11px;margin:18px 0;">build #271 · 2026-07-02 · Field Photos — capture-time (EXIF) ordering everywhere; photos without a capture time show "upload time", never a fake claim</div>
         </div>
         <!-- floating assign bar (sort mode) -->
         <div class="fp-bar fp-hide" id="fp-bar">
@@ -4668,11 +4683,11 @@
           <h2>Project Settings</h2>
           <div class="card">
             <div class="card-title">Project Code</div>
-            <div class="card-status">FR-BX-001</div>
+            <div class="card-status" data-project-code>&nbsp;</div>
           </div>
           <div class="card" style="margin-top: 16px;">
             <div class="card-title">Project Name</div>
-            <div class="card-status">890 East 135th Street · 890 E 135th Street</div>
+            <div class="card-status" data-project-name>&nbsp;</div>
           </div>
           <div class="card" style="margin-top: 16px;">
             <div class="card-title">Status</div>
@@ -4747,7 +4762,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
 // @requires_role is the real authority (non-cost roles 403). Money is rendered
 // from server-computed totals (Decimal, no drift). Dates LOCAL via SSCDatePicker.
 (function(){
-  const PROJECT = (location.pathname.match(/\/projects\/([^\/]+)/) || [])[1] || 'FR-BX-001';
+  const PROJECT = (location.pathname.match(/\/projects\/([^\/]+)/) || [])[1] || (window.SSC_PROJECT_CODE||'');
   const $ = (id) => document.getElementById(id);
   if (!$('exp-tbody')) return;  // section not present
   const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -5352,7 +5367,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
 (function() {
   function _projCode() {
     const m = window.location.pathname.match(/\/projects\/([^\/]+)/);
-    return m ? decodeURIComponent(m[1]) : 'FR-BX-001';
+    return m ? decodeURIComponent(m[1]) : (window.SSC_PROJECT_CODE||'');
   }
   const _esc = (s) => (s == null ? '' : String(s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'));
@@ -5414,10 +5429,10 @@ document.querySelectorAll('.nav-link').forEach(link => {
 // Project Crew (filtered by project_code from URL) + Cert Health
 // =====================================================================
 (function() {
-  // Read project_code from /projects/<code> URL, fallback to FR-BX-001
+  // Read project_code from /projects/<code> URL, else the server-injected global
   function getProjectCode() {
     const m = window.location.pathname.match(/\/projects\/([^\/]+)/);
-    return m ? decodeURIComponent(m[1]) : 'FR-BX-001';
+    return m ? decodeURIComponent(m[1]) : (window.SSC_PROJECT_CODE||'');
   }
   const PROJECT_CODE = getProjectCode();
 
@@ -5798,7 +5813,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
 // NYC Compliance Watch — live data loader
 // =====================================================================
 (function() {
-  const PROJECT = 'FR-BX-001';
+  const PROJECT = (window.SSC_PROJECT_CODE||'');
 
   // Used by inline onclick="cwScrollTo(...)"
   window.cwScrollTo = function(id) {
@@ -6016,7 +6031,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
 // the same endpoint via query params.
 // =====================================================================
 (function() {
-  const PROJECT = 'FR-BX-001';
+  const PROJECT = (window.SSC_PROJECT_CODE||'');
   const STATUSES = ['Open', 'Overdue', 'Answered', 'Closed', 'Void'];
   let activeStatuses = new Set();  // empty = no filter (all rows)
 
@@ -6268,9 +6283,9 @@ document.querySelectorAll('.nav-link').forEach(link => {
       // the Submit-RFI on-site header. /workers gives per-worker cert
       // counts which we sum for the Cert Alerts KPI.
       const [onSite, certWorkers, latestDcr] = await Promise.all([
-        fetch(API + '/api/projects/FR-BX-001/on-site?date=' + today).then(r => r.json()).catch(() => null),
-        fetch(API + '/api/projects/FR-BX-001/workers').then(r => r.json()).catch(() => null),
-        fetch(API + '/api/projects/FR-BX-001/reports/latest?audience=internal&on_date=' + today).then(r => r.json()).catch(() => null),
+        fetch(API + '/api/projects/' + (window.SSC_PROJECT_CODE||'') + '/on-site?date=' + today).then(r => r.json()).catch(() => null),
+        fetch(API + '/api/projects/' + (window.SSC_PROJECT_CODE||'') + '/workers').then(r => r.json()).catch(() => null),
+        fetch(API + '/api/projects/' + (window.SSC_PROJECT_CODE||'') + '/reports/latest?audience=internal&on_date=' + today).then(r => r.json()).catch(() => null),
       ]);
 
       // ---- Workers-Today / Today-on-Site widgets (#115) ----
@@ -6469,7 +6484,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
    wraps each [data-widget] node 1:1 — this module needs no change for that. */
 (function(){
   const $=(id)=>document.getElementById(id);
-  const PROJECT=(location.pathname.match(/\/projects\/([^\/]+)/)||[])[1]||'FR-BX-001';
+  const PROJECT=(location.pathname.match(/\/projects\/([^\/]+)/)||[])[1]||(window.SSC_PROJECT_CODE||'');
   const C={red:'#B11E2E',ok:'#2F7C57',ink:'#14161C',mute:'#76777E',track:'#EDEAE3',ns:'#D9D4CA',warn:'#B68838'};
   function todayLocal(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
   function fmtMDY(iso){if(!iso)return '';const p=String(iso).slice(0,10).split('-');return p.length===3?`${p[1]}/${p[2]}/${p[0]}`:iso;}
@@ -6635,12 +6650,12 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
 
   // ---- Drop Report ----
   // PROJECT is path-scoped — same derivation as the Drop Plan board + home progress
-  // widget (default FR-BX-001 when absent) — so the report follows whatever project's
+  // widget (server-injected global when absent) — so the report follows whatever project's
   // dashboard you're on. CLIENT/PROJ_NAME are pulled live from the project record
   // (loadMeta, via GET /api/projects/<code>), never hardcoded; they degrade to the
   // project code if that fetch fails.
   var _drpc=(location.pathname.match(/\/projects\/([^\/]+)/)||[])[1];
-  var PROJECT=_drpc?decodeURIComponent(_drpc):'FR-BX-001';
+  var PROJECT=_drpc?decodeURIComponent(_drpc):(window.SSC_PROJECT_CODE||'');
   var CLIENT='', PROJ_NAME=PROJECT;
   var SLABEL={not_started:['Not started','na'],in_progress:['In progress','prog'],complete:['Complete','done'],n_a:['N/A','na']};
   function pad(n){return String(n).padStart(2,'0');}
@@ -6739,7 +6754,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
    dates (MM/DD/YYYY display). */
 (function(){
   var pc=(location.pathname.match(/\/projects\/([^\/]+)/)||[])[1];
-  var PROJECT_CODE = pc ? decodeURIComponent(pc) : 'FR-BX-001';
+  var PROJECT_CODE = pc ? decodeURIComponent(pc) : (window.SSC_PROJECT_CODE||'');
   // #225 Lumen+Oat: gradient fills on bars/ring + solid dots; oat for not-started.
   var GRAD={complete:'linear-gradient(90deg,#34c29a,#15a07e)',active:'linear-gradient(90deg,#6a8df5,#4364dc)',behind:'linear-gradient(90deg,#f69483,#e9685a)',not_started:'linear-gradient(90deg,#ded6c8,#cabfad)'};
   var DOT={complete:'#15a07e',active:'#4364dc',behind:'#e9685a',not_started:'#cabfad'};
@@ -7151,7 +7166,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
    NO *_path is ever read from the API (file_url is the gated route). LOCAL dates (MM/DD/YYYY). */
 (function(){
   var pc=(location.pathname.match(/\/projects\/([^\/]+)/)||[])[1];
-  var PROJECT_CODE = pc ? decodeURIComponent(pc) : 'FR-BX-001';
+  var PROJECT_CODE = pc ? decodeURIComponent(pc) : (window.SSC_PROJECT_CODE||'');
   var CATS=[['PERMITS','Permits & Approvals','#6f8bb5'],['DRAWINGS','Drawings & Engineering','#4f9a92'],['CONTRACTS','Contracts & Financial','#8a7fb8'],['INSPECTIONS','Inspections & Reports','#6b78b0'],['SAFETY','Safety & Compliance','#9a8f7a'],['CLOSEOUT','Closeout','#9aa0a8']];
   var CATCOLOR={}; CATS.forEach(function(c){CATCOLOR[c[0]]=c[2];});
   var GRAD={on:'linear-gradient(90deg,#34c29a,#15a07e)',miss:'linear-gradient(90deg,#ded6c8,#cabfad)',warn:'linear-gradient(90deg,#f69483,#e9685a)'};
@@ -7591,7 +7606,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
    Burn/days-left/order-by chips belong to #272b and are deliberately absent. */
 (function(){
   var pc=(location.pathname.match(/\/projects\/([^\/]+)/)||[])[1];
-  var PROJECT_CODE = pc ? decodeURIComponent(pc) : 'FR-BX-001';
+  var PROJECT_CODE = pc ? decodeURIComponent(pc) : (window.SSC_PROJECT_CODE||'');
   function $(id){return document.getElementById(id);}
   function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
   function jget(u){return fetch(u,{credentials:'include'}).then(function(r){return r.json();});}
@@ -8024,7 +8039,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
 /* #235 Field Photos — gallery + Unassigned sort/assign tray + bulk upload. */
 (function(){
   var pc=(location.pathname.match(/\/projects\/([^/]+)/)||[])[1];
-  var PROJECT_CODE = pc?decodeURIComponent(pc):'FR-BX-001';
+  var PROJECT_CODE = pc?decodeURIComponent(pc):(window.SSC_PROJECT_CODE||'');
   function $(id){return document.getElementById(id);}
   function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
   var EL={North:'#6f8bb5',West:'#4f9a92',South:'#8a7fb8',East:'#6b78b0'};

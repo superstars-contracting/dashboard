@@ -128,3 +128,59 @@ def render_role_nav(html: str, role) -> str:
     html = _strip_named_block(html, "BACKLINK_PROJECTS", keep=not company)
     html = _strip_named_block(html, "COMPANYLINK", keep=company)
     return html
+
+
+# ===================== #281 — project identity, filled per request =====================
+# The shell used to carry "890 E 135th St · FR-BX-001" and the client's org name HARD-CODED
+# in three headers. That bound one file to one job and one client: a second project, or a
+# second client, would have needed a second file. It is now filled here, from the
+# project_code in the URL, on every request.
+#
+# SERVER-SIDE rather than a fetch, deliberately: the page already renders per role through
+# this pipeline, so there is no new endpoint to gate (and every /projects/<code> API is
+# behind the #263 hook, which external roles do not currently pass); the header is correct
+# in the first byte, with no empty flash; and it cannot be wrong for a role whose JS never
+# ran. Escaped, because a project name is operator-entered text landing in markup.
+
+def _esc(s) -> str:
+    return (str(s or "")
+            .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace('"', "&quot;"))
+
+
+# Text placeholders: <tag data-project-X>…</tag> gets its TEXT replaced.
+# Attribute placeholder: the literal __PROJECT_CODE__ token, for places where the value
+# has to live in an attribute (a <option value="…">) rather than in element text.
+_PROJECT_CODE_TOKEN = "__PROJECT_CODE__"
+
+
+def render_project_identity(html: str, project) -> str:
+    """Fill every data-project-* placeholder and __PROJECT_CODE__ token from `project`
+    (a mapping with project_code / name / client_name, any of them optional).
+
+    A no-op when the project is unknown: placeholders stay blank rather than showing a
+    stale or guessed name, and the token resolves to empty rather than to another job's
+    code. Blank is the honest failure here — a wrong project on a header is worse than
+    no project."""
+    if not project:
+        return html.replace(_PROJECT_CODE_TOKEN, "")
+    code = _esc(project.get("project_code"))
+    name = _esc(project.get("name"))
+    client = _esc(project.get("client_name"))
+    fills = {
+        "data-project-title":  " · ".join(x for x in (name, code) if x),
+        "data-project-client": client,
+        "data-project-line":   " · ".join(x for x in (code, name) if x),
+        "data-project-code":   code,
+        "data-project-name":   name,
+    }
+    for attr, value in fills.items():
+        # <tag ... attr ...>ANYTHING</tag>  ->  same tag with `value` as its text.
+        # The \b before the attribute name keeps data-project-code from matching inside
+        # data-project-client (they share a prefix); the optional ="…" lets a placeholder
+        # carry a value attribute as well as being a fill target.
+        html = re.sub(
+            r"(<(\w+)([^>]*\b" + re.escape(attr) + r")((?:=\"[^\"]*\")?[^>]*)>)(.*?)(</\2>)",
+            lambda m, v=value: m.group(1) + v + m.group(6),
+            html, flags=re.DOTALL)
+    return html.replace(_PROJECT_CODE_TOKEN, code)

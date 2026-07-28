@@ -283,7 +283,35 @@ def _serve_html_no_store(path):
     return resp
 
 
-def _serve_dashboard_no_store():
+def _project_identity(code):
+    """{project_code, name, client_name} for the shell header, or None. Read-only, and
+    NOT access control — the #263 before_request hook has already rejected a project this
+    user may not open by the time we get here."""
+    if not code:
+        return None
+    conn = db()
+    try:
+        row = conn.execute(
+            "SELECT project_code, name FROM projects WHERE project_code = ?", (code,)).fetchone()
+        if row is None:
+            return None
+        out = {"project_code": row["project_code"], "name": row["name"], "client_name": None}
+        # client org is optional (#266 added projects.client_org_id); absent is fine.
+        try:
+            crow = conn.execute(
+                "SELECT o.name AS client_name FROM projects p "
+                "JOIN crm_organization o ON o.id = p.client_org_id "
+                "WHERE p.project_code = ?", (code,)).fetchone()
+            if crow:
+                out["client_name"] = crow["client_name"]
+        except Exception:
+            pass          # pre-#266 database — header simply omits the client line
+        return out
+    finally:
+        conn.close()
+
+
+def _serve_dashboard_no_store(project_code=None):
     """Project Health surface (per-project dashboard), served no-store. The sidebar is
     RENDERED PER ROLE here:
       * #262 — gated SECTION blocks (Financial) the role can't access are STRIPPED, so a
@@ -301,6 +329,9 @@ def _serve_dashboard_no_store():
     html = ui_version.resolve_page(DASHBOARD_PATH).read_text(encoding="utf-8")
     html = access.render_sections(html, role)   # #262 — strip gated SECTION blocks
     html = access.render_role_nav(html, role)   # #263 — role-correct sidebar nav
+    # #281 — project identity was hard-coded into three headers, binding one file to one
+    # job and one client. Filled here instead, from the code in the URL.
+    html = access.render_project_identity(html, _project_identity(project_code))
     resp = Response(html, mimetype="text/html")
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
@@ -313,7 +344,7 @@ def project_dashboard(project_code):
     """Project-specific dashboard. Project context passed via URL → JS reads it from
     location.pathname. Access is enforced by the #263 before_request scoping hook: a pm
     opening an unassigned or closed project gets 403 here, server-side."""
-    return _serve_dashboard_no_store()
+    return _serve_dashboard_no_store(project_code)
 
 
 @app.route('/dashboard')
