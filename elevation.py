@@ -750,6 +750,13 @@ def _api_comments_list():
         blocked = _require_project(conn, code)
         if blocked:
             return blocked
+        # #283 — comments ride their host surface. The route itself sits behind the
+        # client's 'drawing' grant (client_portal gate); an RFI thread belongs to the
+        # RFIs section, so a client additionally needs 'rfis' to read one.
+        if _role() == "client" and ttype == "rfi":
+            import client_grants
+            if not client_grants.has_grant(conn, _uid(), code, "rfis"):
+                return _err("forbidden", 403)
         rows = conn.execute(
             "SELECT id, target_type, target_id, body, author_uid, created_at "
             "FROM comment WHERE project_code=? AND target_type=? AND target_id=? "

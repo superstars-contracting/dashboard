@@ -165,6 +165,12 @@
       // fallbacks below stay only for a server too old to send them; a new grantable
       // section should never need an edit in this file again.
       if(resp.data && resp.data.grantable_sections){ STATE.grantable = resp.data.grantable_sections; }
+      // #283 — only sections whose portal payload exists render as toggles; a
+      // catalogued-but-unserved key (weekly, materials) must not offer a grant
+      // that opens to nothing.
+      if(resp.data && resp.data.served_sections){
+        STATE.grantable = STATE.grantable.filter(function(s){ return resp.data.served_sections.indexOf(s) !== -1; });
+      }
       if(resp.data && resp.data.presets){ STATE.presets = resp.data.presets; }
       if(resp.data && resp.data.section_labels){ Object.assign(SECTION_LABEL, resp.data.section_labels); }
       if(resp.data && resp.data.preset_labels){ STATE.presetLabels = resp.data.preset_labels; }

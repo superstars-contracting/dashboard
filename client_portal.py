@@ -104,27 +104,31 @@ def _client_gate():
         return redirect("/portal")      # granted clients land on the portal (#269 routing)
     if path == "/portal" or path.startswith("/portal/") or path.startswith("/api/portal/"):
         return None                     # per-endpoint section grants enforced below
-    # #280 — the drawing markup surface. Per the operator's correction, a client and an
-    # architect see the IDENTICAL view, so the client gate has to let a client reach it.
-    # Deliberately placed in the >=1-GRANT branch, never above it: a zero-grant client is
-    # still hard-stopped on /welcome (#267 intact). Project scope is enforced separately
-    # by elevation._require_project, which for a client resolves to the single project
-    # their portal is bound to — reaching the route is not reaching another job's data.
-    #
-    # OPEN DECISION for Amit: this surface currently sits OUTSIDE the #269 per-section
-    # grant system, so any client with at least one grant sees the drawing. If it should
-    # be independently grantable, it needs a 'drawing' section in client_grants.SECTIONS
-    # and a require_section on the elevation endpoints.
-    # #280 steps 4/5 — comments and RFIs ride with the markup surface. The client is
-    # READ-ONLY on both, enforced at the endpoint (client is absent from
-    # elevation.COLLAB_WRITE_ROLES, so any POST/PATCH/DELETE is 403) — never by keeping
-    # them off the route, which would also blind them to the thread. The architect works
-    # for the owner, so their comments are not confidential from the client; that is a
-    # confirmed relationship decision, not a technical default.
+    # #280/#283 — the drawing markup surface, now grant-wired (the #281 open decision,
+    # decided): 'drawing' gates the page, the elevation APIs, and their comment threads;
+    # 'rfis' gates RFI reads. Same #269 posture as every section — re-derived per request,
+    # a revoke takes effect on the next request. Kept in the >=1-GRANT branch: a
+    # zero-grant client is still hard-stopped on /welcome (#267 intact). Project scope is
+    # enforced separately by elevation._require_project. The architect is NOT grant-gated
+    # here (their own gate + project assignment scope them); the client stays READ-ONLY on
+    # comments/RFIs at the endpoint (absent from elevation.COLLAB_WRITE_ROLES).
+    # Comments ride the section that hosts them: drop/photo threads live on the drawing
+    # (this gate); an RFI thread additionally requires the rfis grant, enforced in
+    # elevation._api_comments_list where the target type is known.
     if path == "/drawing-markup" or path.startswith("/drawing-markup/") \
             or path.startswith("/api/elevation/") or path == "/api/elevations" \
-            or path.startswith("/api/comments") or path.startswith("/api/rfis"):
-        return None
+            or path.startswith("/api/comments"):
+        if "drawing" in granted:
+            return None
+        logging.info(f"client_portal: drawing grant missing path={path}")
+        if path.startswith("/api/"):
+            return jsonify({"error": "forbidden"}), 403
+        return redirect("/portal")
+    if path.startswith("/api/rfis"):
+        if "rfis" in granted:
+            return None
+        logging.info(f"client_portal: rfis grant missing path={path}")
+        return jsonify({"error": "forbidden"}), 403
     logging.info(f"client_portal: contain block (granted) path={path}")
     if path.startswith("/api/"):
         return jsonify({"error": "forbidden"}), 403
