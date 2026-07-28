@@ -624,6 +624,8 @@ _ARCH_ALLOW_EXACT = {
     "/api/ui/version",        # #279 — every role may choose its own interface
 }
 _ARCH_ALLOW_PREFIXES = (
+    "/portal/",               # #281 — the shared shell, served from the portal namespace
+    "/api/portal/",           #        and its curated payloads
     "/drawing-markup/",
     "/api/elevation/",
     "/api/comments",          # step 4

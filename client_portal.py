@@ -102,7 +102,7 @@ def _client_gate():
     # ---- >=1 grant: the portal is home ----
     if path == "/welcome":
         return redirect("/portal")      # granted clients land on the portal (#269 routing)
-    if path == "/portal" or path.startswith("/api/portal/"):
+    if path == "/portal" or path.startswith("/portal/") or path.startswith("/api/portal/"):
         return None                     # per-endpoint section grants enforced below
     # #280 — the drawing markup surface. Per the operator's correction, a client and an
     # architect see the IDENTICAL view, so the client gate has to let a client reach it.

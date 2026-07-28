@@ -800,7 +800,12 @@
 <!-- #281 — ONE source for the project code, filled server-side from the URL.
      Every script below reads window.SSC_PROJECT_CODE instead of carrying its own
      hard-coded (window.SSC_PROJECT_CODE||'') fallback, which is what bound this shell to one job. -->
-<script>window.SSC_PROJECT_CODE = "__PROJECT_CODE__";</script>
+<script>window.SSC_PROJECT_CODE = "__PROJECT_CODE__";
+        // #281 — where this shell fetches from. Internal roles get the internal
+        // project namespace; external roles get the CURATED portal namespace, so a
+        // client/architect session never reaches an internal project endpoint and
+        // #264's single routing-layer boundary stays exactly where it is.
+        window.SSC_API_BASE = "__API_BASE__";</script>
 
 <!-- #212 nav icons — inline SVG <symbol> defs (defined ONCE, used via <use>).
      No icon font / CDN, so they always render (offline-safe). -->
@@ -1058,8 +1063,8 @@
 
           <!-- WIDGET: KPI tiles (live) -->
           <div class="ph-kpis" data-widget="kpis">
-            <div class="ph-kpi"><div><div class="ph-kpi-k">Workers on site</div><div class="ph-kpi-v" id="ph-kpi-workers">—</div><div class="ph-kpi-sub" id="ph-kpi-workers-sub">today</div></div></div>
-            <div class="ph-kpi"><div><div class="ph-kpi-k">Certs expiring ≤30d</div><div class="ph-kpi-v" id="ph-kpi-certs">—</div><div class="ph-kpi-sub" id="ph-kpi-certs-sub">incl. expired</div></div></div>
+            <!-- SECTION:workforce_kpi:start --><div class="ph-kpi"><div><div class="ph-kpi-k">Workers on site</div><div class="ph-kpi-v" id="ph-kpi-workers">—</div><div class="ph-kpi-sub" id="ph-kpi-workers-sub">today</div></div></div>
+            <div class="ph-kpi"><div><div class="ph-kpi-k">Certs expiring ≤30d</div><div class="ph-kpi-v" id="ph-kpi-certs">—</div><div class="ph-kpi-sub" id="ph-kpi-certs-sub">incl. expired</div></div></div><!-- SECTION:workforce_kpi:end -->
             <div class="ph-kpi"><div><div class="ph-kpi-k">Active drops</div><div class="ph-kpi-v" id="ph-kpi-active">—</div><div class="ph-kpi-sub">of <span id="ph-kpi-active-total">—</span> drops</div></div></div>
             <div class="ph-kpi"><span id="ph-kpi-progress-ring"></span><div><div class="ph-kpi-k">Overall progress</div><div class="ph-kpi-v" id="ph-kpi-progress">—</div><div class="ph-kpi-sub">drop plan</div></div></div>
           </div>
@@ -1125,14 +1130,14 @@
               </div>
             </div>
 
-            <div class="grid-stack-item" gs-id="roster" gs-x="0" gs-y="7" gs-w="8" gs-h="3">
+            <!-- SECTION:workforce_kpi:start --><div class="grid-stack-item" gs-id="roster" gs-x="0" gs-y="7" gs-w="8" gs-h="3">
               <div class="grid-stack-item-content">
                 <section class="ph-widget" data-widget="roster">
                   <div class="ph-widget-head"><h3>Today on site · roster (W-#### only)</h3><span class="ph-grip" title="Drag to move">⠿</span></div>
                   <div class="ph-widget-body" id="ph-roster-body"><div class="ph-loading">Loading…</div></div>
                 </section>
               </div>
-            </div>
+            </div><!-- SECTION:workforce_kpi:end -->
 
             <div class="grid-stack-item" gs-id="certs" gs-x="8" gs-y="9" gs-w="4" gs-h="2">
               <div class="grid-stack-item-content">

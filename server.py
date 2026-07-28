@@ -332,6 +332,9 @@ def _serve_dashboard_no_store(project_code=None):
     # #281 — project identity was hard-coded into three headers, binding one file to one
     # job and one client. Filled here instead, from the code in the URL.
     html = access.render_project_identity(html, _project_identity(project_code))
+    # #281 — and WHERE this shell fetches from: the internal project namespace for
+    # internal roles, the curated portal namespace for external ones.
+    html = access.render_api_base(html, role, project_code)
     resp = Response(html, mimetype="text/html")
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
@@ -344,6 +347,46 @@ def project_dashboard(project_code):
     """Project-specific dashboard. Project context passed via URL → JS reads it from
     location.pathname. Access is enforced by the #263 before_request scoping hook: a pm
     opening an unassigned or closed project gets 403 here, server-side."""
+    return _serve_dashboard_no_store(project_code)
+
+
+@app.route('/portal/<project_code>')
+def portal_project_shell(project_code):
+    """#281 — THE SAME SHELL, served from the portal namespace.
+
+    Client and architect get dashboard-static.html: same file, same layout, same widgets,
+    same CSS. What differs is injected, not forked — window.SSC_API_BASE points this
+    session at /api/portal/<code> instead of /api/projects/<code>, and the SECTION markers
+    strip what the role may not see.
+
+    WHY A SEPARATE ROUTE rather than letting external roles onto /projects/<code>:
+    #264's boundary is a single routing-layer rule — pm_scoping.pm_can_access_project
+    returns False for every external role on any path carrying a project code, which
+    covers /projects/<code> AND every /api/projects/<code>/… in one place. Opening it
+    would have made ~26 internal endpoint families reachable for external sessions with
+    only per-endpoint gates behind them. This route spends no security decision to save
+    work: the boundary is untouched and an external session never forms an internal URL.
+
+    Access here is the external user's own binding — the same pm_project_assignment /
+    client grant machinery the portal already uses — checked server-side, every request."""
+    role = (current_user() or {}).get("role")
+    conn = db()
+    try:
+        allowed = elevation.accessible_codes(conn, current_user())
+    finally:
+        conn.close()
+    if project_code not in allowed:
+        logging.info(f"portal_shell: scope block role={role} code={project_code}")
+        # A bare 403 — deliberately NOT the company-console message, which offers a link
+        # to /projects that an external role cannot use and would not understand.
+        return Response(
+            "<!doctype html><meta charset=utf-8><title>Not authorized</title>"
+            "<div style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;"
+            "max-width:420px;margin:18vh auto;text-align:center;color:#23211d\">"
+            "<div style=\"font-size:15px;font-weight:700;color:#B11E2E;letter-spacing:.5px\">"
+            "NOT AUTHORIZED</div><p style=\"color:#8a8378;font-size:14px;line-height:1.6\">"
+            "This project is not available on your account.</p></div>",
+            status=403, mimetype="text/html")
     return _serve_dashboard_no_store(project_code)
 
 

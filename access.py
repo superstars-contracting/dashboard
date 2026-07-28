@@ -37,6 +37,13 @@ SECTION_ACCESS = {
     # Estimates section above (board, VP table, CRM links, rollup $) stays admin/c_suite.
     # pm/super/client get 403 on ALL estimating surfaces.
     "estimating": frozenset({"admin", "c_suite", "estimator"}),
+    # #281 — workforce figures on the Project Health page: the "Workers on site" and
+    # "Certs expiring <=30d" KPI tiles and the "Today on site · roster" widget. Internal
+    # tier only. They are on Amit's never-visible list for client/architect, and unlisted
+    # would NOT have been enough: an unlisted key defaults to DASHBOARD_ROLES, which is
+    # already internal-only — but naming it makes the intent explicit and lets the marker
+    # strip the markup rather than relying on the widget's loader failing quietly.
+    "workforce_kpi": frozenset({"admin", "c_suite", "pm", "super"}),
 }
 
 # #263 — COMPANY axis. The company overview console (`/`) and its company-level tabs
@@ -152,6 +159,25 @@ def _esc(s) -> str:
 # Attribute placeholder: the literal __PROJECT_CODE__ token, for places where the value
 # has to live in an attribute (a <option value="…">) rather than in element text.
 _PROJECT_CODE_TOKEN = "__PROJECT_CODE__"
+_API_BASE_TOKEN = "__API_BASE__"
+
+# #281 — the shell is ONE file served from two namespaces. Which namespace a session
+# fetches from is decided HERE, server-side, and injected as a single variable:
+#
+#   internal roles  ->  /api/projects/<code>   the internal project namespace
+#   external roles  ->  /api/portal/<code>     the CURATED portal namespace
+#
+# This is what lets client and architect have the same shell, same layout and same visual
+# language WITHOUT opening #264's routing-layer boundary: an external session simply never
+# forms an internal URL. pm_scoping.pm_can_access_project still returns False for every
+# external role, and that stays the enforcement — this only decides what the page asks for.
+EXTERNAL_API_ROLES = frozenset({"client", "architect", "vendor"})
+
+
+def api_base_for(role, project_code) -> str:
+    code = str(project_code or "")
+    ns = "/api/portal/" if role in EXTERNAL_API_ROLES else "/api/projects/"
+    return ns + code
 
 
 def render_project_identity(html: str, project) -> str:
@@ -184,3 +210,8 @@ def render_project_identity(html: str, project) -> str:
             lambda m, v=value: m.group(1) + v + m.group(6),
             html, flags=re.DOTALL)
     return html.replace(_PROJECT_CODE_TOKEN, code)
+
+
+def render_api_base(html: str, role, project_code) -> str:
+    """Fill __API_BASE__ with the namespace this role is allowed to fetch from."""
+    return html.replace(_API_BASE_TOKEN, _esc(api_base_for(role, project_code)))
