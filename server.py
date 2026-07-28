@@ -375,6 +375,21 @@ def portal_project_shell(project_code):
     role = actor.get("role")
     effective = actor
 
+    # ---- TEMPORARY LOCK (#281, removed at flip time) ----------------------------
+    # STEP 2 (nav rendered from the grant list) is NOT built yet, so this shell still
+    # shows every nav item that has no SECTION marker — around eleven that are not on
+    # any external role's list and would open to internal surfaces that 403. That is a
+    # bad first impression, not a data leak (every endpoint behind them is still gated),
+    # but an outside party must not meet a half-finished menu.
+    #
+    # So until the nav is grant-driven and verified, this route is an ADMIN PREVIEW
+    # SURFACE ONLY. An external role landing here directly goes to Classic, which is
+    # complete and is still what they are meant to be using.
+    if role in access.EXTERNAL_API_ROLES:
+        logging.info(f"portal_shell: external role sent to Classic (pre-STEP2 lock) "
+                     f"role={role} code={project_code}")
+        return redirect("/portal")
+
     # PREVIEW-AS-CLIENT (#270 pattern). Without this the shell would render with the
     # ADMIN's role and show Amit everything — a preview that disagrees with what the
     # client actually gets is worse than no preview at all, which is the whole reason
