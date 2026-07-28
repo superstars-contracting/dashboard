@@ -40,15 +40,38 @@ from auth import _db, _now_iso, current_user, requires_company
 # The grantable client sections, in portal display order. A future section is an
 # additive change HERE (+ its portal endpoint/UI) — no schema change (no CHECK by
 # design, see schema_client_grants_269.sql).
-SECTIONS = ("progress", "photos", "documents", "daily", "schedule")
+SECTIONS = ("progress", "photos", "documents", "daily", "schedule",
+            # #281 — the shared-shell sections. All DEFAULT OFF like every other grant:
+            # adding a key here grants nobody anything, it only makes the toggle exist.
+            "drawing", "weekly", "materials", "rfis")
+
+# Labels travel WITH the catalog now. They used to live only in admin_projects.html, so a
+# new key rendered as its raw slug until someone remembered to add it in a second place.
+SECTION_LABELS = {
+    "progress": "Progress", "photos": "Photos", "documents": "Documents",
+    "daily": "Daily Reports", "schedule": "Schedule",
+    "drawing": "Drawing Markup", "weekly": "Weekly Summary",
+    "materials": "Materials", "rfis": "RFIs",
+}
 
 # #270 — access presets: named bundles an admin applies in one click. IN CODE, no
 # schema — applying one REPLACES the client's grant set with these sections (the
 # per-section toggles remain the fine-grained control). Order = SECTIONS order.
+# #281 — "full" is now an EXPLICIT tuple, not a reference to SECTIONS.
+#
+# It used to be `"full": SECTIONS`, so adding a grantable key silently added it to the
+# Full preset — every client on Full would have been granted the four new sections the
+# moment the catalog grew, with nobody deciding that. A preset is an editorial choice
+# about what a bundle means; the catalog is just what exists. They must not be the same
+# object.
+#
+# The four new keys (drawing, weekly, materials, rfis) are DELIBERATELY IN NO PRESET
+# pending the operator's bundling decision. They remain individually grantable and
+# default OFF, so nothing is blocked — only the one-click bundles wait.
 PRESETS = {
     "minimal": ("progress",),
     "standard": ("progress", "photos", "daily"),
-    "full": SECTIONS,
+    "full": ("progress", "photos", "documents", "daily", "schedule"),
 }
 PRESET_LABELS = {"minimal": "Minimal", "standard": "Standard", "full": "Full view"}
 
@@ -166,7 +189,19 @@ def _api_list_grants():
             clients.append({"user_id": uid,
                             "project_code": pr[0] if pr else None,
                             "sections": per_user.get(uid, [])})
-        return jsonify({"data": {"sections": list(SECTIONS), "clients": clients}})
+        # `sections` is kept for anything already reading it. `grantable_sections`,
+        # `section_labels` and `presets` are what the admin UI actually reads — it was
+        # written to be data-driven but looked for `grantable_sections`, which nothing
+        # emitted, so it silently fell back to a hard-coded list and a new key here would
+        # never have reached the screen. Serving the catalog closes that.
+        return jsonify({"data": {
+            "sections": list(SECTIONS),
+            "grantable_sections": list(SECTIONS),
+            "section_labels": dict(SECTION_LABELS),
+            "presets": {k: list(v) for k, v in PRESETS.items()},
+            "preset_labels": dict(PRESET_LABELS),
+            "clients": clients,
+        }})
     finally:
         conn.close()
 

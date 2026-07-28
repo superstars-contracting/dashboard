@@ -311,7 +311,7 @@ def _project_identity(code):
         conn.close()
 
 
-def _serve_dashboard_no_store(project_code=None):
+def _serve_dashboard_no_store(project_code=None, role_override=None):
     """Project Health surface (per-project dashboard), served no-store. The sidebar is
     RENDERED PER ROLE here:
       * #262 — gated SECTION blocks (Financial) the role can't access are STRIPPED, so a
@@ -322,7 +322,9 @@ def _serve_dashboard_no_store(project_code=None):
         which would 403 anyway).
     Hiding a menu item is not access control — the project-ASSIGNMENT before_request hook
     rejects an unassigned /projects/<code> regardless; this just makes the menu match."""
-    role = (current_user() or {}).get("role")
+    # role_override is the PREVIEW-AS-CLIENT path (#281): the shell renders as the target
+    # client would see it, so what Amit verifies is what the client gets.
+    role = role_override or (current_user() or {}).get("role")
     # #279 — v2 twin when one exists, the untouched v1 file otherwise. The role-based
     # SECTION stripping below runs on WHICHEVER file was chosen: server-side access
     # enforcement is not a v1 behaviour a v2 page gets to opt out of.
@@ -369,10 +371,43 @@ def portal_project_shell(project_code):
 
     Access here is the external user's own binding — the same pm_project_assignment /
     client grant machinery the portal already uses — checked server-side, every request."""
-    role = (current_user() or {}).get("role")
+    actor = current_user() or {}
+    role = actor.get("role")
+    effective = actor
+
+    # PREVIEW-AS-CLIENT (#270 pattern). Without this the shell would render with the
+    # ADMIN's role and show Amit everything — a preview that disagrees with what the
+    # client actually gets is worse than no preview at all, which is the whole reason
+    # this is an explicit switch rather than a silent repoint.
+    raw_preview = request.args.get("preview_client")
+    if raw_preview and role in ("admin", "c_suite"):
+        conn = db()
+        try:
+            try:
+                target_id = int(raw_preview)
+            except (TypeError, ValueError):
+                return jsonify({"error": "forbidden"}), 403
+            trow = conn.execute(
+                "SELECT id, role, status, is_active FROM users WHERE id=?",
+                (target_id,)).fetchone()
+            if (not trow or trow["role"] not in access.EXTERNAL_API_ROLES
+                    or trow["status"] != "active" or not trow["is_active"]):
+                return jsonify({"error": "forbidden"}), 403
+            effective = {"id": trow["id"], "role": trow["role"]}
+            conn.execute(
+                "INSERT INTO audit_log (action, actor_user_id, actor_role, target_type, "
+                "target_id, note, created_at) VALUES (?,?,?,?,?,?,?)",
+                ("portal_shell_preview", actor.get("id"), role, "user", str(target_id),
+                 f"read-only new-shell preview of {project_code}",
+                 datetime.now().isoformat(timespec="seconds")))
+            conn.commit()
+        finally:
+            conn.close()
+        role = effective["role"]
+
     conn = db()
     try:
-        allowed = elevation.accessible_codes(conn, current_user())
+        allowed = elevation.accessible_codes(conn, effective)
     finally:
         conn.close()
     if project_code not in allowed:
@@ -387,7 +422,7 @@ def portal_project_shell(project_code):
             "NOT AUTHORIZED</div><p style=\"color:#8a8378;font-size:14px;line-height:1.6\">"
             "This project is not available on your account.</p></div>",
             status=403, mimetype="text/html")
-    return _serve_dashboard_no_store(project_code)
+    return _serve_dashboard_no_store(project_code, role_override=role)
 
 
 @app.route('/dashboard')

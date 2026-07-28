@@ -890,9 +890,7 @@
       <div class="nav-group" data-group="people">
         <div class="nav-group-label"><span class="nav-group-name">People</span><svg class="nav-chev"><use href="#i-chev"/></svg></div>
         <div class="nav-items">
-          <a class="nav-link" data-view="employees"><svg class="nav-ic"><use href="#i-users"/></svg>Employees & Certs</a>
-          <a class="nav-link" data-view="subs"><svg class="nav-ic"><use href="#i-bldg"/></svg>Subcontractors & COIs</a>
-        </div>
+<!-- SECTION:internal_ops:start --><a class="nav-link" data-view="employees"><svg class="nav-ic"><use href="#i-users"/></svg>Employees & Certs</a><!-- SECTION:internal_ops:end --><!-- SECTION:internal_ops:start --><a class="nav-link" data-view="subs"><svg class="nav-ic"><use href="#i-bldg"/></svg>Subcontractors & COIs</a><!-- SECTION:internal_ops:end -->        </div>
       </div>
       <div class="nav-group" data-group="field">
         <div class="nav-group-label"><span class="nav-group-name">Field</span><svg class="nav-chev"><use href="#i-chev"/></svg></div>
@@ -912,12 +910,9 @@
         <div class="nav-items">
           <a class="nav-link" data-view="daily-report"><svg class="nav-ic"><use href="#i-file"/></svg>Daily Report</a>
           <a class="nav-link" data-view="weekly-summary"><svg class="nav-ic"><use href="#i-cal"/></svg>Weekly Summary</a>
-          <a class="nav-link" data-view="site-closure"><svg class="nav-ic"><use href="#i-clip"/></svg>Site Closure</a>
-          <a class="nav-link" data-view="materials"><svg class="nav-ic"><use href="#i-box"/></svg>Materials & Deliveries</a>
+<!-- SECTION:internal_ops:start --><a class="nav-link" data-view="site-closure"><svg class="nav-ic"><use href="#i-clip"/></svg>Site Closure</a><!-- SECTION:internal_ops:end -->          <a class="nav-link" data-view="materials"><svg class="nav-ic"><use href="#i-box"/></svg>Materials & Deliveries</a>
           <a class="nav-link" data-view="meetings"><svg class="nav-ic"><use href="#i-msg"/></svg>Meeting Minutes</a>
-          <a class="nav-link" data-view="equipment"><svg class="nav-ic"><use href="#i-box"/></svg>Equipment Log</a>
-          <a class="nav-link" data-view="toolbox-talks"><svg class="nav-ic"><use href="#i-mega"/></svg>Toolbox Talks</a>
-        </div>
+<!-- SECTION:internal_ops:start --><a class="nav-link" data-view="equipment"><svg class="nav-ic"><use href="#i-box"/></svg>Equipment Log</a><!-- SECTION:internal_ops:end --><!-- SECTION:internal_ops:start --><a class="nav-link" data-view="toolbox-talks"><svg class="nav-ic"><use href="#i-mega"/></svg>Toolbox Talks</a><!-- SECTION:internal_ops:end -->        </div>
       </div>
       <div class="nav-group" data-group="tracking">
         <div class="nav-group-label"><span class="nav-group-name">Tracking</span><svg class="nav-chev"><use href="#i-chev"/></svg></div>
@@ -1152,6 +1147,7 @@
       </section>
 
       <!-- EMPLOYEES & CERTS — crafted card view (#223): readiness hero + worker cards + table toggle -->
+      <!-- SECTION:internal_ops:start -->
       <section class="view" data-view="employees">
         <style>
           /* #223 — all classes ec- prefixed to avoid colliding with the shared dashboard CSS.
@@ -1255,6 +1251,8 @@
       <!-- INTAKE MODAL — removed from project dashboard. Lives in Company Console (/) -->
 
       <!-- SUBCONTRACTORS & COIs -->
+      <!-- SECTION:internal_ops:end -->
+      <!-- SECTION:internal_ops:start -->
       <section class="view" data-view="subs">
         <div class="section">
           <h2>Subcontractors & COIs</h2>
@@ -1280,6 +1278,7 @@
            NOTE (UI v2 #279): dashboard-static.html is a v1 template, edited here on the
            operator's explicit instruction. The phase-0 byte-identity gate is unaffected —
            there is no v2 twin of this file, so ui_version 1 and 2 serve the same bytes. -->
+      <!-- SECTION:internal_ops:end -->
       <section class="view" data-view="drawings">
         <iframe class="drawings-frame" src="/drawing-markup" loading="lazy"
                 title="Drawing Markup — north elevation drop status"></iframe>
@@ -3818,6 +3817,7 @@
       </script>
 
       <!-- SITE CLOSURE -->
+      <!-- SECTION:internal_ops:start -->
       <section class="view" data-view="site-closure">
         <div class="section">
           <h2>Site Closure</h2>
@@ -3826,6 +3826,7 @@
       </section>
 
       <!-- MATERIALS & DELIVERIES -->
+      <!-- SECTION:internal_ops:end -->
       <section class="view" data-view="materials">
         <style>
           /* #272a — Materials & Deliveries (per the approved A+B mockup). Tokens from
@@ -4046,6 +4047,7 @@
       </section>
 
       <!-- EQUIPMENT LOG -->
+      <!-- SECTION:internal_ops:start -->
       <section class="view" data-view="equipment">
         <div class="section">
           <h2>Equipment Log</h2>
@@ -4054,6 +4056,8 @@
       </section>
 
       <!-- TOOLBOX TALKS -->
+      <!-- SECTION:internal_ops:end -->
+      <!-- SECTION:internal_ops:start -->
       <section class="view" data-view="toolbox-talks">
         <div class="section">
           <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:10px;">
@@ -4077,6 +4081,7 @@
       </section>
 
       <!-- #218 EXPENSES (cost data — admin/c_suite only; server-gated) -->
+      <!-- SECTION:internal_ops:end -->
       <!-- SECTION:financial:start -->
       <section class="view" data-view="expenses">
         <div class="section">
@@ -5720,7 +5725,11 @@ document.querySelectorAll('.nav-link').forEach(link => {
 
   // Wire load to view activation
   let rosterLoaded = false;
-  document.querySelector('[data-view="employees"]').addEventListener('click', () => {
+  // #281 — this nav link is STRIPPED for external roles (SECTION:internal_ops), so the
+      // element is legitimately absent. Unguarded, querySelector(...).addEventListener
+      // threw and killed every statement after it in this IIFE.
+      const _empNav = document.querySelector('[data-view="employees"]');
+      if (_empNav) _empNav.addEventListener('click', () => {
     if (rosterLoaded) loadRoster();
     else { rosterLoaded = true; loadRoster(); }
   });
@@ -6016,7 +6025,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
 
   // Load when the Compliance view is first opened (lazy)
   let loaded = false;
-  document.querySelector('[data-view="compliance"]').addEventListener('click', () => {
+  (document.querySelector('[data-view="compliance"]') || {addEventListener(){}}).addEventListener('click', () => {
     if (loaded) return;
     loaded = true;
     loadAll();

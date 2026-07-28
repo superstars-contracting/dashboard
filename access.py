@@ -44,6 +44,11 @@ SECTION_ACCESS = {
     # already internal-only — but naming it makes the intent explicit and lets the marker
     # strip the markup rather than relying on the widget's loader failing quietly.
     "workforce_kpi": frozenset({"admin", "c_suite", "pm", "super"}),
+    # #281 — the internal-ops sections on Amit's never-visible list: Employees & Certs,
+    # Subcontractors & COIs, Site Closure, Equipment Log, Toolbox Talks. One key because
+    # they share one rule (internal tier, never an outside party), which keeps the strip
+    # legible; split it the day one of them needs a different answer.
+    "internal_ops": frozenset({"admin", "c_suite", "pm", "super"}),
 }
 
 # #263 — COMPANY axis. The company overview console (`/`) and its company-level tabs
