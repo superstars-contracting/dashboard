@@ -276,8 +276,14 @@
               :' title="The portal this client gets today — read-only, logged"')
         +'>👁 Classic <span style="font-size:9px;font-weight:700;letter-spacing:.5px;'
         +'border:1px solid #2F7C57;color:#2F7C57;border-radius:2px;padding:0 3px;margin-left:3px;">LIVE</span></button>'
-        +'<button class="btn-ghost-sm pv-open-new" onclick="window.open(\'/portal/\'+encodeURIComponent('
-        + JSON.stringify(c.project_code||'') + ')+\'?preview_client='+c.user_id+'\',\'_blank\')"'
+        // The URL is built HERE, at render time, and only the finished string goes into
+        // the attribute. The previous version interpolated JSON.stringify(project_code)
+        // into a double-quoted onclick="…" — the quotes it emits closed the attribute at
+        // the first character, so the handler never bound at all (and HTML lowercased the
+        // orphaned remainder into a stray attribute name). Same shape as Classic now.
+        +'<button class="btn-ghost-sm pv-open-new" onclick="window.open(\''
+        + '/portal/' + encodeURIComponent(c.project_code||'') + '?preview_client=' + c.user_id
+        + '\',\'_blank\')"'
         +((dis0||!c.project_code)?' disabled title="Assign a project first"'
               :' title="The new shared shell — not yet what clients land on"')
         +'>👁 New</button>'
