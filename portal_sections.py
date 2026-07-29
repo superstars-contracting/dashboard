@@ -34,8 +34,9 @@ from __future__ import annotations
 
 import functools
 import logging
+from pathlib import Path
 
-from flask import g, jsonify, request
+from flask import g, jsonify, request, send_file
 
 import client_grants
 import client_registry as reg
@@ -210,7 +211,11 @@ def _sec_progress():
                 text += f" {photos_shared} photo{'s' if photos_shared != 1 else ''} shared with you."
         progress = reg.client_payload("health.progress",
                                       {"pct": round(pct, 0), "label": label})
-        summary = {"text": text, "last_activity": last_activity}
+        latest = conn.execute(
+            "SELECT MAX(report_date) FROM report_index "
+            "WHERE project_code=? AND status='issued'", (code,)).fetchone()
+        summary = {"text": text, "last_activity": last_activity,
+                   "latest_report": latest[0] if latest else None}
         if photos_shared is not None:
             summary["photos_shared"] = photos_shared
         summary = reg.client_payload("portal.progress_summary", summary)
@@ -299,9 +304,12 @@ _DAY_LIMIT = 30
 
 
 def _daily_days(conn, code):
-    """Issued report days, newest first. no_work_reason / no_work_note are NOT selected."""
+    """Issued report days, newest first. no_work_reason / no_work_note are NOT selected.
+    #286 — dcr_sequence rides along: the display id is GENERATED from it, and it
+    addresses the client-audience render route."""
     return conn.execute(
-        "SELECT report_date AS date, MAX(COALESCE(no_work,0)) AS no_work "
+        "SELECT report_date AS date, MAX(COALESCE(no_work,0)) AS no_work, "
+        "MAX(dcr_sequence) AS seq "
         "FROM report_index WHERE project_code=? AND status='issued' "
         "GROUP BY report_date ORDER BY report_date DESC LIMIT ?",
         (code, _DAY_LIMIT)).fetchall()
@@ -357,7 +365,12 @@ def _daily_stage_activity(conn, code, dates):
 
 def _daily_cell_changes(conn, code, dates):
     """{date: [registered change]} from the append-only elevation_cell_event log, in
-    CLIENT vocabulary (status_tone client_label). reason / actor_uid never selected."""
+    CLIENT vocabulary (status_tone client_label). reason / actor_uid never selected.
+
+    #286 CHURN FILTER — the feed is NET day-level movement, not the raw event log:
+    events collapse per (day, cell) to first-from -> last-to, so a no-op write
+    (X -> X) and a same-day round trip (A -> B -> A) render NOTHING. Operator
+    churn is not client news; the day either moved or it did not."""
     if not dates:
         return {}
     tones = {r["key"][len("elevation."):]: (r["client_label"] or r["label"])
@@ -366,22 +379,35 @@ def _daily_cell_changes(conn, code, dates):
                  "WHERE module='elevation' AND client_visible=1").fetchall()}
     ph = ",".join(["?"] * len(dates))
     rows = conn.execute(
-        f"SELECT substr(ev.created_at,1,10) AS day, ed.idx AS drop_idx, "
+        f"SELECT substr(ev.created_at,1,10) AS day, ev.cell_id, ed.idx AS drop_idx, "
         f"       c.level_name, ev.from_status, ev.to_status "
         f"FROM elevation_cell_event ev "
         f"JOIN elevation_cell c ON c.id = ev.cell_id "
         f"JOIN elevation_drop ed ON ed.id = c.drop_id "
         f"JOIN elevation e ON e.id = ed.elevation_id "
         f"WHERE e.project_code=? AND substr(ev.created_at,1,10) IN ({ph}) "
-        f"ORDER BY ev.created_at", [code, *dates]).fetchall()
-    out = {}
+        f"ORDER BY ev.created_at, ev.id", [code, *dates]).fetchall()
+    net = {}      # (day, cell_id) -> {first_from, last_to, drop_idx, level_name}
+    order = []
     for r in rows:
-        frm, to = tones.get(r["from_status"]), tones.get(r["to_status"])
+        k = (r["day"], r["cell_id"])
+        if k not in net:
+            net[k] = {"first_from": r["from_status"], "drop_idx": r["drop_idx"],
+                      "level_name": r["level_name"]}
+            order.append(k)
+        net[k]["last_to"] = r["to_status"]
+    out = {}
+    for k in order:
+        day, _cell = k
+        n = net[k]
+        if n["first_from"] == n["last_to"]:
+            continue          # no NET movement that day — churn, not news
+        frm, to = tones.get(n["first_from"]), tones.get(n["last_to"])
         if to is None:
             continue          # a non-client-visible status never ships, even renamed
-        out.setdefault(r["day"], []).append(reg.client_payload("portal.daily_change", {
-            "drop_label": f"Drop {r['drop_idx']}",
-            "level": r["level_name"],
+        out.setdefault(day, []).append(reg.client_payload("portal.daily_change", {
+            "drop_label": f"Drop {n['drop_idx']}",
+            "level": n["level_name"],
             "from_label": frm, "to_label": to,
         }))
     return out
@@ -426,10 +452,14 @@ def _sec_daily():
         for r in day_rows:
             d = r["date"]
             no_work = bool(r["no_work"])
+            seq = r["seq"]
             day = reg.client_payload("portal.daily_day", {
                 "date": d, "no_work": no_work,
                 "label": "No work performed" if no_work
                          else "Crew on site — work performed",
+                # #286 — GENERATED display id (never the per-audience report_id column)
+                "report_id": (f"DCR-{code}-{seq:03d}" if seq is not None else None),
+                "seq": seq,
             })
             drops_map, acts = stage.get(d, ({}, []))
             day["weather"] = weather.get(d)
@@ -444,6 +474,84 @@ def _sec_daily():
         conn.close()
 
 
+# ============= #286: the client-audience rendered DCR, by sequence =============
+
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_DCR_RENDER_BASE = _SCRIPT_DIR / "data_room" / "reports" / "dcr"
+
+
+@require_portal_section("daily")
+def _sec_daily_view(seq):
+    """Serve the CLIENT-AUDIENCE rendered DCR for one issued sequence of the client's
+    own project. Audience is PER-RENDER, not per-item: this route serves client.html
+    and nothing else — the internal render and the PDF do not exist on this namespace,
+    at any URL, for any parameter. Ownership + issuance re-derived per request; any
+    other-project / unissued / unknown sequence is 404 (never reveals existence)."""
+    code = g.client_project_code
+    conn = _db()
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM report_index WHERE project_code=? AND report_type='DCR' "
+            "AND dcr_sequence=? AND status='issued' LIMIT 1", (code, seq)).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    f = _DCR_RENDER_BASE / code / f"{seq:03d}" / "client.html"
+    try:
+        if not f.resolve().is_relative_to(_DCR_RENDER_BASE.resolve()) or not f.exists():
+            return jsonify({"error": "not found"}), 404
+    except (OSError, ValueError):
+        return jsonify({"error": "not found"}), 404
+    resp = send_file(str(f), mimetype="text/html")
+    return _no_store(resp)
+
+
+# ============= #286: the look-ahead board (anatomy parity, read-only) =============
+
+@require_portal_section("schedule")
+def _sec_lookahead():
+    """The client's Two-Week Look-Ahead: the SAME board the internal page renders,
+    through the registry. STRICTLY READ-ONLY — this route never drafts, refreshes,
+    or writes; an empty plan serves an empty window honestly.
+
+    Curated per the #286 provenance decision: activity TITLES cross (planning labels
+    designed for external consumption — flagged in HANDOFF); a delivery's name is
+    replaced with the generic "Delivery"; crew / notes / source / constraint counts
+    never enter the payload."""
+    from datetime import date as _date
+    code = g.client_project_code
+    start = (request.args.get("start") or "").strip() or _date.today().isoformat()
+    try:
+        _date.fromisoformat(start)
+    except ValueError:
+        return jsonify({"error": "start must be YYYY-MM-DD"}), 400
+    import lookahead as _lookahead
+    conn = _db()
+    try:
+        raw = _lookahead.load_window(conn, code, start)
+    finally:
+        conn.close()
+
+    def activity(a):
+        name = "Delivery" if a.get("activity_type") == "delivery" else a.get("name")
+        return reg.client_payload("la.activity", {
+            "name": name, "activity_type": a.get("activity_type"), "grid": a.get("grid"),
+        })
+
+    groups = [{
+        **reg.client_payload("la.group", gr),
+        "activities": [activity(a) for a in gr.get("activities", [])],
+    } for gr in raw.get("groups", [])]
+    return _no_store(jsonify({"data": {
+        "window_start": raw.get("window_start"), "window_end": raw.get("window_end"),
+        "days": reg.client_payload("la.day", raw.get("days", [])),
+        "kpis": reg.client_payload("la.kpis", raw.get("kpis", {})),
+        "groups": groups,
+        "general": [activity(a) for a in raw.get("general", [])],
+    }}))
+
+
 def register(app) -> None:
     """Wire the four section payloads. Call AFTER client_portal.register (the client
     gate must already be routing /api/portal/* for the session role)."""
@@ -455,3 +563,7 @@ def register(app) -> None:
                      _sec_documents, methods=["GET"])
     app.add_url_rule("/api/portal/<project_code>/daily", "portal_sec_daily",
                      _sec_daily, methods=["GET"])
+    app.add_url_rule("/api/portal/<project_code>/daily/<int:seq>/view",
+                     "portal_sec_daily_view", _sec_daily_view, methods=["GET"])
+    app.add_url_rule("/api/portal/<project_code>/lookahead", "portal_sec_lookahead",
+                     _sec_lookahead, methods=["GET"])

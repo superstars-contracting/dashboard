@@ -12,9 +12,10 @@
      #269 — Client Access grew per-section, DEFAULT-OFF access toggles (client_section_grant):
      an admin unlocks a client's portal one section at a time; zero sections = the client
      stays hard-contained on /welcome (#267).
-     #270 — access PRESETS (Minimal/Standard/Full view; apply = replace-set) + a read-only
-     "Preview portal" button per client (/portal?preview_client=<id> — stateless, server-
-     enforced parity, audited; amber banner marks the preview). -->
+     #270 — access PRESETS (Minimal/Standard/Full view; apply = replace-set).
+     #286 — ONE read-only "Preview" button per client (/portal/<code>?preview_client=<id>
+     — the portal clients actually land on; stateless, server-enforced parity, audited;
+     amber banner marks the preview). -->
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:var(--canvas);color:var(--ink);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;}
@@ -271,28 +272,16 @@
       return '<div class="pm-card"><div class="pm-head"><div><div class="pm-nm">'+esc(c.display_name||c.email)+'</div>'
         +'<div class="pm-em">'+esc(c.email)+'</div></div>'
         +'<div class="pm-save" style="display:flex;gap:8px;align-items:center;">'
-        // #281 — TWO-WAY PREVIEW SWITCH, never a silent repoint. Classic is what clients
-        // actually get today and is marked LIVE; New is the shared shell at /portal/<code>.
-        // A preview that quietly disagrees with the client's real landing page is worse
-        // than no preview, so which one you are looking at is always on screen.
-        +'<span class="pv-switch" style="display:inline-flex;align-items:center;gap:6px;'
-        +'font-size:11px;color:var(--muted);">Preview:</span>'
-        +'<button class="btn-ghost-sm pv-open" onclick="window.open(\'/portal?preview_client='+c.user_id+'\',\'_blank\')"'
-        +(dis0?' disabled title="Assign a project first"'
-              :' title="The portal this client gets today — read-only, logged"')
-        +'>👁 Classic <span style="font-size:9px;font-weight:700;letter-spacing:.5px;'
-        +'border:1px solid #2F7C57;color:#2F7C57;border-radius:2px;padding:0 3px;margin-left:3px;">LIVE</span></button>'
-        // The URL is built HERE, at render time, and only the finished string goes into
-        // the attribute. The previous version interpolated JSON.stringify(project_code)
-        // into a double-quoted onclick="…" — the quotes it emits closed the attribute at
-        // the first character, so the handler never bound at all (and HTML lowercased the
-        // orphaned remainder into a stray attribute name). Same shape as Classic now.
-        +'<button class="btn-ghost-sm pv-open-new" onclick="window.open(\''
+        // #286 — ONE preview, the portal clients actually land on (#284 flip). The
+        // Classic/New pair is gone with Classic as a preview surface; the Classic
+        // engine remains server-side purely as the rollback path. URL built at
+        // render time — only the finished string enters the attribute (#281 lesson).
+        +'<button class="btn-ghost-sm pv-open" onclick="window.open(\''
         + '/portal/' + encodeURIComponent(c.project_code||'') + '?preview_client=' + c.user_id
         + '\',\'_blank\')"'
         +((dis0||!c.project_code)?' disabled title="Assign a project first"'
-              :' title="The new shared shell — not yet what clients land on"')
-        +'>👁 New</button>'
+              :' title="See this client\\u2019s portal exactly as they see it — read-only, logged"')
+        +'>👁 Preview</button>'
         +'<select id="cl-sel-'+c.user_id+'" style="height:34px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;font-size:13px;background:#fff;color:var(--ink);">'+opts+'</select>'
         +'<button class="btn-primary" onclick="saveClientAssignment('+c.user_id+', this)">Save</button></div></div>'
         +'<div class="sec-grid" id="cl-secs-'+c.user_id+'">'+toggles+'</div>'

@@ -79,22 +79,41 @@ The architect is contained by an **allowlist** (`elevation._architect_gate`)
 normal project scoping. Architects are not grant-gated on their own
 drawing surface.
 
-**#285 — THE PARITY CONTRACT (doctrine).** Every portal section MIRRORS its
-internal counterpart's presentation — same tokens, same components, same
-layout language — minus internal-only elements. PRESENTATION IS SHARED;
-PLUMBING IS NOT: the shared layer is `/files/static/css/widgets.css` (the
-`shc-` component families, extracted verbatim from the internal fp-/ph-/
-dcr-/wx- rules — both surfaces link the sheet; drift between an internal
-rule and its shc- twin is a bug). The portal shell stays ALLOWLIST-FIRST
-(its own file; only portal components are ever added to it), the
-`client_payload()` registry stays the ONLY data path, and we NEVER serve
-internal pages to external roles. Changing a mirrored component means
-changing the internal rule AND its shc- twin together; adding a portal
-section means adding its components HERE and its fields to the REGISTRY —
-never linking internal assets' behavior or endpoints. The refactor that
-created the layer left every internal page serve sha256-IDENTICAL
-(11-page role×page matrix, proven in-build); portal-side conformance is
-asserted by the parity block in `tests/smoke_portal_flip_284.py`.
+**#286 — THE PARITY CONTRACT (doctrine; supersedes the #285 wording).**
+Parity is PAGE ANATOMY, not component styling: for every portal section the
+page SKELETON — header block, KPI tile row, widget grid, tables, boards —
+is IDENTICAL to its internal counterpart; only the data feeding it differs
+(the `client_payload()` registry, as always). The shared layer is
+`/files/static/css/widgets.css` (`shc-` families, extracted verbatim from
+the internal fp-/ph-/dcr-/wx-/la- rules) PLUS the actual layout engine:
+`/files/static/js/dash_layout.js` + vendored GridStack are consumed by
+BOTH surfaces — the portal Progress grid is the same drag/persist/reset
+machinery as the internal dashboards (page_key `portal_progress`,
+`/api/dashboard/layout` opened to granted clients: user-scoped,
+key-allowlisted, structurally sanitized). Plumbing separation unchanged:
+allowlist shell, registry-only data, never serve internal pages to
+external roles. Client-safe DELTAS are subtractions, never substitutions
+(a removed workforce tile is not replaced with worker data; removed
+actions leave read-only anatomy).
+
+**PROVENANCE EXCEPTION (#286, planner-approved):** look-ahead activity
+TITLES cross to the client — they are planning labels designed for
+external consumption (the internal Print exists to share that board).
+Delivery titles are REPLACED with the generic "Delivery" before
+projection; crew, notes, source and constraint counts never cross. This
+is the ONLY free-text field with an external pass; anything else still
+requires its own explicit decision here.
+
+**#286 anatomy notes.** Daily = the internal DCR archive (KPI tiles,
+search + date range, black-header table); the view icon serves the
+CLIENT-AUDIENCE render by sequence (`/api/portal/<code>/daily/<seq>/view`
+— serves `client.html` and nothing else; audience is per-render). The
+status-churn feed collapses to NET day-level changes (X→X and same-day
+round trips render nothing) and lives as a secondary expand block inside
+the table row. Schedule = the internal Two-Week Look-Ahead board
+read-only via `load_window` (NEVER the drafting GET — a client request
+must never write), minus the constraints column. Admin client-access page
+has ONE Preview button; Classic remains server-side purely as rollback.
 
 **#284 — THE FLIP IS LIVE.** `/portal/<code>` is the CLIENT's home:
 `portal_shell.html` (allowlist-first — the file contains ONLY portal

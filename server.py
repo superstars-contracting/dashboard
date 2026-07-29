@@ -514,7 +514,8 @@ def legacy_dashboard():
 # lets Project Health, the company console, and future surfaces share one table
 # + one JS module. PII discipline: layout_json is sanitized to a list of
 # {id,x,y,w,h} — widget ids + grid positions ONLY, never names/rates/PINs.
-_LAYOUT_PAGE_KEYS = {'project_health', 'company_console'}
+_LAYOUT_PAGE_KEYS = {'project_health', 'company_console',
+                     'portal_progress'}   # #286 — the client portal's widget grid
 # #278 ROOT FIX — the per-page widget-id ALLOWLIST is gone. It was frozen at the
 # original widgets, so the sanitizer SILENTLY STRIPPED every newer widget
 # (material-alerts #272b, project-costs #278) from saved layouts: drags "saved"

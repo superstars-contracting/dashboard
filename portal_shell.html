@@ -5,8 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Superstars Contracting — Project Portal</title>
   <link rel="stylesheet" href="/files/static/fonts/typography.css">
-  <link rel="stylesheet" href="/files/static/css/widgets.css?v=285">
+  <link rel="stylesheet" href="/files/static/css/widgets.css?v=286">
   <script src="/files/static/vendor/chart.umd.min.js"></script>
+  <!-- #286 — the REAL grid engine, the same shared assets the internal dashboards
+       consume: vendored GridStack + the DashLayout framework (per-user layout
+       persistence, merge-safe restore, reset). Presentational only. -->
+  <link rel="stylesheet" href="/files/static/vendor/gridstack.min.css">
+  <script src="/files/static/vendor/gridstack-all.js"></script>
+  <script src="/files/static/js/dash_layout.js?v=286"></script>
+  <script src="/files/static/js/datepicker.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     :root {
@@ -67,20 +74,7 @@
     .v-head h1 { font-size:22px; line-height:1.25; margin-top:2px; }
     .loading { color:var(--mute); font-size:13px; padding:10px 0; }
 
-    /* progress hero (overall ring — shell-specific chrome around shared parts) */
-    .prog-hero { background:#fff; border:1px solid var(--hairline); border-radius:12px;
-                 padding:18px; margin-bottom:16px; }
-    .prog-wrap { display:flex; align-items:center; gap:26px; flex-wrap:wrap; }
-    .prog-ring { width:150px; height:150px; flex:none; }
-    .prog-ring .bg { stroke:#EDEAE3; }
-    .prog-ring .fg { stroke:#2F7C57; transition:stroke-dasharray .5s; }
-    .prog-label { display:inline-block; font-size:10px; font-weight:700; letter-spacing:1px;
-                  text-transform:uppercase; color:var(--brand-red); background:#fbeceb;
-                  padding:4px 10px; border-radius:99px; margin-bottom:8px; }
-    .prog-text { font-size:14px; color:var(--soft); max-width:460px; }
-    .prog-meta { font-size:11px; color:var(--mute); margin-top:8px; }
-
-    /* documents + schedule (unchanged this build — local look) */
+    /* documents (unchanged this build — local look) */
     .doc-row { display:flex; align-items:center; gap:14px; padding:12px 4px;
                border-bottom:1px solid #F2EFE7; }
     .doc-main { min-width:0; flex:1; }
@@ -89,12 +83,7 @@
     .doc-open { flex:none; font-size:12px; font-weight:700; color:var(--brand-red); text-decoration:none;
                 border:1px solid var(--hairline); border-radius:8px; padding:6px 12px; }
     .doc-open:hover { border-color:var(--brand-red); }
-    .doc-pad, .sch-pad { padding:18px; }
-    .sch-row { display:flex; align-items:baseline; gap:12px; padding:10px 4px; border-bottom:1px solid #F2EFE7; }
-    .sch-window { flex:none; font-size:12px; color:var(--mute); min-width:170px; }
-    .sch-name { font-size:13.5px; font-weight:600; }
-    .sch-type { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
-                color:var(--mute); margin-left:8px; }
+    .doc-pad { padding:18px; }
 
     @media (max-width:860px) {
       .app-shell { flex-direction:column; }
@@ -177,44 +166,62 @@
 
 <!-- PORTAL_SECTION:progress:start -->
       <section class="view" data-portal-view="progress">
-        <div class="v-head"><div class="v-eyebrow">Overall</div><h1>Project Progress</h1></div>
-        <div class="prog-hero">
-          <div class="loading" data-loading>Loading progress…</div>
-          <div class="prog-wrap" style="display:none" data-body>
-            <svg class="prog-ring" viewBox="0 0 120 120">
-              <circle class="bg" cx="60" cy="60" r="52" fill="none" stroke-width="12"/>
-              <circle class="fg" id="prog-fg" cx="60" cy="60" r="52" fill="none" stroke-width="12"
-                      stroke-linecap="round" transform="rotate(-90 60 60)"/>
-              <text x="60" y="66" text-anchor="middle" id="prog-num" font-size="26" font-weight="800" fill="#14161C"></text>
-            </svg>
-            <div>
-              <span class="prog-label" id="prog-label"></span>
-              <div class="prog-text" id="prog-text"></div>
-              <div class="prog-meta" id="prog-meta"></div>
-            </div>
-          </div>
+        <!-- #286 — the internal Project Health page anatomy: kicker header, 4-tile
+             KPI row, the REAL widget grid (GridStack + DashLayout, per-user saved
+             layouts, Reset). Client-safe tiles only — workforce tiles are internal
+             and are never substituted with worker data. -->
+        <div class="shc-phead">
+          <div class="shc-eyebrow">Project Health</div>
+          <h1 data-project-title>&nbsp;</h1>
+          <div class="shc-psub" data-project-client>&nbsp;</div>
         </div>
-        <div class="shc-grid2" id="prog-boards" style="display:none">
-          <div class="shc-widget">
-            <div class="shc-widget-head"><h3>Active Drops</h3></div>
-            <div class="shc-widget-body" id="prog-active"></div>
-          </div>
-          <div class="shc-widget">
-            <div class="shc-widget-head"><h3>Drops by Status</h3></div>
-            <div class="shc-widget-body">
-              <div class="shc-donut-wrap"><canvas id="prog-donut"></canvas>
-                <div class="shc-donut-center"><div class="n" id="prog-donut-total"></div><div class="l">drops</div></div>
-              </div>
-              <div class="shc-legend" id="prog-donut-legend"></div>
+        <div class="shc-kpirow">
+          <div class="shc-kpi"><span id="pp-kpi-ring"></span><div><div class="shc-kpi-k">Overall progress</div><div class="shc-kpi-v" id="pp-kpi-progress">—</div><div class="shc-kpi-sub" id="pp-kpi-progress-sub">&nbsp;</div></div></div>
+          <div class="shc-kpi"><div><div class="shc-kpi-k">Active drops</div><div class="shc-kpi-v" id="pp-kpi-active">—</div><div class="shc-kpi-sub">of <span id="pp-kpi-active-total">—</span> drops</div></div></div>
+          <div class="shc-kpi"><div><div class="shc-kpi-k">Photos shared</div><div class="shc-kpi-v" id="pp-kpi-photos">—</div><div class="shc-kpi-sub">with you</div></div></div>
+          <div class="shc-kpi"><div><div class="shc-kpi-k">Latest report</div><div class="shc-kpi-v" id="pp-kpi-latest" style="font-size:16px">—</div><div class="shc-kpi-sub">daily report</div></div></div>
+        </div>
+        <div class="shc-gridbar">
+          <button class="shc-reset" id="pp-reset-layout" type="button" title="Revert to the default layout">↺ Reset layout</button>
+          <span class="shc-gridbar-hint" id="pp-layout-hint">Drag a widget by its ⠿ handle; drag an edge/corner to resize — your layout saves automatically.</span>
+        </div>
+        <div class="grid-stack shc-gs" id="pp-grid">
+          <div class="grid-stack-item" gs-id="active-drops" gs-x="0" gs-y="0" gs-w="8" gs-h="3">
+            <div class="grid-stack-item-content">
+              <section class="shc-widget">
+                <div class="shc-widget-head"><h3>Active drops</h3><span class="shc-grip" title="Drag to move">⠿</span></div>
+                <div class="shc-widget-body" id="prog-active"><div class="loading">Loading…</div></div>
+              </section>
             </div>
           </div>
-          <div class="shc-widget">
-            <div class="shc-widget-head"><h3>Progress by Elevation</h3></div>
-            <div class="shc-widget-body"><div class="shc-bar-wrap"><canvas id="prog-bars"></canvas></div></div>
+          <div class="grid-stack-item" gs-id="drops-status" gs-x="8" gs-y="0" gs-w="4" gs-h="4">
+            <div class="grid-stack-item-content">
+              <section class="shc-widget">
+                <div class="shc-widget-head"><h3>Drops by status</h3><span class="shc-grip" title="Drag to move">⠿</span></div>
+                <div class="shc-widget-body">
+                  <div class="shc-donut-wrap"><canvas id="prog-donut"></canvas>
+                    <div class="shc-donut-center"><div class="n" id="prog-donut-total">—</div><div class="l">drops</div></div>
+                  </div>
+                  <div class="shc-legend" id="prog-donut-legend"></div>
+                </div>
+              </section>
+            </div>
           </div>
-          <div class="shc-widget">
-            <div class="shc-widget-head"><h3>Site Weather</h3></div>
-            <div class="shc-widget-body" id="prog-weather"></div>
+          <div class="grid-stack-item" gs-id="progress-elevation" gs-x="0" gs-y="3" gs-w="8" gs-h="4">
+            <div class="grid-stack-item-content">
+              <section class="shc-widget">
+                <div class="shc-widget-head"><h3>Progress by elevation</h3><span class="shc-grip" title="Drag to move">⠿</span></div>
+                <div class="shc-widget-body"><div class="shc-bar-wrap"><canvas id="prog-bars"></canvas></div></div>
+              </section>
+            </div>
+          </div>
+          <div class="grid-stack-item" gs-id="weather" gs-x="8" gs-y="4" gs-w="4" gs-h="5">
+            <div class="grid-stack-item-content">
+              <section class="shc-widget">
+                <div class="shc-widget-head"><h3>Weather</h3><span class="shc-grip" title="Drag to move">⠿</span></div>
+                <div class="shc-widget-body" id="prog-weather"><div class="loading">Loading…</div></div>
+              </section>
+            </div>
           </div>
         </div>
       </section>
@@ -237,15 +244,59 @@
 <!-- PORTAL_SECTION:documents:end -->
 <!-- PORTAL_SECTION:daily:start -->
       <section class="view" data-portal-view="daily">
-        <div class="v-head"><div class="v-eyebrow">Field activity</div><h1>Daily Reports</h1></div>
-        <div class="shc-kpis" id="daily-kpis" style="display:none"></div>
-        <div class="shc-card" id="daily-list"><div class="loading" style="padding:16px">Loading daily reports…</div></div>
+        <!-- #286 — the internal Daily Construction Reports page anatomy: head with
+             count, KPI tiles, search + date-range toolbar, the black-header table.
+             READ-ONLY deltas: no Issue button, no Edit/Delete actions — the view
+             icon opens the CLIENT-AUDIENCE rendered report; a row click expands
+             the cleaned day summary as a secondary block. -->
+        <div class="shc-dcr-head">
+          <div>
+            <h1>Daily Construction Reports</h1>
+            <div class="sub"><span data-project-line></span> · <span id="dr-head-count">—</span> reports</div>
+          </div>
+        </div>
+        <div class="shc-dcr-kpis">
+          <div class="shc-tile"><div class="l">Total reports</div><div class="v" id="dr-kpi-total">—</div></div>
+          <div class="shc-tile"><div class="l">Latest</div><div class="v" id="dr-kpi-latest" style="font-size:16px">—</div></div>
+        </div>
+        <div class="shc-dcr-toolbar">
+          <div class="shc-searchbox"><input id="dr-search" type="text" placeholder="Search reports by ID or date…" autocomplete="off"></div>
+          <label for="dr-filter-from">From</label><input class="shc-inp ssc-date" type="text" id="dr-filter-from" placeholder="MM-DD-YYYY">
+          <label for="dr-filter-to">To</label><input class="shc-inp ssc-date" type="text" id="dr-filter-to" placeholder="MM-DD-YYYY">
+          <button id="dr-filter-apply" class="shc-apply" type="button">Apply</button>
+          <span class="shc-dcr-count" id="dr-status">Loading…</span>
+        </div>
+        <div class="shc-card">
+          <table class="shc-dcr-table">
+            <thead><tr><th>Report ID</th><th>Date</th><th>Status</th><th></th></tr></thead>
+            <tbody id="dr-tbody"><tr><td colspan="4" class="shc-dcr-empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
       </section>
 <!-- PORTAL_SECTION:daily:end -->
 <!-- PORTAL_SECTION:schedule:start -->
       <section class="view" data-portal-view="schedule">
-        <div class="v-head"><div class="v-eyebrow">Look-ahead</div><h1>Schedule</h1></div>
-        <div class="shc-card sch-pad" id="sch-list"><div class="loading">Loading schedule…</div></div>
+        <!-- #286 — the internal Two-Week Look-Ahead board anatomy, READ-ONLY:
+             start-date + window header, stat hero + legend, day-column grid with
+             bars and milestone diamonds, drop groups with stage n-of-N. Client
+             deltas: no constraints column, no add/drag/edit, delivery chips are
+             generic. Activity TITLES cross by the #286 provenance exception. -->
+        <div class="shc-la-wrap" id="la-wrap">
+          <div class="shc-la-top">
+            <div>
+              <h2>Two-Week Look-Ahead</h2>
+              <div class="shc-la-sub">Planned work across the coming window — updated by the field team</div>
+            </div>
+            <div class="shc-la-controls">
+              <label class="shc-la-lbl" for="pla-start">Start</label>
+              <input type="text" id="pla-start" class="shc-inp ssc-date" placeholder="MM-DD-YYYY" style="width:128px">
+              <div class="shc-la-win" id="pla-win"></div>
+            </div>
+          </div>
+          <div class="shc-la-hero" id="pla-hero"></div>
+          <div class="shc-la-grid" id="pla-board"><div class="loading" style="padding:20px">Loading the look-ahead…</div></div>
+          <div class="shc-la-hint">Planned windows for the active drops. Diamonds mark deliveries and inspections.</div>
+        </div>
       </section>
 <!-- PORTAL_SECTION:schedule:end -->
 
@@ -289,6 +340,15 @@
     if (p.length !== 3) return '';
     var d = new Date(+p[0], +p[1] - 1, +p[2]);
     return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+  }
+  function mdy(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+    return m ? m[2] + '-' + m[3] + '-' + m[1] : (iso || '');
+  }
+  function todayLocal() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0');
   }
   // the internal ringSVG, shared parameters (class renamed to the shc namespace)
   function ringSVG(pct, size, stroke) {
@@ -353,6 +413,94 @@
 
   // ---- loaders ----
   var PHOTOS = [];   // photos cache for the drop filter re-render
+  var DAILY = [];    // daily cache for the search/date filters
+
+  function dayDetailHtml(d) {
+    var h = '';
+    if (d.weather) {
+      var w = [];
+      if (d.weather.am_temp_f != null) w.push('AM ' + Math.round(d.weather.am_temp_f) + '°F' +
+        (d.weather.am_conditions ? ' ' + d.weather.am_conditions : ''));
+      if (d.weather.pm_temp_f != null) w.push('PM ' + Math.round(d.weather.pm_temp_f) + '°F' +
+        (d.weather.pm_conditions ? ' ' + d.weather.pm_conditions : ''));
+      if (d.weather.wind) w.push('Wind ' + d.weather.wind);
+      if (w.length) h += '<div class="shc-daymuted" style="margin-top:0">' + esc(w.join(' · ')) + '</div>';
+    }
+    if (d.active_drops && d.active_drops.length) {
+      h += '<div class="shc-daysec"><div class="shc-daysec-k">Active drops</div><div class="shc-daychips">' +
+        d.active_drops.map(function (x) {
+          return '<span class="shc-dropchip">' + esc(x.label) +
+            (x.elevation ? '<small>' + esc(x.elevation) + '</small>' : '') + '</span>';
+        }).join('') + '</div></div>';
+    }
+    if (d.activities && d.activities.length) {
+      h += '<div class="shc-daysec"><div class="shc-daysec-k">Work activity</div>' +
+        d.activities.map(function (a) {
+          return '<div class="shc-dayline"><span class="shc-verb">' + esc(a.status) + '</span>' +
+            esc(a.category) + '</div>';
+        }).join('') + '</div>';
+    }
+    // the CLEANED churn feed (#286): net day-level movement only, secondary block
+    if (d.status_changes && d.status_changes.length) {
+      h += '<div class="shc-daysec"><div class="shc-daysec-k">Status updates</div>' +
+        d.status_changes.map(function (c) {
+          var arrow = (c.from_label ? esc(c.from_label) + ' → ' : '') + esc(c.to_label);
+          return '<div class="shc-dayline"><b>' + esc(c.drop_label) + '</b>' +
+            (c.level ? ' · ' + esc(c.level) : '') + ' — ' + arrow + '</div>';
+        }).join('') + '</div>';
+    }
+    if (d.photos && d.photos.length) {
+      h += '<div class="shc-daysec"><div class="shc-daysec-k">Photos from this day</div><div class="shc-dayphotos">' +
+        d.photos.map(function (p) {
+          return '<img loading="lazy" src="' + esc(u(p.thumb_url)) + '" data-full="' +
+            esc(u(p.file_url)) + '" alt="Project photo">';
+        }).join('') + '</div></div>';
+    }
+    return h || '<div class="shc-daymuted" style="margin-top:0">No further detail recorded for this day.</div>';
+  }
+
+  function renderDailyTable() {
+    var tbody = document.getElementById('dr-tbody');
+    var q = (document.getElementById('dr-search').value || '').trim().toLowerCase();
+    var from = window.SSCDatePicker ? SSCDatePicker.getISO(document.getElementById('dr-filter-from')) : '';
+    var to = window.SSCDatePicker ? SSCDatePicker.getISO(document.getElementById('dr-filter-to')) : '';
+    var rows = DAILY.filter(function (d) {
+      if (from && d.date < from) return false;
+      if (to && d.date > to) return false;
+      if (q && String(d.report_id || '').toLowerCase().indexOf(q) < 0
+            && String(d.date).indexOf(q) < 0 && mdy(d.date).indexOf(q) < 0) return false;
+      return true;
+    });
+    document.getElementById('dr-status').textContent =
+      rows.length + ' of ' + DAILY.length + ' reports';
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="shc-dcr-empty">' +
+        (DAILY.length ? 'No reports match the filters.' :
+         'No daily reports yet — issued reports will appear here.') + '</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(function (d, i) {
+      var view = (d.seq != null)
+        ? '<a class="shc-iconbtn" title="View report" target="_blank" rel="noopener" href="' +
+          esc(u(API_BASE + '/daily/' + d.seq + '/view')) + '" onclick="event.stopPropagation()">👁</a>'
+        : '';
+      return '<tr class="dr-row" data-i="' + i + '" style="cursor:pointer">' +
+        '<td class="shc-repid">' + esc(d.report_id || '—') + '</td>' +
+        '<td>' + esc(weekdayOf(d.date)) + ' · ' + esc(mdy(d.date)) + '</td>' +
+        '<td><span class="shc-pill' + (d.no_work ? ' na' : '') + '">' +
+        (d.no_work ? 'Issued · no work' : 'Issued') + '</span></td>' +
+        '<td style="text-align:right">' + view + '</td></tr>' +
+        '<tr class="shc-dayrow-detail" style="display:none"><td colspan="4">' +
+        dayDetailHtml(d) + '</td></tr>';
+    }).join('');
+    tbody.querySelectorAll('tr.dr-row').forEach(function (tr) {
+      tr.addEventListener('click', function () {
+        var det = tr.nextElementSibling;
+        if (det) det.style.display = (det.style.display === 'none') ? '' : 'none';
+      });
+    });
+    wireLightbox(tbody);
+  }
 
   function renderPhotoGroups(filter) {
     var host = document.getElementById('photo-groups');
@@ -392,24 +540,39 @@
 
   var LOADERS = {
     progress: function () {
-      var view = document.querySelector('[data-portal-view="progress"]');
       getJSON(API_BASE + '/progress').then(function (j) {
         var d = j.data || {};
         var pct = Math.max(0, Math.min(100, (d.progress && d.progress.pct) || 0));
-        var Ci = 2 * Math.PI * 52;
-        document.getElementById('prog-fg').setAttribute('stroke-dasharray', (Ci * pct / 100) + ' ' + Ci);
-        document.getElementById('prog-num').textContent = Math.round(pct) + '%';
-        document.getElementById('prog-label').textContent = (d.progress && d.progress.label) || '';
-        document.getElementById('prog-text').textContent = (d.summary && d.summary.text) || '';
-        var meta = [];
-        if (d.summary && d.summary.photos_shared != null) meta.push(d.summary.photos_shared + ' photos shared');
-        if (d.summary && d.summary.last_activity) meta.push('Latest shared photo: ' + d.summary.last_activity);
-        document.getElementById('prog-meta').textContent = meta.join(' · ');
-        view.querySelector('[data-loading]').style.display = 'none';
-        view.querySelector('[data-body]').style.display = 'flex';
+        // ---- the KPI row (internal Project Health anatomy, client-safe tiles) ----
+        document.getElementById('pp-kpi-ring').innerHTML = ringSVG(pct, 46, 6);
+        document.getElementById('pp-kpi-progress').textContent = Math.round(pct) + '%';
+        document.getElementById('pp-kpi-progress-sub').textContent =
+          (d.progress && d.progress.label) || '';
+        var sc = d.status_counts || [];
+        var total = sc.reduce(function (s, x) { return s + (x.count || 0); }, 0);
+        var nActive = 0;
+        sc.forEach(function (x) { if (x.status === 'active') nActive = x.count || 0; });
+        document.getElementById('pp-kpi-active').textContent = String(nActive);
+        document.getElementById('pp-kpi-active-total').textContent = String(total);
+        document.getElementById('pp-kpi-photos').textContent =
+          (d.summary && d.summary.photos_shared != null) ? String(d.summary.photos_shared) : '—';
+        document.getElementById('pp-kpi-latest').textContent =
+          (d.summary && d.summary.latest_report) ? mdy(d.summary.latest_report) : '—';
 
-        // ---- the four boards (internal Project Health mirror) ----
-        document.getElementById('prog-boards').style.display = 'grid';
+        // ---- the REAL grid engine: shared DashLayout over the four widgets ----
+        if (!window.__ppGrid && window.DashLayout) {
+          window.__ppGrid = DashLayout.init({
+            pageKey: 'portal_progress',
+            defaultLayout: [
+              { id: 'active-drops', x: 0, y: 0, w: 8, h: 3 },
+              { id: 'drops-status', x: 8, y: 0, w: 4, h: 4 },
+              { id: 'progress-elevation', x: 0, y: 3, w: 8, h: 4 },
+              { id: 'weather', x: 8, y: 4, w: 4, h: 5 }
+            ],
+            gridSelector: '#pp-grid', resetBtnId: 'pp-reset-layout', hintId: 'pp-layout-hint',
+            gridOpts: { handle: '.shc-grip', draggable: { handle: '.shc-grip' } }
+          });
+        }
         var act = d.active_drops || [];
         var actHost = document.getElementById('prog-active');
         if (!act.length) {
@@ -482,81 +645,25 @@
           wxHost.innerHTML = h;
         }
       }).catch(function () {
-        view.querySelector('[data-loading]').textContent = 'Progress is unavailable right now.';
+        emptyState(document.getElementById('prog-active'),
+          'Progress is unavailable right now', 'Please try again shortly.');
       });
     },
 
     daily: function () {
-      var host = document.getElementById('daily-list');
       getJSON(API_BASE + '/daily').then(function (j) {
-        var days = (j.data && j.data.days) || [];
-        if (!days.length) {
-          host.innerHTML = '';
-          host.appendChild(document.createElement('div'));
-          emptyState(host.firstChild, 'No daily reports yet',
-            'Once field reports are issued for your project, each day will appear here.');
-          return;
-        }
-        var kpis = document.getElementById('daily-kpis');
-        var workDays = days.filter(function (d) { return !d.no_work; }).length;
-        kpis.style.display = 'grid';
-        kpis.innerHTML =
-          '<div class="shc-tile"><div class="l">Report days</div><div class="v">' + days.length + '</div></div>' +
-          '<div class="shc-tile"><div class="l">Work days</div><div class="v">' + workDays + '</div></div>' +
-          '<div class="shc-tile"><div class="l">Latest report</div><div class="v shc-repid" style="font-size:15px">' +
-          esc(days[0].date) + '</div></div>';
-        host.innerHTML = days.map(function (d) {
-          var h = '<div class="shc-dayrow">';
-          h += '<div class="shc-dayhead"><span class="shc-repid">' + esc(weekdayOf(d.date)) + ' · ' + esc(d.date) + '</span>';
-          h += '<span class="shc-pill' + (d.no_work ? ' na' : '') + '">' + esc(d.label) + '</span></div>';
-          if (d.weather) {
-            var w = [];
-            if (d.weather.am_temp_f != null) w.push('AM ' + Math.round(d.weather.am_temp_f) + '°F' +
-              (d.weather.am_conditions ? ' ' + d.weather.am_conditions : ''));
-            if (d.weather.pm_temp_f != null) w.push('PM ' + Math.round(d.weather.pm_temp_f) + '°F' +
-              (d.weather.pm_conditions ? ' ' + d.weather.pm_conditions : ''));
-            if (d.weather.wind) w.push('Wind ' + d.weather.wind);
-            if (w.length) h += '<div class="shc-daymuted">' + esc(w.join(' · ')) + '</div>';
-          }
-          if (d.active_drops && d.active_drops.length) {
-            h += '<div class="shc-daysec"><div class="shc-daysec-k">Active drops</div><div class="shc-daychips">';
-            h += d.active_drops.map(function (x) {
-              return '<span class="shc-dropchip">' + esc(x.label) +
-                (x.elevation ? '<small>' + esc(x.elevation) + '</small>' : '') + '</span>';
-            }).join('');
-            h += '</div></div>';
-          }
-          if (d.activities && d.activities.length) {
-            h += '<div class="shc-daysec"><div class="shc-daysec-k">Work activity</div>';
-            h += d.activities.map(function (a) {
-              return '<div class="shc-dayline"><span class="shc-verb">' + esc(a.status) + '</span>' +
-                esc(a.category) + '</div>';
-            }).join('');
-            h += '</div>';
-          }
-          if (d.status_changes && d.status_changes.length) {
-            h += '<div class="shc-daysec"><div class="shc-daysec-k">Status updates</div>';
-            h += d.status_changes.map(function (c) {
-              var arrow = (c.from_label ? esc(c.from_label) + ' → ' : '') + esc(c.to_label);
-              return '<div class="shc-dayline"><b>' + esc(c.drop_label) + '</b>' +
-                (c.level ? ' · ' + esc(c.level) : '') + ' — ' + arrow + '</div>';
-            }).join('');
-            h += '</div>';
-          }
-          if (d.photos && d.photos.length) {
-            h += '<div class="shc-daysec"><div class="shc-daysec-k">Photos from this day</div><div class="shc-dayphotos">';
-            h += d.photos.map(function (p) {
-              return '<img loading="lazy" src="' + esc(u(p.thumb_url)) + '" data-full="' +
-                esc(u(p.file_url)) + '" alt="Project photo">';
-            }).join('');
-            h += '</div></div>';
-          }
-          return h + '</div>';
-        }).join('');
-        wireLightbox(host);
+        DAILY = (j.data && j.data.days) || [];
+        document.getElementById('dr-kpi-total').textContent = String(DAILY.length);
+        document.getElementById('dr-kpi-latest').textContent =
+          DAILY.length ? mdy(DAILY[0].date) : '—';
+        document.getElementById('dr-head-count').textContent = String(DAILY.length);
+        var apply = function () { renderDailyTable(); };
+        document.getElementById('dr-filter-apply').addEventListener('click', apply);
+        document.getElementById('dr-search').addEventListener('input', apply);
+        renderDailyTable();
       }).catch(function () {
-        host.innerHTML = '';
-        emptyState(host, 'Daily reports are unavailable right now', 'Please try again shortly.');
+        document.getElementById('dr-tbody').innerHTML =
+          '<tr><td colspan="4" class="shc-dcr-empty">Daily reports are unavailable right now.</td></tr>';
       });
     },
 
@@ -619,25 +726,116 @@
     },
 
     schedule: function () {
-      var host = document.getElementById('sch-list');
-      // Classic's curated look-ahead endpoint (#269) — same engine, same grant.
-      getJSON('/api/portal/schedule').then(function (j) {
-        var acts = (j.data && j.data.activities) || [];
-        if (!acts.length) {
-          emptyState(host, 'Nothing scheduled in this window',
-            'Planned activity for the coming weeks will appear here.');
-          return;
-        }
-        host.innerHTML = acts.map(function (a) {
-          return '<div class="sch-row"><span class="sch-window">' + esc(a.start) + ' → ' +
-            esc(a.finish) + '</span><span class="sch-name">' + esc(a.name) +
-            '<span class="sch-type">' + esc(a.type || '') + '</span></span></div>';
-        }).join('');
-      }).catch(function () {
-        emptyState(host, 'Schedule is unavailable right now', 'Please try again shortly.');
-      });
+      var startEl = document.getElementById('pla-start');
+      if (window.SSCDatePicker) {
+        SSCDatePicker.wire(startEl);
+        SSCDatePicker.setISO(startEl, todayLocal());
+      } else { startEl.value = todayLocal(); }
+      startEl.addEventListener('change', plaLoad);
+      plaLoad();
     }
   };
+
+  // ---- #286: the read-only Look-Ahead board (internal anatomy, curated data) ----
+  function plaStartISO() {
+    var el = document.getElementById('pla-start');
+    return (window.SSCDatePicker ? SSCDatePicker.getISO(el) : el.value) || todayLocal();
+  }
+  function plaLoad() {
+    var board = document.getElementById('pla-board');
+    board.innerHTML = '<div class="loading" style="padding:20px">Loading the look-ahead…</div>';
+    getJSON(API_BASE + '/lookahead?start=' + encodeURIComponent(plaStartISO()))
+      .then(function (j) { plaRender(j.data || {}); })
+      .catch(function () {
+        emptyState(board, 'The look-ahead is unavailable right now', 'Please try again shortly.');
+      });
+  }
+  function plaTrackCells(days) {
+    return days.map(function (d) {
+      return '<div class="cell' + (d.is_today ? ' today' : '') + '"></div>';
+    }).join('');
+  }
+  function plaActivityRow(a, status, days) {
+    var isMile = a.activity_type === 'delivery' || a.activity_type === 'inspection';
+    var track = plaTrackCells(days);
+    if (a.grid) {
+      if (isMile) {
+        var c = a.grid[0];
+        var icon = a.activity_type === 'delivery'
+          ? '<svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="#c2914e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v8H3zM14 10h4l3 3v2h-7z"/><circle cx="7" cy="18" r="1.4"/><circle cx="17" cy="18" r="1.4"/></svg>'
+          : '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#15a07e" stroke-width="3" stroke-linecap="round"><path d="M5 12l5 5L20 6"/></svg>';
+        track += '<div class="shc-la-mile' + (a.activity_type === 'inspection' ? ' insp' : '') +
+          '" style="grid-column:' + c + ' / ' + (c + 1) + '"><span>' + icon + '</span></div>';
+      } else {
+        var cls = status === 'behind' ? 'behind' : (status === 'soon' ? 'soon' : 'stage');
+        var span = a.grid[1] - a.grid[0];
+        var lbl = span >= 2 ? esc(String(a.name || '').slice(0, 18)) : '';
+        track += '<div class="shc-la-bar ' + cls + '" style="grid-column:' + a.grid[0] +
+          ' / ' + a.grid[1] + '">' + lbl + '</div>';
+      }
+    }
+    var name = isMile
+      ? '<div class="shc-la-an milestone"><span class="nm">' +
+        (a.activity_type === 'delivery' ? '🧱 ' : '✓ ') + esc(a.name) + '</span></div>'
+      : '<div class="shc-la-an"><span class="nm">' + esc(a.name) + '</span></div>';
+    return '<div class="shc-la-ar">' + name +
+      '<div class="shc-la-track">' + track + '</div></div>';
+  }
+  function plaGroupHtml(g, days) {
+    var head;
+    if (g._general) {
+      head = '<div class="shc-la-drophead"><div class="shc-la-dl">' +
+        '<span class="shc-la-elb" style="background:#cabfad"></span>' + esc(g.label) +
+        ' <s>· project-wide</s></div><div></div></div>';
+    } else {
+      var statName = g.status === 'behind' ? 'Behind' : (g.status === 'soon' ? 'Starts soon' : 'Active');
+      var sub = g.status === 'soon' ? '· not started'
+        : ('· stage ' + g.stage_index + ' of ' + g.stage_total);
+      var behindTag = (g.behind_days > 0)
+        ? ' <span style="color:#e9685a;font-size:9px;font-weight:700">+' + g.behind_days + ' days</span>' : '';
+      head = '<div class="shc-la-drophead"><div class="shc-la-dl"><span class="shc-la-elb"></span>' +
+        esc(g.label) + behindTag + ' <s>' + sub + '</s></div>' +
+        '<span class="shc-la-stat ' + esc(g.status) + '">' + statName + '</span></div>';
+    }
+    return '<div class="shc-la-drop">' + head +
+      g.activities.map(function (a) {
+        return plaActivityRow(a, g._general ? 'active' : g.status, days);
+      }).join('') + '</div>';
+  }
+  function plaRender(LA) {
+    var days = LA.days || [];
+    var k = LA.kpis || {};
+    document.getElementById('pla-hero').innerHTML =
+      '<div class="shc-la-k"><b>' + (k.active_drops || 0) + '</b><s>active drops</s></div>' +
+      '<div class="shc-la-k"><b>' + (k.activities || 0) + '</b><s>activities</s></div>' +
+      '<div class="shc-la-k"><b>' + (k.deliveries || 0) + '</b><s>deliveries</s></div>' +
+      '<div class="shc-la-k' + ((k.behind || 0) > 0 ? ' warn' : '') + '"><b>' + (k.behind || 0) +
+      '</b><s>behind</s></div>' +
+      '<div class="shc-la-lg"><span><span class="shc-la-sw" style="background:#4364dc"></span>active</span>' +
+      '<span><span class="shc-la-sw" style="background:#e9685a"></span>behind</span>' +
+      '<span><span class="shc-la-sw" style="background:#cabfad"></span>upcoming</span>' +
+      '<span><span style="width:11px;height:11px;border:2px solid #c2914e;transform:rotate(45deg);display:inline-block;border-radius:2px"></span>delivery</span>' +
+      '<span><span style="width:11px;height:11px;border:2px solid #15a07e;transform:rotate(45deg);display:inline-block;border-radius:2px"></span>inspection</span></div>';
+    document.getElementById('pla-win').innerHTML =
+      'Window <b>' + esc(mdy(LA.window_start)) + ' – ' + esc(mdy(LA.window_end)) +
+      '</b> · 10 working days';
+    var dayCells = days.map(function (d) {
+      return '<div class="d' + (d.is_today ? ' today' : '') + '">' + esc(d.dow) +
+        '<s>' + esc(d.md) + '</s></div>';
+    }).join('');
+    var html = '<div class="shc-la-ghead"><div class="lh" style="padding-left:12px">Activity</div>' +
+      '<div class="shc-la-days">' + dayCells + '</div></div>';
+    var groups = LA.groups || [];
+    groups.forEach(function (g) { html += plaGroupHtml(g, days); });
+    if (LA.general && LA.general.length) {
+      html += plaGroupHtml({ label: 'General / no drop', _general: true, activities: LA.general }, days);
+    }
+    if (!groups.length && !(LA.general && LA.general.length)) {
+      html += '<div class="shc-empty" style="padding:30px"><b>Nothing planned in this window</b>' +
+        '<span>Planned activity for the coming weeks will appear here.</span></div>';
+    }
+    document.getElementById('pla-board').innerHTML = html;
+  }
 
   // ---- land on the FIRST section the server rendered (nav order = display order) ----
   var first = document.querySelector('[data-portal-nav]');

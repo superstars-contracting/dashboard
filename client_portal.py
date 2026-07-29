@@ -108,6 +108,14 @@ def _client_gate():
         return redirect(f"/portal/{_code}")
     if path.startswith("/portal/") or path.startswith("/api/portal/"):
         return None                     # per-endpoint section grants enforced below
+    # #286 — the portal widget grid saves per-user layouts through the SAME generic
+    # endpoint the internal dashboards use. Safe to open to a granted client: the
+    # endpoint is user-scoped (a session only ever reads/writes its own row),
+    # page_key-allowlisted, and the layout body is structurally sanitized to
+    # {id,x,y,w,h} — no project data flows either way. Zero-grant clients never
+    # reach here (the hard-stop above already returned).
+    if path == "/api/dashboard/layout":
+        return None
     # #280/#283 — the drawing markup surface, now grant-wired (the #281 open decision,
     # decided): 'drawing' gates the page, the elevation APIs, and their comment threads;
     # 'rfis' gates RFI reads. Same #269 posture as every section — re-derived per request,

@@ -54,6 +54,8 @@ BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
 PC, PD = "SMK284-C", "SMK284-D"
 PASS, FAIL = [], []
 IDS = {"users": [], "photos": [], "docs": []}
+FIX_SEQ = 99902   # the seeded report_index dcr_sequence for PC
+DCR_FIX_DIR = SCRIPT_DIR / "data_room" / "reports" / "dcr" / PC / f"{FIX_SEQ:03d}"
 
 
 def ok(name, cond, note=""):
@@ -156,17 +158,51 @@ def seed():
                      "VALUES (?, 2, 'Grinding & Routing')", (tmpl,))
         conn.execute("INSERT INTO drop_stage_status (drop_id, step_no, status, started_on, note) "
                      "VALUES ('SMK284-DP3', 2, 'in_progress', '2026-07-27', 'SENTINEL-284-STAGE')")
+        # #286 — look-ahead fixtures with SENTINELS: crew/notes must never cross;
+        # a delivery's stored TITLE (vendor-bearing) must be replaced with "Delivery".
+        conn.execute("INSERT INTO lookahead_activity (project_code, drop_id, name, activity_type, "
+                     "planned_start, planned_finish, crew, source, notes) VALUES "
+                     "(?, 'SMK284-DP3', 'SMK284 Facade Work', 'work', '2026-07-27', "
+                     "'2026-08-08', 'SENTINEL-284-CREW', 'manual', 'SENTINEL-284-LANOTE')", (PC,))
+        conn.execute("INSERT INTO lookahead_activity (project_code, drop_id, name, activity_type, "
+                     "planned_start, planned_finish, source) VALUES "
+                     "(?, 'SMK284-DP3', 'SENTINEL-284-VENDOR Masonry Delivery', 'delivery', "
+                     "'2026-08-04', '2026-08-04', 'manual')", (PC,))
         cur = conn.execute("INSERT INTO elevation (project_code, face, name) VALUES (?, 'N', "
                            "'SMK284 North')", (PC,))
         elev = cur.lastrowid
         cur = conn.execute("INSERT INTO elevation_drop (elevation_id, idx) VALUES (?, 3)", (elev,))
+        edrop = cur.lastrowid
         cur = conn.execute("INSERT INTO elevation_cell (drop_id, level_id, level_name, status_key, "
                            "internal_note) VALUES (?, 'L2', 'Level 2', 'in_progress', "
-                           "'SENTINEL-284-INTNOTE')", (cur.lastrowid,))
+                           "'SENTINEL-284-INTNOTE')", (edrop,))
+        cell1 = cur.lastrowid
         conn.execute("INSERT INTO elevation_cell_event (cell_id, from_status, to_status, reason, "
                      "actor_uid, created_at) VALUES (?, 'not_started', 'in_progress', "
                      "'SENTINEL-284-CELLREASON', ?, '2026-07-27T09:30:00')",
-                     (cur.lastrowid, users["admin"]))
+                     (cell1, users["admin"]))
+        # #286 CHURN PLANTS — none of these may render:
+        # (a) a same-day NO-OP write on cell1 (X -> X)
+        conn.execute("INSERT INTO elevation_cell_event (cell_id, from_status, to_status, "
+                     "actor_uid, created_at) VALUES (?, 'in_progress', 'in_progress', ?, "
+                     "'2026-07-27T10:00:00')", (cell1, users["admin"]))
+        # (b) a same-day ROUND TRIP on a second cell (A -> B -> A nets to nothing)
+        cur = conn.execute("INSERT INTO elevation_cell (drop_id, level_id, level_name, "
+                           "status_key) VALUES (?, 'L3', 'Level 3', 'not_started')", (edrop,))
+        cell2 = cur.lastrowid
+        conn.execute("INSERT INTO elevation_cell_event (cell_id, from_status, to_status, reason, "
+                     "actor_uid, created_at) VALUES (?, 'not_started', 'on_hold', "
+                     "'SENTINEL-284-CELLREASON', ?, '2026-07-27T11:00:00')", (cell2, users["admin"]))
+        conn.execute("INSERT INTO elevation_cell_event (cell_id, from_status, to_status, "
+                     "actor_uid, created_at) VALUES (?, 'on_hold', 'not_started', ?, "
+                     "'2026-07-27T12:00:00')", (cell2, users["admin"]))
+        # #286 — the client-audience render fixtures for the by-seq view route
+        (DCR_FIX_DIR).mkdir(parents=True, exist_ok=True)
+        (DCR_FIX_DIR / "client.html").write_text(
+            "<html><body>SMK284 CLIENT RENDER MARKER</body></html>", encoding="utf-8")
+        (DCR_FIX_DIR / "internal.html").write_text(
+            "<html><body>SMK284 INTERNAL RENDER MARKER — SENTINEL-284-INTERNALDOC"
+            "</body></html>", encoding="utf-8")
         sessions = {}
         for key, uid in users.items():
             tok = secrets.token_urlsafe(32)
@@ -219,10 +255,12 @@ def cleanup():
         conn.execute("DELETE FROM elevation_drop WHERE elevation_id IN (SELECT id FROM elevation "
                      "WHERE project_code IN (?,?))", (PC, PD))
         for t in ("elevation", "report_index", "weather_log", "work_log", "drops",
-                  "stage_templates"):
+                  "stage_templates", "lookahead_activity"):
             conn.execute(f"DELETE FROM {t} WHERE project_code IN (?,?)", (PC, PD))
         conn.execute("DELETE FROM projects WHERE project_code IN (?,?)", (PC, PD))
         conn.commit()
+        import shutil
+        shutil.rmtree(DCR_FIX_DIR.parent, ignore_errors=True)   # data_room/.../SMK284-C/
         print("  [cleanup] synthetic rows removed (scoped to SMK284 ids)")
     finally:
         conn.close()
@@ -241,8 +279,10 @@ BANNED_DAILY_KEYS = {
     "worked_hours", "headcount", "rate", "rates", "cost", "pay", "qty", "quantity",
     "sov", "note", "notes", "internal_note", "reason", "no_work_reason", "no_work_note",
     "scope_of_work", "trades_working", "trade_area", "location_elevation", "description",
-    "time_in", "time_out", "caption", "report_id", "dcr_sequence", "actor_uid",
+    "time_in", "time_out", "caption", "dcr_sequence", "actor_uid",
     "updated_by_uid", "uploaded_by_uid", "file_path", "thumb_path",
+    # report_id LEFT the banned set in #286 (operator-approved: the daily table's
+    # first column is the GENERATED display id; "seq" addresses the view route)
 }
 
 
@@ -450,9 +490,16 @@ def run():
         ok("daily_weather_present", (day.get("weather") or {}).get("wind") == "5-10 mph")
         ok("daily_activity_structured", day.get("activities") ==
            [{"category": "Grinding & Routing", "status": "started"}], str(day.get("activities")))
-        ok("daily_change_client_vocab", day.get("status_changes") ==
+        # #286 — this assertion now DOUBLES as the churn-filter proof: the fixtures
+        # plant a same-day no-op (X->X) on cell1 and a same-day round trip (A->B->A)
+        # on cell2. EXACTLY the one net change may render; any extra row = the
+        # filter regressed.
+        ok("daily_change_net_only_churn_filtered", day.get("status_changes") ==
            [{"drop_label": "Drop 3", "level": "Level 2", "from_label": "Not started",
              "to_label": "In progress"}], str(day.get("status_changes")))
+        ok("daily_day_has_report_id",
+           day.get("report_id") == f"DCR-{PC}-{FIX_SEQ:03d}" and day.get("seq") == FIX_SEQ,
+           str({k: day.get(k) for k in ("report_id", "seq")}))
         ok("daily_photos_shared_only", [p.get("id") for p in day.get("photos", [])] ==
            [fx["p_shared"]], str(day.get("photos")))
     body_text = r.text if r.status_code == 200 else ""
@@ -461,9 +508,102 @@ def run():
     ok("daily_no_sentinel_values", "SENTINEL-284" not in body_text,
        "a populated free-text column reached the client payload")
 
+    print("\n-- #286 page anatomy: the portal pages ARE the internal pages --")
+    # cli_min holds progress+daily; grant schedule too so all three clones render
+    conn2 = db_layer.connect()
+    try:
+        conn2.execute("INSERT INTO client_section_grant (user_id, project_code, section, "
+                      "granted_by, granted_at) VALUES (?,?,?,?, '2026-07-29T00:00:00')",
+                      (users["cli_min"], PC, "schedule", users["admin"]))
+        conn2.commit()
+    finally:
+        conn2.close()
+    shell = CMIN.get(f"{BASE}/portal/{PC}", **R).text
+    sm = markup(shell)
+    ok("anatomy_ph_header_kpis_grid",
+       'class="shc-phead"' in sm and 'class="shc-kpirow"' in sm
+       and 'id="pp-grid"' in sm and 'id="pp-reset-layout"' in sm
+       and all(f'gs-id="{w}"' in sm for w in
+               ("active-drops", "drops-status", "progress-elevation", "weather")))
+    ok("anatomy_grid_engine_assets",
+       "gridstack-all.js" in shell and "dash_layout.js" in shell)
+    ok("anatomy_dcr_table_headers",
+       re.search(r"<thead><tr><th>Report ID</th><th>Date</th><th>Status</th><th></th></tr></thead>",
+                 sm) is not None)
+    ok("anatomy_dcr_head_and_toolbar",
+       "Daily Construction Reports" in sm and 'id="dr-search"' in sm
+       and 'id="dr-filter-from"' in sm and 'id="dr-filter-apply"' in sm)
+    ok("anatomy_dcr_readonly", "Issue New DCR" not in sm
+       and "data-edit-seq" not in sm and "dcr-del" not in sm)
+    ok("anatomy_la_board", "Two-Week Look-Ahead" in sm and 'id="pla-board"' in sm
+       and 'id="pla-start"' in sm and 'id="pla-hero"' in sm)
+    ok("anatomy_la_readonly", "la-add" not in sm and "Add activity" not in sm
+       and "Refresh" not in sm and "data-rm" not in sm)
+
+    print("\n-- #286 the client-audience DCR view route --")
+    v = CMIN.get(f"{BASE}/api/portal/{PC}/daily/{FIX_SEQ}/view", **R)
+    ok("view_200_client_file_bytes", v.status_code == 200
+       and "SMK284 CLIENT RENDER MARKER" in v.text, f"{v.status_code}")
+    ok("view_never_internal_file", "SENTINEL-284-INTERNALDOC" not in v.text,
+       "the internal render reached a client")
+    v = CMIN.get(f"{BASE}/api/portal/{PD}/daily/{FIX_SEQ}/view", **R)
+    ok("view_cross_project_403", v.status_code == 403, f"{v.status_code}")
+    v = CMIN.get(f"{BASE}/api/portal/{PC}/daily/99999/view", **R)
+    ok("view_unknown_seq_404", v.status_code == 404, f"{v.status_code}")
+    v = CMIN.get(f"{BASE}/project-files/data_room/reports/dcr/{PC}/{FIX_SEQ:03d}/internal.html", **R)
+    ok("internal_files_namespace_closed", v.status_code in (302, 403), f"{v.status_code}")
+    v = CZERO.get(f"{BASE}/api/portal/{PC}/daily/{FIX_SEQ}/view", **R)
+    ok("view_zero_grant_403", v.status_code == 403, f"{v.status_code}")
+
+    print("\n-- #286 look-ahead payload: curated, read-only --")
+    la = CMIN.get(f"{BASE}/api/portal/{PC}/lookahead", **R)
+    ld = la.json().get("data", {}) if la.status_code == 200 else {}
+    ok("la_200_days_10", la.status_code == 200 and len(ld.get("days", [])) == 10,
+       f"{la.status_code} days={len(ld.get('days', []))}")
+    ok("la_groups_nonempty", len(ld.get("groups", [])) >= 1,
+       "the fixture activities must produce a drop group — checks below are vacuous otherwise")
+    flat = str(ld)
+    ok("la_no_crew_notes_constraints",
+       "'crew'" not in flat and "'notes'" not in flat and "constraint" not in flat
+       and "'source'" not in flat, "an uncurated look-ahead field crossed")
+    ok("la_sentinels_never_cross",
+       "SENTINEL-284-CREW" not in flat and "SENTINEL-284-LANOTE" not in flat
+       and "SENTINEL-284-VENDOR" not in flat,
+       "a populated crew/note/vendor value reached the client board")
+    for gr in ld.get("groups", []):
+        ok("la_group_fields_registered",
+           set(gr) <= (set(reg.DATASETS["la.group"]) | {"activities"}), str(sorted(gr)))
+        break
+    delivs = [a for g in ld.get("groups", []) for a in g.get("activities", [])
+              if a.get("activity_type") == "delivery"]
+    delivs += [a for a in ld.get("general", []) if a.get("activity_type") == "delivery"]
+    ok("la_delivery_present_and_generic", len(delivs) >= 1
+       and all(a.get("name") == "Delivery" for a in delivs),
+       str([a.get("name") for a in delivs][:3]))
+    ok("la_activity_fields_registered",
+       all(set(a) <= set(reg.DATASETS["la.activity"])
+           for g in ld.get("groups", []) for a in g.get("activities", [])))
+    la2 = ARCH.get(f"{BASE}/api/portal/{PC}/lookahead", **R)
+    ok("la_architect_403", la2.status_code == 403, f"{la2.status_code}")
+
+    print("\n-- #286 layout persistence round-trip (client user) --")
+    p = CMIN.put(f"{BASE}/api/dashboard/layout",
+                 json={"page_key": "portal_progress",
+                       "layout": [{"id": "weather", "x": 0, "y": 0, "w": 4, "h": 5}]},
+                 timeout=15)
+    ok("layout_put_200", p.status_code == 200, f"{p.status_code}")
+    gj = CMIN.get(f"{BASE}/api/dashboard/layout?page_key=portal_progress", timeout=15).json()
+    saved = (gj.get("data") or {}).get("layout") or []
+    ok("layout_get_roundtrip", bool(saved) and saved[0].get("id") == "weather", str(saved))
+    dl = CMIN.delete(f"{BASE}/api/dashboard/layout?page_key=portal_progress", timeout=15)
+    ok("layout_delete_resets", dl.status_code == 200, f"{dl.status_code}")
+    zg = CZERO.put(f"{BASE}/api/dashboard/layout",
+                   json={"page_key": "portal_progress", "layout": []}, timeout=15)
+    ok("layout_zero_grant_403", zg.status_code == 403, f"{zg.status_code}")
+
     print("\n-- preview parity: byte-for-byte page, JSON-identical payloads --")
     for label, sess, key in (("cli_min", CMIN, "cli_min"), ("cli_full", CFULL, "cli_full")):
-        own = pages[label]
+        own = sess.get(f"{BASE}/portal/{PC}", **R).content   # fresh — grants changed above
         pv = AD.get(f"{BASE}/portal/{PC}", params={"preview_client": users[key]}, **R)
         ok(f"parity_page_bytes_{label}", pv.status_code == 200 and pv.content == own,
            f"{pv.status_code} own={len(own)}B pv={len(pv.content)}B")

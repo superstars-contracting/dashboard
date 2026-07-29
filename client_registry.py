@@ -85,7 +85,9 @@ DATASETS: dict[str, frozenset] = {
 
     # progress — the Classic progress data re-served through the registry.
     # summary.text is code-GENERATED from pct (never operator free text).
-    "portal.progress_summary": frozenset({"text", "last_activity", "photos_shared"}),
+    # #286 — latest_report: the newest issued report DATE (KPI tile fuel).
+    "portal.progress_summary": frozenset({"text", "last_activity", "photos_shared",
+                                          "latest_report"}),
 
     # photos — item-shared only (visibility.py is the source; this is the shape).
     # #285 — caption is GONE (operator decision: cards show drop · elevation ·
@@ -110,13 +112,28 @@ DATASETS: dict[str, frozenset] = {
     # column (no_work_reason, no_work_note, scope_of_work, description,
     # stage-note, cell reason) — none of them is ever SELECTED, let alone
     # registered. `label` and `status` carry generated/enum vocabulary only.
-    "portal.daily_day": frozenset({"date", "no_work", "label"}),
+    # #286 — report_id (the GENERATED display id "DCR-<code>-NNN") + seq joined the
+    # day row: the portal daily table mirrors the internal archive's first column,
+    # and seq addresses the gated client-audience render route. Operator-approved.
+    "portal.daily_day": frozenset({"date", "no_work", "label", "report_id", "seq"}),
     "portal.daily_weather": frozenset({"am_temp_f", "pm_temp_f", "am_conditions",
                                        "pm_conditions", "wind"}),
     "portal.daily_drop": frozenset({"label", "elevation"}),
     "portal.daily_activity": frozenset({"category", "status"}),
     "portal.daily_change": frozenset({"drop_label", "level", "from_label", "to_label"}),
     "portal.daily_photo": frozenset({"id", "thumb_url", "file_url"}),
+
+    # ---- #286 · the look-ahead board (anatomy parity with the internal page) --
+    # PROVENANCE EXCEPTION (planner-approved, flagged in HANDOFF): activity NAME
+    # crosses to the client — look-ahead titles are planning labels designed for
+    # external consumption (the internal Print exists to share this board).
+    # Delivery names are REPLACED with the generic "Delivery" before projection;
+    # crew / notes / source / constraint_count never enter the payload.
+    "la.day": frozenset({"iso", "dow", "md", "is_today"}),
+    "la.kpis": frozenset({"active_drops", "activities", "deliveries", "behind"}),
+    "la.group": frozenset({"label", "status", "stage_index", "stage_total",
+                           "behind_days"}),
+    "la.activity": frozenset({"name", "activity_type", "grid"}),
 }
 
 # Fields matching these are internal BY NATURE. They must never appear in DATASETS.
