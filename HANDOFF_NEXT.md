@@ -79,10 +79,22 @@ The architect is contained by an **allowlist** (`elevation._architect_gate`)
 normal project scoping. Architects are not grant-gated on their own
 drawing surface.
 
-`/portal/<code>` (the #281 shared shell) is an **admin-preview surface
-only** until the nav is grant-driven: every external role landing there is
-redirected to Classic. That lock is committed and asserted by
-`tests/smoke_portal_shell_281.py`.
+**#284 — THE FLIP IS LIVE.** `/portal/<code>` is the CLIENT's home:
+`portal_shell.html` (allowlist-first — the file contains ONLY portal
+components), nav + view panes rendered from the client's EFFECTIVE set =
+`portal_matrix.ROLE_SECTION_MATRIX[role]` ∩ #269 grants, fetching
+`/api/portal/<code>/{progress,photos,documents,daily}` (portal_sections.py —
+every field through the `client_payload()` registry, audience hard-coded
+"client", URL code must equal the client's bound project). `/welcome` and
+Classic `/portal` 302 granted clients to `/portal/<code>`; the #267
+zero-grant hard-stop is unchanged; the architect keeps `/drawing-markup`;
+the Classic ENGINE (its /api/portal/* payloads + id-gated byte routes +
+admin Classic preview) is intact. Admin preview of the new shell is
+byte-identical to the client's own page by construction.
+**ROLLBACK = `git revert 2c4fb4a` (the flip commit) + #244 restart — one
+commit, nothing else.** Guarded by `tests/smoke_portal_flip_284.py` (56
+checks, planted-failure-proven) + the updated landing contracts in
+smoke_portal_shell_281 / smoke_client_grants_269.
 
 ### Two invariants that are load-bearing
 
@@ -282,31 +294,40 @@ relevant suite red, and the code restores clean.
 
 ## Known gaps / operator decisions pending
 
-- **2026-07-16 and 2026-07-17 have no DCR at all.** Each day has 17
-  sign-ins (real crew on site) but zero `report_index` rows. Two orphan
-  PDFs sat in the numbering slots those days would have occupied; their
-  index rows were destroyed during the 07-23 resequencer churn. The PDFs
-  are preserved at `snapshots/dcr_quarantine_283/054|055`. Re-issuing
-  would create genuine reports from surviving sign-in data, but under the
-  immutability rule they would take the next free numbers (not 054/055) —
-  **operator decision, not a cleanup step.**
-- **DCR-041 (2026-06-29)** has issued index rows but no render directory;
-  its artifacts were lost in the same churn. Re-issuing regenerates them.
+- **RESOLVED (#284, operator-approved):** 2026-07-16 → **DCR-062** and
+  2026-07-17 → **DCR-063** re-issued 2026-07-28 from surviving DB data
+  through the standard pipeline (next-free numbers per immutability; 054/
+  055 stay retired). Each report carries an Administrative issues-row note
+  ("Re-issued 2026-07-28 from database records; original render lost in
+  the 2026-07-23 renumbering incident."), rendered in BOTH audiences.
+  **DCR-041** artifacts re-rendered at its existing number, content-
+  verified. Audit: `dcr_reissue_284` / `dcr_rerender_284`. The quarantined
+  originals at `snapshots/dcr_quarantine_283/054|055` are retained
+  untouched. Tree verified: seqs 1–63 contiguous-by-allocation (54/55
+  retired), zero unindexed dirs, zero missing renders.
+- `report_index` id 11754 (2026-07-07) is a dead `no_work_pending`
+  placeholder (no_work=0, seq NULL) beside that date's issued seq-47 rows —
+  harmless promotion residue, excluded from contiguity checks. Delete or
+  leave at leisure.
+- The live architect user has **no `pm_project_assignment` row** — they
+  cannot open any elevation until assigned to FR-BX-001.
 - `.orphan_dst_058_*` — a PDF-only remnant whose identity could not be
   established (Edge PDFs use subset font encodings, so the text is not
   extractable). Quarantined, not destroyed.
 
 ## Pending work (by priority — pick from the top)
 
-### The portal-flip track (sequenced next, deliberately NOT in #283)
+### The portal-flip track (#284 SHIPPED the core; remainder below)
 
-- Nav rendered from the grant list, so `/portal/<code>` can come off its
-  admin-preview lock.
-- The six portal section payloads (progress, photos, documents, daily,
-  schedule, weekly/materials when they exist) served through
-  `client_payload()` on the `/api/portal/<code>/*` namespace — the
-  registry currently has **no production consumers**.
-- The role × section matrix, and S/E/W elevation tracing.
+- DONE 2026-07-28: matrix + nav-from-grants + progress/photos/documents/
+  daily payloads through the registry + THE FLIP (clients land on
+  `/portal/<code>`). The new shell's schedule view re-consumes Classic's
+  curated `/api/portal/schedule`; drawing renders as a nav link when
+  granted.
+- REMAINING: weekly / materials portal payloads (catalogued, unserved);
+  the fancy sections (weather, drops-by-status, progress-by-elevation)
+  through the registry; S/E/W elevation tracing; architect grant
+  machinery if the architect ever gets shell sections.
 
 ### Field-blocking before tomorrow's site test
 
@@ -426,6 +447,8 @@ restore from CSV).
 
 ---
 
-*Last updated: end of the 2026-07-28 session (#282 verification/repair +
-#283 fold-in). Live: two clients + one architect with real logins;
-`/portal/<code>` still admin-preview-only pending the portal-flip track.*
+*Last updated: end of the 2026-07-28 #284 session (THE PORTAL FLIP +
+DCR-062/063 re-issue + DCR-041 re-render). Live: two clients + one
+architect; clients land on the NEW SHELL `/portal/<code>`; gate is 32
+suites, green on both backends at deploy commit f513235; flip rollback =
+revert 2c4fb4a + #244 restart.*
