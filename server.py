@@ -20,6 +20,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 DB_PATH = SCRIPT_DIR / "superstars.db"
 COMPANY_DASHBOARD_PATH = SCRIPT_DIR / "company-dashboard.html"
 DASHBOARD_PATH = SCRIPT_DIR / "dashboard-static.html"
+PORTAL_SHELL_PATH = SCRIPT_DIR / "portal_shell.html"   # #284 — the external shell
 PM_PROJECTS_PATH = SCRIPT_DIR / "projects.html"  # #263 — pm projects-only landing
 
 # #248 — PUBLIC static serving is the vendored-asset subtree ONLY. The
@@ -87,6 +88,14 @@ client_portal.register(app)
 # the admin/c_suite-only grant/revoke/list endpoints.
 import client_grants  # noqa: E402
 client_grants.register(app)
+
+# #284 — the ROLE x SECTION matrix (portal_matrix) + the /api/portal/<code>/* section
+# payloads (portal_sections): the portal shell's data, every field through the
+# client_payload() registry, matrix + grant + project-binding re-derived per request.
+# MUST follow client_portal.register (the client gate routes /api/portal/* first).
+import portal_matrix  # noqa: E402
+import portal_sections  # noqa: E402
+portal_sections.register(app)
 
 # #272a — Materials & Deliveries: per-project catalog + txn ledger + expected
 # deliveries + weekly count. Operational section (all dashboard roles; pm via the
@@ -352,14 +361,34 @@ def project_dashboard(project_code):
     return _serve_dashboard_no_store(project_code)
 
 
+def _serve_portal_shell(project_code, effective_sections):
+    """#284 — render the EXTERNAL portal shell for one effective section set.
+
+    portal_shell.html is allowlist-first: it contains ONLY portal components (no
+    internal nav/views/scripts exist in the file to strip). Rendering is a pure
+    function of (project_code, effective_sections) — a real client session and an
+    admin preview of that client produce byte-identical pages BY CONSTRUCTION,
+    which is the #284 preview-parity acceptance criterion."""
+    html = ui_version.resolve_page(PORTAL_SHELL_PATH).read_text(encoding="utf-8")
+    html = portal_matrix.render_portal_sections(html, effective_sections)
+    html = access.render_project_identity(html, _project_identity(project_code))
+    html = access.render_api_base(html, "client", project_code)   # /api/portal/<code>
+    resp = Response(html, mimetype="text/html")
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
+
+
 @app.route('/portal/<project_code>')
 def portal_project_shell(project_code):
-    """#281 — THE SAME SHELL, served from the portal namespace.
+    """#281/#284 — the project shell, served per audience.
 
-    Client and architect get dashboard-static.html: same file, same layout, same widgets,
-    same CSS. What differs is injected, not forked — window.SSC_API_BASE points this
-    session at /api/portal/<code> instead of /api/projects/<code>, and the SECTION markers
-    strip what the role may not see.
+    INTERNAL roles get dashboard-static.html on the internal namespace (unchanged).
+    A CLIENT (or an admin previewing one, #270) gets portal_shell.html: nav and view
+    panes rendered ONLY for their EFFECTIVE sections (#284 matrix ∩ #269 grants),
+    fetching from the curated /api/portal/<code>/* namespace. An architect keeps
+    /drawing-markup as their home; any other external role has no portal surface.
 
     WHY A SEPARATE ROUTE rather than letting external roles onto /projects/<code>:
     #264's boundary is a single routing-layer rule — pm_scoping.pm_can_access_project
@@ -376,15 +405,9 @@ def portal_project_shell(project_code):
     effective = actor
 
     # ---- TEMPORARY LOCK (#281, removed at flip time) ----------------------------
-    # STEP 2 (nav rendered from the grant list) is NOT built yet, so this shell still
-    # shows every nav item that has no SECTION marker — around eleven that are not on
-    # any external role's list and would open to internal surfaces that 403. That is a
-    # bad first impression, not a data leak (every endpoint behind them is still gated),
-    # but an outside party must not meet a half-finished menu.
-    #
-    # So until the nav is grant-driven and verified, this route is an ADMIN PREVIEW
-    # SURFACE ONLY. An external role landing here directly goes to Classic, which is
-    # complete and is still what they are meant to be using.
+    # Kept until #284's flip commit: an external role landing here directly still
+    # goes to Classic. The admin preview below already exercises the finished
+    # portal shell end to end, so the flip is a routing decision, not new render code.
     if role in access.EXTERNAL_API_ROLES:
         logging.info(f"portal_shell: external role sent to Classic (pre-STEP2 lock) "
                      f"role={role} code={project_code}")
@@ -437,6 +460,32 @@ def portal_project_shell(project_code):
             "NOT AUTHORIZED</div><p style=\"color:#8a8378;font-size:14px;line-height:1.6\">"
             "This project is not available on your account.</p></div>",
             status=403, mimetype="text/html")
+
+    # ---- #284: the EXTERNAL experience — the portal shell, per effective sections ----
+    if role == "client":
+        conn = db()
+        try:
+            eff = portal_matrix.effective_sections(
+                conn, effective["id"], "client", project_code)
+        finally:
+            conn.close()
+        if not eff:
+            # zero effective sections: a real client belongs on the #267 welcome
+            # hard-stop (their gate already routes them there — this is the in-route
+            # backstop); a previewing admin goes back where containment is stated.
+            is_preview = effective is not actor
+            return redirect("/admin/projects" if is_preview else "/welcome")
+        return _serve_portal_shell(project_code, eff)
+    if role == "architect":
+        # #284 seeds the architect's MATRIX row, but architects have no grant
+        # machinery yet — their effective set is empty by construction, and their
+        # home remains the drawing surface (landing deliberately unchanged tonight).
+        return redirect("/drawing-markup")
+    if role in access.EXTERNAL_API_ROLES:
+        # vendor / any future external role: no matrix row -> no portal surface.
+        return jsonify({"error": "forbidden"}), 403
+
+    # INTERNAL roles: unchanged — the internal shell on the internal namespace.
     return _serve_dashboard_no_store(project_code, role_override=role)
 
 

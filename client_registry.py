@@ -74,6 +74,41 @@ DATASETS: dict[str, frozenset] = {
 
     # ---- project identity shown in the shell header ----------------------
     "project.identity": frozenset({"project_code", "name", "client_name"}),
+
+    # ---- #284 · the four portal-shell section payloads -------------------
+    # The first PRODUCTION consumers of this registry. Every field below is an
+    # operator-approved disclosure; a field a section needs next month gets
+    # REGISTERED next month — never slipped into a SELECT.
+
+    # progress — the Classic progress data re-served through the registry.
+    # summary.text is code-GENERATED from pct (never operator free text).
+    "portal.progress_summary": frozenset({"text", "last_activity", "photos_shared"}),
+
+    # photos — item-shared only (visibility.py is the source; this is the shape).
+    # caption is operator-entered, approved as part of the deliberate share act
+    # (Classic has served it since #264). URLs point at the id-gated byte routes.
+    "portal.photo": frozenset({"id", "caption", "taken_at", "thumb_url", "file_url"}),
+
+    # documents — item-shared only, same engine. notes / file_name / uploader /
+    # requirement_key stay internal exactly as Classic decided in #269.
+    "portal.document": frozenset({"id", "title", "category", "doc_type",
+                                  "effective_date", "file_url"}),
+
+    # daily — the CLIENT DCR BREAKDOWN (#284 operator-approved allowlist):
+    # date + work/no-work; weather; active drop/elevation labels; structured
+    # activity categories; that-day status changes; that-day shared photos.
+    # EXPLICITLY ABSENT, forever, by provenance: worker identities, hours,
+    # rates, headcounts, SOV quantities, internal notes, and EVERY free-text
+    # column (no_work_reason, no_work_note, scope_of_work, description,
+    # stage-note, cell reason) — none of them is ever SELECTED, let alone
+    # registered. `label` and `status` carry generated/enum vocabulary only.
+    "portal.daily_day": frozenset({"date", "no_work", "label"}),
+    "portal.daily_weather": frozenset({"am_temp_f", "pm_temp_f", "am_conditions",
+                                       "pm_conditions", "wind"}),
+    "portal.daily_drop": frozenset({"label", "elevation"}),
+    "portal.daily_activity": frozenset({"category", "status"}),
+    "portal.daily_change": frozenset({"drop_label", "level", "from_label", "to_label"}),
+    "portal.daily_photo": frozenset({"id", "thumb_url", "file_url"}),
 }
 
 # Fields matching these are internal BY NATURE. They must never appear in DATASETS.

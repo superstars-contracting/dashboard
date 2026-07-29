@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Superstars Contracting — Project Portal</title>
+  <link rel="stylesheet" href="/files/static/fonts/typography.css">
+  <!-- #284 — THE PORTAL SHELL. The external counterpart of dashboard-static.html,
+       built ALLOWLIST-FIRST: this file contains ONLY portal components. There is no
+       internal nav, view, or script here to strip — an external DOM starts empty and
+       effective sections are ADDED, the same default-deny the payloads live by.
+       Server render fills: __API_BASE__, __PROJECT_CODE__, data-project-* text, and
+       strips every PORTAL_SECTION block not in the target's EFFECTIVE set
+       (portal_matrix.render_portal_sections — matrix ∩ grants, per request). -->
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    :root {
+      --brand-red:#B11E2E; --brand-red-deep:#8B1623; --ink:#14161C;
+      --mute:#76777E; --soft:#54505A; --hairline:#E8E4DD; --paper:#FCFBF8;
+    }
+    html { font-size:16px; }
+    body { font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+           background:#fff; color:var(--ink); line-height:1.6; }
+    .app-shell { display:flex; min-height:100vh; }
+
+    /* ---- sidebar (same visual language as the project dashboard) ---- */
+    .sidebar { width:256px; background:#fff; border-right:1px solid var(--hairline);
+               padding:24px 12px; flex-shrink:0; display:flex; flex-direction:column; }
+    .sidebar-header { display:flex; align-items:center; gap:10px; padding:0 10px 18px;
+                      border-bottom:1px solid var(--hairline); margin-bottom:10px; }
+    .sidebar-header img.brand-mark { width:24px; height:24px; object-fit:contain; } /* #265 reserved box */
+    .brand-name { font-family:'Archivo',-apple-system,sans-serif; font-size:13px; font-weight:700;
+                  letter-spacing:.5px; text-transform:uppercase; line-height:1.2; }
+    .brand-sub { font-size:9px; color:var(--mute); letter-spacing:1px; text-transform:uppercase;
+                 font-weight:600; margin-top:2px; }
+    .proj-line { padding:12px 10px 14px; border-bottom:1px solid var(--hairline); margin-bottom:12px; }
+    .proj-name { font-size:13px; font-weight:700; line-height:1.35; }
+    .proj-client { font-size:11px; color:var(--mute); margin-top:2px; }
+    .nav { display:flex; flex-direction:column; gap:2px; }
+    .nav-label { font-size:10px; color:var(--mute); text-transform:uppercase; letter-spacing:.12em;
+                 font-weight:700; padding:6px 12px 4px; }
+    .nav-link { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:8px;
+                font-size:13.5px; font-weight:600; color:var(--soft); text-decoration:none;
+                cursor:pointer; border-left:3px solid transparent; }
+    .nav-link:hover { color:var(--brand-red); background:var(--paper); }
+    .nav-link.active { color:var(--brand-red); background:#fbeceb; border-left-color:var(--brand-red); }
+    .nav-ic { width:16px; height:16px; flex:none; stroke:currentColor; fill:none;
+              stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .sidebar-grow { flex:1; min-height:8px; }
+    .sidebar-footer { flex:0 0 auto; border-top:1px solid var(--hairline); padding:12px 10px 2px; }
+    .acct-name { font-size:12.5px; font-weight:700; }
+    .acct-role { font-size:10px; color:var(--mute); text-transform:uppercase; letter-spacing:.08em; }
+    .signout { margin-top:8px; display:inline-block; font-size:12px; font-weight:700;
+               color:var(--brand-red); background:none; border:1px solid var(--hairline);
+               border-radius:8px; padding:6px 12px; cursor:pointer; }
+    .signout:hover { border-color:var(--brand-red); }
+
+    /* ---- main pane ---- */
+    .main { flex:1; min-width:0; display:flex; flex-direction:column; }
+    .topbar { background:#fff; border-bottom:1px solid var(--hairline); padding:14px 22px;
+              display:flex; align-items:center; justify-content:space-between; gap:12px;
+              position:sticky; top:0; z-index:5; }
+    .top-title { font-size:14px; font-weight:700; letter-spacing:.02em; }
+    .top-sub { font-size:11px; color:var(--mute); }
+    .preview-banner { display:none; background:#B68838; color:#fff; font-size:12px; font-weight:700;
+                      padding:8px 22px; letter-spacing:.03em; }
+    .content { padding:22px; max-width:1060px; width:100%; }
+    .view { display:none; }
+    .view.active { display:block; }
+    .v-head { margin:2px 0 16px; }
+    .v-eyebrow { font-size:11px; color:var(--mute); text-transform:uppercase; letter-spacing:.12em; font-weight:700; }
+    .v-head h1 { font-size:22px; line-height:1.25; margin-top:2px; }
+    .card { background:#fff; border:1px solid var(--hairline); border-radius:12px; padding:18px; }
+    .loading { color:var(--mute); font-size:13px; padding:10px 0; }
+    .empty { text-align:center; padding:26px 12px; color:var(--mute); }
+    .empty b { display:block; color:var(--soft); font-size:14px; }
+    .empty span { font-size:12px; }
+
+    /* progress */
+    .prog-wrap { display:flex; align-items:center; gap:26px; flex-wrap:wrap; }
+    .prog-ring { width:150px; height:150px; flex:none; }
+    .prog-ring .bg { stroke:#F2EFE7; }
+    .prog-ring .fg { stroke:var(--brand-red); transition:stroke-dasharray .5s; }
+    .prog-num { font-size:30px; font-weight:800; }
+    .prog-label { display:inline-block; font-size:10px; font-weight:700; letter-spacing:1px;
+                  text-transform:uppercase; color:var(--brand-red); background:#fbeceb;
+                  padding:4px 10px; border-radius:99px; margin-bottom:8px; }
+    .prog-text { font-size:14px; color:var(--soft); max-width:420px; }
+    .prog-meta { font-size:11px; color:var(--mute); margin-top:8px; }
+
+    /* daily timeline */
+    .day-card { background:#fff; border:1px solid var(--hairline); border-radius:12px;
+                padding:16px 18px; margin-bottom:14px; }
+    .day-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+    .day-date { font-size:15px; font-weight:800; }
+    .day-chip { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+                padding:3px 9px; border-radius:99px; background:#EDF3EC; color:#3F6B3F; }
+    .day-chip.nowork { background:#F4F1EA; color:var(--mute); }
+    .day-weather { font-size:12px; color:var(--mute); margin-top:6px; }
+    .day-sec { margin-top:10px; }
+    .day-sec-k { font-size:10px; color:var(--mute); text-transform:uppercase; letter-spacing:.08em; font-weight:700; }
+    .day-drops { display:flex; flex-wrap:wrap; gap:8px; margin-top:5px; }
+    .drop-chip { font-size:12px; font-weight:700; background:var(--paper); border:1px solid #EFEBE3;
+                 border-radius:8px; padding:4px 10px; }
+    .drop-chip small { font-weight:600; color:var(--mute); text-transform:uppercase; font-size:10px; margin-left:6px; }
+    .act-row, .chg-row { font-size:13px; color:var(--soft); margin-top:4px; display:flex; gap:8px; align-items:baseline; }
+    .act-verb { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--brand-red); }
+    .day-photos { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+    .day-photos img { width:72px; height:72px; object-fit:cover; border-radius:8px;
+                      border:1px solid var(--hairline); cursor:pointer; }
+
+    /* photos grid */
+    .photo-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:14px; }
+    .photo-tile { border:1px solid var(--hairline); border-radius:12px; overflow:hidden; background:#fff; }
+    .photo-tile img { width:100%; aspect-ratio:4/3; object-fit:cover; display:block; cursor:pointer; }
+    .photo-cap { padding:8px 10px; font-size:12px; color:var(--soft); }
+    .photo-date { font-size:10px; color:var(--mute); text-transform:uppercase; letter-spacing:.05em; }
+
+    /* documents list */
+    .doc-row { display:flex; align-items:center; gap:14px; padding:12px 4px;
+               border-bottom:1px solid #F2EFE7; }
+    .doc-main { min-width:0; flex:1; }
+    .doc-title { font-size:13.5px; font-weight:700; }
+    .doc-meta { font-size:11px; color:var(--mute); text-transform:uppercase; letter-spacing:.04em; margin-top:1px; }
+    .doc-open { flex:none; font-size:12px; font-weight:700; color:var(--brand-red); text-decoration:none;
+                border:1px solid var(--hairline); border-radius:8px; padding:6px 12px; }
+    .doc-open:hover { border-color:var(--brand-red); }
+
+    /* schedule list */
+    .sch-row { display:flex; align-items:baseline; gap:12px; padding:10px 4px; border-bottom:1px solid #F2EFE7; }
+    .sch-window { flex:none; font-size:12px; color:var(--mute); min-width:170px; }
+    .sch-name { font-size:13.5px; font-weight:600; }
+    .sch-type { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+                color:var(--mute); margin-left:8px; }
+
+    @media (max-width:860px) {
+      .app-shell { flex-direction:column; }
+      .sidebar { width:100%; height:auto; border-right:none; border-bottom:1px solid var(--hairline);
+                 padding:14px 12px; }
+      .sidebar-grow { display:none; }
+      .content { padding:16px; }
+    }
+  </style>
+</head>
+<body>
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="pi-gauge" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 12l5-5"/></symbol>
+  <symbol id="pi-file" viewBox="0 0 24 24"><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/></symbol>
+  <symbol id="pi-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+  <symbol id="pi-cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+  <symbol id="pi-pencil" viewBox="0 0 24 24"><path d="M4 20l4-1L20 7l-3-3L5 16z"/></symbol>
+</svg>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <!-- #265 — canonical lockup (single source: brand.py) -->
+      <img class="brand-mark" src="/files/static/brand/mark.svg" alt="Superstars Contracting">
+      <div>
+        <div class="brand-name">Superstars Contracting</div>
+        <div class="brand-sub">Client Portal</div>
+      </div>
+    </div>
+    <div class="proj-line">
+      <div class="proj-name" data-project-title></div>
+      <div class="proj-client" data-project-client></div>
+    </div>
+    <nav class="nav" id="portal-nav">
+      <div class="nav-label">Your project</div>
+<!-- PORTAL_SECTION:progress:start -->
+      <a class="nav-link" data-portal-nav="progress"><svg class="nav-ic"><use href="#pi-gauge"/></svg>Progress</a>
+<!-- PORTAL_SECTION:progress:end -->
+<!-- PORTAL_SECTION:daily:start -->
+      <a class="nav-link" data-portal-nav="daily"><svg class="nav-ic"><use href="#pi-file"/></svg>Daily Reports</a>
+<!-- PORTAL_SECTION:daily:end -->
+<!-- PORTAL_SECTION:photos:start -->
+      <a class="nav-link" data-portal-nav="photos"><svg class="nav-ic"><use href="#pi-camera"/></svg>Photos</a>
+<!-- PORTAL_SECTION:photos:end -->
+<!-- PORTAL_SECTION:documents:start -->
+      <a class="nav-link" data-portal-nav="documents"><svg class="nav-ic"><use href="#pi-file"/></svg>Documents</a>
+<!-- PORTAL_SECTION:documents:end -->
+<!-- PORTAL_SECTION:schedule:start -->
+      <a class="nav-link" data-portal-nav="schedule"><svg class="nav-ic"><use href="#pi-cal"/></svg>Schedule</a>
+<!-- PORTAL_SECTION:schedule:end -->
+<!-- PORTAL_SECTION:drawing:start -->
+      <a class="nav-link" href="/drawing-markup"><svg class="nav-ic"><use href="#pi-pencil"/></svg>Drawing Markup</a>
+<!-- PORTAL_SECTION:drawing:end -->
+    </nav>
+    <div class="sidebar-grow"></div>
+    <div class="sidebar-footer">
+      <div class="acct-name" id="acct-name"></div>
+      <div class="acct-role" id="acct-role"></div>
+      <button class="signout" id="signout" type="button">Sign out</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="preview-banner" id="preview-banner"></div>
+    <div class="topbar">
+      <div>
+        <div class="top-title" data-project-line></div>
+        <div class="top-sub">Prepared for <span data-project-client></span></div>
+      </div>
+    </div>
+    <div class="content">
+
+<!-- PORTAL_SECTION:progress:start -->
+      <section class="view" data-portal-view="progress">
+        <div class="v-head"><div class="v-eyebrow">Overall</div><h1>Project Progress</h1></div>
+        <div class="card">
+          <div class="loading" data-loading>Loading progress…</div>
+          <div class="prog-wrap" style="display:none" data-body>
+            <svg class="prog-ring" viewBox="0 0 120 120">
+              <circle class="bg" cx="60" cy="60" r="52" fill="none" stroke-width="12"/>
+              <circle class="fg" id="prog-fg" cx="60" cy="60" r="52" fill="none" stroke-width="12"
+                      stroke-linecap="round" transform="rotate(-90 60 60)"/>
+              <text x="60" y="66" text-anchor="middle" class="prog-num" id="prog-num" font-size="26" font-weight="800" fill="#14161C"></text>
+            </svg>
+            <div>
+              <span class="prog-label" id="prog-label"></span>
+              <div class="prog-text" id="prog-text"></div>
+              <div class="prog-meta" id="prog-meta"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+<!-- PORTAL_SECTION:progress:end -->
+
+<!-- PORTAL_SECTION:daily:start -->
+      <section class="view" data-portal-view="daily">
+        <div class="v-head"><div class="v-eyebrow">Field activity</div><h1>Daily Reports</h1></div>
+        <div id="daily-list"><div class="loading">Loading daily reports…</div></div>
+      </section>
+<!-- PORTAL_SECTION:daily:end -->
+
+<!-- PORTAL_SECTION:photos:start -->
+      <section class="view" data-portal-view="photos">
+        <div class="v-head"><div class="v-eyebrow">Shared with you</div><h1>Project Photos</h1></div>
+        <div id="photo-grid" class="photo-grid"><div class="loading">Loading photos…</div></div>
+      </section>
+<!-- PORTAL_SECTION:photos:end -->
+
+<!-- PORTAL_SECTION:documents:start -->
+      <section class="view" data-portal-view="documents">
+        <div class="v-head"><div class="v-eyebrow">Shared with you</div><h1>Project Documents</h1></div>
+        <div class="card" id="doc-list"><div class="loading">Loading documents…</div></div>
+      </section>
+<!-- PORTAL_SECTION:documents:end -->
+
+<!-- PORTAL_SECTION:schedule:start -->
+      <section class="view" data-portal-view="schedule">
+        <div class="v-head"><div class="v-eyebrow">Look-ahead</div><h1>Schedule</h1></div>
+        <div class="card" id="sch-list"><div class="loading">Loading schedule…</div></div>
+      </section>
+<!-- PORTAL_SECTION:schedule:end -->
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var API_BASE = "__API_BASE__";                 // /api/portal/<code>, server-filled
+  var PROJECT_CODE = "__PROJECT_CODE__";
+
+  // #270 preview pattern: an admin preview carries ?preview_client=<id>, and every
+  // API/byte fetch this page makes must carry it too (the server re-validates the
+  // target on EVERY request; for a real client session the param is ignored server-
+  // side, so propagating it is never a widening).
+  var qs = new URLSearchParams(location.search);
+  var PREVIEW_ID = qs.get('preview_client');
+  function u(url) {
+    if (!PREVIEW_ID) return url;
+    return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'preview_client=' + encodeURIComponent(PREVIEW_ID);
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function getJSON(url) {
+    return fetch(u(url), { credentials: 'same-origin' }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
+  // ---- account chip + preview banner (banner only for a company-role session) ----
+  fetch('/api/auth/me', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
+    .then(function (j) {
+      var me = (j && j.data) || j || {};
+      var nameEl = document.getElementById('acct-name');
+      var roleEl = document.getElementById('acct-role');
+      if (nameEl) nameEl.textContent = me.display_name || me.full_name || me.email || '';
+      if (roleEl) roleEl.textContent = me.role === 'client' ? 'Client' : (me.role || '');
+      if (PREVIEW_ID && (me.role === 'admin' || me.role === 'c_suite')) {
+        var b = document.getElementById('preview-banner');
+        b.style.display = 'block';
+        b.textContent = 'PREVIEW — you are seeing this portal exactly as the client sees it. Read-only.';
+      }
+    }).catch(function () { /* chip stays blank; the page itself is already authed */ });
+
+  document.getElementById('signout').onclick = function () {
+    fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+      .then(function () { location.href = '/login'; });
+  };
+
+  // ---- view switching: the nav the server left IS the section list ----
+  var loaded = {};
+  function show(key) {
+    document.querySelectorAll('[data-portal-view]').forEach(function (v) {
+      v.classList.toggle('active', v.getAttribute('data-portal-view') === key);
+    });
+    document.querySelectorAll('[data-portal-nav]').forEach(function (n) {
+      n.classList.toggle('active', n.getAttribute('data-portal-nav') === key);
+    });
+    if (!loaded[key]) { loaded[key] = true; (LOADERS[key] || function () {})(); }
+  }
+  document.querySelectorAll('[data-portal-nav]').forEach(function (n) {
+    n.addEventListener('click', function () { show(n.getAttribute('data-portal-nav')); });
+  });
+
+  // ---- loaders ----
+  function emptyState(el, title, sub) {
+    el.innerHTML = '<div class="empty"><b>' + esc(title) + '</b><span>' + esc(sub) + '</span></div>';
+  }
+
+  var LOADERS = {
+    progress: function () {
+      var view = document.querySelector('[data-portal-view="progress"]');
+      getJSON(API_BASE + '/progress').then(function (j) {
+        var d = j.data || {};
+        var pct = Math.max(0, Math.min(100, (d.progress && d.progress.pct) || 0));
+        var C = 2 * Math.PI * 52;
+        var fg = document.getElementById('prog-fg');
+        fg.setAttribute('stroke-dasharray', (C * pct / 100) + ' ' + C);
+        document.getElementById('prog-num').textContent = Math.round(pct) + '%';
+        document.getElementById('prog-label').textContent = (d.progress && d.progress.label) || '';
+        document.getElementById('prog-text').textContent = (d.summary && d.summary.text) || '';
+        var meta = [];
+        if (d.summary && d.summary.photos_shared != null) meta.push(d.summary.photos_shared + ' photos shared');
+        if (d.summary && d.summary.last_activity) meta.push('Latest shared photo: ' + d.summary.last_activity);
+        document.getElementById('prog-meta').textContent = meta.join(' · ');
+        view.querySelector('[data-loading]').style.display = 'none';
+        view.querySelector('[data-body]').style.display = 'flex';
+      }).catch(function () {
+        view.querySelector('[data-loading]').textContent = 'Progress is unavailable right now.';
+      });
+    },
+
+    daily: function () {
+      var host = document.getElementById('daily-list');
+      getJSON(API_BASE + '/daily').then(function (j) {
+        var days = (j.data && j.data.days) || [];
+        if (!days.length) {
+          emptyState(host, 'No daily reports yet',
+            'Once field reports are issued for your project, each day will appear here.');
+          return;
+        }
+        host.innerHTML = days.map(function (d) {
+          var h = '<div class="day-card">';
+          h += '<div class="day-head"><span class="day-date">' + esc(d.date) + '</span>';
+          h += '<span class="day-chip' + (d.no_work ? ' nowork' : '') + '">' + esc(d.label) + '</span></div>';
+          if (d.weather) {
+            var w = [];
+            if (d.weather.am_temp_f != null) w.push('AM ' + Math.round(d.weather.am_temp_f) + '°F' +
+              (d.weather.am_conditions ? ' ' + d.weather.am_conditions : ''));
+            if (d.weather.pm_temp_f != null) w.push('PM ' + Math.round(d.weather.pm_temp_f) + '°F' +
+              (d.weather.pm_conditions ? ' ' + d.weather.pm_conditions : ''));
+            if (d.weather.wind) w.push('Wind ' + d.weather.wind);
+            if (w.length) h += '<div class="day-weather">' + esc(w.join(' · ')) + '</div>';
+          }
+          if (d.active_drops && d.active_drops.length) {
+            h += '<div class="day-sec"><div class="day-sec-k">Active drops</div><div class="day-drops">';
+            h += d.active_drops.map(function (x) {
+              return '<span class="drop-chip">' + esc(x.label) +
+                (x.elevation ? '<small>' + esc(x.elevation) + '</small>' : '') + '</span>';
+            }).join('');
+            h += '</div></div>';
+          }
+          if (d.activities && d.activities.length) {
+            h += '<div class="day-sec"><div class="day-sec-k">Work activity</div>';
+            h += d.activities.map(function (a) {
+              return '<div class="act-row"><span class="act-verb">' + esc(a.status) + '</span>' +
+                esc(a.category) + '</div>';
+            }).join('');
+            h += '</div>';
+          }
+          if (d.status_changes && d.status_changes.length) {
+            h += '<div class="day-sec"><div class="day-sec-k">Status updates</div>';
+            h += d.status_changes.map(function (c) {
+              var arrow = (c.from_label ? esc(c.from_label) + ' → ' : '') + esc(c.to_label);
+              return '<div class="chg-row"><b>' + esc(c.drop_label) + '</b>' +
+                (c.level ? ' · ' + esc(c.level) : '') + ' — ' + arrow + '</div>';
+            }).join('');
+            h += '</div>';
+          }
+          if (d.photos && d.photos.length) {
+            h += '<div class="day-sec"><div class="day-sec-k">Photos from this day</div><div class="day-photos">';
+            h += d.photos.map(function (p) {
+              return '<img loading="lazy" src="' + esc(u(p.thumb_url)) + '" data-full="' +
+                esc(u(p.file_url)) + '" alt="Project photo">';
+            }).join('');
+            h += '</div></div>';
+          }
+          return h + '</div>';
+        }).join('');
+        host.querySelectorAll('img[data-full]').forEach(function (img) {
+          img.addEventListener('click', function () { window.open(img.getAttribute('data-full'), '_blank'); });
+        });
+      }).catch(function () {
+        emptyState(host, 'Daily reports are unavailable right now', 'Please try again shortly.');
+      });
+    },
+
+    photos: function () {
+      var host = document.getElementById('photo-grid');
+      getJSON(API_BASE + '/photos').then(function (j) {
+        var photos = (j.data && j.data.photos) || [];
+        if (!photos.length) {
+          emptyState(host, 'No photos shared yet',
+            'Photos your team shares to the portal will appear here.');
+          return;
+        }
+        host.innerHTML = photos.map(function (p) {
+          return '<figure class="photo-tile"><img loading="lazy" src="' + esc(u(p.thumb_url)) +
+            '" data-full="' + esc(u(p.file_url)) + '" alt="Project photo">' +
+            '<figcaption class="photo-cap">' +
+            (p.caption ? esc(p.caption) + '<br>' : '') +
+            '<span class="photo-date">' + esc(p.taken_at || '') + '</span></figcaption></figure>';
+        }).join('');
+        host.querySelectorAll('img[data-full]').forEach(function (img) {
+          img.addEventListener('click', function () { window.open(img.getAttribute('data-full'), '_blank'); });
+        });
+      }).catch(function () {
+        emptyState(host, 'Photos are unavailable right now', 'Please try again shortly.');
+      });
+    },
+
+    documents: function () {
+      var host = document.getElementById('doc-list');
+      getJSON(API_BASE + '/documents').then(function (j) {
+        var docs = (j.data && j.data.documents) || [];
+        if (!docs.length) {
+          emptyState(host, 'No documents shared yet',
+            'Documents your team shares to the portal will appear here.');
+          return;
+        }
+        host.innerHTML = docs.map(function (d) {
+          var meta = [d.category, d.doc_type, d.effective_date].filter(Boolean).join(' · ');
+          return '<div class="doc-row"><div class="doc-main">' +
+            '<div class="doc-title">' + esc(d.title) + '</div>' +
+            '<div class="doc-meta">' + esc(meta) + '</div></div>' +
+            '<a class="doc-open" target="_blank" rel="noopener" href="' + esc(u(d.file_url)) + '">Open</a></div>';
+        }).join('');
+      }).catch(function () {
+        emptyState(host, 'Documents are unavailable right now', 'Please try again shortly.');
+      });
+    },
+
+    schedule: function () {
+      var host = document.getElementById('sch-list');
+      // Classic's curated look-ahead endpoint (#269) — same engine, same grant.
+      getJSON('/api/portal/schedule').then(function (j) {
+        var acts = (j.data && j.data.activities) || [];
+        if (!acts.length) {
+          emptyState(host, 'Nothing scheduled in this window',
+            'Planned activity for the coming weeks will appear here.');
+          return;
+        }
+        host.innerHTML = acts.map(function (a) {
+          return '<div class="sch-row"><span class="sch-window">' + esc(a.start) + ' → ' +
+            esc(a.finish) + '</span><span class="sch-name">' + esc(a.name) +
+            '<span class="sch-type">' + esc(a.type || '') + '</span></span></div>';
+        }).join('');
+      }).catch(function () {
+        emptyState(host, 'Schedule is unavailable right now', 'Please try again shortly.');
+      });
+    }
+  };
+
+  // ---- land on the FIRST section the server rendered (nav order = display order) ----
+  var first = document.querySelector('[data-portal-nav]');
+  if (first) show(first.getAttribute('data-portal-nav'));
+})();
+</script>
+</body>
+</html>
