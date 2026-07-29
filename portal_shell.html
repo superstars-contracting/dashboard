@@ -138,25 +138,25 @@
     </div>
     <nav class="nav" id="portal-nav">
       <div class="nav-label">Your project</div>
-<!-- PORTAL_SECTION:progress:start -->
+    <!-- PORTAL_SECTION:progress:start -->
       <a class="nav-link" data-portal-nav="progress"><svg class="nav-ic"><use href="#pi-gauge"/></svg>Progress</a>
 <!-- PORTAL_SECTION:progress:end -->
-<!-- PORTAL_SECTION:daily:start -->
-      <a class="nav-link" data-portal-nav="daily"><svg class="nav-ic"><use href="#pi-file"/></svg>Daily Reports</a>
-<!-- PORTAL_SECTION:daily:end -->
 <!-- PORTAL_SECTION:photos:start -->
       <a class="nav-link" data-portal-nav="photos"><svg class="nav-ic"><use href="#pi-camera"/></svg>Photos</a>
 <!-- PORTAL_SECTION:photos:end -->
 <!-- PORTAL_SECTION:documents:start -->
       <a class="nav-link" data-portal-nav="documents"><svg class="nav-ic"><use href="#pi-file"/></svg>Documents</a>
 <!-- PORTAL_SECTION:documents:end -->
+<!-- PORTAL_SECTION:daily:start -->
+      <a class="nav-link" data-portal-nav="daily"><svg class="nav-ic"><use href="#pi-file"/></svg>Daily Reports</a>
+<!-- PORTAL_SECTION:daily:end -->
 <!-- PORTAL_SECTION:schedule:start -->
       <a class="nav-link" data-portal-nav="schedule"><svg class="nav-ic"><use href="#pi-cal"/></svg>Schedule</a>
 <!-- PORTAL_SECTION:schedule:end -->
 <!-- PORTAL_SECTION:drawing:start -->
       <a class="nav-link" href="/drawing-markup"><svg class="nav-ic"><use href="#pi-pencil"/></svg>Drawing Markup</a>
 <!-- PORTAL_SECTION:drawing:end -->
-    </nav>
+</nav>
     <div class="sidebar-grow"></div>
     <div class="sidebar-footer">
       <div class="acct-name" id="acct-name"></div>
@@ -219,15 +219,6 @@
         </div>
       </section>
 <!-- PORTAL_SECTION:progress:end -->
-
-<!-- PORTAL_SECTION:daily:start -->
-      <section class="view" data-portal-view="daily">
-        <div class="v-head"><div class="v-eyebrow">Field activity</div><h1>Daily Reports</h1></div>
-        <div class="shc-kpis" id="daily-kpis" style="display:none"></div>
-        <div class="shc-card" id="daily-list"><div class="loading" style="padding:16px">Loading daily reports…</div></div>
-      </section>
-<!-- PORTAL_SECTION:daily:end -->
-
 <!-- PORTAL_SECTION:photos:start -->
       <section class="view" data-portal-view="photos">
         <div class="v-head"><div class="v-eyebrow">Shared with you</div><h1>Project Photos</h1></div>
@@ -238,14 +229,19 @@
         <div id="photo-groups"><div class="loading">Loading photos…</div></div>
       </section>
 <!-- PORTAL_SECTION:photos:end -->
-
 <!-- PORTAL_SECTION:documents:start -->
       <section class="view" data-portal-view="documents">
         <div class="v-head"><div class="v-eyebrow">Shared with you</div><h1>Project Documents</h1></div>
         <div class="shc-card doc-pad" id="doc-list"><div class="loading">Loading documents…</div></div>
       </section>
 <!-- PORTAL_SECTION:documents:end -->
-
+<!-- PORTAL_SECTION:daily:start -->
+      <section class="view" data-portal-view="daily">
+        <div class="v-head"><div class="v-eyebrow">Field activity</div><h1>Daily Reports</h1></div>
+        <div class="shc-kpis" id="daily-kpis" style="display:none"></div>
+        <div class="shc-card" id="daily-list"><div class="loading" style="padding:16px">Loading daily reports…</div></div>
+      </section>
+<!-- PORTAL_SECTION:daily:end -->
 <!-- PORTAL_SECTION:schedule:start -->
       <section class="view" data-portal-view="schedule">
         <div class="v-head"><div class="v-eyebrow">Look-ahead</div><h1>Schedule</h1></div>
@@ -253,7 +249,7 @@
       </section>
 <!-- PORTAL_SECTION:schedule:end -->
 
-    </div>
+</div>
   </div>
 </div>
 
