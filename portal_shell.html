@@ -5,13 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Superstars Contracting — Project Portal</title>
   <link rel="stylesheet" href="/files/static/fonts/typography.css">
-  <!-- #284 — THE PORTAL SHELL. The external counterpart of dashboard-static.html,
-       built ALLOWLIST-FIRST: this file contains ONLY portal components. There is no
-       internal nav, view, or script here to strip — an external DOM starts empty and
-       effective sections are ADDED, the same default-deny the payloads live by.
-       Server render fills: __API_BASE__, __PROJECT_CODE__, data-project-* text, and
-       strips every PORTAL_SECTION block not in the target's EFFECTIVE set
-       (portal_matrix.render_portal_sections — matrix ∩ grants, per request). -->
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     :root {

@@ -75,10 +75,14 @@ _PORTAL_SECTION_RE = re.compile(
     r"<!--\s*PORTAL_SECTION:(\w+):start\s*-->.*?<!--\s*PORTAL_SECTION:\1:end\s*-->",
     re.DOTALL,
 )
+_PORTAL_MARKER_RE = re.compile(r"<!--\s*PORTAL_SECTION:\w+:(?:start|end)\s*-->")
 
 
 def render_portal_sections(html: str, effective) -> str:
-    """Return `html` with every PORTAL_SECTION block not in `effective` removed."""
+    """Return `html` with every PORTAL_SECTION block not in `effective` removed — and
+    the marker comments of the KEPT blocks removed too: the served external page
+    carries the sections, never the machinery that decided them."""
     keep = frozenset(effective)
-    return _PORTAL_SECTION_RE.sub(
+    html = _PORTAL_SECTION_RE.sub(
         lambda m: m.group(0) if m.group(1) in keep else "", html)
+    return _PORTAL_MARKER_RE.sub("", html)
