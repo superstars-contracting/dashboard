@@ -281,7 +281,7 @@
   // ---- account chip + preview banner (banner only for a company-role session) ----
   fetch('/api/auth/me', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
     .then(function (j) {
-      var me = (j && j.data) || j || {};
+      var me = (j && j.user) || {};   // /api/auth/me wraps as {user:{...}}
       var nameEl = document.getElementById('acct-name');
       var roleEl = document.getElementById('acct-role');
       if (nameEl) nameEl.textContent = me.display_name || me.full_name || me.email || '';
