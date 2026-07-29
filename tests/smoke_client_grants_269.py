@@ -308,7 +308,9 @@ def run():
 
     # ---- (b) GRANT `progress` -> exactly that section unlocks ----
     ok("grant_progress_200", _grant(admin, client_uid, "progress").status_code == 200)
-    ok("granted_welcome_forwards_to_portal", _redirects_to(client, "/welcome", "/portal"))
+    # #284 flip — a granted client's home is the NEW SHELL at /portal/<code>.
+    ok("granted_welcome_forwards_to_portal",
+       _redirects_to(client, "/welcome", f"/portal/{PROJ_A}"))
     ok("granted_portal_200", _sc(client, "GET", "/portal") == 200)
     r = client.get(f"{BASE}/api/portal/context", timeout=15)
     ok("granted_context_200", r.status_code == 200)
@@ -326,7 +328,8 @@ def run():
         ok(f"ungranted_still_403_{s}", _sc(client, "GET", SECTION_API[s]) == 403,
            "granting one section must not open another")
     # still contained outside the portal
-    ok("granted_admin_page_to_portal", _redirects_to(client, "/admin/users", "/portal"))
+    ok("granted_admin_page_to_portal",
+       _redirects_to(client, "/admin/users", f"/portal/{PROJ_A}"))   # #284 flip
     ok("granted_internal_api_403",
        _sc(client, "GET", f"/api/projects/{PROJ_A}/photos") == 403)
 
