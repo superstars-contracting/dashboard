@@ -1,5 +1,9 @@
 """#284 GUARD — THE PORTAL FLIP: matrix, nav-from-grants, registry-served payloads,
-preview parity, and the landing switch.
+preview parity, and the landing switch. #285 extended it with the PARITY CONTRACT:
+photos mirror (drop/elevation labels, caption BANNED with a populated sentinel,
+stat strip), progress boards (active drops with template-step text, status counts,
+elevation bars, registered weather), shared-sheet-on-both-surfaces assertions, and
+a static free-text-column scan over every SQL string in portal_sections.py.
 
 What it proves:
   MATRIX      fail-closed on every axis: an unseeded role resolves to an EMPTY
@@ -93,11 +97,16 @@ def seed():
                              "granted_by, granted_at) VALUES (?,?,?,?, '2026-07-28T00:00:00')",
                              (users[key], code, s, users["admin"]))
 
-        def photo(code, cap, shared):
+        # drops BEFORE photos: the shared photo references SMK284-DP3 (FK-safe on PG)
+        conn.execute("INSERT INTO drops (drop_id, project_code, elevation, sequence_no, lifecycle) "
+                     "VALUES ('SMK284-DP3', ?, 'North', 3, 'scaffold_active')", (PC,))
+
+        def photo(code, cap, shared, drop_id=None):
             cur = conn.execute(
-                "INSERT INTO field_photos (project_code, caption, taken_at, uploaded_at, "
-                "file_path, thumb_path, mime) VALUES (?,?, '2026-07-27 10:00:00', "
-                "'2026-07-27 10:05:00', 'x/none.jpg', 'x/none_t.jpg', 'image/jpeg')", (code, cap))
+                "INSERT INTO field_photos (project_code, drop_id, caption, taken_at, uploaded_at, "
+                "file_path, thumb_path, mime) VALUES (?,?,?, '2026-07-27 10:00:00', "
+                "'2026-07-27 10:05:00', 'x/none.jpg', 'x/none_t.jpg', 'image/jpeg')",
+                (code, drop_id, cap))
             pid = cur.lastrowid
             IDS["photos"].append(pid)
             if shared:
@@ -120,7 +129,9 @@ def seed():
             return did
 
         fx = {
-            "p_shared": photo(PC, "smk284 shared", True),
+            # captions stay POPULATED — they are leak sentinels (#285: caption must
+            # never reach the external photos payload again)
+            "p_shared": photo(PC, "SENTINEL-284-CAPTION", True, drop_id="SMK284-DP3"),
             "p_unshared": photo(PC, "smk284 unshared", False),
             "p_other": photo(PD, "smk284 other-project shared", True),
             "d_shared": doc(PC, "SMK284 Shared Permit", True),
@@ -138,8 +149,6 @@ def seed():
                      "'Sunny', 'Partly cloudy', '5-10 mph')", (PC,))
         conn.execute("INSERT INTO work_log (date, project_code, scope_of_work, description) "
                      "VALUES ('2026-07-27', ?, 'SENTINEL-284-SCOPE', 'SENTINEL-284-DESC')", (PC,))
-        conn.execute("INSERT INTO drops (drop_id, project_code, elevation, sequence_no, lifecycle) "
-                     "VALUES ('SMK284-DP3', ?, 'North', 3, 'scaffold_active')", (PC,))
         cur = conn.execute("INSERT INTO stage_templates (project_code, name) VALUES (?, 'SMK284 T')",
                            (PC,))
         tmpl = cur.lastrowid
@@ -323,12 +332,100 @@ def run():
 
     print("\n-- payloads: right-subset by id, registered fields only --")
     r = CFULL.get(f"{BASE}/api/portal/{PC}/photos", **R)
-    ids = [x["id"] for x in (r.json().get("data", {}) or {}).get("photos", [])] if r.status_code == 200 else []
+    pdata = r.json().get("data", {}) if r.status_code == 200 else {}
+    ids = [x["id"] for x in (pdata or {}).get("photos", [])]
     ok("photos_exactly_shared_own_project", ids == [fx["p_shared"]],
        f"{r.status_code} ids={ids} want=[{fx['p_shared']}]")
-    if r.status_code == 200 and (r.json()["data"]["photos"] or [None])[0]:
+    if pdata.get("photos"):
         ok("photos_fields_registered_only",
-           set((r.json()["data"]["photos"] or [{}])[0]) <= set(reg.DATASETS["portal.photo"]))
+           set(pdata["photos"][0]) <= set(reg.DATASETS["portal.photo"]))
+    # ---- #285: the photos mirror — drop/elevation present, caption/labels GONE ----
+    first_p = (pdata.get("photos") or [{}])[0]
+    ok("photos_carry_drop_and_elevation",
+       first_p.get("drop_label") == "DP-3" and first_p.get("elevation") == "North",
+       str({k: first_p.get(k) for k in ("drop_label", "elevation")}))
+    PHOTO_BANNED = {"caption", "stage", "label", "file_name", "notes", "description",
+                    "worker_id", "uploaded_by_uid", "file_path", "thumb_path"}
+    def photo_banned_found(obj, path=""):
+        out = []
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if str(k).lower() in PHOTO_BANNED:
+                    out.append(path + str(k))
+                out += photo_banned_found(v, path + str(k) + ".")
+        elif isinstance(obj, list):
+            for i, v in enumerate(obj):
+                out += photo_banned_found(v, f"{path}{i}.")
+        return out
+    leaks = photo_banned_found(pdata)
+    ok("photos_banned_keys_absent_recursively", not leaks, str(leaks))
+    ok("photos_no_caption_sentinel_value", "SENTINEL-284-CAPTION" not in r.text,
+       "a populated caption reached the external photos payload")
+    stats = pdata.get("stats") or {}
+    ok("photos_stats_shape_and_values",
+       set(stats) <= set(reg.DATASETS["portal.photos_stats"])
+       and stats.get("shared_count") == 1 and stats.get("drops_covered") == 1
+       and stats.get("latest_date") == "2026-07-27", str(stats))
+
+    print("\n-- #285 progress boards: registered fields, structured sources --")
+    r = CMIN.get(f"{BASE}/api/portal/{PC}/progress", **R)
+    gdata = r.json().get("data", {}) if r.status_code == 200 else {}
+    act = gdata.get("active_drops") or []
+    ok("progress_active_drops_present", len(act) == 1
+       and act[0].get("label") == "DP-3" and act[0].get("elevation") == "North",
+       str(act))
+    ok("progress_active_step_is_template_text",
+       act and act[0].get("step") == "Step 2 · Grinding & Routing", str(act))
+    ok("progress_active_fields_registered",
+       all(set(a) <= set(reg.DATASETS["health.active_drop"]) for a in act))
+    scounts = gdata.get("status_counts") or []
+    ok("progress_status_counts_shape",
+       [ (s.get("status"), s.get("count")) for s in scounts ] ==
+       [("active", 1), ("complete", 0), ("not_started", 0)]
+       and all(set(s) <= set(reg.DATASETS["health.status_count"]) for s in scounts),
+       str(scounts))
+    ep = gdata.get("elevation_progress") or []
+    ok("progress_elevation_bars_shape", len(ep) == 1
+       and ep[0].get("elevation") == "North"
+       and all(set(x) <= set(reg.DATASETS["health.elevation_progress"]) for x in ep),
+       str(ep))
+    wx = gdata.get("weather")
+    ok("progress_weather_registered_or_absent",
+       wx is None or set(wx) <= set(reg.DATASETS["health.weather"]),
+       str(sorted(wx) if isinstance(wx, dict) else wx))
+    ok("progress_weather_days_registered",
+       all(set(x) <= set(reg.DATASETS["health.weather"])
+           for x in (gdata.get("weather_days") or [])))
+
+    print("\n-- #285 parity contract: shared sheet on both surfaces, SQL clean --")
+    shell_html = CMIN.get(f"{BASE}/portal/{PC}", **R).text
+    ok("portal_links_shared_sheet", "/files/static/css/widgets.css" in shell_html)
+    internal_html = PM.get(f"{BASE}/projects/{PC}", **R).text
+    ok("internal_links_shared_sheet", "/files/static/css/widgets.css" in internal_html)
+    sheet = requests.get(f"{BASE}/files/static/css/widgets.css", timeout=15).text
+    ok("shared_sheet_defines_parity_components",
+       all(cls in sheet for cls in (".shc-photo", ".shc-tile", ".shc-drop",
+                                    ".shc-donut-wrap", ".shc-dayrow", ".shc-wx-now")))
+    ok("portal_dom_consumes_shared_components",
+       'class="shc-' in shell_html or "shc-kpis" in shell_html)
+    ok("internal_markup_untouched_by_shared_layer",
+       'shc-' not in markup(internal_html),
+       "internal DOM must not reference the shc- namespace (refactor is additive)")
+    import ast as _ast
+    src = (SCRIPT_DIR / "portal_sections.py").read_text(encoding="utf-8")
+    # actual SQL only — a string (or f-string fragment) that BEGINS with a SQL
+    # verb. Docstrings legitimately NAME the banned columns while documenting
+    # their exclusion; they must not trip the scan.
+    sql_strings = [n.value for n in _ast.walk(_ast.parse(src))
+                   if isinstance(n, _ast.Constant) and isinstance(n.value, str)
+                   and n.value.lstrip().upper().startswith(
+                       ("SELECT", "INSERT", "UPDATE", "DELETE", "WITH"))]
+    FREETEXT_COLS = re.compile(
+        r"\b(caption|notes?|description|reason|scope_of_work|no_work_reason|"
+        r"no_work_note|internal_note|trades_working|trade_area|location_elevation)\b")
+    dirty = [s[:60] for s in sql_strings if FREETEXT_COLS.search(s)]
+    ok("no_freetext_column_in_any_portal_select", not dirty, str(dirty))
+
     r = CFULL.get(f"{BASE}/api/portal/{PC}/documents", **R)
     dids = [x["id"] for x in (r.json().get("data", {}) or {}).get("documents", [])] if r.status_code == 200 else []
     ok("documents_exactly_shared_own_project", dids == [fx["d_shared"]],

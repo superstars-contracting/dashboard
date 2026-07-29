@@ -79,6 +79,23 @@ The architect is contained by an **allowlist** (`elevation._architect_gate`)
 normal project scoping. Architects are not grant-gated on their own
 drawing surface.
 
+**#285 — THE PARITY CONTRACT (doctrine).** Every portal section MIRRORS its
+internal counterpart's presentation — same tokens, same components, same
+layout language — minus internal-only elements. PRESENTATION IS SHARED;
+PLUMBING IS NOT: the shared layer is `/files/static/css/widgets.css` (the
+`shc-` component families, extracted verbatim from the internal fp-/ph-/
+dcr-/wx- rules — both surfaces link the sheet; drift between an internal
+rule and its shc- twin is a bug). The portal shell stays ALLOWLIST-FIRST
+(its own file; only portal components are ever added to it), the
+`client_payload()` registry stays the ONLY data path, and we NEVER serve
+internal pages to external roles. Changing a mirrored component means
+changing the internal rule AND its shc- twin together; adding a portal
+section means adding its components HERE and its fields to the REGISTRY —
+never linking internal assets' behavior or endpoints. The refactor that
+created the layer left every internal page serve sha256-IDENTICAL
+(11-page role×page matrix, proven in-build); portal-side conformance is
+asserted by the parity block in `tests/smoke_portal_flip_284.py`.
+
 **#284 — THE FLIP IS LIVE.** `/portal/<code>` is the CLIENT's home:
 `portal_shell.html` (allowlist-first — the file contains ONLY portal
 components), nav + view panes rendered from the client's EFFECTIVE set =

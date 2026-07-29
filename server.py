@@ -361,17 +361,24 @@ def project_dashboard(project_code):
     return _serve_dashboard_no_store(project_code)
 
 
-def _serve_portal_shell(project_code, effective_sections):
+def _serve_portal_shell(project_code, effective_sections, fallback_client=None):
     """#284 — render the EXTERNAL portal shell for one effective section set.
 
     portal_shell.html is allowlist-first: it contains ONLY portal components (no
     internal nav/views/scripts exist in the file to strip). Rendering is a pure
-    function of (project_code, effective_sections) — a real client session and an
-    admin preview of that client produce byte-identical pages BY CONSTRUCTION,
-    which is the #284 preview-parity acceptance criterion."""
+    function of (project_code, effective_sections, fallback_client) — a real client
+    session and an admin preview of that client produce byte-identical pages BY
+    CONSTRUCTION (the fallback derives from the TARGET, same either way), which is
+    the #284 preview-parity acceptance criterion.
+
+    #285 — "Prepared for" is never blank: the project's client ORG name when the
+    #266 link exists, else the client user's display name (the fallback)."""
+    identity = _project_identity(project_code) or {"project_code": project_code}
+    if not identity.get("client_name") and fallback_client:
+        identity = {**identity, "client_name": fallback_client}
     html = ui_version.resolve_page(PORTAL_SHELL_PATH).read_text(encoding="utf-8")
     html = portal_matrix.render_portal_sections(html, effective_sections)
-    html = access.render_project_identity(html, _project_identity(project_code))
+    html = access.render_project_identity(html, identity)
     html = access.render_api_base(html, "client", project_code)   # /api/portal/<code>
     resp = Response(html, mimetype="text/html")
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
@@ -422,12 +429,15 @@ def portal_project_shell(project_code):
             except (TypeError, ValueError):
                 return jsonify({"error": "forbidden"}), 403
             trow = conn.execute(
-                "SELECT id, role, status, is_active FROM users WHERE id=?",
+                "SELECT id, role, status, is_active, display_name, full_name, email "
+                "FROM users WHERE id=?",
                 (target_id,)).fetchone()
             if (not trow or trow["role"] not in access.EXTERNAL_API_ROLES
                     or trow["status"] != "active" or not trow["is_active"]):
                 return jsonify({"error": "forbidden"}), 403
-            effective = {"id": trow["id"], "role": trow["role"]}
+            effective = {"id": trow["id"], "role": trow["role"],
+                         "display_name": trow["display_name"],
+                         "full_name": trow["full_name"], "email": trow["email"]}
             conn.execute(
                 "INSERT INTO audit_log (action, actor_user_id, actor_role, target_type, "
                 "target_id, note, created_at) VALUES (?,?,?,?,?,?,?)",
@@ -471,7 +481,11 @@ def portal_project_shell(project_code):
             # backstop); a previewing admin goes back where containment is stated.
             is_preview = effective is not actor
             return redirect("/admin/projects" if is_preview else "/welcome")
-        return _serve_portal_shell(project_code, eff)
+        # #285 — "Prepared for" fallback: the TARGET's display name (same value for
+        # a real client session and an admin preview of that client — parity holds).
+        fallback = (effective.get("display_name") or effective.get("full_name")
+                    or effective.get("email"))
+        return _serve_portal_shell(project_code, eff, fallback_client=fallback)
     if role == "architect":
         # #284 seeds the architect's MATRIX row, but architects have no grant
         # machinery yet — their effective set is empty by construction, and their

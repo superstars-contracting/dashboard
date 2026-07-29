@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Superstars Contracting — Project Portal</title>
   <link rel="stylesheet" href="/files/static/fonts/typography.css">
+  <link rel="stylesheet" href="/files/static/css/widgets.css?v=285">
+  <script src="/files/static/vendor/chart.umd.min.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     :root {
@@ -57,59 +59,28 @@
     .top-sub { font-size:11px; color:var(--mute); }
     .preview-banner { display:none; background:#B68838; color:#fff; font-size:12px; font-weight:700;
                       padding:8px 22px; letter-spacing:.03em; }
-    .content { padding:22px; max-width:1060px; width:100%; }
+    .content { padding:22px; max-width:1120px; width:100%; }
     .view { display:none; }
     .view.active { display:block; }
     .v-head { margin:2px 0 16px; }
     .v-eyebrow { font-size:11px; color:var(--mute); text-transform:uppercase; letter-spacing:.12em; font-weight:700; }
     .v-head h1 { font-size:22px; line-height:1.25; margin-top:2px; }
-    .card { background:#fff; border:1px solid var(--hairline); border-radius:12px; padding:18px; }
     .loading { color:var(--mute); font-size:13px; padding:10px 0; }
-    .empty { text-align:center; padding:26px 12px; color:var(--mute); }
-    .empty b { display:block; color:var(--soft); font-size:14px; }
-    .empty span { font-size:12px; }
 
-    /* progress */
+    /* progress hero (overall ring — shell-specific chrome around shared parts) */
+    .prog-hero { background:#fff; border:1px solid var(--hairline); border-radius:12px;
+                 padding:18px; margin-bottom:16px; }
     .prog-wrap { display:flex; align-items:center; gap:26px; flex-wrap:wrap; }
     .prog-ring { width:150px; height:150px; flex:none; }
-    .prog-ring .bg { stroke:#F2EFE7; }
-    .prog-ring .fg { stroke:var(--brand-red); transition:stroke-dasharray .5s; }
-    .prog-num { font-size:30px; font-weight:800; }
+    .prog-ring .bg { stroke:#EDEAE3; }
+    .prog-ring .fg { stroke:#2F7C57; transition:stroke-dasharray .5s; }
     .prog-label { display:inline-block; font-size:10px; font-weight:700; letter-spacing:1px;
                   text-transform:uppercase; color:var(--brand-red); background:#fbeceb;
                   padding:4px 10px; border-radius:99px; margin-bottom:8px; }
-    .prog-text { font-size:14px; color:var(--soft); max-width:420px; }
+    .prog-text { font-size:14px; color:var(--soft); max-width:460px; }
     .prog-meta { font-size:11px; color:var(--mute); margin-top:8px; }
 
-    /* daily timeline */
-    .day-card { background:#fff; border:1px solid var(--hairline); border-radius:12px;
-                padding:16px 18px; margin-bottom:14px; }
-    .day-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
-    .day-date { font-size:15px; font-weight:800; }
-    .day-chip { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
-                padding:3px 9px; border-radius:99px; background:#EDF3EC; color:#3F6B3F; }
-    .day-chip.nowork { background:#F4F1EA; color:var(--mute); }
-    .day-weather { font-size:12px; color:var(--mute); margin-top:6px; }
-    .day-sec { margin-top:10px; }
-    .day-sec-k { font-size:10px; color:var(--mute); text-transform:uppercase; letter-spacing:.08em; font-weight:700; }
-    .day-drops { display:flex; flex-wrap:wrap; gap:8px; margin-top:5px; }
-    .drop-chip { font-size:12px; font-weight:700; background:var(--paper); border:1px solid #EFEBE3;
-                 border-radius:8px; padding:4px 10px; }
-    .drop-chip small { font-weight:600; color:var(--mute); text-transform:uppercase; font-size:10px; margin-left:6px; }
-    .act-row, .chg-row { font-size:13px; color:var(--soft); margin-top:4px; display:flex; gap:8px; align-items:baseline; }
-    .act-verb { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--brand-red); }
-    .day-photos { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
-    .day-photos img { width:72px; height:72px; object-fit:cover; border-radius:8px;
-                      border:1px solid var(--hairline); cursor:pointer; }
-
-    /* photos grid */
-    .photo-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:14px; }
-    .photo-tile { border:1px solid var(--hairline); border-radius:12px; overflow:hidden; background:#fff; }
-    .photo-tile img { width:100%; aspect-ratio:4/3; object-fit:cover; display:block; cursor:pointer; }
-    .photo-cap { padding:8px 10px; font-size:12px; color:var(--soft); }
-    .photo-date { font-size:10px; color:var(--mute); text-transform:uppercase; letter-spacing:.05em; }
-
-    /* documents list */
+    /* documents + schedule (unchanged this build — local look) */
     .doc-row { display:flex; align-items:center; gap:14px; padding:12px 4px;
                border-bottom:1px solid #F2EFE7; }
     .doc-main { min-width:0; flex:1; }
@@ -118,8 +89,7 @@
     .doc-open { flex:none; font-size:12px; font-weight:700; color:var(--brand-red); text-decoration:none;
                 border:1px solid var(--hairline); border-radius:8px; padding:6px 12px; }
     .doc-open:hover { border-color:var(--brand-red); }
-
-    /* schedule list */
+    .doc-pad, .sch-pad { padding:18px; }
     .sch-row { display:flex; align-items:baseline; gap:12px; padding:10px 4px; border-bottom:1px solid #F2EFE7; }
     .sch-window { flex:none; font-size:12px; color:var(--mute); min-width:170px; }
     .sch-name { font-size:13.5px; font-weight:600; }
@@ -142,6 +112,14 @@
   <symbol id="pi-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></symbol>
   <symbol id="pi-cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
   <symbol id="pi-pencil" viewBox="0 0 24 24"><path d="M4 20l4-1L20 7l-3-3L5 16z"/></symbol>
+  <!-- weather glyphs — the internal widget's vocabulary, carried verbatim -->
+  <symbol id="w-sun" viewBox="0 0 24 24"><g stroke="#F6A609" stroke-width="2" stroke-linecap="round"><path d="M12 2v2.4M12 19.6V22M2 12h2.4M19.6 12H22M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M19.4 4.6l-1.7 1.7M6.3 17.7l-1.7 1.7"/></g><circle cx="12" cy="12" r="4.6" fill="#FDB813" stroke="#F6A609" stroke-width="1"/></symbol>
+  <symbol id="w-pcloud" viewBox="0 0 24 24"><g stroke="#F6A609" stroke-width="1.6" stroke-linecap="round"><path d="M8 1.6v1.6M2 7.5h1.6M3.6 3.1l1.1 1.1M12.4 3.1l-1.1 1.1"/></g><circle cx="8" cy="7.5" r="3.2" fill="#FDB813" stroke="#F6A609" stroke-width="1"/><path d="M9 18.5h8a3.6 3.6 0 000-7.2 4.6 4.6 0 00-8.9 1.2A3.1 3.1 0 009 18.5z" fill="#C2C9D2" stroke="#AEB6C0" stroke-width="1"/></symbol>
+  <symbol id="w-cloud" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 000-8 5 5 0 00-9.6 1.3A3.5 3.5 0 007 18z" fill="#B4BBC4" stroke="#9AA3AE" stroke-width="1"/></symbol>
+  <symbol id="w-rain" viewBox="0 0 24 24"><path d="M7 14h10a4 4 0 000-8 5 5 0 00-9.6 1.3A3.5 3.5 0 007 14z" fill="#9AA3AE" stroke="#828B97" stroke-width="1"/><g stroke="#2f86d6" stroke-width="2" stroke-linecap="round"><path d="M8 17.5l-1 2.5M12 17.5l-1 2.5M16 17.5l-1 2.5"/></g></symbol>
+  <symbol id="w-snow" viewBox="0 0 24 24"><path d="M7 14h10a4 4 0 000-8 5 5 0 00-9.6 1.3A3.5 3.5 0 007 14z" fill="#B4BBC4" stroke="#9AA3AE" stroke-width="1"/><g fill="#8FB7DD"><circle cx="8" cy="18.5" r="1.2"/><circle cx="12" cy="20" r="1.2"/><circle cx="16" cy="18.5" r="1.2"/></g></symbol>
+  <symbol id="w-storm" viewBox="0 0 24 24"><path d="M7 13h10a4 4 0 000-8 5 5 0 00-9.6 1.3A3.5 3.5 0 007 13z" fill="#828B97" stroke="#6E7682" stroke-width="1"/><path d="M12.5 13.5L9.5 18h2.4l-1.4 4 4.5-5.5h-2.6l1.6-3z" fill="#F6A609"/></symbol>
+  <symbol id="w-drop" viewBox="0 0 24 24"><path d="M12 3.5C9 8 6.5 11 6.5 14.4a5.5 5.5 0 0011 0C17.5 11 15 8 12 3.5z" fill="#2f86d6"/></symbol>
 </svg>
 
 <div class="app-shell">
@@ -200,14 +178,14 @@
 <!-- PORTAL_SECTION:progress:start -->
       <section class="view" data-portal-view="progress">
         <div class="v-head"><div class="v-eyebrow">Overall</div><h1>Project Progress</h1></div>
-        <div class="card">
+        <div class="prog-hero">
           <div class="loading" data-loading>Loading progress…</div>
           <div class="prog-wrap" style="display:none" data-body>
             <svg class="prog-ring" viewBox="0 0 120 120">
               <circle class="bg" cx="60" cy="60" r="52" fill="none" stroke-width="12"/>
               <circle class="fg" id="prog-fg" cx="60" cy="60" r="52" fill="none" stroke-width="12"
                       stroke-linecap="round" transform="rotate(-90 60 60)"/>
-              <text x="60" y="66" text-anchor="middle" class="prog-num" id="prog-num" font-size="26" font-weight="800" fill="#14161C"></text>
+              <text x="60" y="66" text-anchor="middle" id="prog-num" font-size="26" font-weight="800" fill="#14161C"></text>
             </svg>
             <div>
               <span class="prog-label" id="prog-label"></span>
@@ -216,34 +194,62 @@
             </div>
           </div>
         </div>
+        <div class="shc-grid2" id="prog-boards" style="display:none">
+          <div class="shc-widget">
+            <div class="shc-widget-head"><h3>Active Drops</h3></div>
+            <div class="shc-widget-body" id="prog-active"></div>
+          </div>
+          <div class="shc-widget">
+            <div class="shc-widget-head"><h3>Drops by Status</h3></div>
+            <div class="shc-widget-body">
+              <div class="shc-donut-wrap"><canvas id="prog-donut"></canvas>
+                <div class="shc-donut-center"><div class="n" id="prog-donut-total"></div><div class="l">drops</div></div>
+              </div>
+              <div class="shc-legend" id="prog-donut-legend"></div>
+            </div>
+          </div>
+          <div class="shc-widget">
+            <div class="shc-widget-head"><h3>Progress by Elevation</h3></div>
+            <div class="shc-widget-body"><div class="shc-bar-wrap"><canvas id="prog-bars"></canvas></div></div>
+          </div>
+          <div class="shc-widget">
+            <div class="shc-widget-head"><h3>Site Weather</h3></div>
+            <div class="shc-widget-body" id="prog-weather"></div>
+          </div>
+        </div>
       </section>
 <!-- PORTAL_SECTION:progress:end -->
 
 <!-- PORTAL_SECTION:daily:start -->
       <section class="view" data-portal-view="daily">
         <div class="v-head"><div class="v-eyebrow">Field activity</div><h1>Daily Reports</h1></div>
-        <div id="daily-list"><div class="loading">Loading daily reports…</div></div>
+        <div class="shc-kpis" id="daily-kpis" style="display:none"></div>
+        <div class="shc-card" id="daily-list"><div class="loading" style="padding:16px">Loading daily reports…</div></div>
       </section>
 <!-- PORTAL_SECTION:daily:end -->
 
 <!-- PORTAL_SECTION:photos:start -->
       <section class="view" data-portal-view="photos">
         <div class="v-head"><div class="v-eyebrow">Shared with you</div><h1>Project Photos</h1></div>
-        <div id="photo-grid" class="photo-grid"><div class="loading">Loading photos…</div></div>
+        <div class="shc-kpis" id="photo-kpis" style="display:none"></div>
+        <div class="shc-toolbar" id="photo-toolbar" style="display:none">
+          <select class="shc-sel" id="photo-drop-filter"><option value="">All drops</option></select>
+        </div>
+        <div id="photo-groups"><div class="loading">Loading photos…</div></div>
       </section>
 <!-- PORTAL_SECTION:photos:end -->
 
 <!-- PORTAL_SECTION:documents:start -->
       <section class="view" data-portal-view="documents">
         <div class="v-head"><div class="v-eyebrow">Shared with you</div><h1>Project Documents</h1></div>
-        <div class="card" id="doc-list"><div class="loading">Loading documents…</div></div>
+        <div class="shc-card doc-pad" id="doc-list"><div class="loading">Loading documents…</div></div>
       </section>
 <!-- PORTAL_SECTION:documents:end -->
 
 <!-- PORTAL_SECTION:schedule:start -->
       <section class="view" data-portal-view="schedule">
         <div class="v-head"><div class="v-eyebrow">Look-ahead</div><h1>Schedule</h1></div>
-        <div class="card" id="sch-list"><div class="loading">Loading schedule…</div></div>
+        <div class="shc-card sch-pad" id="sch-list"><div class="loading">Loading schedule…</div></div>
       </section>
 <!-- PORTAL_SECTION:schedule:end -->
 
@@ -256,6 +262,9 @@
   'use strict';
   var API_BASE = "__API_BASE__";                 // /api/portal/<code>, server-filled
   var PROJECT_CODE = "__PROJECT_CODE__";
+  var C = { red:'#B11E2E', ok:'#2F7C57', ink:'#14161C', mute:'#76777E',
+            track:'#EDEAE3', ns:'#D9D4CA', warn:'#B68838' };
+  var EL_COLORS = { North:'#6f8bb5', West:'#4f9a92', South:'#8a7fb8', East:'#6b78b0' };
 
   // #270 preview pattern: an admin preview carries ?preview_client=<id>, and every
   // API/byte fetch this page makes must carry it too (the server re-validates the
@@ -276,6 +285,30 @@
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     });
+  }
+  // local-date weekday from a YYYY-MM-DD string (never new Date('YYYY-MM-DD'),
+  // which parses UTC — the CLAUDE.md dates rule).
+  function weekdayOf(iso) {
+    var p = String(iso || '').split('-');
+    if (p.length !== 3) return '';
+    var d = new Date(+p[0], +p[1] - 1, +p[2]);
+    return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+  }
+  // the internal ringSVG, shared parameters (class renamed to the shc namespace)
+  function ringSVG(pct, size, stroke) {
+    var r = (size - stroke) / 2, cx = size / 2, Ci = 2 * Math.PI * r;
+    var p = Math.max(0, Math.min(100, Math.round(pct || 0))), arc = p / 100 * Ci;
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size +
+      '" class="shc-ring"><circle cx="' + cx + '" cy="' + cx + '" r="' + r +
+      '" fill="none" stroke="' + C.track + '" stroke-width="' + stroke + '"/><circle cx="' + cx +
+      '" cy="' + cx + '" r="' + r + '" fill="none" stroke="' + C.ok + '" stroke-width="' + stroke +
+      '" stroke-linecap="round" stroke-dasharray="' + arc.toFixed(2) + ' ' + (Ci - arc).toFixed(2) +
+      '" transform="rotate(-90 ' + cx + ' ' + cx + ')"/><text x="' + cx + '" y="' + cx +
+      '" dy="0.35em" text-anchor="middle" style="font-size:' + Math.round(size * 0.3) +
+      'px;font-weight:800;fill:' + C.ink + '">' + p + '%</text></svg>';
+  }
+  function wIcon(name, sz) {
+    return '<svg width="' + sz + '" height="' + sz + '"><use href="#w-' + esc(name || 'cloud') + '"/></svg>';
   }
 
   // ---- account chip + preview banner (banner only for a company-role session) ----
@@ -313,9 +346,52 @@
     n.addEventListener('click', function () { show(n.getAttribute('data-portal-nav')); });
   });
 
-  // ---- loaders ----
   function emptyState(el, title, sub) {
-    el.innerHTML = '<div class="empty"><b>' + esc(title) + '</b><span>' + esc(sub) + '</span></div>';
+    el.innerHTML = '<div class="shc-empty"><b>' + esc(title) + '</b><span>' + esc(sub) + '</span></div>';
+  }
+  function wireLightbox(host) {
+    host.querySelectorAll('img[data-full]').forEach(function (img) {
+      img.addEventListener('click', function () { window.open(img.getAttribute('data-full'), '_blank'); });
+    });
+  }
+
+  // ---- loaders ----
+  var PHOTOS = [];   // photos cache for the drop filter re-render
+
+  function renderPhotoGroups(filter) {
+    var host = document.getElementById('photo-groups');
+    var list = filter ? PHOTOS.filter(function (p) { return p.drop_label === filter; }) : PHOTOS;
+    if (!list.length) {
+      emptyState(host, 'No photos here yet', 'Photos your team shares to the portal will appear here.');
+      return;
+    }
+    // group by drop (portal order: DP-n ascending, Unassigned last), then date DESC
+    var groups = {};
+    list.forEach(function (p) {
+      var k = p.drop_label || 'Unassigned';
+      (groups[k] = groups[k] || []).push(p);
+    });
+    var keys = Object.keys(groups).sort(function (a, b) {
+      if (a === 'Unassigned') return 1;
+      if (b === 'Unassigned') return -1;
+      return (parseInt(a.replace(/\D+/g, ''), 10) || 0) - (parseInt(b.replace(/\D+/g, ''), 10) || 0);
+    });
+    host.innerHTML = keys.map(function (k) {
+      var ph = groups[k];
+      var elev = ph[0].elevation || '';
+      var color = EL_COLORS[elev] || '#B4BBC4';
+      var head = esc(k) + (elev ? ' · ' + esc(elev) : '') +
+        ' <span class="shc-cnt">· ' + ph.length + ' photo' + (ph.length !== 1 ? 's' : '') + '</span>';
+      var cards = ph.map(function (p) {
+        return '<figure class="shc-photo"><img loading="lazy" src="' + esc(u(p.thumb_url)) +
+          '" data-full="' + esc(u(p.file_url)) + '" alt="Project photo">' +
+          '<div class="shc-grad"></div><div class="shc-meta"><span>' + esc(p.taken_at || '') +
+          '</span><span class="shc-tag">' + esc(k) + '</span></div></figure>';
+      }).join('');
+      return '<div class="shc-grp"><div class="shc-ghead"><span class="shc-elbadge" style="background:' +
+        color + '"></span>' + head + '</div><div class="shc-gallery">' + cards + '</div></div>';
+    }).join('');
+    wireLightbox(host);
   }
 
   var LOADERS = {
@@ -324,9 +400,8 @@
       getJSON(API_BASE + '/progress').then(function (j) {
         var d = j.data || {};
         var pct = Math.max(0, Math.min(100, (d.progress && d.progress.pct) || 0));
-        var C = 2 * Math.PI * 52;
-        var fg = document.getElementById('prog-fg');
-        fg.setAttribute('stroke-dasharray', (C * pct / 100) + ' ' + C);
+        var Ci = 2 * Math.PI * 52;
+        document.getElementById('prog-fg').setAttribute('stroke-dasharray', (Ci * pct / 100) + ' ' + Ci);
         document.getElementById('prog-num').textContent = Math.round(pct) + '%';
         document.getElementById('prog-label').textContent = (d.progress && d.progress.label) || '';
         document.getElementById('prog-text').textContent = (d.summary && d.summary.text) || '';
@@ -336,6 +411,80 @@
         document.getElementById('prog-meta').textContent = meta.join(' · ');
         view.querySelector('[data-loading]').style.display = 'none';
         view.querySelector('[data-body]').style.display = 'flex';
+
+        // ---- the four boards (internal Project Health mirror) ----
+        document.getElementById('prog-boards').style.display = 'grid';
+        var act = d.active_drops || [];
+        var actHost = document.getElementById('prog-active');
+        if (!act.length) {
+          emptyState(actHost, 'No active drops right now', 'Live drop progress appears here while work is underway.');
+        } else {
+          var shown = act.slice(0, 10);
+          actHost.innerHTML = '<div class="shc-active-grid">' + shown.map(function (a) {
+            return '<div class="shc-drop">' + ringSVG(a.pct, 52, 7) +
+              '<div style="min-width:0"><div class="shc-drop-label">' + esc(a.label) + '</div>' +
+              '<div class="shc-drop-stage">' + esc(a.step || '') + '</div>' +
+              '<div class="shc-drop-elev">' + esc(a.elevation || '') + '</div></div></div>';
+          }).join('') + '</div>' +
+          (act.length > 10 ? '<div class="shc-more">+ ' + (act.length - 10) + ' more active (showing 10)</div>' : '');
+        }
+        var sc = d.status_counts || [];
+        var total = sc.reduce(function (s, x) { return s + (x.count || 0); }, 0);
+        document.getElementById('prog-donut-total').textContent = String(total);
+        var toneColor = { blue: '#1E73E8', green: C.ok, neutral: C.ns };
+        document.getElementById('prog-donut-legend').innerHTML = sc.map(function (x) {
+          return '<div class="shc-leg"><span class="dot" style="background:' +
+            (toneColor[x.tone] || C.ns) + '"></span>' + esc(x.label) + '<b>' + (x.count || 0) + '</b></div>';
+        }).join('');
+        if (typeof Chart !== 'undefined' && total > 0) {
+          new Chart(document.getElementById('prog-donut'), {
+            type: 'doughnut',
+            data: { labels: sc.map(function (x) { return x.label; }),
+                    datasets: [{ data: sc.map(function (x) { return x.count || 0; }),
+                                 backgroundColor: sc.map(function (x) { return toneColor[x.tone] || C.ns; }),
+                                 borderWidth: 2, borderColor: '#fff' }] },
+            options: { cutout: '68%', responsive: true, maintainAspectRatio: false,
+                       plugins: { legend: { display: false } } }
+          });
+        }
+        var ep = d.elevation_progress || [];
+        if (typeof Chart !== 'undefined' && ep.length) {
+          new Chart(document.getElementById('prog-bars'), {
+            type: 'bar',
+            data: { labels: ep.map(function (x) { return x.elevation; }),
+                    datasets: [{ data: ep.map(function (x) { return x.pct || 0; }),
+                                 backgroundColor: ep.map(function (x) { return EL_COLORS[x.elevation] || C.ok; }),
+                                 borderRadius: 6, maxBarThickness: 46 }] },
+            options: { responsive: true, maintainAspectRatio: false,
+                       scales: { y: { beginAtZero: true, max: 100,
+                                      ticks: { callback: function (v) { return v + '%'; } } } },
+                       plugins: { legend: { display: false } } }
+          });
+        }
+        var wxHost = document.getElementById('prog-weather');
+        var w = d.weather;
+        if (!w) {
+          emptyState(wxHost, 'Weather unavailable', 'Live site conditions will appear here.');
+        } else {
+          var h = '<div class="shc-wx-now"><div class="shc-wx-ico">' + wIcon(w.icon, 44) + '</div>' +
+            '<div class="shc-wx-meta"><div class="shc-wx-temp">' +
+            (w.temp_f != null ? Math.round(w.temp_f) + '°F' : '—') + '</div>' +
+            '<div class="shc-wx-cond">' + esc(w.condition || '') + '</div>' +
+            '<div class="shc-wx-sub">' + (w.wind_mph != null ? 'Wind ' + Math.round(w.wind_mph) + ' mph' : '') + '</div>' +
+            (w.precip_pct != null ? '<div class="shc-wx-rain">' + wIcon('drop', 13) + w.precip_pct + '% rain</div>' : '') +
+            '</div></div>';
+          var days = d.weather_days || [];
+          if (days.length) {
+            h += '<div class="shc-wx-label">5-day outlook</div><div class="shc-wx-days">' +
+              days.map(function (f) {
+                return '<div class="shc-wx-day"><div class="d">' + esc(weekdayOf(f.date)) + '</div>' +
+                  wIcon(f.icon, 26) + '<div class="t">' +
+                  (f.temp_f != null ? Math.round(f.temp_f) + '°' : '—') + '</div>' +
+                  (f.precip_pct != null ? '<div class="r">' + f.precip_pct + '%</div>' : '') + '</div>';
+              }).join('') + '</div>';
+          }
+          wxHost.innerHTML = h;
+        }
       }).catch(function () {
         view.querySelector('[data-loading]').textContent = 'Progress is unavailable right now.';
       });
@@ -346,14 +495,24 @@
       getJSON(API_BASE + '/daily').then(function (j) {
         var days = (j.data && j.data.days) || [];
         if (!days.length) {
-          emptyState(host, 'No daily reports yet',
+          host.innerHTML = '';
+          host.appendChild(document.createElement('div'));
+          emptyState(host.firstChild, 'No daily reports yet',
             'Once field reports are issued for your project, each day will appear here.');
           return;
         }
+        var kpis = document.getElementById('daily-kpis');
+        var workDays = days.filter(function (d) { return !d.no_work; }).length;
+        kpis.style.display = 'grid';
+        kpis.innerHTML =
+          '<div class="shc-tile"><div class="l">Report days</div><div class="v">' + days.length + '</div></div>' +
+          '<div class="shc-tile"><div class="l">Work days</div><div class="v">' + workDays + '</div></div>' +
+          '<div class="shc-tile"><div class="l">Latest report</div><div class="v shc-repid" style="font-size:15px">' +
+          esc(days[0].date) + '</div></div>';
         host.innerHTML = days.map(function (d) {
-          var h = '<div class="day-card">';
-          h += '<div class="day-head"><span class="day-date">' + esc(d.date) + '</span>';
-          h += '<span class="day-chip' + (d.no_work ? ' nowork' : '') + '">' + esc(d.label) + '</span></div>';
+          var h = '<div class="shc-dayrow">';
+          h += '<div class="shc-dayhead"><span class="shc-repid">' + esc(weekdayOf(d.date)) + ' · ' + esc(d.date) + '</span>';
+          h += '<span class="shc-pill' + (d.no_work ? ' na' : '') + '">' + esc(d.label) + '</span></div>';
           if (d.weather) {
             var w = [];
             if (d.weather.am_temp_f != null) w.push('AM ' + Math.round(d.weather.am_temp_f) + '°F' +
@@ -361,35 +520,35 @@
             if (d.weather.pm_temp_f != null) w.push('PM ' + Math.round(d.weather.pm_temp_f) + '°F' +
               (d.weather.pm_conditions ? ' ' + d.weather.pm_conditions : ''));
             if (d.weather.wind) w.push('Wind ' + d.weather.wind);
-            if (w.length) h += '<div class="day-weather">' + esc(w.join(' · ')) + '</div>';
+            if (w.length) h += '<div class="shc-daymuted">' + esc(w.join(' · ')) + '</div>';
           }
           if (d.active_drops && d.active_drops.length) {
-            h += '<div class="day-sec"><div class="day-sec-k">Active drops</div><div class="day-drops">';
+            h += '<div class="shc-daysec"><div class="shc-daysec-k">Active drops</div><div class="shc-daychips">';
             h += d.active_drops.map(function (x) {
-              return '<span class="drop-chip">' + esc(x.label) +
+              return '<span class="shc-dropchip">' + esc(x.label) +
                 (x.elevation ? '<small>' + esc(x.elevation) + '</small>' : '') + '</span>';
             }).join('');
             h += '</div></div>';
           }
           if (d.activities && d.activities.length) {
-            h += '<div class="day-sec"><div class="day-sec-k">Work activity</div>';
+            h += '<div class="shc-daysec"><div class="shc-daysec-k">Work activity</div>';
             h += d.activities.map(function (a) {
-              return '<div class="act-row"><span class="act-verb">' + esc(a.status) + '</span>' +
+              return '<div class="shc-dayline"><span class="shc-verb">' + esc(a.status) + '</span>' +
                 esc(a.category) + '</div>';
             }).join('');
             h += '</div>';
           }
           if (d.status_changes && d.status_changes.length) {
-            h += '<div class="day-sec"><div class="day-sec-k">Status updates</div>';
+            h += '<div class="shc-daysec"><div class="shc-daysec-k">Status updates</div>';
             h += d.status_changes.map(function (c) {
               var arrow = (c.from_label ? esc(c.from_label) + ' → ' : '') + esc(c.to_label);
-              return '<div class="chg-row"><b>' + esc(c.drop_label) + '</b>' +
+              return '<div class="shc-dayline"><b>' + esc(c.drop_label) + '</b>' +
                 (c.level ? ' · ' + esc(c.level) : '') + ' — ' + arrow + '</div>';
             }).join('');
             h += '</div>';
           }
           if (d.photos && d.photos.length) {
-            h += '<div class="day-sec"><div class="day-sec-k">Photos from this day</div><div class="day-photos">';
+            h += '<div class="shc-daysec"><div class="shc-daysec-k">Photos from this day</div><div class="shc-dayphotos">';
             h += d.photos.map(function (p) {
               return '<img loading="lazy" src="' + esc(u(p.thumb_url)) + '" data-full="' +
                 esc(u(p.file_url)) + '" alt="Project photo">';
@@ -398,33 +557,45 @@
           }
           return h + '</div>';
         }).join('');
-        host.querySelectorAll('img[data-full]').forEach(function (img) {
-          img.addEventListener('click', function () { window.open(img.getAttribute('data-full'), '_blank'); });
-        });
+        wireLightbox(host);
       }).catch(function () {
+        host.innerHTML = '';
         emptyState(host, 'Daily reports are unavailable right now', 'Please try again shortly.');
       });
     },
 
     photos: function () {
-      var host = document.getElementById('photo-grid');
+      var host = document.getElementById('photo-groups');
       getJSON(API_BASE + '/photos').then(function (j) {
-        var photos = (j.data && j.data.photos) || [];
-        if (!photos.length) {
-          emptyState(host, 'No photos shared yet',
-            'Photos your team shares to the portal will appear here.');
+        var d = j.data || {};
+        PHOTOS = d.photos || [];
+        var stats = d.stats || {};
+        if (!PHOTOS.length) {
+          emptyState(host, 'No photos shared yet', 'Photos your team shares to the portal will appear here.');
           return;
         }
-        host.innerHTML = photos.map(function (p) {
-          return '<figure class="photo-tile"><img loading="lazy" src="' + esc(u(p.thumb_url)) +
-            '" data-full="' + esc(u(p.file_url)) + '" alt="Project photo">' +
-            '<figcaption class="photo-cap">' +
-            (p.caption ? esc(p.caption) + '<br>' : '') +
-            '<span class="photo-date">' + esc(p.taken_at || '') + '</span></figcaption></figure>';
-        }).join('');
-        host.querySelectorAll('img[data-full]').forEach(function (img) {
-          img.addEventListener('click', function () { window.open(img.getAttribute('data-full'), '_blank'); });
+        var kpis = document.getElementById('photo-kpis');
+        kpis.style.display = 'grid';
+        kpis.innerHTML =
+          '<div class="shc-tile"><div class="l">Photos shared</div><div class="v">' + (stats.shared_count || 0) + '</div></div>' +
+          '<div class="shc-tile"><div class="l">Drops covered</div><div class="v">' + (stats.drops_covered || 0) + '</div></div>' +
+          '<div class="shc-tile"><div class="l">Latest shared</div><div class="v shc-repid" style="font-size:15px">' +
+          esc(stats.latest_date || '—') + '</div></div>';
+        var seen = {};
+        PHOTOS.forEach(function (p) { if (p.drop_label) seen[p.drop_label] = true; });
+        var sel = document.getElementById('photo-drop-filter');
+        Object.keys(seen).sort(function (a, b) {
+          if (a === 'Unassigned') return 1;
+          if (b === 'Unassigned') return -1;
+          return (parseInt(a.replace(/\D+/g, ''), 10) || 0) - (parseInt(b.replace(/\D+/g, ''), 10) || 0);
+        }).forEach(function (k) {
+          var o = document.createElement('option');
+          o.value = k; o.textContent = k;
+          sel.appendChild(o);
         });
+        document.getElementById('photo-toolbar').style.display = 'flex';
+        sel.addEventListener('change', function () { renderPhotoGroups(sel.value); });
+        renderPhotoGroups('');
       }).catch(function () {
         emptyState(host, 'Photos are unavailable right now', 'Please try again shortly.');
       });

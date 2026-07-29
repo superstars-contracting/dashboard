@@ -95,10 +95,101 @@ def require_portal_section(section: str):
 
 # ============= SECTION: progress =============
 
+# WMO weather code -> the shared icon vocabulary (the internal widget's w-* symbol
+# names). A structured map over an enum — no free text involved.
+_WMO_ICON = {}
+for _codes, _name in (((0, 1), "sun"), ((2,), "pcloud"), ((3, 45, 48), "cloud"),
+                      (tuple(range(51, 68)) + tuple(range(80, 83)), "rain"),
+                      (tuple(range(71, 78)) + (85, 86), "snow"),
+                      (tuple(range(95, 100)), "storm")):
+    for _c in _codes:
+        _WMO_ICON[_c] = _name
+
+
+def _drop_status(lifecycle, pct):
+    """The internal Project Health three-bucket derivation, mirrored: structured
+    inputs (lifecycle enum + derived pct) only."""
+    if lifecycle == "not_started":
+        return "not_started"
+    if pct >= 100 or lifecycle in ("closed",):
+        return "complete"
+    return "active"
+
+
+def _progress_boards(conn, code):
+    """The client-safe Project Health boards: active-drop cards, drops-by-status
+    counts, progress-by-elevation bars. Sources are drops (enum/label columns),
+    drop_stage_status (via rollups) and stage_template_steps.name (structured
+    template vocabulary). No note/description column is selected anywhere."""
+    drops = conn.execute(
+        "SELECT drop_id, sequence_no, elevation, lifecycle FROM drops "
+        "WHERE project_code=? ORDER BY sequence_no", (code,)).fetchall()
+    active, counts, by_elev = [], {"active": 0, "complete": 0, "not_started": 0}, {}
+    for d in drops:
+        p = _rollups.drop_progress(conn, d["drop_id"])
+        pct = p.get("pct", 0.0) or 0.0
+        status = _drop_status(d["lifecycle"], pct)
+        counts[status] += 1
+        if d["elevation"]:
+            by_elev.setdefault(d["elevation"], []).append(pct)
+        if status == "active":
+            stage = _rollups.current_stage(conn, d["drop_id"])
+            step = (f"Step {stage['step_no']} · {stage['name']}" if stage
+                    else "All steps complete")
+            active.append(reg.client_payload("health.active_drop", {
+                "label": f"DP-{d['sequence_no']}",
+                "elevation": d["elevation"],
+                "pct": round(pct, 0),
+                "step": step,
+            }))
+    status_counts = reg.client_payload("health.status_count", [
+        {"status": "active", "label": "Active", "tone": "blue",
+         "count": counts["active"]},
+        {"status": "complete", "label": "Complete", "tone": "green",
+         "count": counts["complete"]},
+        {"status": "not_started", "label": "Not started", "tone": "neutral",
+         "count": counts["not_started"]},
+    ])
+    elevation_progress = reg.client_payload("health.elevation_progress", [
+        {"elevation": e, "pct": round(sum(v) / len(v), 0)}
+        for e, v in sorted(by_elev.items())])
+    return active, status_counts, elevation_progress
+
+
+def _progress_weather():
+    """Today's conditions + the 5-day strip, from the same Open-Meteo helper the
+    internal widget uses (public data), every row through health.weather. On a
+    provider failure the card is simply absent — never an error page."""
+    try:
+        from server import fetch_open_meteo_weather
+        w = fetch_open_meteo_weather(40.8083, -73.9162)
+    except Exception:
+        return None, []
+    now = reg.client_payload("health.weather", {
+        "date": w.get("date"),
+        "temp_f": w.get("temp_now"),
+        "condition": w.get("condition_label"),
+        "icon": _WMO_ICON.get(w.get("condition_code"), "cloud"),
+        "precip_pct": w.get("precip_prob_today"),
+        "wind_mph": w.get("wind_mph"),
+    })
+    days = reg.client_payload("health.weather", [{
+        "date": f.get("date"),
+        "temp_f": f.get("temp_max"),
+        "condition": None,
+        "icon": _WMO_ICON.get(f.get("code"), "cloud"),
+        "precip_pct": f.get("precip_prob"),
+        "wind_mph": None,
+    } for f in (w.get("forecast") or [])])
+    return now, days
+
+
 @require_portal_section("progress")
 def _sec_progress():
-    """Overall % + label + a generated summary line — Classic's progress data re-served
-    through the registry. include_cost=False => no $ field exists to begin with."""
+    """The client-safe Project Health mirror (#285): overall ring + generated summary
+    (as before), plus active-drop cards, drops-by-status counts, progress-by-elevation
+    bars, and the weather card. Every field through the registry; include_cost=False
+    means no $ field exists to begin with."""
     code = g.client_project_code
     conn = _db()
     try:
@@ -123,9 +214,16 @@ def _sec_progress():
         if photos_shared is not None:
             summary["photos_shared"] = photos_shared
         summary = reg.client_payload("portal.progress_summary", summary)
-        return _no_store(jsonify({"data": {"progress": progress, "summary": summary}}))
+        active, status_counts, elevation_progress = _progress_boards(conn, code)
     finally:
         conn.close()
+    weather_now, weather_days = _progress_weather()   # network call AFTER the db closes
+    return _no_store(jsonify({"data": {
+        "progress": progress, "summary": summary,
+        "active_drops": active, "status_counts": status_counts,
+        "elevation_progress": elevation_progress,
+        "weather": weather_now, "weather_days": weather_days,
+    }}))
 
 
 # ============= SECTION: photos =============
@@ -133,25 +231,39 @@ def _sec_progress():
 @require_portal_section("photos")
 def _sec_photos():
     """Item-shared photos ONLY (visibility.py is the source of truth for WHICH; the
-    registry curates the SHAPE). Byte URLs point at the Classic id-gated routes."""
+    registry curates the SHAPE). #285 — the internal Field Photos mirror: each photo
+    carries its drop label + elevation (structured joins, generated labels), the
+    caption column is NOT SELECTED (operator decision: drop · elevation · date only),
+    and a stat strip rides alongside. Byte URLs stay on the Classic id-gated routes."""
     code = g.client_project_code
     conn = _db()
     try:
         ids = visibility.client_visible_photo_ids(conn, code)
         if not ids:
-            return _no_store(jsonify({"data": {"photos": []}}))
+            stats = reg.client_payload("portal.photos_stats", {
+                "shared_count": 0, "drops_covered": 0, "latest_date": None})
+            return _no_store(jsonify({"data": {"photos": [], "stats": stats}}))
         rows = conn.execute(
-            f"SELECT id, caption, taken_at FROM field_photos "
-            f"WHERE id IN ({','.join(['?'] * len(ids))}) "
-            f"ORDER BY taken_at DESC, id DESC", ids).fetchall()
+            f"SELECT fp.id, fp.taken_at, d.sequence_no, d.elevation "
+            f"FROM field_photos fp LEFT JOIN drops d ON d.drop_id = fp.drop_id "
+            f"WHERE fp.id IN ({','.join(['?'] * len(ids))}) "
+            f"ORDER BY fp.taken_at DESC, fp.id DESC", ids).fetchall()
         photos = reg.client_payload("portal.photo", [{
             "id": r["id"],
-            "caption": r["caption"],
+            "drop_label": (f"DP-{r['sequence_no']}" if r["sequence_no"] is not None
+                           else "Unassigned"),
+            "elevation": r["elevation"],
             "taken_at": (r["taken_at"] or "")[:10] or None,   # date only, LOCAL
             "thumb_url": f"/api/portal/photos/{r['id']}/thumb",
             "file_url": f"/api/portal/photos/{r['id']}/file",
         } for r in rows])
-        return _no_store(jsonify({"data": {"photos": photos}}))
+        drops_covered = len({p["drop_label"] for p in photos
+                             if p.get("drop_label") and p["drop_label"] != "Unassigned"})
+        latest = max((p["taken_at"] for p in photos if p.get("taken_at")), default=None)
+        stats = reg.client_payload("portal.photos_stats", {
+            "shared_count": len(photos), "drops_covered": drops_covered,
+            "latest_date": latest})
+        return _no_store(jsonify({"data": {"photos": photos, "stats": stats}}))
     finally:
         conn.close()
 
@@ -229,7 +341,10 @@ def _daily_stage_activity(conn, code, dates):
         [code, *dates, *dates]).fetchall()
     out = {}
     for r in rows:
-        label = f"Drop {r['sequence_no']}"
+        # #285 — schedule-drop vocabulary is DP-{n} everywhere on the portal
+        # (photos groups, progress cards, these chips). Drawing-cell status
+        # changes keep their own surface's "Drop {idx}" naming.
+        label = f"DP-{r['sequence_no']}"
         elev = r["elevation"]
         for col, verb in (("started_on", "started"), ("completed_on", "completed")):
             day = r[col]

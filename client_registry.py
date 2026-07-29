@@ -56,7 +56,10 @@ DATASETS: dict[str, frozenset] = {
     # Active drops — PROGRESS ONLY. Deliberately absent: note, internal_note, any
     # attribution (who marked it), lifecycle, and every date other than a bare
     # target. An outside party gets "where is the work", not "who did what when".
-    "health.active_drop": frozenset({"drop_id", "label", "elevation", "pct", "status"}),
+    # #285 — `step` joined the row: the current stage-template step, a GENERATED
+    # string from structured parts only ("Step {no} · {template step name}").
+    "health.active_drop": frozenset({"drop_id", "label", "elevation", "pct", "status",
+                                     "step"}),
 
     # Drops by status — COUNTS ONLY. status here is a client_key, never an internal key.
     "health.status_count": frozenset({"status", "label", "tone", "count"}),
@@ -85,9 +88,14 @@ DATASETS: dict[str, frozenset] = {
     "portal.progress_summary": frozenset({"text", "last_activity", "photos_shared"}),
 
     # photos — item-shared only (visibility.py is the source; this is the shape).
-    # caption is operator-entered, approved as part of the deliberate share act
-    # (Classic has served it since #264). URLs point at the id-gated byte routes.
-    "portal.photo": frozenset({"id", "caption", "taken_at", "thumb_url", "file_url"}),
+    # #285 — caption is GONE (operator decision: cards show drop · elevation ·
+    # date ONLY; no free text of any kind on the external gallery). drop_label
+    # is generated ("DP-{n}" / "Unassigned"); elevation comes from the drops
+    # row. URLs point at the id-gated byte routes.
+    "portal.photo": frozenset({"id", "drop_label", "elevation", "taken_at",
+                               "thumb_url", "file_url"}),
+    # #285 — the photos stat strip (mirror of the internal Field Photos tiles).
+    "portal.photos_stats": frozenset({"shared_count", "drops_covered", "latest_date"}),
 
     # documents — item-shared only, same engine. notes / file_name / uploader /
     # requirement_key stay internal exactly as Classic decided in #269.
