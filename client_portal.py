@@ -100,9 +100,13 @@ def _client_gate():
             return jsonify({"error": "forbidden"}), 403
         return redirect("/welcome")
     # ---- >=1 grant: the portal is home ----
-    if path == "/welcome":
-        return redirect("/portal")      # granted clients land on the portal (#269 routing)
-    if path == "/portal" or path.startswith("/portal/") or path.startswith("/api/portal/"):
+    # #284 FLIP — the client's home is now the NEW SHELL at /portal/<code>. /welcome
+    # forwards there, and the Classic PAGE (/portal exact) redirects there too; the
+    # Classic ENGINE (its /api/portal/* endpoints, the by-id byte routes, the admin
+    # preview of Classic) stays fully intact — the rollback is reverting this commit.
+    if path == "/welcome" or path == "/portal":
+        return redirect(f"/portal/{_code}")
+    if path.startswith("/portal/") or path.startswith("/api/portal/"):
         return None                     # per-endpoint section grants enforced below
     # #280/#283 — the drawing markup surface, now grant-wired (the #281 open decision,
     # decided): 'drawing' gates the page, the elevation APIs, and their comment threads;
@@ -132,7 +136,7 @@ def _client_gate():
     logging.info(f"client_portal: contain block (granted) path={path}")
     if path.startswith("/api/"):
         return jsonify({"error": "forbidden"}), 403
-    return redirect("/portal")
+    return redirect(f"/portal/{_code}")   # #284 — containment lands on the new shell
 
 
 # ============= #270 — EFFECTIVE CLIENT (self, or read-only admin preview) =============

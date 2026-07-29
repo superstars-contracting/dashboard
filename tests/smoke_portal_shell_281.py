@@ -1,10 +1,11 @@
 """#283 GUARD for the #281 portal foundation (shipped without a suite).
 
 What it proves, per the fold-in audit's gap inventory:
-  LOCK        /portal/<code> is an ADMIN-PREVIEW SURFACE until the nav is
-              grant-driven: every external role landing there is redirected to
-              Classic. This was the repair pass's uncommitted hunk — it is now
-              committed AND asserted, so it cannot silently regress.
+  LANDING     (#284 — the flip replaced the #281 LOCK) /portal/<code> is now the
+              CLIENT's surface: a client on their own project gets the portal
+              shell (200), another project is 403 (scope), an architect keeps
+              /drawing-markup, and the shell a client receives carries ONLY
+              portal nav (grant-driven), never internal nav items.
   SCOPE       an unassigned pm gets 403; an assigned pm gets 200 and the page is
               wired to the INTERNAL namespace (/api/projects/<code>), never the
               curated portal one.
@@ -148,16 +149,28 @@ def run():
     PM_ON, PM_OFF = S(sessions, "pm_on"), S(sessions, "pm_off")
     CA, CB, ARCH = S(sessions, "client_a"), S(sessions, "client_b"), S(sessions, "arch")
 
-    print("\n-- the containment lock (external roles never meet the half-built shell) --")
+    print("\n-- #284 landing (the flip): the shell is the client's surface, scoped --")
     r = CA.get(f"{BASE}/portal/{PA}", **R)
-    ok("client_own_project_redirects_to_classic",
-       r.status_code == 302 and r.headers.get("Location", "").endswith("/portal"),
-       f"{r.status_code} -> {r.headers.get('Location')}")
+    body = r.text if r.status_code == 200 else ""
+    ca_markup = re.sub(r"<script\b.*?</script>", "", body, flags=re.S | re.I)
+    ok("client_own_project_gets_portal_shell", r.status_code == 200
+       and 'data-portal-nav="progress"' in ca_markup
+       and 'data-portal-nav="documents"' in ca_markup,
+       f"{r.status_code}")
+    ok("client_shell_nav_is_grant_driven",
+       'data-portal-nav="photos"' not in ca_markup
+       and 'data-portal-nav="daily"' not in ca_markup,
+       "client_a holds progress+documents ONLY")
+    ok("client_shell_has_no_internal_nav", 'data-view="' not in ca_markup,
+       "an internal nav item reached an external DOM")
+    ok("client_shell_uses_portal_namespace",
+       f"/api/portal/{PA}" in body and f"/api/projects/{PA}" not in body)
     r = CA.get(f"{BASE}/portal/{PB}", **R)
-    ok("client_other_project_also_redirected", r.status_code == 302,
-       "the lock precedes scope — an external role never reaches the shell either way")
+    ok("client_other_project_403", r.status_code == 403, f"{r.status_code}")
     r = ARCH.get(f"{BASE}/portal/{PA}", **R)
-    ok("architect_redirected", r.status_code == 302, f"{r.status_code}")
+    ok("architect_kept_on_drawing_surface", r.status_code == 302
+       and r.headers.get("Location", "").endswith("/drawing-markup"),
+       f"{r.status_code} -> {r.headers.get('Location')}")
 
     print("\n-- internal scope on the same route --")
     r = PM_OFF.get(f"{BASE}/portal/{PA}", **R)
@@ -197,7 +210,9 @@ def run():
        r.status_code == 200 and PA in flat and PB not in flat,
        "a client may never widen their view with the preview param")
     r = CA.get(f"{BASE}/portal/{PA}", params={"preview_client": users["client_b"]}, **R)
-    ok("client_preview_new_shell_still_locked", r.status_code == 302, f"{r.status_code}")
+    ok("client_preview_param_ignored_on_shell", r.status_code == 200
+       and f"/api/portal/{PA}" in r.text,
+       "a client passing preview_client must get SELF, never another client's shell")
 
     print("\n-- served-shell scrub for the role that actually receives it --")
     preview = AD.get(f"{BASE}/portal/{PA}", params={"preview_client": users["client_a"]}, **R).text

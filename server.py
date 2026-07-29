@@ -404,14 +404,10 @@ def portal_project_shell(project_code):
     role = actor.get("role")
     effective = actor
 
-    # ---- TEMPORARY LOCK (#281, removed at flip time) ----------------------------
-    # Kept until #284's flip commit: an external role landing here directly still
-    # goes to Classic. The admin preview below already exercises the finished
-    # portal shell end to end, so the flip is a routing decision, not new render code.
-    if role in access.EXTERNAL_API_ROLES:
-        logging.info(f"portal_shell: external role sent to Classic (pre-STEP2 lock) "
-                     f"role={role} code={project_code}")
-        return redirect("/portal")
+    # THE #281 TEMPORARY LOCK IS REMOVED HERE (#284 flip commit): external roles now
+    # ENTER this route and are served per the audience branches below — nav is grant-
+    # driven, the payloads are registry-served, and the scrub/parity guards are green.
+    # Reverting THIS COMMIT alone restores the pre-flip world (Classic landing).
 
     # PREVIEW-AS-CLIENT (#270 pattern). Without this the shell would render with the
     # ADMIN's role and show Amit everything — a preview that disagrees with what the
