@@ -41,6 +41,27 @@ gate runs green in all four backend×root configs. NOT yet cloud: M2 = PDF on
 Linux, M3 = public-door hardening, M4 = bring-up (see the operator's
 CLOUD_MIGRATION_BLUEPRINT.md).
 
+### Cloud M2 (#288) — PDF engine abstraction
+
+`pdf_export.py` is engine-selectable via **`SSC_PDF_ENGINE`** ('edge' |
+'chromium'; unset -> edge, today's Windows path byte-for-byte). Chromium
+binary from `SSC_CHROMIUM_PATH` (must exist when set — a wrong path raises
+a clean PDFExportError, never a fallback), else PATH lookup (chromium /
+chromium-browser / google-chrome / chrome), else the Windows Chrome dirs.
+ALL engine-specific flags live in `engine_flags()` — edge keeps
+`--headless=old` (its print-flush quirk); chromium uses `--headless
+--no-sandbox` (modern Chrome dropped old-headless; containerized M4 hosts
+need no-sandbox, and our renders are our own self-contained file:// HTML).
+The result dict keeps its historical shape — the browser path stays under
+"edge_path" (the #247 response scrub list keys on it) with an "engine" key
+alongside. generate_credentials_batch consumes the SAME discovery + flags
+(its two embedded Edge command blocks are gone). Engine parity proven on
+the workstation across 7 doc types (DCR internal+client, weekly-hours,
+blank form, toolbox talk, signage, CoF credential card): identical page
+counts, size ratios 1.00-1.17; the credential BUNDLE shares the pipeline.
+Guard: `tests/smoke_pdf_chromium_288.py` (gate #34). M4 sets
+SSC_PDF_ENGINE=chromium on the cloud host.
+
 ### Architecture in one paragraph
 
 Flask (Python 3.12) + waitress on `127.0.0.1:5050`, vanilla HTML/JS

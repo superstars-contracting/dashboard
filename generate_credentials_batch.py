@@ -313,10 +313,12 @@ def _fmt_mdy(d):
 
 
 def find_edge():
-    for p in EDGE_PATHS:
-        if p.exists():
-            return p
-    raise RuntimeError("Microsoft Edge not found")
+    """#288 — the shared engine layer decides which browser renders (edge on
+    Windows by default; chromium when SSC_PDF_ENGINE says so). Kept under the
+    historical name; callers below only need a browser path."""
+    import pdf_export
+    _engine, browser = pdf_export.find_browser_executable()
+    return browser
 
 
 def fetch_card_context(emp_id):
@@ -462,16 +464,10 @@ def render_card_html_to_pdf(html_text, base_url, output_pdf):
     tmp_html = Path(profile) / "card.html"
     tmp_html.write_text(full_html, encoding="utf-8")
     try:
-        cmd = [
-            str(edge),
-            "--headless=old",
-            "--disable-gpu",
-            "--no-pdf-header-footer",
-            f"--user-data-dir={profile}",
-            "--virtual-time-budget=5000",
-            f"--print-to-pdf={output_pdf}",
-            tmp_html.as_uri(),
-        ]
+        import pdf_export
+        cmd = [str(edge)] + pdf_export.engine_flags(
+            pdf_export.active_engine(), profile, output_pdf, budget_ms=5000
+        ) + [tmp_html.as_uri()]   # #288 — flags live in ONE place
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=45)
         if r.returncode != 0:
             return False
@@ -693,16 +689,10 @@ def build_bundle(fronts_by_type, shared_backs, output_pdf, base_url):
     tmp_html = Path(profile) / "bundle.html"
     tmp_html.write_text(bundle_html, encoding="utf-8")
     try:
-        cmd = [
-            str(edge),
-            "--headless=old",
-            "--disable-gpu",
-            "--no-pdf-header-footer",
-            f"--user-data-dir={profile}",
-            "--virtual-time-budget=8000",
-            f"--print-to-pdf={output_pdf}",
-            tmp_html.as_uri(),
-        ]
+        import pdf_export
+        cmd = [str(edge)] + pdf_export.engine_flags(
+            pdf_export.active_engine(), profile, output_pdf, budget_ms=8000
+        ) + [tmp_html.as_uri()]   # #288 — flags live in ONE place
         subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         for _ in range(40):
             if Path(output_pdf).exists() and Path(output_pdf).stat().st_size > 0:

@@ -1,10 +1,22 @@
-"""Headless Microsoft Edge PDF rendering for finalized DCRs.
+"""Headless-browser PDF rendering (#288 Cloud M2: engine-selectable).
 
-Why Edge and not WeasyPrint:
-  WeasyPrint requires GTK on Windows; GTK won't install on this workstation
-  (Windows Home, no MSYS2 toolchain). Edge ships with Windows, supports
-  --print-to-pdf in headless mode, and produces clean PDFs from
-  self-contained HTML.
+Two engines, ONE code path:
+  * edge      — headless Microsoft Edge. The Windows default and today's
+                production path, byte-for-byte (same binary discovery, same
+                flags, same quirk handling as before #288).
+  * chromium  — headless Chromium/Chrome for the Linux cloud host (M4 sets
+                it explicitly). Binary from SSC_CHROMIUM_PATH, else a PATH
+                lookup over chromium / chromium-browser / google-chrome /
+                chrome, else the standard Windows Chrome install dirs (so
+                the workstation can run engine-parity checks).
+
+Selection: SSC_PDF_ENGINE env ('edge' | 'chromium'), read per call. Unset ->
+edge — a Windows workstation with no env change behaves exactly as before.
+
+Why a browser and not WeasyPrint: WeasyPrint requires GTK on Windows; GTK
+won't install on this workstation (Windows Home, no MSYS2 toolchain).
+Headless Chromium-family browsers print self-contained HTML deterministically
+on both OSes.
 
 Usage:
   from pdf_export import render_html_to_pdf, PDFExportError
@@ -18,10 +30,16 @@ Caller policy:
   This module never raises on rendering failures — it returns
   {"ok": False, "error": ...} so the caller (DCR issuance) decides whether
   to fail the whole issue or just warn + continue. The only exception
-  raised is PDFExportError when Edge itself is not installed (a setup-time
-  problem, not a runtime one).
+  raised is PDFExportError when the selected engine's browser is not
+  installed / not found (a setup-time problem, not a runtime one).
+
+Result-shape compatibility note: the browser path is still returned under
+the key "edge_path" regardless of engine — that key is on the server's
+response scrub list (#247) and several callers read it; renaming it would
+re-open a path-leak review for zero benefit. An "engine" key rides along.
 """
 import logging
+import os
 import shutil
 import subprocess
 import tempfile
@@ -51,13 +69,36 @@ EDGE_PATHS = [
     Path(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
 ]
 
+# Chromium-family binary names for the PATH lookup (Linux first, then the
+# generic Chrome names), plus the standard Windows Chrome dirs so the
+# workstation can exercise the chromium engine for parity checks.
+CHROMIUM_BINARY_NAMES = ("chromium", "chromium-browser", "google-chrome", "chrome")
+CHROME_WIN_PATHS = [
+    Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
+    Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
+]
+
+ENGINES = ("edge", "chromium")
+
 
 class PDFExportError(Exception):
-    """Raised when Microsoft Edge is not installed at any expected path."""
+    """Raised when the selected engine's browser cannot be found (setup-time)."""
+
+
+def active_engine() -> str:
+    """The engine this process should use: SSC_PDF_ENGINE, default 'edge'.
+    Read per call (same discipline as ssc_paths #287) — a bad value raises
+    loudly rather than silently falling back to a browser nobody chose."""
+    v = (os.environ.get("SSC_PDF_ENGINE") or "").strip().lower() or "edge"
+    if v not in ENGINES:
+        raise PDFExportError(
+            f"SSC_PDF_ENGINE={v!r} is not a valid engine (expected one of {ENGINES})")
+    return v
 
 
 def find_edge_executable():
-    """Return the Path to msedge.exe, or raise PDFExportError if not found."""
+    """Return the Path to msedge.exe, or raise PDFExportError if not found.
+    (Kept under its historical name — pre-#288 importers still call it.)"""
     for p in EDGE_PATHS:
         if p.exists():
             return p
@@ -67,8 +108,62 @@ def find_edge_executable():
     )
 
 
-def render_html_to_pdf(html_path, pdf_path, timeout_sec=60):
-    """Render an HTML file to PDF using headless Edge.
+def find_chromium_executable():
+    """Locate a Chromium-family browser. SSC_CHROMIUM_PATH wins when set (and
+    MUST exist — a configured-but-wrong path is a setup error to surface, never
+    something to silently fall past); else PATH lookup; else Windows Chrome."""
+    explicit = (os.environ.get("SSC_CHROMIUM_PATH") or "").strip()
+    if explicit:
+        p = Path(explicit)
+        if p.exists():
+            return p
+        raise PDFExportError(
+            f"SSC_CHROMIUM_PATH is set but does not exist: {explicit}")
+    for name in CHROMIUM_BINARY_NAMES:
+        hit = shutil.which(name)
+        if hit:
+            return Path(hit)
+    for p in CHROME_WIN_PATHS:
+        if p.exists():
+            return p
+    raise PDFExportError(
+        "No Chromium-family browser found. Set SSC_CHROMIUM_PATH, or install one of: "
+        + ", ".join(CHROMIUM_BINARY_NAMES))
+
+
+def find_browser_executable(engine=None):
+    """(engine, Path) for the active — or explicitly requested — engine."""
+    engine = engine or active_engine()
+    if engine == "edge":
+        return "edge", find_edge_executable()
+    return "chromium", find_chromium_executable()
+
+
+def engine_flags(engine, profile_dir, pdf_path, budget_ms=5000):
+    """The full headless-print flag list for one render. EVERY engine-specific
+    flag lives here and nowhere else.
+
+    edge:     --headless=old — required for reliable --print-to-pdf on Edge
+              (the newer mode sometimes exits 0 without flushing the PDF).
+    chromium: plain --headless — modern Chrome/Chromium removed the old
+              headless mode entirely; the new one prints reliably there.
+              --no-sandbox — containerized Linux hosts (the M4 target) run
+              without the kernel privileges Chromium's sandbox wants; a PDF
+              render of OUR OWN self-contained file:// HTML carries no
+              untrusted content, so the sandbox buys nothing here.
+    """
+    head = ["--headless=old"] if engine == "edge" else ["--headless", "--no-sandbox"]
+    return head + [
+        "--disable-gpu",
+        "--no-pdf-header-footer",
+        f"--user-data-dir={profile_dir}",
+        f"--virtual-time-budget={budget_ms}",
+        f"--print-to-pdf={pdf_path}",
+    ]
+
+
+def render_html_to_pdf(html_path, pdf_path, timeout_sec=60, engine=None):
+    """Render an HTML file to PDF using the active headless engine (#288).
 
     Args:
       html_path: Path or str — must exist on disk. Should be self-contained
@@ -85,39 +180,30 @@ def render_html_to_pdf(html_path, pdf_path, timeout_sec=60):
                    finalize still returns 201 — the DCR is the source of
                    truth; the PDF is derivative and can be regenerated.
 
-    Returns dict:
-      {"ok": True,  "pdf_path": "<abs>", "edge_path": "<abs>", "size": int}
-      {"ok": False, "edge_path": "<abs>", "error": "<reason>"}
+    Returns dict (shape unchanged from the Edge-only era — "edge_path" carries
+    the browser path for EITHER engine; see the module docstring):
+      {"ok": True,  "pdf_path": "<abs>", "edge_path": "<abs>", "size": int, "engine": str}
+      {"ok": False, "edge_path": "<abs>", "error": "<reason>", "engine": str}
 
-    Raises PDFExportError if Edge isn't installed (setup problem).
+    Raises PDFExportError if the selected engine's browser isn't installed
+    (setup problem).
     """
     html_path = Path(html_path).resolve()
     pdf_path = Path(pdf_path).resolve()
     if not html_path.exists():
         return {"ok": False, "error": f"HTML not found: {html_path}"}
 
-    edge = find_edge_executable()
+    engine, browser = find_browser_executable(engine)
 
-    # Fresh per-render profile dir. Without --user-data-dir Edge attaches to
-    # any running edge.exe instance and silently skips --print-to-pdf. With a
-    # FRESH temp dir each invocation, we get a guaranteed new browser process.
+    # Fresh per-render profile dir. Without --user-data-dir the browser attaches
+    # to any running instance and silently skips --print-to-pdf. With a FRESH
+    # temp dir each invocation, we get a guaranteed new browser process.
     # Not using `with TemporaryDirectory(...)` — Edge holds file handles in the
     # profile briefly after subprocess.run() returns, racing the auto-cleanup
     # and crashing with WinError 32. mkdtemp + best-effort cleanup avoids that.
-    profile_dir = tempfile.mkdtemp(prefix="dcr_edge_")
+    profile_dir = tempfile.mkdtemp(prefix=f"dcr_{engine}_")
     try:
-        # --headless=old is required for reliable --print-to-pdf. The newer
-        # --headless=new mode sometimes exits 0 without flushing the PDF in
-        # recent Edge/Chromium versions. Tracked upstream as a long-standing
-        # quirk; for a release surface like a DCR, we want determinism.
-        cmd = [
-            str(edge),
-            "--headless=old",
-            "--disable-gpu",
-            "--no-pdf-header-footer",
-            f"--user-data-dir={profile_dir}",
-            "--virtual-time-budget=5000",  # let the page settle before printing
-            f"--print-to-pdf={pdf_path}",
+        cmd = [str(browser)] + engine_flags(engine, profile_dir, pdf_path) + [
             html_path.as_uri(),  # file:///C:/Users/...
         ]
         pdf_path.parent.mkdir(parents=True, exist_ok=True)
@@ -127,35 +213,36 @@ def render_html_to_pdf(html_path, pdf_path, timeout_sec=60):
                 cmd, capture_output=True, text=True, timeout=timeout_sec
             )
         except subprocess.TimeoutExpired:
-            return {"ok": False, "edge_path": str(edge),
-                    "error": f"Edge timed out after {timeout_sec}s"}
+            return {"ok": False, "edge_path": str(browser), "engine": engine,
+                    "error": f"{engine} timed out after {timeout_sec}s"}
         except Exception as e:
-            return {"ok": False, "edge_path": str(edge),
-                    "error": f"Edge subprocess failed: {e}"}
+            return {"ok": False, "edge_path": str(browser), "engine": engine,
+                    "error": f"{engine} subprocess failed: {e}"}
 
         stderr_tail = (result.stderr or "").strip()[-500:]
         stdout_tail = (result.stdout or "").strip()[-500:]
         if result.returncode != 0:
             return {
                 "ok": False,
-                "edge_path": str(edge),
-                "error": f"Edge exited rc={result.returncode}: {stderr_tail or stdout_tail}",
+                "edge_path": str(browser),
+                "engine": engine,
+                "error": f"{engine} exited rc={result.returncode}: {stderr_tail or stdout_tail}",
             }
-        # Edge sometimes writes the file just after subprocess.run() returns
-        # on Windows (filesystem flush lag). Poll briefly before giving up.
+        # The browser sometimes writes the file just after subprocess.run()
+        # returns (filesystem flush lag). Poll briefly before giving up.
         for _ in range(20):
             if pdf_path.exists() and pdf_path.stat().st_size > 0:
                 break
             time.sleep(0.1)
         if not pdf_path.exists():
-            return {"ok": False, "edge_path": str(edge),
-                    "error": f"Edge exited 0 but no PDF written. stderr_tail: {stderr_tail}"}
+            return {"ok": False, "edge_path": str(browser), "engine": engine,
+                    "error": f"{engine} exited 0 but no PDF written. stderr_tail: {stderr_tail}"}
         size = pdf_path.stat().st_size
         if size == 0:
-            return {"ok": False, "edge_path": str(edge),
+            return {"ok": False, "edge_path": str(browser), "engine": engine,
                     "error": f"PDF written but is 0 bytes. stderr_tail: {stderr_tail}"}
         return {"ok": True, "pdf_path": str(pdf_path),
-                "edge_path": str(edge), "size": size}
+                "edge_path": str(browser), "size": size, "engine": engine}
     finally:
         _best_effort_rmtree(profile_dir)
 
