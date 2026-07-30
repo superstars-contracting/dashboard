@@ -20,6 +20,27 @@ Real external users are on the live system: two **clients** and one
 per request — see "Access model" below before touching any portal,
 grant, or elevation code.
 
+### Cloud M1 (#287) — the storage abstraction
+
+Every DATA path resolves through **`ssc_paths.py`** driven by **`SSC_DATA_ROOT`**:
+unset (production today) = exactly the old repo-dir layout, byte for byte; set =
+all data categories under the root (`<root>/data_room/...`, `<root>/worker_records`,
+`<root>/superstars.db`). Categories: media (field_photos, project_docs, photos,
+receipts, walkthroughs, estimate_docs, material_slips, worker_records,
+employee_photos, issuer_signatures), renders (reports, credentials, forms,
+toolbox_talks, signage, cof_exports + the legacy root output dirs), logs, db.
+Static assets and code stay repo-relative. STORED rows: every pre-#287 `*_path`
+is an absolute Windows path — reads go through `ssc_paths.resolve_data_path()`
+(as-is while it exists; re-anchored under the active root by its data anchor
+once the tree moves); NEW media writes store RELATIVE paths (`store_rel`).
+`migrate_data_root_287.py` copies + sha256-verifies the tree per category
+(dry-run default; idempotent re-run = verify). Guard:
+`tests/smoke_data_root_287.py` (own rooted server; upload/render/serve under a
+scratch root; repo-tree mtime watchdog proves zero out-of-root writes). The
+gate runs green in all four backend×root configs. NOT yet cloud: M2 = PDF on
+Linux, M3 = public-door hardening, M4 = bring-up (see the operator's
+CLOUD_MIGRATION_BLUEPRINT.md).
+
 ### Architecture in one paragraph
 
 Flask (Python 3.12) + waitress on `127.0.0.1:5050`, vanilla HTML/JS

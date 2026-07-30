@@ -63,6 +63,7 @@ GATE = [
     "smoke_markup_280.py",        # #283 guard — elevation scoping/vocabulary/derivation, comments, RFIs, drawing+rfis grants
     "smoke_portal_shell_281.py",  # #283 guard — /portal/<code> landing, preview, served-shell scrub, catalog, fail-closed registry
     "smoke_portal_flip_284.py",   # #284 guard — matrix fail-closed, nav-from-grants, registry payloads, daily allowlist, parity, the flip
+    "smoke_data_root_287.py",     # #287 guard — SSC_DATA_ROOT containment (own rooted server; watchdog on the repo tree)
     "smoke_dropplan_api.py",
     "smoke_worker_lifecycle.py",
     "smoke_dcr214_lifecycle.py",

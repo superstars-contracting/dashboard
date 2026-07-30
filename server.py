@@ -17,7 +17,8 @@ import db_layer
 from cert_extractor import extract_cert_from_image, load_cert_types_from_db
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-DB_PATH = SCRIPT_DIR / "superstars.db"
+import ssc_paths  # #287 — THE data-path resolver (SSC_DATA_ROOT)
+DB_PATH = ssc_paths.sqlite_db_path()   # #287 — data-root aware (unset = same file)
 COMPANY_DASHBOARD_PATH = SCRIPT_DIR / "company-dashboard.html"
 DASHBOARD_PATH = SCRIPT_DIR / "dashboard-static.html"
 PORTAL_SHELL_PATH = SCRIPT_DIR / "portal_shell.html"   # #284 — the external shell
@@ -164,14 +165,13 @@ ALLOWED_DOC_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.h
 # and server_logs are never servable; receipts, project_docs, and
 # field_photos already have their own gated id-based routes with their own
 # role rules (listing them here would loosen those).
-_ARTIFACT_ROOTS = (
-    SCRIPT_DIR / "data_room" / "reports",
-    SCRIPT_DIR / "data_room" / "photos",
-    SCRIPT_DIR / "data_room" / "forms",
-    SCRIPT_DIR / "data_room" / "toolbox_talks",
-    SCRIPT_DIR / "data_room" / "signage",
-    SCRIPT_DIR / "data_room" / "credentials",
-)
+# #287 — evaluated per call (env decides the base): see _artifact_roots().
+_ARTIFACT_SUBTREES = ("reports", "photos", "forms", "toolbox_talks",
+                      "signage", "credentials")
+
+
+def _artifact_roots():
+    return tuple(ssc_paths.under_root("data_room", t) for t in _ARTIFACT_SUBTREES)
 
 # Extensions an artifact may carry. Code / config / db / log / csv are absent
 # BY DESIGN — a future artifact type gets its extension added here
@@ -215,14 +215,14 @@ def _safe_artifact_path(rel):
     parts = _split_safe_rel(rel)
     if parts is None:
         return None
-    candidate = SCRIPT_DIR.joinpath(*parts)
+    candidate = ssc_paths.data_root().joinpath(*parts)   # #287
     if candidate.suffix.lower() not in _ARTIFACT_EXTENSIONS:
         return None
     try:
         resolved = candidate.resolve()
     except OSError:
         return None
-    if not any(resolved.is_relative_to(root.resolve()) for root in _ARTIFACT_ROOTS):
+    if not any(resolved.is_relative_to(root.resolve()) for root in _artifact_roots()):
         return None
     if not resolved.is_file():
         return None
@@ -681,7 +681,7 @@ def api_activity_recent():
 
 # Logging setup
 logging.basicConfig(
-    filename=str(SCRIPT_DIR / "server.log"),
+    filename=str(ssc_paths.server_log_path()),
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
@@ -1220,7 +1220,7 @@ def api_payroll_hours_pdf():
 
         # Use a stable temp filename pair under data_room so the file is
         # locatable for post-mortem if rendering fails. Overwritten each call.
-        out_dir = SCRIPT_DIR / "data_room" / "reports" / "weekly_hours"
+        out_dir = ssc_paths.under_root("data_room", "reports", "weekly_hours")   # #287
         out_dir.mkdir(parents=True, exist_ok=True)
         html_tmp = out_dir / f"week-{grid['week_start']}.html"
         pdf_tmp = out_dir / f"week-{grid['week_start']}.pdf"
@@ -2009,9 +2009,7 @@ def delete_photo(row_id):
     file_error = None
     if file_path:
         try:
-            p = Path(file_path)
-            if not p.is_absolute():
-                p = SCRIPT_DIR / p
+            p = ssc_paths.resolve_data_path(file_path)   # #287
             if p.exists():
                 p.unlink()
                 file_deleted = True
@@ -2190,7 +2188,7 @@ def delete_report_by_sequence(project_code, seq):
 
     files_deleted = []
     file_errors = {}
-    seq_dir = SCRIPT_DIR / "data_room" / "reports" / "dcr" / project_code / f"{seq:03d}"
+    seq_dir = ssc_paths.under_root("data_room", "reports", "dcr", project_code, f"{seq:03d}")   # #287
     for audience in ('internal', 'client'):
         out_file = seq_dir / f"{audience}.html"
         try:
@@ -2249,7 +2247,7 @@ def delete_report(project_code, report_id):
     file_deleted = False
     file_error = None
     if seq is not None and audience:
-        out_file = SCRIPT_DIR / "data_room" / "reports" / "dcr" / project_code / f"{seq:03d}" / f"{audience}.html"
+        out_file = ssc_paths.under_root("data_room", "reports", "dcr", project_code, f"{seq:03d}", f"{audience}.html")   # #287
         try:
             if out_file.exists():
                 out_file.unlink()
@@ -2398,13 +2396,13 @@ def _issue_one_dcr(conn, project_code, report_date, audience, seq):
     dcr['display_id'] = display_id
     dcr['dcr_sequence'] = seq
     html = DCRHTMLRenderer(dcr).render()
-    out_dir = SCRIPT_DIR / "data_room" / "reports" / "dcr" / project_code / f"{seq:03d}"
+    out_dir = ssc_paths.under_root("data_room", "reports", "dcr", project_code, f"{seq:03d}")   # #287
     out_dir.mkdir(parents=True, exist_ok=True)
     out_file = out_dir / f"{audience}.html"
     tmp_file = out_dir / f"{audience}.html.tmp"
     tmp_file.write_text(html, encoding='utf-8')
     tmp_file.replace(out_file)  # atomic on POSIX and Windows
-    rel = out_file.relative_to(SCRIPT_DIR).as_posix()
+    rel = out_file.relative_to(ssc_paths.data_root()).as_posix()   # #287 — URL shape unchanged
     html_url = f"/project-files/{rel}"
 
     # PDF render: internal audience only (the "full record" copy that gets
@@ -2427,7 +2425,7 @@ def _issue_one_dcr(conn, project_code, report_date, audience, seq):
             logging.warning(f"DCR {report_id}: Edge not installed, PDF skipped: {e}")
         if pdf_status.get('ok'):
             pdf_path = pdf_target
-            pdf_url = f"/project-files/{pdf_target.relative_to(SCRIPT_DIR).as_posix()}"
+            pdf_url = f"/project-files/{pdf_target.relative_to(ssc_paths.data_root()).as_posix()}"   # #287
             # Drive archive — copy the local PDF into the project's synced
             # folder. Failure here is a WARN, never an error: local PDF is
             # always retained; Drive may simply not be configured/running.
@@ -3932,8 +3930,8 @@ def upload_photo():
         photo_uuid = uuid.uuid4().hex[:8]
         filename = f"{timestamp}_{photo_uuid}{ext}"
 
-        photos_base = (SCRIPT_DIR / "data_room" / "photos").resolve()
-        photo_dir = SCRIPT_DIR / "data_room" / "photos" / project_code / date_str / location
+        photos_base = (ssc_paths.under_root("data_room", "photos")).resolve()
+        photo_dir = ssc_paths.under_root("data_room", "photos") / project_code / date_str / location
         if not photo_dir.resolve().is_relative_to(photos_base):
             return jsonify({"error": "Invalid location path"}), 400
         photo_dir.mkdir(parents=True, exist_ok=True)
@@ -4115,7 +4113,7 @@ def api_project_crew_compliance(project_code):
         today = date.today()
         today_iso = today.isoformat()
         d30_iso = (today + timedelta(days=30)).isoformat()
-        base = (SCRIPT_DIR / "worker_records").resolve()
+        base = ssc_paths.under_root("worker_records").resolve()   # #287
         renderable = ('.jpg', '.jpeg', '.png')   # browser-renderable headshots only
         workers = []
         agg = {"total": 0, "ready": 0, "expiring": 0, "expired": 0}
@@ -4254,8 +4252,8 @@ def _projdoc_save_file(project_code, fs):
     ext = Path(fs.filename or 'document').suffix.lower()
     if ext not in _PROJDOC_EXT_TYPE:
         raise ValueError(f"unsupported file type: {ext or '(none)'}")
-    base = (SCRIPT_DIR / 'data_room' / 'project_docs').resolve()
-    pdir = SCRIPT_DIR / 'data_room' / 'project_docs' / project_code
+    base = (ssc_paths.under_root('data_room', 'project_docs')).resolve()
+    pdir = ssc_paths.under_root('data_room', 'project_docs') / project_code
     if not pdir.resolve().is_relative_to(base):
         raise ValueError("invalid project path")
     pdir.mkdir(parents=True, exist_ok=True)
@@ -4586,7 +4584,7 @@ def api_projdoc_file(doc_id):
         if not row or not row['file_path']:
             return jsonify({"error": "not found"}), 404
         p = Path(row['file_path'])
-        base = (SCRIPT_DIR / 'data_room' / 'project_docs').resolve()
+        base = (ssc_paths.under_root('data_room', 'project_docs')).resolve()
         if not (p.resolve().is_relative_to(base) and p.exists()):
             return jsonify({"error": "file missing"}), 404
         resp = send_file(str(p), mimetype=row['mime'] or 'application/octet-stream',
@@ -4631,7 +4629,7 @@ def api_projdoc_replace_file(doc_id):
                 pass
             raise
         # the wrong file is gone for good (confined delete; the ROW/version is untouched)
-        base = (SCRIPT_DIR / 'data_room' / 'project_docs').resolve()
+        base = (ssc_paths.under_root('data_room', 'project_docs')).resolve()
         if old_path is not None:
             try:
                 if old_path.resolve().is_relative_to(base):
@@ -4696,7 +4694,7 @@ def api_projdoc_delete(doc_id):
         conn.commit()
         try:
             p = Path(row['file_path'])
-            base = (SCRIPT_DIR / 'data_room' / 'project_docs').resolve()
+            base = (ssc_paths.under_root('data_room', 'project_docs')).resolve()
             if p.resolve().is_relative_to(base):
                 p.unlink(missing_ok=True)
         except Exception as e:
@@ -5553,7 +5551,7 @@ def api_lr_worker_card(worker_id):
         if emp and emp['face_image_path']:
             try:
                 p = Path(emp['face_image_path'])
-                base = (SCRIPT_DIR / "worker_records").resolve()
+                base = ssc_paths.under_root("worker_records").resolve()   # #287
                 has_photo = p.resolve().is_relative_to(base) and p.exists()
             except Exception:
                 has_photo = False
@@ -5578,7 +5576,7 @@ def api_lr_worker_photo(worker_id):
         if not emp or not emp['face_image_path']:
             return jsonify({"error": "no photo"}), 404
         p = Path(emp['face_image_path'])
-        base = (SCRIPT_DIR / "worker_records").resolve()
+        base = ssc_paths.under_root("worker_records").resolve()   # #287
         if not (p.resolve().is_relative_to(base) and p.exists()):
             return jsonify({"error": "photo missing"}), 404
         mt = 'image/png' if p.suffix.lower() == '.png' else 'image/jpeg'
@@ -6631,8 +6629,8 @@ def api_crm_assignable_users():
 import re
 import shutil
 
-WORKER_RECORDS_DIR = SCRIPT_DIR / "worker_records"
-WORKER_RECORDS_DIR.mkdir(exist_ok=True)
+WORKER_RECORDS_DIR = ssc_paths.under_root("worker_records")   # #287
+WORKER_RECORDS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def slugify_name(name):
@@ -7958,7 +7956,7 @@ def serve_card_live(emp_id, cred_type):
         if face_path:
             fp = Path(face_path)
             if not fp.is_absolute():
-                fp = SCRIPT_DIR / fp
+                fp = ssc_paths.resolve_data_path(fp)   # #287
             if fp.exists():
                 try:
                     rel = fp.resolve().relative_to(WORKER_RECORDS_DIR.resolve())
@@ -7976,7 +7974,7 @@ def serve_card_live(emp_id, cred_type):
         signature_url = ''
         sig_path = card.get('signature_path')
         if sig_path:
-            sig_full = SCRIPT_DIR / sig_path.lstrip('/')
+            sig_full = ssc_paths.resolve_data_path(sig_path.lstrip('/'))   # #287
             if sig_full.exists():
                 signature_url = _file_url_for(sig_path)
 
@@ -8149,13 +8147,13 @@ def issue_employee_credential(emp_id):
         photo_url = ''
         photo_snapshot = card.get('photo_snapshot_path')
         if photo_snapshot:
-            photo_full = SCRIPT_DIR / photo_snapshot.lstrip('/')
+            photo_full = ssc_paths.resolve_data_path(photo_snapshot.lstrip('/'))   # #287
             if photo_full.exists():
                 photo_url = _file_url_for(photo_snapshot)
         signature_url = ''
         sig_path = card.get('signature_path')
         if sig_path:
-            sig_full = SCRIPT_DIR / sig_path.lstrip('/')
+            sig_full = ssc_paths.resolve_data_path(sig_path.lstrip('/'))   # #287
             if sig_full.exists():
                 signature_url = _file_url_for(sig_path)
         ctx = {
@@ -8183,7 +8181,7 @@ def issue_employee_credential(emp_id):
         except Exception as ex:
             logging.error(f"POST .../credential/issue ({emp_id}) jinja render failed: {ex}")
             return jsonify({"error": f"Template render failed: {ex}"}), 500
-        html_dir = SCRIPT_DIR / "data_room" / "credentials" / subdir
+        html_dir = ssc_paths.under_root("data_room", "credentials", subdir)   # #287
         html_dir.mkdir(parents=True, exist_ok=True)
         html_file = html_dir / f"{emp_id}.html"
         html_file.write_text(html_out, encoding='utf-8')
@@ -9477,7 +9475,7 @@ def dropplan_page():
 # roles can view + upload.
 # ===========================================================================
 _FP_ROLES = ('admin', 'c_suite', 'pm', 'super')
-_FP_BASE = SCRIPT_DIR / 'data_room' / 'field_photos'
+_FP_BASE = ssc_paths.under_root('data_room', 'field_photos')   # #287
 _FP_EXT = {'.jpg', '.jpeg', '.png', '.heic', '.heif', '.webp'}
 _FP_MAX_FILES = 60            # per single POST (the UI chunks bigger batches)
 _FP_CLUSTER_GAP_MIN = 90      # a > 90-min gap (or a date change) starts a new time cluster
@@ -9529,7 +9527,8 @@ def _fp_write(project_code, res):
     tpath = pdir / ("thumb" + res["ext"])
     fpath.write_bytes(res["display_bytes"])
     tpath.write_bytes(res["thumb_bytes"])
-    return str(fpath), str(tpath)
+    # #287 — store PORTABLE relative paths; reads go through resolve_data_path
+    return ssc_paths.store_rel(fpath), ssc_paths.store_rel(tpath)
 
 
 def _fp_parse_batch_date(s):
@@ -10176,14 +10175,22 @@ def static_files(filename):
         return jsonify({"error": "File not found", "path": filename}), 404
     if len(parts) > 1 and parts[0] not in _ROOT_SERVE_DIRS:
         return jsonify({"error": "File not found", "path": filename}), 404
-    candidate = SCRIPT_DIR.joinpath(*parts)
-    if candidate.suffix.lower() not in _ARTIFACT_EXTENSIONS:
-        return jsonify({"error": "File not found", "path": filename}), 404
-    try:
-        resolved = candidate.resolve()
-        if not resolved.is_relative_to(SCRIPT_DIR.resolve()):
+    # #287 — legacy outputs are DATA: prefer the data root; fall back to the
+    # repo dir for pre-data_room files that were never migrated. Unset root =
+    # both bases are SCRIPT_DIR (identical to the old single check).
+    resolved = None
+    for base in (ssc_paths.data_root(), SCRIPT_DIR):
+        candidate = base.joinpath(*parts)
+        if candidate.suffix.lower() not in _ARTIFACT_EXTENSIONS:
             return jsonify({"error": "File not found", "path": filename}), 404
-    except OSError:
+        try:
+            r = candidate.resolve()
+            if r.is_relative_to(base.resolve()) and r.is_file():
+                resolved = r
+                break
+        except OSError:
+            pass
+    if resolved is None:
         return jsonify({"error": "File not found", "path": filename}), 404
     if not resolved.is_file():
         return jsonify({"error": "File not found", "path": filename}), 404
@@ -10247,7 +10254,7 @@ _RECEIPT_MIME = {
     '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
     '.heic': 'image/heic', '.heif': 'image/heif', '.pdf': 'application/pdf',
 }
-_RECEIPTS_BASE = (SCRIPT_DIR / "data_room" / "receipts")
+_RECEIPTS_BASE = ssc_paths.under_root("data_room", "receipts")   # #287
 
 
 def _exp_dec(v):

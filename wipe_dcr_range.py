@@ -22,8 +22,9 @@ from pathlib import Path
 from collections import defaultdict
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+import ssc_paths  # #287
 DB_PATH = SCRIPT_DIR / "superstars.db"
-REPORTS_ROOT = SCRIPT_DIR / "data_room" / "reports" / "dcr"
+REPORTS_ROOT = ssc_paths.under_root("data_room", "reports", "dcr")   # #287
 
 START = "2026-05-04"
 END   = "2026-05-17"

@@ -7,9 +7,10 @@ import sys
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+import ssc_paths  # #287
 DB_PATH = SCRIPT_DIR / "superstars.db"
 SQL_PATH = SCRIPT_DIR / "schema_blank_forms.sql"
-FORMS_DIR = SCRIPT_DIR / "data_room" / "forms"   # serve location (gitignored)
+FORMS_DIR = ssc_paths.under_root("data_room", "forms")   # #287   # serve location (gitignored)
 SOURCES_DIR = SCRIPT_DIR / "forms_source"        # tracked source HTML
 
 # (title, filename, source_html, category, description)

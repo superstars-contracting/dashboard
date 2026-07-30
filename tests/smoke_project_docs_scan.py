@@ -46,6 +46,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import document_scanner as scanner  # noqa: E402
 from auth import hash_password  # noqa: E402
 import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
+import ssc_paths  # noqa: E402  # #287
 
 PROJ = "SMK-DOCSCAN"
 NOROLE_EMAIL = "smk-norole-scan@superstars.local"
@@ -243,7 +244,7 @@ def cleanup():
     conn.commit()
     residue = conn.execute("SELECT COUNT(*) FROM project_documents WHERE project_code=?", (PROJ,)).fetchone()[0]
     conn.close()
-    pdir = SCRIPT_DIR / "data_room" / "project_docs" / PROJ
+    pdir = ssc_paths.under_root("data_room", "project_docs") / PROJ
     if pdir.exists():
         import shutil
         shutil.rmtree(pdir, ignore_errors=True)

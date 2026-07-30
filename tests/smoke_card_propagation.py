@@ -45,6 +45,7 @@ import requests
 # Auth gate (#48): login the smoke admin + patch requests so cookies ride along.
 import _smoke_auth  # noqa: E402
 import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
+import ssc_paths  # noqa: E402  # #287
 _smoke_auth.setup()
 
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
@@ -52,6 +53,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = SCRIPT_DIR / "superstars.db"
 # Let the test pull in worker_id helpers from the dashboard root.
 sys.path.insert(0, str(SCRIPT_DIR))
+
 RUN_MARKER = "PROP_" + uuid.uuid4().hex[:6].upper()
 
 
@@ -412,7 +414,7 @@ def driver():
             conn.close()
         # On-disk folder teardown — bounded to worker_records/ for safety.
         import shutil
-        wr = (SCRIPT_DIR / "worker_records").resolve()
+        wr = ssc_paths.under_root("worker_records").resolve()   # #287
         for fp in folders_to_rm:
             try:
                 p = Path(fp).resolve()

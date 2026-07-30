@@ -25,8 +25,9 @@ from datetime import date
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-DB_PATH = SCRIPT_DIR / "superstars.db"
-CREDENTIALS_DIR = SCRIPT_DIR / "data_room" / "credentials" / "company_id"
+import ssc_paths  # #287
+DB_PATH = ssc_paths.sqlite_db_path()   # #287
+CREDENTIALS_DIR = ssc_paths.under_root("data_room", "credentials", "company_id")   # #287
 
 
 # =====================================================================
@@ -137,7 +138,7 @@ def _snapshot_photo(employee_id, revision, source_path):
         return None
     src = Path(source_path)
     if not src.is_absolute():
-        src = SCRIPT_DIR / src
+        src = ssc_paths.resolve_data_path(src)   # #287
     if not src.exists():
         return None
     CREDENTIALS_DIR.mkdir(parents=True, exist_ok=True)

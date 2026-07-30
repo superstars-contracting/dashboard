@@ -295,7 +295,8 @@ def connect(sqlite_path=None, pragma_fk: bool = False):
     if is_postgres():
         return _PgConn(db_url())
     # explicit arg > SSC_DB_URL sqlite path > default live file
-    path = str(sqlite_path) if sqlite_path else (_sqlite_path_from_url() or str(DEFAULT_SQLITE_PATH))
+    import ssc_paths  # #287 — local import: db_layer loads before app modules
+    path = str(sqlite_path) if sqlite_path else (_sqlite_path_from_url() or str(ssc_paths.sqlite_db_path()))
     conn = sqlite3.connect(path, timeout=60.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL;")

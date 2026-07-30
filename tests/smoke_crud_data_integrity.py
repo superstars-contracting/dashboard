@@ -37,6 +37,7 @@ import requests
 # Auth gate (#48): login the smoke admin + patch requests so cookies ride along.
 import _smoke_auth  # noqa: E402
 _smoke_auth.setup()
+import ssc_paths  # noqa: E402  # #287
 
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
 PROJECT = "FR-BX-001"
@@ -175,7 +176,7 @@ def _synth_teardown(emp_id):
         import shutil
         try:
             p = Path(folder).resolve()
-            wr = (SCRIPT_DIR / "worker_records").resolve()
+            wr = ssc_paths.under_root("worker_records").resolve()   # #287
             if str(p).startswith(str(wr)) and p.exists():
                 shutil.rmtree(p, ignore_errors=True)
         except Exception:

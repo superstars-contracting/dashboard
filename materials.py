@@ -40,7 +40,8 @@ import db_layer
 import pm_scoping
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-_SLIP_BASE = SCRIPT_DIR / "data_room" / "material_slips"
+import ssc_paths  # #287
+_SLIP_BASE = ssc_paths.under_root("data_room", "material_slips")   # #287
 _SLIP_EXT = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
              '.heic': 'image/heic', '.heif': 'image/heif', '.pdf': 'application/pdf'}
 
@@ -539,7 +540,7 @@ def _api_txn_slip(txn_id):
             return jsonify({"error": "forbidden"}), 403
     finally:
         conn.close()
-    p = Path(r["slip_path"])
+    p = ssc_paths.resolve_data_path(r["slip_path"])   # #287
     try:
         if not (p.resolve().is_relative_to(_SLIP_BASE.resolve()) and p.exists()):
             return jsonify({"error": "file missing"}), 404

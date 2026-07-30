@@ -42,6 +42,8 @@ import requests
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR.parent))
 
+import ssc_paths  # noqa: E402  # #287 — fixture paths honor SSC_DATA_ROOT
+
 import db_layer            # noqa: E402
 from auth import hash_password  # noqa: E402
 from apply_walkthroughs_277 import ensure_walkthroughs_schema  # noqa: E402
@@ -60,7 +62,7 @@ ROLE_OF = {"csuite": "c_suite", "est": "estimator", "pm": "pm", "super": "super"
 ORG_NAME = "SMK277 WT Org"
 SERIES = (("FR", "QN"), ("IR", "QN"))
 TODAY = date.today()
-_WT_DIR = SCRIPT_DIR.parent / "data_room" / "walkthroughs"
+_WT_DIR = ssc_paths.under_root("data_room", "walkthroughs")   # #287
 
 PASS, FAIL = [], []
 SEEN = []
@@ -358,9 +360,9 @@ def main():
         ok("captions_kept", sorted((p.get("caption") or "") for p in rep.get("photos", [])) == ["north", "setback"])
         # STORED BYTES are GPS-free (the #235 pipeline strip, proven on disk)
         conn = db_layer.connect()
-        paths = [r[0] for r in conn.execute(
+        paths = [ssc_paths.resolve_data_path(r[0]) for r in conn.execute(
             "SELECT p.file_path FROM walkthrough_photo p JOIN walkthrough_report wr ON wr.id=p.report_id "
-            "WHERE wr.estimate_id=?", (a_id,)).fetchall()]
+            "WHERE wr.estimate_id=?", (a_id,)).fetchall()]   # #287 — rows may be relative
         conn.close()
         gps_free = all(len(_Im.open(p).getexif().get_ifd(0x8825)) == 0
                        and 34853 not in _Im.open(p).getexif() for p in paths)

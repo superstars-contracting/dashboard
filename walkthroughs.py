@@ -39,7 +39,8 @@ import notifications
 from auth import _db, current_user, requires_section
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-_WT_BASE = SCRIPT_DIR / "data_room" / "walkthroughs"
+import ssc_paths  # #287
+_WT_BASE = ssc_paths.under_root("data_room", "walkthroughs")   # #287
 
 VISIT_STATUSES = ("scheduled", "done", "cancelled")
 
@@ -225,7 +226,7 @@ def _wt_write(est_code, res):
     tpath = pdir / ("thumb" + res["ext"])
     fpath.write_bytes(res["display_bytes"])
     tpath.write_bytes(res["thumb_bytes"])
-    return str(fpath), str(tpath)
+    return ssc_paths.store_rel(fpath), ssc_paths.store_rel(tpath)   # #287 — portable rows
 
 
 def create_report(conn, est_id, *, note, files, captions=None, visit_id=None,
@@ -540,7 +541,7 @@ def _serve_photo(photo_id, col):
             "WHERE p.id=?", (photo_id,)).fetchone()
         if not row or not estimates.get_estimate(conn, row["estimate_id"]):
             return jsonify({"error": "not found"}), 404
-        p = Path(row[col])
+        p = ssc_paths.resolve_data_path(row[col])   # #287 — rows may be relative now
         if not (p.resolve().is_relative_to(_WT_BASE.resolve()) and p.exists()):
             return jsonify({"error": "file missing"}), 404
         resp = send_file(str(p), mimetype=row["mime"] or "image/jpeg",

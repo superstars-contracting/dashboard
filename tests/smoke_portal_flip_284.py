@@ -46,6 +46,8 @@ import requests
 SCRIPT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+import ssc_paths  # noqa: E402  # #287 — fixture paths honor SSC_DATA_ROOT
+
 import db_layer  # noqa: E402
 import portal_matrix  # noqa: E402
 import client_registry as reg  # noqa: E402
@@ -55,7 +57,7 @@ PC, PD = "SMK284-C", "SMK284-D"
 PASS, FAIL = [], []
 IDS = {"users": [], "photos": [], "docs": []}
 FIX_SEQ = 99902   # the seeded report_index dcr_sequence for PC
-DCR_FIX_DIR = SCRIPT_DIR / "data_room" / "reports" / "dcr" / PC / f"{FIX_SEQ:03d}"
+DCR_FIX_DIR = ssc_paths.under_root("data_room", "reports", "dcr", PC, f"{FIX_SEQ:03d}")   # #287
 
 
 def ok(name, cond, note=""):

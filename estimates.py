@@ -44,7 +44,8 @@ import crm
 from auth import _db, current_user, requires_section
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-_DOC_BASE = SCRIPT_DIR / "data_room" / "estimate_docs"
+import ssc_paths  # #287
+_DOC_BASE = ssc_paths.under_root("data_room", "estimate_docs")   # #287
 
 # ---- catalogs (in code, extensible — the operator adds a type here, no schema change) ----
 EST_TYPES = {
@@ -417,7 +418,7 @@ def add_document(conn, est_id, fs, *, category, title=None, uploaded_by=None,
         cols = ["estimate_id", "category", "title", "doc_type", "file_path", "file_name",
                 "file_size", "mime", "uploaded_by", "uploaded_at"]
         vals = [est_id, category, (title or "").strip() or file_name, doc_type,
-                str(fpath), file_name, size, mime, uploaded_by, _now()]
+                ssc_paths.store_rel(fpath), file_name, size, mime, uploaded_by, _now()]   # #287
         # #274 — expiry_date column exists once apply_ira_274 ran; include it only when
         # provided so a #273-only schema (older gate DB) keeps working unchanged.
         if expiry_date:
@@ -799,7 +800,7 @@ def _api_doc_file(doc_id):
                            (doc_id,)).fetchone()
         if not row or not row["file_path"]:
             return jsonify({"error": "not found"}), 404
-        p = Path(row["file_path"])
+        p = ssc_paths.resolve_data_path(row["file_path"])   # #287 — rows may be relative now
         base = _DOC_BASE.resolve()
         if not (p.resolve().is_relative_to(base) and p.exists()):
             return jsonify({"error": "file missing"}), 404

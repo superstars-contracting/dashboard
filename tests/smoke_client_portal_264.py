@@ -39,14 +39,16 @@ import requests
 SCRIPT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+
 import db_layer  # noqa: E402
+import ssc_paths  # noqa: E402  # #287
 from auth import hash_password, _now_iso  # noqa: E402
 from apply_pm_assignment_263 import ensure_pm_assignment_schema  # noqa: E402
 from apply_item_visibility_264 import ensure_item_visibility_schema  # noqa: E402
 import visibility  # noqa: E402
 
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
-_FP_BASE = SCRIPT_DIR / "data_room" / "field_photos"
+_FP_BASE = ssc_paths.under_root("data_room", "field_photos")   # #287
 
 PW = secrets.token_urlsafe(18)
 USERS = {

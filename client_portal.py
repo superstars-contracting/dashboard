@@ -42,10 +42,11 @@ import visibility
 import dropplan_rollups as _rollups
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+import ssc_paths  # #287
 PORTAL_PAGE = SCRIPT_DIR / "client_portal.html"
 WELCOME_PAGE = SCRIPT_DIR / "welcome.html"   # #267 — the client hard-stop
-_FP_BASE = SCRIPT_DIR / "data_room" / "field_photos"
-_DOC_BASE = SCRIPT_DIR / "data_room" / "project_docs"
+_FP_BASE = ssc_paths.under_root("data_room", "field_photos")   # #287
+_DOC_BASE = ssc_paths.under_root("data_room", "project_docs")   # #287
 
 # ============= CLIENT DEFAULT-DENY GATE — #267 contain / #269 grant-aware =============
 # The ONLY paths a client may ALWAYS reach: the forced-reset page, the auth API, the two
@@ -416,7 +417,7 @@ def _portal_serve(photo_id, col):
         conn.close()
     if not r or not r["p"]:
         return jsonify({"error": "not found"}), 404
-    p = Path(r["p"])
+    p = ssc_paths.resolve_data_path(r["p"])   # #287
     try:
         if not p.resolve().is_relative_to(_FP_BASE.resolve()) or not p.exists():
             return jsonify({"error": "not found"}), 404
@@ -484,7 +485,7 @@ def _portal_document_file(doc_id):
         conn.close()
     if not r or not r["file_path"]:
         return jsonify({"error": "not found"}), 404
-    p = Path(r["file_path"])
+    p = ssc_paths.resolve_data_path(r["file_path"])   # #287
     try:
         if not p.resolve().is_relative_to(_DOC_BASE.resolve()) or not p.exists():
             return jsonify({"error": "not found"}), 404

@@ -32,11 +32,12 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-DB_PATH = SCRIPT_DIR / "superstars.db"
-PHOTOS_DIR = SCRIPT_DIR / "employee_photos"
-EXPORTS_DIR = SCRIPT_DIR / "cof_exports"
-SIGNATURES_DIR = SCRIPT_DIR / "issuer_signatures"
-CREDENTIALS_DIR = SCRIPT_DIR / "data_room" / "credentials" / "cof"
+import ssc_paths  # #287
+DB_PATH = ssc_paths.sqlite_db_path()   # #287
+PHOTOS_DIR = ssc_paths.under_root("employee_photos")   # #287
+EXPORTS_DIR = ssc_paths.under_root("cof_exports")   # #287
+SIGNATURES_DIR = ssc_paths.under_root("issuer_signatures")   # #287
+CREDENTIALS_DIR = ssc_paths.under_root("data_room", "credentials", "cof")   # #287
 
 # Renewal warning threshold
 RENEWAL_WARN_DAYS = 30

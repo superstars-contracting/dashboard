@@ -74,13 +74,14 @@ import pypdfium2 as pp
 from PIL import Image
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+import ssc_paths  # #287
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import sqlite3  # noqa: E402
 
-DB = SCRIPT_DIR / "superstars.db"
-WORKER_RECORDS_DIR = SCRIPT_DIR / "worker_records"
-BATCH_DIR = SCRIPT_DIR / "data_room" / "credentials" / "batch_print"
+DB = ssc_paths.sqlite_db_path()   # #287
+WORKER_RECORDS_DIR = ssc_paths.under_root("worker_records")   # #287
+BATCH_DIR = ssc_paths.under_root("data_room", "credentials", "batch_print")   # #287
 EDGE_PATHS = [
     Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
     Path(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
@@ -178,7 +179,7 @@ def _photo_mtime(face_image_path):
         return None
     fp = Path(face_image_path)
     if not fp.is_absolute():
-        fp = SCRIPT_DIR / fp
+        fp = ssc_paths.resolve_data_path(fp)   # #287
     if not fp.exists():
         return None
     return fp.stat().st_mtime
@@ -398,7 +399,7 @@ def fetch_card_context(emp_id):
     if face_path:
         fp = Path(face_path)
         if not fp.is_absolute():
-            fp = SCRIPT_DIR / fp
+            fp = ssc_paths.resolve_data_path(fp)   # #287
         if fp.exists() and fp.stat().st_size > 0:
             mime = {
                 ".jpg": "image/jpeg", ".jpeg": "image/jpeg",

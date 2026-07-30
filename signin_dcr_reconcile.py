@@ -69,7 +69,8 @@ from pathlib import Path
 from typing import Iterable, List, Optional
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-DCR_ARTIFACT_ROOT = SCRIPT_DIR / "data_room" / "reports" / "dcr"
+import ssc_paths  # #287
+DCR_ARTIFACT_ROOT = ssc_paths.under_root("data_room", "reports", "dcr")   # #287
 
 # Default times to use when reconciling an `in_dcr_not_log` divergence.
 # Matches the 07:00–15:30 = 8.5h with 30-min lunch = 8h pattern that

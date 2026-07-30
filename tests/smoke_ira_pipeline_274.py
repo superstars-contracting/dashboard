@@ -42,6 +42,8 @@ import requests
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR.parent))
 
+import ssc_paths  # noqa: E402  # #287 — fixture paths honor SSC_DATA_ROOT
+
 import db_layer            # noqa: E402
 from auth import hash_password  # noqa: E402
 from apply_ira_274 import ensure_ira_schema  # noqa: E402
@@ -59,7 +61,7 @@ ROLE_OF = {"csuite": "c_suite", "pm": "pm", "super": "super", "client": "client"
 ORG_NAME = "SMK274 Client Org"
 SERIES = ("IRA", "QN")                    # synthetic series for this smoke
 REPORT_DATE = "2026-06-11"                # verbatim-persistence probes
-_DOC_DIR = SCRIPT_DIR.parent / "data_room" / "estimate_docs"
+_DOC_DIR = ssc_paths.under_root("data_room", "estimate_docs")   # #287
 _PDF = b"%PDF-1.4\n1 0 obj<</T(smk274)>>endobj\ntrailer<<>>\n%%EOF\n"
 
 PASS, FAIL = [], []

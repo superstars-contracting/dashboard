@@ -12,9 +12,10 @@ import sys
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+import ssc_paths  # #287
 DB_PATH = SCRIPT_DIR / "superstars.db"
 SQL_PATH = SCRIPT_DIR / "schema_signage_templates.sql"
-SIGNS_DIR = SCRIPT_DIR / "data_room" / "signage"          # served via /files/
+SIGNS_DIR = ssc_paths.under_root("data_room", "signage")   # #287          # served via /files/
 SOURCES_DIR = SCRIPT_DIR / "signage_templates_source"     # tracked HTML
 
 # (code, title, filename, source_html, category, orientation, description)

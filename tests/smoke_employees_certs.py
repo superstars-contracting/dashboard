@@ -27,6 +27,7 @@ import requests
 
 import _smoke_auth  # noqa: E402
 import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
+import ssc_paths  # noqa: E402  # #287
 _smoke_auth.setup()
 
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
@@ -61,7 +62,7 @@ def seed():
     conn = db()
     conn.execute("INSERT OR IGNORE INTO projects (project_code,name,status) VALUES (?,?,?)",
                  (PROJ, "SMK EC Smoke", "active"))
-    d = SCRIPT_DIR / "worker_records" / "E-99601_SMK-EC"
+    d = ssc_paths.under_root("worker_records") / "E-99601_SMK-EC"
     d.mkdir(parents=True, exist_ok=True)
     fp = d / "face.jpg"
     try:
@@ -136,7 +137,7 @@ def cleanup():
     res_a = conn.execute("SELECT COUNT(*) FROM project_assignments WHERE project_code=?", (PROJ,)).fetchone()[0]
     res_c = conn.execute("SELECT COUNT(*) FROM certifications WHERE employee_id LIKE 'E-996%'").fetchone()[0]
     conn.close()
-    pd = SCRIPT_DIR / "worker_records" / "E-99601_SMK-EC"
+    pd = ssc_paths.under_root("worker_records") / "E-99601_SMK-EC"
     if pd.exists():
         shutil.rmtree(pd, ignore_errors=True)
     return res_e, res_a, res_c

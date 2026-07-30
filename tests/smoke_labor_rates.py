@@ -34,6 +34,8 @@ BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
 SCRIPT_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = SCRIPT_DIR / "superstars.db"
 sys.path.insert(0, str(SCRIPT_DIR))
+
+import ssc_paths  # noqa: E402  # #287 — fixture paths honor SSC_DATA_ROOT
 from auth import hash_password  # noqa: E402
 import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
 
@@ -85,7 +87,7 @@ def mk_emp(wid, eid, name, trade, photo=False):
     SYNTHETIC worker_records dir (no real name). Returns nothing PII."""
     fip = None
     if photo:
-        d = SCRIPT_DIR / "worker_records" / f"{eid}_SMK-TEST"
+        d = ssc_paths.under_root("worker_records") / f"{eid}_SMK-TEST"   # #287
         d.mkdir(parents=True, exist_ok=True)
         fp = d / "face.jpg"
         try:
@@ -341,7 +343,7 @@ def _cleanup():
     conn.close()
     # synthetic worker_records dirs (E-99..._SMK-TEST) — never touch real worker folders
     dirs = 0
-    for d in (SCRIPT_DIR / "worker_records").glob("E-99*_SMK-TEST"):
+    for d in ssc_paths.under_root("worker_records").glob("E-99*_SMK-TEST"):   # #287
         shutil.rmtree(d, ignore_errors=True); dirs += 1
     print(f"    purged {chg} change rows + synthetic emps; removed {dirs} test photo dir(s); residue state={res_state} change={res_chg} emp={res_emp} wr={res_wr9}")
     ok("cleanup_zero_residue", res_state == 0 and res_chg == 0 and res_emp == 0 and res_wr9 == 0)

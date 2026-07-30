@@ -48,6 +48,7 @@ TEST_PASSWORD = "SmokeExp!" + uuid.uuid4().hex[:16]
 sys.path.insert(0, str(SCRIPT_DIR))
 from auth import hash_password  # noqa: E402
 import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
+import ssc_paths  # noqa: E402  # #287
 
 results: list[tuple[str, bool, str]] = []
 
@@ -100,11 +101,11 @@ def probe_serves(sess, label: str, path: str, min_bytes: int = 1):
 # ---------- fixture discovery (runtime, so the smoke works before AND after the move) ----------
 
 def newest_db_backup_rel() -> str:
-    d = SCRIPT_DIR / "data_room" / "db_backups"
+    d = ssc_paths.under_root("data_room", "db_backups")
     if d.exists():
         cands = sorted(d.glob("*.db"))
         if cands:
-            return cands[-1].relative_to(SCRIPT_DIR).as_posix()
+            return cands[-1].relative_to(ssc_paths.data_root()).as_posix()
     # Post-move state: dir empty/gone — probe the pattern path; non-200 by construction.
     return "data_room/db_backups/superstars-daily-2099-01-01.db"
 
@@ -114,11 +115,11 @@ def newest_artifact_rel() -> str | None:
     for sub, pat in (("reports", "**/*.html"), ("forms", "*.pdf"),
                      ("toolbox_talks", "*.pdf"), ("signage", "*.pdf"),
                      ("credentials", "**/*.html")):
-        d = SCRIPT_DIR / "data_room" / sub
+        d = ssc_paths.under_root("data_room", sub)
         if d.exists():
             cands = sorted(p for p in d.glob(pat) if p.is_file())
             if cands:
-                return cands[-1].relative_to(SCRIPT_DIR).as_posix()
+                return cands[-1].relative_to(ssc_paths.data_root()).as_posix()
     return None
 
 
@@ -137,6 +138,7 @@ def a_real_font_rel() -> str | None:
         for ext in ("*.woff2", "*.woff", "*.ttf"):
             cands = sorted(d.rglob(ext))
             if cands:
+                # STATIC asset — repo-relative by design (#287: only DATA moves)
                 return cands[-1].relative_to(SCRIPT_DIR).as_posix()
     return None
 

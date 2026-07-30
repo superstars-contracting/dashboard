@@ -20,6 +20,7 @@ import requests
 
 import _smoke_auth  # noqa: E402
 import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
+import ssc_paths  # noqa: E402  # #287
 _smoke_auth.setup()
 
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
@@ -175,7 +176,7 @@ def _cleanup(base_req):
     res = conn.execute("SELECT COUNT(*) FROM project_documents WHERE project_code=?", (PROJ,)).fetchone()[0]
     req_now = conn.execute("SELECT COUNT(*) FROM document_requirements").fetchone()[0]
     conn.close()
-    pdir = SCRIPT_DIR / "data_room" / "project_docs" / PROJ
+    pdir = ssc_paths.under_root("data_room", "project_docs") / PROJ
     file_residue = len(list(pdir.glob("*"))) if pdir.exists() else 0
     if pdir.exists():
         shutil.rmtree(pdir, ignore_errors=True)

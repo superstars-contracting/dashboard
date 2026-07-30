@@ -477,7 +477,12 @@ def _sec_daily():
 # ============= #286: the client-audience rendered DCR, by sequence =============
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_DCR_RENDER_BASE = _SCRIPT_DIR / "data_room" / "reports" / "dcr"
+import ssc_paths  # #287
+_DCR_RENDER_BASE = None   # #287 — replaced by _dcr_render_base(), per call
+
+
+def _dcr_render_base():
+    return ssc_paths.under_root("data_room", "reports", "dcr")
 
 
 @require_portal_section("daily")
@@ -497,9 +502,9 @@ def _sec_daily_view(seq):
         conn.close()
     if not row:
         return jsonify({"error": "not found"}), 404
-    f = _DCR_RENDER_BASE / code / f"{seq:03d}" / "client.html"
+    f = _dcr_render_base() / code / f"{seq:03d}" / "client.html"
     try:
-        if not f.resolve().is_relative_to(_DCR_RENDER_BASE.resolve()) or not f.exists():
+        if not f.resolve().is_relative_to(_dcr_render_base().resolve()) or not f.exists():
             return jsonify({"error": "not found"}), 404
     except (OSError, ValueError):
         return jsonify({"error": "not found"}), 404

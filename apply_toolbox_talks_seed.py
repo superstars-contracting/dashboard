@@ -13,9 +13,10 @@ import sys
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+import ssc_paths  # #287
 DB_PATH = SCRIPT_DIR / "superstars.db"
 SQL_PATH = SCRIPT_DIR / "schema_toolbox_talks.sql"
-TALKS_DIR = SCRIPT_DIR / "data_room" / "toolbox_talks"     # /files/ serves these
+TALKS_DIR = ssc_paths.under_root("data_room", "toolbox_talks")   # #287     # /files/ serves these
 SOURCES_DIR = SCRIPT_DIR / "toolbox_talks_source"          # tracked HTML
 
 from toolbox_talks_data import TALKS  # noqa: E402

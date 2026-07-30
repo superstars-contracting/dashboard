@@ -47,7 +47,8 @@ import requests
 
 # Auth gate (#48): login the smoke admin + patch requests so cookies ride along.
 import _smoke_auth  # noqa: E402
-import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
+import ssc_paths  # noqa: E402  # #287
 _smoke_auth.setup()
 
 BASE = os.environ.get("SMOKE_BASE", "http://127.0.0.1:5050")
@@ -150,7 +151,7 @@ def lifecycle(worker):
            f"top={rows[0]['report_date'] if rows else '-'}")
 
     # View target rendered to disk (both audiences).
-    seq_dir = SCRIPT_DIR / "data_room" / "reports" / "dcr" / PROJECT / f"{seq:03d}"
+    seq_dir = ssc_paths.under_root("data_room", "reports", "dcr", PROJECT, f"{seq:03d}")   # #287
     ok("lifecycle_internal_html_written", (seq_dir / "internal.html").exists())
     ok("lifecycle_client_html_written", (seq_dir / "client.html").exists())
 

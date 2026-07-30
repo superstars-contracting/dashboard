@@ -42,6 +42,8 @@ import requests
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR.parent))
 
+import ssc_paths  # noqa: E402  # #287 — fixture paths honor SSC_DATA_ROOT
+
 import db_layer            # noqa: E402
 from auth import hash_password  # noqa: E402
 from apply_estimates_273 import ensure_estimates_schema  # noqa: E402
@@ -61,7 +63,7 @@ ORG_NAME = "SMK273 Client Org"
 SERIES = (("IRA", "SI"), ("FR", "SI"), ("IR", "SI"))   # synthetic series, live has none
 SUB_DATE = "2026-03-05"    # user-picked LOCAL dates (verbatim persistence)
 DEC_DATE = "2026-03-20"
-_DOC_DIR = SCRIPT_DIR.parent / "data_room" / "estimate_docs"
+_DOC_DIR = ssc_paths.under_root("data_room", "estimate_docs")   # #287
 
 PASS, FAIL = [], []
 SEEN_PAYLOADS = []

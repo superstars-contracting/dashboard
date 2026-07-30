@@ -45,7 +45,8 @@ DB = DASHBOARD_DIR / "superstars.db"
 LOG = DASHBOARD_DIR / "tests" / "_smoke_dcr_volume_server.log"
 VENV_PY = DASHBOARD_DIR / "venv" / "Scripts" / "python.exe"
 sys.path.insert(0, str(DASHBOARD_DIR))
-import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
+import db_layer  # noqa: E402  # #260 — route DB access through the env-driven layer (SSC_DB_URL)
+import ssc_paths  # noqa: E402  # #287
 PROJECT = "FR-BX-001"
 N_DCRS = 200
 N_DELETE_REISSUE = 30
@@ -126,7 +127,7 @@ def wipe_fr_bx_001():
         c.execute("DELETE FROM work_log WHERE project_code=?", (PROJECT,))
         c.execute("DELETE FROM deliveries WHERE project_code=?", (PROJECT,))
         c.commit()
-    out_root = DASHBOARD_DIR / "data_room" / "reports" / "dcr" / PROJECT
+    out_root = ssc_paths.under_root("data_room", "reports", "dcr", PROJECT)   # #287
     if out_root.exists():
         for child in list(out_root.iterdir()):
             if child.is_dir():
@@ -223,7 +224,7 @@ def main():
                 FAIL.append(f"i={i}: display_id={dat.get('display_id')!r} expected {expected_display!r}")
             if dat.get("sequence") != i:
                 FAIL.append(f"i={i}: sequence={dat.get('sequence')!r} expected {i}")
-            seq_dir = DASHBOARD_DIR / "data_room" / "reports" / "dcr" / PROJECT / f"{i:03d}"
+            seq_dir = ssc_paths.under_root("data_room", "reports", "dcr", PROJECT, f"{i:03d}")   # #287
             internal = seq_dir / "internal.html"
             client = seq_dir / "client.html"
             if not internal.exists() or internal.stat().st_size < 100:
@@ -321,7 +322,7 @@ def main():
             n_work = c.execute("SELECT COUNT(*) FROM work_log WHERE project_code=?", (PROJECT,)).fetchone()[0]
             n_del = c.execute("SELECT COUNT(*) FROM deliveries WHERE project_code=?", (PROJECT,)).fetchone()[0]
         print(f"  post-cleanup: report_index={n_rep}, work_log={n_work}, deliveries={n_del}")
-        out_root = DASHBOARD_DIR / "data_room" / "reports" / "dcr" / PROJECT
+        out_root = ssc_paths.under_root("data_room", "reports", "dcr", PROJECT)   # #287
         leftover_dirs = []
         if out_root.exists():
             leftover_dirs = [d.name for d in out_root.iterdir() if d.is_dir()]
