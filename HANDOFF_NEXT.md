@@ -525,11 +525,11 @@ restore from CSV).
 
 ---
 
-*Last updated: end of the 2026-07-29 #287 session (Cloud M1 storage
-abstraction; #284 flip → #285 component parity → #286 page-anatomy parity
-landed on the preceding two evenings). Live: two clients + one architect;
-clients land on the NEW SHELL `/portal/<code>`; production at 222b6da with
-SSC_DATA_ROOT unset; gate is 33 suites, green in all four backend×root
-configs; origin/main is current (72f6833..222b6da pushed). Flip rollback =
-revert 2c4fb4a + #244 restart. Next per the blueprint: M2 (#288) PDF on
-Linux.*
+*Last updated: end of the 2026-07-30 #288 session (Cloud M2 PDF engine —
+edge default / chromium for Linux; M1 storage abstraction the evening
+before). Live: two clients + one architect; clients land on the NEW SHELL
+`/portal/<code>`; production at 8caa516 with SSC_DATA_ROOT and
+SSC_PDF_ENGINE both unset (workstation defaults); gate is 34 suites, green
+on both backends; origin/main is current. Flip rollback = revert 2c4fb4a +
+#244 restart. Next per the blueprint: M3 (#289) public-door hardening,
+then M4 cloud bring-up.*
