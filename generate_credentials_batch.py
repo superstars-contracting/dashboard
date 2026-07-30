@@ -77,15 +77,15 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 import ssc_paths  # #287
 sys.path.insert(0, str(SCRIPT_DIR))
 
-import sqlite3  # noqa: E402
+# #290 (Cloud M4) — DB access goes through db_layer (SSC_DB_URL: SQLite default
+# or Postgres), matching the rest of the app. The old direct sqlite3.connect
+# both broke the bundle on a Postgres host AND read the LIVE file under the
+# isolated gate. (The dead EDGE_PATHS list is gone too — browser discovery has
+# been pdf_export's job since #288.)
+import db_layer  # noqa: E402
 
-DB = ssc_paths.sqlite_db_path()   # #287
 WORKER_RECORDS_DIR = ssc_paths.under_root("worker_records")   # #287
 BATCH_DIR = ssc_paths.under_root("data_room", "credentials", "batch_print")   # #287
-EDGE_PATHS = [
-    Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
-    Path(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
-]
 
 # #246 — the bundle pool is the CANONICAL active roster (v_active_workers),
 # in numeric W-#### order, derived at gather time. The previous hardcoded
@@ -200,8 +200,7 @@ def gather_bundle_inputs():
     Pulls everything in ONE DB connection to avoid TOCTOU drift
     between fingerprint compute and cache miss regen.
     """
-    c = sqlite3.connect(str(DB))
-    c.row_factory = sqlite3.Row
+    c = db_layer.connect()
     try:
         emp_rows = c.execute(
             """SELECT employee_id, worker_id, name, trade, pin, phone,
@@ -324,8 +323,7 @@ def find_edge():
 def fetch_card_context(emp_id):
     """Return (cred_type, template_name, ctx) for the worker's active
     credential, or None if none exists."""
-    c = sqlite3.connect(str(DB))
-    c.row_factory = sqlite3.Row
+    c = db_layer.connect()
     try:
         emp = c.execute(
             "SELECT employee_id, name, trade, pin, face_image_path "
@@ -946,8 +944,7 @@ def main(base_url="http://127.0.0.1:5050", *, force_regenerate=False):
     try:
         # #246 — same canonical pool as gather_bundle_inputs: the active
         # roster in numeric order (no hardcoded id list to go stale).
-        c = sqlite3.connect(str(DB))
-        c.row_factory = sqlite3.Row
+        c = db_layer.connect()
         try:
             pool = c.execute(
                 "SELECT worker_id, employee_id FROM v_active_workers "

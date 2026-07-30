@@ -73,3 +73,9 @@ pypdf>=6.0
 # python-dotenv>=1.0       # load .env file (if we switch from os.environ direct)
 # pysqlcipher3>=1.2        # encrypted SQLite (Tier 1 security upgrade)
 psycopg[binary]>=3.1  # #259 � Postgres driver (dev/optional; SQLite remains default)
+
+# #290 - IANA tz database for zoneinfo on hosts without a system copy
+# (Windows). Load-bearing for ssc_tz's SSC_TZ validation and the tz gate
+# check; already a transitive dep of pandas, pinned here explicitly so a
+# lean install can never lose it.
+tzdata>=2024.1

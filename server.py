@@ -1,3 +1,9 @@
+# #290 (Cloud M4) — SSC_TZ enforcement MUST be the first app code that runs:
+# every import below may derive dates at module level, and all of them must
+# already see the enforced zone (UTC cloud host -> Eastern). No-op when unset.
+import ssc_tz
+ssc_tz.enforce()
+
 from flask import Flask, jsonify, request, send_from_directory, send_file, Response, redirect
 from flask_cors import CORS
 import sqlite3

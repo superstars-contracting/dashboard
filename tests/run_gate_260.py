@@ -66,6 +66,7 @@ GATE = [
     "smoke_data_root_287.py",     # #287 guard — SSC_DATA_ROOT containment (own rooted server; watchdog on the repo tree)
     "smoke_pdf_chromium_288.py",  # #288 guard — chromium PDF engine (synthetic DCR/form/CR80; planted bad-binary fails clean)
     "smoke_public_hardening_289.py",  # #289 guard — login backoff/no-enum, TOTP, force_sso, worker device binding, session flags
+    "smoke_tz_290.py",            # #290 guard — SSC_TZ enforcement: Eastern today on a UTC host; planted 23:30 boundary; Windows no-op
     "smoke_dropplan_api.py",
     "smoke_worker_lifecycle.py",
     "smoke_dcr214_lifecycle.py",

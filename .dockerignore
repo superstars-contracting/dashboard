@@ -1,0 +1,66 @@
+# =====================================================================
+# .dockerignore — keeps DATA and PII out of any Docker build context.
+#
+# Render builds from the git clone, which is already clean (gitignore).
+# This file is the belt-and-suspenders for a LOCAL `docker build .` on
+# the workstation, where the context would otherwise include the live
+# DB, worker records, and every media tree — none of which may ever be
+# baked into an image (CLAUDE.md PII rule).
+# =====================================================================
+
+# --- live data / PII (mirror of the data-bearing .gitignore entries) ---
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+superstars.db*
+data_room/
+worker_records/
+employee_photos/
+issuer_signatures/
+cof_exports/
+uploads/
+worker_intake_inbox/
+worker_files/
+field_photos/
+intake/
+meetings/
+drop_plans/
+site_closures/
+toolbox_talks/
+meeting_workflow_run/
+rfi_workflow_run/
+
+# --- secrets ---
+.env
+.env.*
+*.key
+*.pem
+secrets/
+credentials.json
+service-account*.json
+api-keys.txt
+api_keys.txt
+api-keys.*.txt
+.dev_db_url
+
+# --- workstation tooling / heavy noise (never useful in the image) ---
+venv/
+.venv/
+.pgdev/
+node_modules/
+__pycache__/
+*.py[cod]
+.git/
+.claude/
+.vscode/
+.idea/
+*.log
+tmp/
+temp/
+*.bak
+*.backup
+snapshots/
+Dockerfile
+.dockerignore
+render.yaml

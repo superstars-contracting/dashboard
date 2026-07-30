@@ -41,6 +41,44 @@ gate runs green in all four backend×root configs. NOT yet cloud: M2 = PDF on
 Linux, M3 = public-door hardening, M4 = bring-up (see the operator's
 CLOUD_MIGRATION_BLUEPRINT.md).
 
+### Cloud M4 (#290) — bring-up artifacts (blueprint + tz + battery)
+
+The repo now carries the full Render bring-up kit — see
+**CLOUD_M4_RUNBOOK_290.md** for the operator flow, rehearsal procedure and the
+M5 final-sync runbook. Pieces:
+
+- **render.yaml + Dockerfile + .dockerignore** — one web service
+  (`ssc-dashboard`, docker runtime, starter, region virginia — MUST match
+  ssc-dashboard-db), disk `/var/data` (5 GB), health `/api/health`, env
+  topology values literal + every secret `sync: false` (names only; values
+  1Password → Render). Image: python:3.12-slim + chromium (+ fonts-inter/
+  liberation/dejavu, tzdata, rsync). Waitress binds 0.0.0.0:$PORT INSIDE the
+  container — a documented, deliberate exception to the loopback rule (no LAN
+  in a container; Render's proxy is the only ingress). The workstation deploy
+  keeps 127.0.0.1:5050.
+- **SSC_TZ enforcement (`ssc_tz.py`)** — `ssc_tz.enforce()` is the FIRST call
+  in server.py: SSC_TZ set + POSIX → export TZ + tzset() before any date use
+  (UTC host thinks in Eastern); unset → no-op; Windows → hard no-op that never
+  exports TZ (MSVC would misparse IANA names in children). Unresolvable zone
+  RAISES at boot (#288 fail-fast doctrine). db_layer opens PG sessions with
+  `TimeZone=<SSC_TZ>` (libpq options, connection-scoped). Guard:
+  `tests/smoke_tz_290.py` (gate #36) — planted 23:30-Eastern boundary instants
+  (EST + EDT) where UTC date ≠ Eastern date, POSIX UTC-host simulation with a
+  can-fail control, Windows no-op contract, boot-order source check, live
+  /api/today probe.
+- **Linux sweep** — generate_credentials_batch now goes through db_layer
+  (was 3× raw sqlite3.connect: broke the bundle on PG AND read LIVE under the
+  gate) and its dead EDGE_PATHS list is gone. Known-fine Windows-isms left in
+  place: pdf_export's exists()-guarded Edge/Chrome fallback paths, workstation
+  tooling (.ps1, tests' taskkill), 22 CRLF shebangs (nothing execs them
+  directly), apply_refresh_cofs_171's hardcoded dir (one-time, historical).
+- **Remote verification** — `tests/acceptance_battery_290.py` (PRE = health/
+  login/auth-gate/static/worker-app/timezone; FULL adds synthetic is_system
+  login, chromium PDF w/ page count, portal containment probes, photo-serves,
+  DCR client render; refuses full phase on a non-Postgres SSC_DB_URL) and
+  `tests/verify_media_remote_290.py` (per-tree counts/bytes + sampled sha256
+  over Render SSH, PII-safe output).
+
 ### Cloud M3 (#289) — public-door hardening (DEPLOYED behavior)
 
 The login endpoint, staff auth, and worker PIN flow are hardened for the M5
@@ -573,11 +611,14 @@ restore from CSV).
 
 ---
 
-*Last updated: end of the 2026-07-30 #288 session (Cloud M2 PDF engine —
-edge default / chromium for Linux; M1 storage abstraction the evening
-before). Live: two clients + one architect; clients land on the NEW SHELL
-`/portal/<code>`; production at 8caa516 with SSC_DATA_ROOT and
-SSC_PDF_ENGINE both unset (workstation defaults); gate is 34 suites, green
-on both backends; origin/main is current. Flip rollback = revert 2c4fb4a +
-#244 restart. Next per the blueprint: M3 (#289) public-door hardening,
-then M4 cloud bring-up.*
+*Last updated: 2026-07-30 #290 session (Cloud M4 bring-up kit: render.yaml/
+Dockerfile, SSC_TZ enforcement + tz gate suite, Linux sweep, acceptance
+battery + media verifier, CLOUD_M4_RUNBOOK_290.md). Live: two clients + one
+architect; clients land on the NEW SHELL `/portal/<code>`; workstation
+production runs with SSC_TZ/SSC_DATA_ROOT/SSC_PDF_ENGINE all unset (defaults
+— zero behavior change from #290's code). Gate is 36 suites, green on both
+backends. Flip rollback = revert 2c4fb4a + #244 restart. Next: the M4
+operator moments (Render service creation → acceptance battery → data
+rehearsal, per CLOUD_M4_RUNBOOK_290.md), then M4.5 Cloudflare flip-week
+steps and M5 cutover. The #289 operator 2FA/device to-do remains the hard
+pre-M5 gate.*

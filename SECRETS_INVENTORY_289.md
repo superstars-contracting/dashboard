@@ -36,4 +36,15 @@ they become the Render **environment group**, values sourced from the 1Password
   `users.totp_recovery` (bcrypt-hashed), `worker_device.token_hash` /
   `provision_code_hash` (bcrypt). None ever logged or emitted post-enrollment.
 
-*Generated #289 (Cloud M3). Update as M4 wiring lands.*
+## M4 wiring (#290)
+
+`render.yaml` declares every var above by NAME — fixed topology values
+(`SSC_TZ=America/New_York`, `SSC_DATA_ROOT=/var/data`, `SSC_PDF_ENGINE=chromium`,
+`SSC_CHROMIUM_PATH=/usr/bin/chromium`, `SSC_TRUSTED_PROXY=1`,
+`GOOGLE_OAUTH_ALLOWED_DOMAIN`) as literals, all secrets as `sync: false`
+(values pasted 1Password → Render during the blueprint-creation flow; see
+CLOUD_M4_RUNBOOK_290.md §1). `SSC_TZ` is new in #290 (app-boot Eastern
+enforcement via ssc_tz.py — set on any host whose OS clock is not Eastern).
+`PORT` is supplied by Render. Test-only seams stay unset in production.
+
+*Generated #289 (Cloud M3); M4 wiring updated #290.*

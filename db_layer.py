@@ -222,7 +222,18 @@ class _PgConn:
 
     def __init__(self, url):
         import psycopg
-        self._conn = psycopg.connect(url, autocommit=False, row_factory=_hybrid_row_factory)
+        # #290 (Cloud M4) — when SSC_TZ is set, open the session with that
+        # TimeZone (libpq startup option — connection-scoped, unlike a SET
+        # inside a transaction, which a rollback would undo). Keeps the few
+        # SQL-side CURRENT_TIMESTAMP audit stamps in the same zone the app
+        # writes on a UTC cloud PG, matching the workstation's dev PG (which
+        # inherits Eastern from the OS). Read per call, like ssc_paths.
+        kwargs = {}
+        tz = (os.environ.get("SSC_TZ") or "").strip()
+        if tz:
+            kwargs["options"] = f"-c TimeZone={tz}"
+        self._conn = psycopg.connect(url, autocommit=False, row_factory=_hybrid_row_factory,
+                                     **kwargs)
         self.row_factory = None       # assignment accepted + ignored (always hybrid Row)
         self._pkmap = _pk_map(self._conn)
 

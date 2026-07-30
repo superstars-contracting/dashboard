@@ -1,0 +1,79 @@
+# =====================================================================
+# render.yaml — Render Blueprint for the SSC dashboard (#290, Cloud M4)
+#
+# Applied via: Render Dashboard -> New -> Blueprint -> (this repo).
+# One web service. The managed Postgres (ssc-dashboard-db) ALREADY EXISTS
+# in the workspace (created by the operator per the migration blueprint's
+# setup tasks) and is deliberately NOT declared here — declaring a
+# database in a blueprint would try to create a new one. The app reaches
+# it via SSC_DB_URL (sync: false below; operator pastes the DB's
+# INTERNAL connection string during the blueprint-creation flow).
+#
+# REGION MUST MATCH ssc-dashboard-db (internal DB URLs only resolve
+# within the same region). This file says `virginia` (US East). Before
+# applying: open the ssc-dashboard-db page in the Render dashboard and
+# confirm its region reads "Virginia (US East)". If it says Ohio (or
+# anything else), edit `region:` below to match BEFORE applying.
+#
+# Secrets discipline (CLAUDE.md secrets rule + SECRETS_INVENTORY_289.md):
+# every operator-supplied value is `sync: false` — names in the repo,
+# values ONLY in Render's dashboard, sourced from the 1Password
+# "Dashboard Secrets" vault. Never commit a value here.
+# The test-only seams (GOOGLE_OAUTH_FAKE_VERIFY, DOC_SCAN_FAKE,
+# DOC_SCAN_MODEL, EXPENSE_SCAN_FAKE, EXPENSE_SCAN_MODEL) must NEVER be
+# set on this service.
+# =====================================================================
+
+services:
+  - type: web
+    name: ssc-dashboard
+    runtime: docker
+    repo: https://github.com/superstars-contracting/dashboard # verified against origin
+    region: virginia            # US East — MUST match ssc-dashboard-db (see header)
+    plan: starter               # per M4 spec; bump to standard if chromium renders OOM on 512MB
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit   # every push to main deploys (parallel-use phase; workstation stays primary until the M5 DNS flip)
+
+    # Persistent media disk — SSC_DATA_ROOT (#287) points here. ~300MB of
+    # media today; 5GB leaves growth headroom (disks can grow, never
+    # shrink). NOTE: attaching a disk turns off zero-downtime deploys —
+    # deploys briefly restart the service; acceptable for this app.
+    disk:
+      name: ssc-data
+      mountPath: /var/data
+      sizeGB: 5
+
+    envVars:
+      # ---- fixed by this blueprint (non-secret, topology-inherent) ----
+      - key: SSC_TZ
+        value: America/New_York   # #290 — app-level Eastern enforcement on the UTC host
+      - key: SSC_DATA_ROOT
+        value: /var/data          # #287 — every data path resolves under the disk
+      - key: SSC_PDF_ENGINE
+        value: chromium           # #288 — Linux PDF engine
+      - key: SSC_CHROMIUM_PATH
+        value: /usr/bin/chromium  # Debian chromium package path (see Dockerfile)
+      - key: SSC_TRUSTED_PROXY
+        value: "1"                # #289 — peel 1 XFF hop (Render's proxy). M5: set to "2" once Cloudflare proxying is ON in front of Render.
+      - key: GOOGLE_OAUTH_ALLOWED_DOMAIN
+        value: superstarscontracting.com
+
+      # ---- operator-supplied during the blueprint-creation flow -------
+      # (values from 1Password "Dashboard Secrets"; names per
+      #  SECRETS_INVENTORY_289.md)
+      - key: SSC_DB_URL
+        sync: false               # ssc-dashboard-db INTERNAL connection string (postgresql://...internal hostname)
+      - key: ANTHROPIC_API_KEY
+        sync: false               # optional — absent -> AI extraction returns clean 503
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: GOOGLE_OAUTH_REDIRECT_URI
+        sync: false               # M4: https://<service>.onrender.com/auth/google/callback ; M5: https://app.superstarscontracting.com/auth/google/callback
+      - key: APP_BASE_URL
+        sync: false               # M4: https://<service>.onrender.com ; M5: https://app.superstarscontracting.com
