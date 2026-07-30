@@ -1226,6 +1226,36 @@ function checkCertStatus() {
 // Track removal as a post-Monday cleanup once the field flow is proven.
 let TESTING_BYPASS = localStorage.getItem('testing_bypass') === '1';
 
+// #289 — one-time DEVICE PROVISIONING. The operator opens
+// /worker-app?provision=<code> on the worker's phone (from the console list or a
+// QR), the phone asks for the worker's ID, redeems the code for a device token,
+// and stores it. Offline-tolerant everywhere except the single redeem POST; PIN
+// UX is unchanged afterward. Under a minute in the field.
+(async function maybeProvision() {
+  const params = new URLSearchParams(location.search);
+  const code = (params.get('provision') || '').trim();
+  if (!code) return;
+  const emp = (prompt('Set up this phone — enter the Worker ID (E-#####) shown in the office console:') || '').trim();
+  if (!emp) return;
+  try {
+    const r = await fetch('/api/worker/device/redeem', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ employee_id: emp, provision_code: code })
+    });
+    const j = await r.json();
+    if (r.ok && j.data && j.data.device_token) {
+      localStorage.setItem('ssc_device_token', j.data.device_token);
+      alert('✓ This phone is now set up for sign-in.');
+      // drop the code from the URL so a refresh doesn't re-redeem
+      history.replaceState(null, '', location.pathname);
+    } else {
+      alert('✗ ' + ((j && j.error) || 'Could not set up this phone — check the code with the office.'));
+    }
+  } catch (e) {
+    alert('✗ Network problem — try again on a connection.');
+  }
+})();
+
 function updateSignInButton() {
   const btn = document.getElementById('signin-btn');
   const gpsOk = geofenceData.onSite || TESTING_BYPASS;
@@ -1245,7 +1275,11 @@ async function signIn() {
     const loginPayload = {
       phone_or_pin: pinCode,
       latitude: geofenceData.latitude || 0,
-      longitude: geofenceData.longitude || 0
+      longitude: geofenceData.longitude || 0,
+      // #289 — the device token from a prior provisioning (localStorage). Absent
+      // on an un-provisioned phone; the server only REQUIRES it once the operator
+      // flips enforcement on, so PIN entry UX is unchanged until then.
+      device_token: localStorage.getItem('ssc_device_token') || ''
     };
     // Only attach when bypass is on so the server doesn't see an idle flag.
     if (TESTING_BYPASS) loginPayload.bypass_geofence = true;

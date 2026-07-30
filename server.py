@@ -7,6 +7,7 @@ import logging
 import json
 import os
 import re
+import time
 import uuid
 
 # #259 — env-driven DB layer (SSC_DB_URL): SQLite default (unchanged) or Postgres.
@@ -67,6 +68,22 @@ auth_admin.register(app)
 
 import auth_google  # noqa: E402  # #261 — Google OIDC SSO (feature-flagged; 404 when unconfigured)
 auth_google.register(app)
+
+# #289 (Cloud M3) — public-door hardening: staff TOTP + force_sso + the missing-2FA
+# banner, and worker-app device provisioning/revocation. MUST follow apply_auth_gate.
+# The schema is ensured at boot (idempotent) so a fresh deploy needs no manual step.
+import apply_public_hardening_289 as _hardening_schema
+try:
+    _hc = db_layer.connect(pragma_fk=True)
+    try:
+        _hardening_schema.ensure_hardening_schema(_hc)
+        _hc.commit()
+    finally:
+        _hc.close()
+except Exception as _e:
+    logging.warning(f"#289 hardening schema ensure skipped: {_e}")
+import auth_hardening
+auth_hardening.register(app)
 
 # #263 — PM project-scoping: registers the project-ASSIGNMENT before_request hook
 # (rejects any /projects/<code> the user can't access) + the admin/c_suite-only
@@ -3700,11 +3717,25 @@ def worker_login():
     try:
         data = request.get_json(silent=True) or {}
         pin = (data.get('phone_or_pin') or '').strip()
+        device_token = (data.get('device_token') or '').strip()
         latitude = float(data.get('latitude', 0))
         longitude = float(data.get('longitude', 0))
 
         if len(pin) != 4 or not pin.isdigit():
             return jsonify({"error": "Invalid PIN"}), 401
+
+        # #289 — per-source PIN THROTTLE (always on, independent of device
+        # enforcement): a burst of wrong PINs from one origin gets stalled +
+        # eventually refused, so 4 digits can't be brute-forced from the open
+        # internet. Uses the login_audit 'pin_fail' rows the same window covers.
+        import auth as _auth
+        _pin_ip = _auth._client_ip()
+        _pin_fails = _auth._recent_ip_fails(_pin_ip)   # shares the login fail window
+        if _pin_fails >= _auth.LOGIN_IP_MAX_FAILS:
+            _auth._login_audit(None, "pin_lockout", _pin_ip)
+            time.sleep(_auth._login_backoff_delay(_pin_fails))
+            return jsonify({"error": "Too many attempts — wait a few minutes"}), 429
+        _pin_delay = _auth._login_backoff_delay(_pin_fails)
 
         conn = db()
         # #246 — resolve against the canonical roster so labor status gates
@@ -3720,6 +3751,9 @@ def worker_login():
 
         if len(rows) == 0:
             conn.close()
+            if _pin_delay:
+                time.sleep(_pin_delay)
+            _auth._login_audit(None, "pin_fail", _pin_ip)
             return jsonify({"error": "Invalid PIN"}), 401
         if all(r["labor_status"] == 'inactive' for r in rows):
             conn.close()
@@ -3733,6 +3767,22 @@ def worker_login():
             conn.close()
             return jsonify({"error": "Authentication failed"}), 500
         emp = dict(rows[0])
+
+        # #289 — DEVICE BINDING. When enforcement is on, a valid PIN is not enough:
+        # the phone must present a device_token issued by the operator's one-time
+        # provisioning (worker_device). Enforcement DEFAULTS OFF (app_settings) so a
+        # deploy never strands the field crew — the operator flips it on after the
+        # crew's phones are provisioned, a hard pre-M5 gate. Throttle above is
+        # unconditional; THIS gate is the flag.
+        import auth_hardening as _wd
+        if _wd.worker_enforcement_on(conn):
+            if not _wd.device_valid_for(conn, emp['employee_id'], device_token):
+                conn.close()
+                if _pin_delay:
+                    time.sleep(_pin_delay)
+                _auth._login_audit(None, "pin_fail", _pin_ip)
+                return jsonify({"error": "This device isn't set up yet — ask the office to add it",
+                                "device_required": True}), 403
 
         # TESTING AFFORDANCE — remove post-Monday cleanup. The bypass_geofence
         # flag is intentionally trusted from the client because we have no

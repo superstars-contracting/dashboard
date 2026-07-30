@@ -23,8 +23,10 @@ from __future__ import annotations
 
 import functools
 import logging
+import os
 import secrets
 import sqlite3
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterable, Optional
@@ -41,13 +43,27 @@ LOGIN_PAGE_PATH = SCRIPT_DIR / "login.html"
 
 COOKIE_NAME = "ssc_session"
 SESSION_TTL = timedelta(hours=12)  # sliding — refreshed on each authed request
+# #289 — absolute ceiling: a session is dead 7 days after CREATION no matter how
+# much it slid. Bounds a stolen cookie's usefulness even under continuous use.
+SESSION_ABSOLUTE_TTL = timedelta(days=7)
 
-# Multi-user phase 1 (#257). Security basics built now even on Tailscale so the
-# later public-exposure phase is ready (admin 2FA + public TLS/WAF are NEXT phase
-# — TODO, not built here). Nothing here exposes the app publicly.
 MIN_PASSWORD_LEN = 12
 LOGIN_MAX_FAILS = 5                          # per-account, within the window
 LOGIN_FAIL_WINDOW = timedelta(minutes=15)
+
+# #289 — public-door login hardening (Cloud M3). The app is going to the open
+# internet at M5; the login endpoint gets brute-force resistance NOW.
+#   * Per-account AND per-source(IP) fail counting in the window.
+#   * EXPONENTIAL BACKOFF: once fails cross the soft threshold, every response
+#     (right OR wrong password, existing OR not) is delayed by a growing amount,
+#     capped — so there is no timing oracle and no lockout oracle. During a hard
+#     lockout even a correct password is refused with the identical 401.
+#   * All of it audited (login_lockout), never revealing which of email/password
+#     was wrong.
+LOGIN_IP_MAX_FAILS = 20                       # per-source, within the window
+LOGIN_BACKOFF_AFTER = 3                       # start delaying after this many fails
+LOGIN_BACKOFF_BASE = 0.4                      # seconds; delay = base * 2**(fails-after)
+LOGIN_BACKOFF_CAP = 6.0                       # seconds, hard ceiling on the delay
 SET_PASSWORD_PAGE_PATH = SCRIPT_DIR / "set_password.html"
 # A must_reset_password user may reach ONLY these paths (plus the public /api/auth/*)
 # until they set a real password — NO data loads behind the forced-reset screen.
@@ -124,12 +140,32 @@ def _redact_sid(sid: Optional[str]) -> str:
 # ============= AUDIT + SECURITY HELPERS (#257) =============
 
 def _client_ip() -> Optional[str]:
-    """Best-effort client IP for the audit trail. Behind Tailscale serve the real
-    client rides in X-Forwarded-For; fall back to remote_addr. (IP is allowed in
-    the audit per CLAUDE.md — it is not name/path PII.)"""
-    xff = request.headers.get("X-Forwarded-For", "")
-    if xff:
-        return xff.split(",")[0].strip()[:64] or None
+    """The client IP for audit + rate limiting.
+
+    #289 — X-Forwarded-For is only trusted when SSC_TRUSTED_PROXY is set (the
+    funnel today; Cloudflare/Render at M4). A forwarded header is client-supplied
+    and trivially spoofable, so trusting it blind would let an attacker rotate a
+    fake XFF to dodge per-IP throttling AND poison the audit trail. When the env
+    is unset we use remote_addr — the real socket peer — full stop.
+
+    SSC_TRUSTED_PROXY may name how many right-most proxy hops to peel: '1' (or
+    'true'/'yes') takes the LAST XFF entry appended by our own proxy; an integer
+    N takes the Nth-from-the-right. The left-most entries are attacker-controlled
+    and never used."""
+    trusted = (os.environ.get("SSC_TRUSTED_PROXY") or "").strip().lower()
+    if trusted and trusted not in ("0", "false", "no"):
+        xff = request.headers.get("X-Forwarded-For", "")
+        if xff:
+            parts = [p.strip() for p in xff.split(",") if p.strip()]
+            if parts:
+                try:
+                    hops = int(trusted)
+                except ValueError:
+                    hops = 1
+                idx = max(1, hops)
+                # idx-th from the right (1 = last hop = the one our proxy added)
+                pick = parts[-idx] if idx <= len(parts) else parts[0]
+                return pick[:64] or None
     return (request.remote_addr or "")[:64] or None
 
 
@@ -169,6 +205,34 @@ def _recent_login_fails(user_id: int) -> int:
         conn.close()
 
 
+def _recent_ip_fails(ip: Optional[str]) -> int:
+    """login_fail count from this SOURCE IP within the window (#289 per-source
+    throttle — catches password spraying across many accounts from one origin)."""
+    if not ip:
+        return 0
+    since = (datetime.now() - LOGIN_FAIL_WINDOW).isoformat(timespec="seconds")
+    conn = _db()
+    try:
+        row = conn.execute(
+            "SELECT COUNT(1) FROM login_audit WHERE ip = ? AND event = 'login_fail' AND at >= ?",
+            (ip, since)).fetchone()
+        return row[0] if row else 0
+    except Exception:
+        return 0
+    finally:
+        conn.close()
+
+
+def _login_backoff_delay(fails: int) -> float:
+    """Seconds to stall a login response given the current fail count. Zero below
+    the soft threshold, then exponential, capped. Applied UNIFORMLY (right or wrong
+    password) once tripped, so response timing never distinguishes the two —
+    closing the timing oracle that a bare per-account counter would open."""
+    if fails < LOGIN_BACKOFF_AFTER:
+        return 0.0
+    return min(LOGIN_BACKOFF_CAP, LOGIN_BACKOFF_BASE * (2 ** (fails - LOGIN_BACKOFF_AFTER)))
+
+
 def password_strength_error(pw: str) -> Optional[str]:
     """Return an error string if the password is too weak, else None. Reasonable
     rule: >= MIN_PASSWORD_LEN chars with at least one letter and one digit."""
@@ -190,7 +254,8 @@ def get_user_by_email(email: str) -> Optional[dict]:
     try:
         row = conn.execute(
             "SELECT id, email, password_hash, role, full_name, display_name, employee_id_link, "
-            "       is_active, status, must_reset_password, created_at, last_login_at "
+            "       is_active, status, must_reset_password, created_at, last_login_at, "
+            "       totp_secret, totp_enabled, totp_recovery, force_sso, google_sub "
             "FROM users WHERE LOWER(email) = LOWER(?)",
             (email.strip(),),
         ).fetchone()
@@ -254,7 +319,7 @@ def lookup_session(sid: str) -> Optional[dict]:
     conn = _db()
     try:
         row = conn.execute(
-            "SELECT s.id, s.user_id, s.expires_at, "
+            "SELECT s.id, s.user_id, s.expires_at, s.created_at, "
             "       u.email, u.role, u.full_name, u.display_name, u.employee_id_link, "
             "       u.is_active, u.status, u.must_reset_password "
             "FROM sessions s JOIN users u ON u.id = s.user_id "
@@ -268,6 +333,19 @@ def lookup_session(sid: str) -> Optional[dict]:
             conn.execute("DELETE FROM sessions WHERE id = ?", (sid,))
             conn.commit()
             return None
+        # #289 — ABSOLUTE ceiling: dead SESSION_ABSOLUTE_TTL after creation, no
+        # matter how much the sliding TTL was refreshed. created_at may be a DB
+        # DEFAULT (CURRENT_TIMESTAMP, 'YYYY-MM-DD HH:MM:SS' UTC-ish) or a value we
+        # wrote; compare on the date-time prefix, tolerant of the 'T' separator.
+        created = str(row["created_at"] or "").replace("T", " ")[:19]
+        if created:
+            cutoff = (datetime.now() - SESSION_ABSOLUTE_TTL).isoformat(
+                sep=" ", timespec="seconds")
+            if created < cutoff:
+                conn.execute("DELETE FROM sessions WHERE id = ?", (sid,))
+                conn.commit()
+                logging.info(f"auth: session past absolute cap sid={_redact_sid(sid)}")
+                return None
         # Status is re-read from the users row on EVERY request (the session stores
         # only user_id) — so a deactivation / role change takes effect on the user's
         # very next request. A non-active user's session is destroyed so re-auth is forced.
@@ -320,15 +398,23 @@ def destroy_all_user_sessions(user_id: int) -> None:
 # ============= COOKIE HELPERS =============
 
 def _request_is_https() -> bool:
-    """True if the client-facing connection is HTTPS.
+    """True if the CLIENT-FACING connection is HTTPS (drives the Secure cookie flag).
 
-    Direct HTTPS sets request.is_secure. Under Tailscale serve the local
-    Flask sees HTTP from the loopback; Tailscale's reverse proxy sets
-    X-Forwarded-Proto=https. Either signal counts.
-    """
+    Three signals, any one counts:
+      * request.is_secure — a direct TLS connection.
+      * X-Forwarded-Proto=https — a proxy that forwards the header (dev/direct).
+      * SSC_TRUSTED_PROXY set — the operator asserts a TLS-terminating trusted edge
+        sits in front (Tailscale serve today; Cloudflare/Render at M4). #289 —
+        waitress STRIPS untrusted X-Forwarded-* by default, so the header alone is
+        unreliable behind our own proxy; the trusted-proxy declaration is the
+        authoritative "every real request arrived over HTTPS at the edge" signal
+        (the app binds loopback-only, so the proxy is the only ingress)."""
     if request.is_secure:
         return True
-    return (request.headers.get("X-Forwarded-Proto", "").lower() == "https")
+    if request.headers.get("X-Forwarded-Proto", "").lower() == "https":
+        return True
+    tp = (os.environ.get("SSC_TRUSTED_PROXY") or "").strip().lower()
+    return bool(tp) and tp not in ("0", "false", "no")
 
 
 def _set_session_cookie(response, sid: str) -> None:
@@ -430,28 +516,106 @@ def _login_page():
     return ("login page missing", 500)
 
 
+_UNIFORM_401 = ({"error": "invalid credentials"}, 401)
+
+
+def _fail_login(user, ip, delay):
+    """The ONE failure exit: audit (only for a resolved account), stall by `delay`
+    (uniform whether the password was right, wrong, or the email unknown), return
+    the identical 401. No branch here reveals which of email/password was wrong,
+    nor whether the account exists — the response body, status, and timing are the
+    same for every failure mode."""
+    if user:
+        _login_audit(user["id"], "login_fail", ip)
+    if delay > 0:
+        time.sleep(delay)
+    logging.info("auth: login failed")  # PII rule: never the email
+    return jsonify(_UNIFORM_401[0]), _UNIFORM_401[1]
+
+
 def _api_login():
-    """POST /api/auth/login → {email, password} → sets session cookie."""
+    """POST /api/auth/login → {email, password, totp?} → session cookie.
+
+    #289 order of operations, chosen so nothing distinguishes accounts to an
+    UNAUTHENTICATED caller:
+      1. rate context (per-account + per-source fails) -> backoff delay
+      2. HARD LOCKOUT (account or IP over the ceiling): audit login_lockout,
+         stall, uniform 401 — a correct password is refused identically.
+      3. verify password; wrong -> uniform 401 via _fail_login (stalled).
+      4. [password now known correct] force_sso -> 403 use-SSO; TOTP enrolled ->
+         require the code (a distinct `totp_required` step, but only reachable
+         AFTER a correct password, so it enumerates nothing to an attacker).
+      5. success: rotate the session, audit, set cookie."""
     data = request.get_json(silent=True) or {}
     email = (data.get("email") or "").strip()
     password = data.get("password") or ""
+    totp_code = (data.get("totp") or "").strip()
     if not email or not password:
         return jsonify({"error": "email and password required"}), 400
     ip = _client_ip()
     user = get_user_by_email(email)
-    # Silent per-account lockout: after N fails in the window, refuse even a correct
-    # password — same generic 401, so it never discloses that the account exists.
-    if user and _recent_login_fails(user["id"]) >= LOGIN_MAX_FAILS:
-        _login_audit(user["id"], "login_fail", ip)
-        logging.info("auth: login refused (rate-limited)")
-        return jsonify({"error": "invalid credentials"}), 401
-    active = bool(user) and user.get("status") == "active" and bool(user.get("is_active"))
-    # Uniform failure response — never disclose whether the email exists or is disabled.
-    if not user or not active or not verify_password(password, user["password_hash"]):
+
+    acct_fails = _recent_login_fails(user["id"]) if user else 0
+    ip_fails = _recent_ip_fails(ip)
+    delay = max(_login_backoff_delay(acct_fails), _login_backoff_delay(ip_fails))
+
+    # HARD LOCKOUT — refuse even a correct password with the uniform 401.
+    if (user and acct_fails >= LOGIN_MAX_FAILS) or ip_fails >= LOGIN_IP_MAX_FAILS:
         if user:
-            _login_audit(user["id"], "login_fail", ip)
-        logging.info("auth: login failed")  # PII rule: do NOT log the email
-        return jsonify({"error": "invalid credentials"}), 401
+            _login_audit(user["id"], "login_lockout", ip)
+        if delay > 0:
+            time.sleep(delay)
+        logging.info("auth: login refused (locked out)")
+        return jsonify(_UNIFORM_401[0]), _UNIFORM_401[1]
+
+    active = bool(user) and user.get("status") == "active" and bool(user.get("is_active"))
+    if not user or not active or not verify_password(password, user["password_hash"]):
+        return _fail_login(user, ip, delay)
+
+    # ---- password is correct from here; the branches below are safe to distinguish ----
+    if user.get("force_sso"):
+        logging.info("auth: password path refused (force_sso)")
+        return jsonify({"error": "This account must sign in with Google.",
+                        "sso_required": True}), 403
+
+    if user.get("totp_enabled"):
+        import json
+        ok_totp = False
+        recovery_used = False
+        if totp_code:
+            import totp as _totp
+            if _totp.verify(user.get("totp_secret") or "", totp_code):
+                ok_totp = True
+            else:
+                try:
+                    codes = json.loads(user.get("totp_recovery") or "[]")
+                except Exception:
+                    codes = []
+                burned, remaining = _totp.consume_recovery(totp_code, codes)
+                if burned:
+                    ok_totp = True
+                    recovery_used = True
+                    _conn = _db()
+                    try:
+                        _conn.execute("UPDATE users SET totp_recovery=? WHERE id=?",
+                                      (json.dumps(remaining), user["id"]))
+                        _conn.commit()
+                    finally:
+                        _conn.close()
+        if not ok_totp:
+            # correct password, missing/incorrect second factor: NOT a login_fail
+            # against the password counter (that would let a factor-2 miss trip the
+            # password lockout); its own audit event, and a distinct 401 that the
+            # UI turns into the code prompt.
+            _login_audit(user["id"], "totp_fail", ip)
+            return jsonify({"error": "second factor required", "totp_required": True}), 401
+        if recovery_used:
+            _login_audit(user["id"], "totp_recovery_used", ip)
+
+    # rotate: destroy any session the client presented before minting a fresh one.
+    old_sid = request.cookies.get(COOKIE_NAME)
+    if old_sid:
+        destroy_session(old_sid)
     sid = create_session(user["id"], request.headers.get("User-Agent"))
     touch_last_login(user["id"])
     _login_audit(user["id"], "login_success", ip)

@@ -360,6 +360,32 @@
 </head>
 <body>
 
+<!-- #289 — staff second-factor readiness banner (admin/c_suite only). Populated by
+     /api/admin/2fa-status; hidden unless staff accounts still lack a 2nd factor. -->
+<div id="twofa-banner" role="status" style="display:none;background:#7A2E1B;color:#fff;
+     padding:10px 18px;font-size:13px;font-weight:600;text-align:center;"></div>
+<script>
+(function(){
+  function boot2fa(){
+    fetch('/api/admin/2fa-status',{credentials:'same-origin'})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){
+        if(!j || !j.data) return;
+        var b=document.getElementById('twofa-banner');
+        var miss=j.data.missing||[];
+        if(!miss.length){ b.style.display='none'; return; }
+        var who=miss.map(function(m){return m.email;}).join(', ');
+        b.textContent='⚠ Second factor still needed before public launch — '+
+          j.data.missing_count+' of '+j.data.total+' staff accounts: '+who+
+          '. Enroll TOTP (Settings) or link Google SSO for each.';
+        b.style.display='block';
+      }).catch(function(){});
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot2fa);
+  else boot2fa();
+})();
+</script>
+
 <div class="topbar">
   <div class="brand">
     <img class="brand-mark" src="/files/static/brand/mark.svg" alt="Superstars Contracting">
@@ -1493,6 +1519,54 @@
       <div class="h2-sub" data-i18n="p-settings-sub">Company info, issuer signature, integrations.</div>
       <div class="placeholder" data-i18n="p-settings-placeholder">Settings UI — coming next. Today, edit api-keys.txt directly.</div>
     </div>
+    <!-- #289 — Two-factor (TOTP) self-enrollment for the signed-in staff account. -->
+    <div class="section" id="twofa-section" style="margin-top:16px;">
+      <h2>Two-Factor Authentication (TOTP)</h2>
+      <div class="h2-sub">Add an authenticator app (Google Authenticator, Authy, 1Password) as your second factor before public launch.</div>
+      <div id="twofa-body" style="margin-top:12px;font-size:14px;">
+        <button id="twofa-enroll-btn" class="btn-primary" type="button">Set up authenticator</button>
+        <div id="twofa-enroll-area" style="display:none;margin-top:14px;max-width:520px;">
+          <div style="font-size:13px;color:#54505A;">1. In your authenticator app, add an account by pasting this setup key (or scanning the QR your app offers):</div>
+          <code id="twofa-secret" style="display:inline-block;margin:8px 0;padding:8px 12px;background:#F4F1EA;border-radius:6px;font-size:15px;letter-spacing:1px;user-select:all;"></code>
+          <div id="twofa-uri" style="font-size:11px;color:#76777E;word-break:break-all;margin-bottom:12px;"></div>
+          <div style="font-size:13px;color:#54505A;">2. Save these one-time recovery codes somewhere safe (each works once if you lose your phone):</div>
+          <pre id="twofa-recovery" style="background:#F4F1EA;border-radius:6px;padding:10px;font-size:13px;white-space:pre-wrap;"></pre>
+          <div style="font-size:13px;color:#54505A;">3. Enter the current 6-digit code from your app to finish:</div>
+          <input id="twofa-code" inputmode="numeric" maxlength="6" placeholder="123456"
+                 style="font-size:16px;letter-spacing:3px;width:130px;padding:8px 10px;border:1px solid #E8E4DD;border-radius:6px;margin:8px 8px 0 0;">
+          <button id="twofa-confirm-btn" class="btn-primary" type="button">Turn on</button>
+          <div id="twofa-msg" style="margin-top:8px;font-size:13px;"></div>
+        </div>
+      </div>
+    </div>
+    <script>
+    (function(){
+      var enrollBtn=document.getElementById('twofa-enroll-btn');
+      if(!enrollBtn) return;
+      enrollBtn.addEventListener('click', function(){
+        fetch('/api/2fa/begin',{method:'POST',credentials:'same-origin'})
+          .then(function(r){return r.json();}).then(function(j){
+            if(!j.data){ alert(j.error||'Could not start enrollment'); return; }
+            document.getElementById('twofa-secret').textContent=j.data.secret;
+            document.getElementById('twofa-uri').textContent=j.data.otpauth_uri;
+            document.getElementById('twofa-recovery').textContent=(j.data.recovery_codes||[]).join('\n');
+            document.getElementById('twofa-enroll-area').style.display='block';
+            enrollBtn.style.display='none';
+          }).catch(function(){ alert('Network error'); });
+      });
+      document.getElementById('twofa-confirm-btn').addEventListener('click', function(){
+        var code=(document.getElementById('twofa-code').value||'').trim();
+        fetch('/api/2fa/confirm',{method:'POST',credentials:'same-origin',
+          headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code})})
+          .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+          .then(function(res){
+            var m=document.getElementById('twofa-msg');
+            if(res.ok){ m.style.color='#2F7C57'; m.textContent='✓ Two-factor is now on for your account.'; }
+            else { m.style.color='#B11E2E'; m.textContent='✗ '+(res.j.error||'Try again'); }
+          });
+      });
+    })();
+    </script>
   </div>
 
 </div>
