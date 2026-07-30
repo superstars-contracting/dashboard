@@ -41,6 +41,54 @@ gate runs green in all four backend×root configs. NOT yet cloud: M2 = PDF on
 Linux, M3 = public-door hardening, M4 = bring-up (see the operator's
 CLOUD_MIGRATION_BLUEPRINT.md).
 
+### Cloud M3 (#289) — public-door hardening (DEPLOYED behavior)
+
+The login endpoint, staff auth, and worker PIN flow are hardened for the M5
+public exposure. **Enforcement switches ship OFF (grace) so the deploy strands
+nobody; the operator flips them after enrolling people** — see the OPERATOR
+2FA / DEVICE TO-DO below.
+
+- **Login** (`auth.py`): per-account + per-source(IP) fail counting →
+  exponential backoff, uniform on right/wrong password (no timing oracle);
+  hard lockout refuses even a correct password with the identical 401
+  (audited `login_lockout`); unknown-email ≡ wrong-password response (no
+  enumeration). `_client_ip` trusts `X-Forwarded-For` ONLY when
+  `SSC_TRUSTED_PROXY` is set. Sessions: rotate on login, absolute 7-day
+  ceiling atop the 12h slide, logout server-invalidates. `_request_is_https`
+  honors `SSC_TRUSTED_PROXY` (waitress strips untrusted XFP) so the Secure
+  cookie flag is correct behind the M4 TLS edge.
+- **Staff 2FA** (`totp.py` stdlib RFC-6238 + `auth_hardening.py`):
+  self-service TOTP at `/api/2fa/begin|confirm|disable` (Settings panel UI),
+  otpauth URI + 10 bcrypt-hashed single-use recovery codes; login two-step
+  (password → `totp_required` 401 → code), enumeration-safe. `force_sso`
+  admin flag disables the password path (403 `sso_required`), refused unless
+  the account has `google_sub`. Console banner (`/api/admin/2fa-status`)
+  lists staff still missing a factor.
+- **Worker PIN** (`server.py` + `auth_hardening.py`): per-source PIN throttle
+  ALWAYS ON; device binding behind `app_settings.worker_device_enforcement`
+  (default `0` = grace). When `1`, a valid PIN also needs a `device_token`
+  from one-time provisioning (admin issues a 6-digit code / `?provision=`
+  URL → the phone redeems it for a localStorage token). Revocable per device.
+- Schema: `apply_public_hardening_289.py` (idempotent, dual-backend, **ensured
+  at server boot** — no manual migration step on deploy). Secrets: runtime
+  reads env only (guard-asserted); inventory in `SECRETS_INVENTORY_289.md`
+  (the M4 Render env group).
+
+**OPERATOR 2FA / DEVICE TO-DO — before the M5 public DNS flip:**
+1. Each staff account (admin/c_suite/pm/super/estimator) gets a second
+   factor. Fastest: **link Google SSO** (already domain-restricted). Or
+   enroll **TOTP** in Settings → Two-Factor. Do the **admin account(s) first**,
+   then c_suite, then pm/super/estimator. The console banner lists who's still
+   missing one; it clears as you go.
+2. Optionally set `force_sso` on staff who should be SSO-only (must have SSO
+   linked first).
+3. Provision the **8 field phones** (worker-devices/provision → open the
+   `?provision=` URL on each phone, enter the Worker ID). Then flip
+   `worker_device_enforcement` to `1` (worker-devices/enforcement). This is a
+   **hard pre-M5 gate** — do NOT flip the public DNS until it's on.
+4. At M4, set `SSC_TRUSTED_PROXY` in the Render env group so per-IP throttling
+   and Secure cookies read the real client through Cloudflare/Render.
+
 ### Cloud M2 (#288) — PDF engine abstraction
 
 `pdf_export.py` is engine-selectable via **`SSC_PDF_ENGINE`** ('edge' |
