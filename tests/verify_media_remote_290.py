@@ -103,7 +103,10 @@ def main() -> int:
         random.seed()                        # fresh sample every run
         sample = random.sample(all_local, min(args.sample, len(all_local)))
         listing = "\n".join(f"{args.remote_root}/{rel}" for rel, _ in sample)
-        out = ssh_out(args.ssh_addr, "xargs -d '\\n' sha256sum --", stdin_text=listing + "\n")
+        # tr strips the \r that Windows text-mode subprocess writes inject into
+        # the \n-joined listing (CRLF -> the remote saw "path\r" and failed).
+        out = ssh_out(args.ssh_addr, "tr -d '\\r' | xargs -d '\\n' sha256sum --",
+                      stdin_text=listing + "\n")
         remote_hashes = {}
         for line in out.strip().splitlines():
             h, _, path = line.partition("  ")
