@@ -106,9 +106,12 @@ def p_static(base):
 
 
 def p_worker_app_shell(base):
-    r = requests.get(f"{base}/worker-app", timeout=20)
+    # /worker-app.html is the real worker entry point (the bare /worker-app is
+    # auth-exempted defensively but has never had a route — 404 on the
+    # workstation too; verified against live 2026-07-30).
+    r = requests.get(f"{base}/worker-app.html", timeout=20)
     record("worker-app-public-shell", r.status_code == 200 and len(r.content) > 1000,
-           f"status={r.status_code}")
+           f"status={r.status_code} bytes={len(r.content)}")
 
 
 def p_timezone(base):
