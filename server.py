@@ -9887,7 +9887,11 @@ def _fp_serve(photo_id, col):
         conn.close()
     if not r or not r["p"]:
         return jsonify({"error": "not found"}), 404
-    p = Path(r["p"])
+    # #290 — stored rows go through THE resolver (this route predated #287 and
+    # was missed): relative rows anchor under the active root, and pre-#287
+    # absolute WINDOWS rows re-anchor on a Linux host. The containment check
+    # below is unchanged and still decides what may serve.
+    p = ssc_paths.resolve_data_path(r["p"])
     try:
         if not p.resolve().is_relative_to(_FP_BASE.resolve()) or not p.exists():
             return jsonify({"error": "not found"}), 404

@@ -214,8 +214,51 @@ def run(scratch: Path, sessions, users):
        f"added={len(added)} removed={len(removed)} changed={len(changed)} (names withheld)")
 
 
+def check_cross_flavor_resolution():
+    """#290 — resolve_data_path must parse stored WINDOWS-absolute rows on a
+    POSIX host (the cloud). PosixPath('C:\\Users\\...') is neither absolute nor
+    splittable on backslashes, so pre-#287 rows never re-anchored and every
+    photo 404'd on Render. The parsing helper is pure (PureWindowsPath works on
+    any OS), so the cross-flavor math is provable right here on Windows."""
+    import ssc_paths
+
+    win_row = r"C:\Users\SSC-Admin\Superstars\dashboard\data_room\field_photos\PC\ab12\full.jpg"
+    parts, is_abs = ssc_paths._stored_parts(win_row)
+    ok("290 windows row parses absolute", is_abs is True)
+    ok("290 windows row splits on backslashes",
+       "data_room" in parts and parts[-1] == "full.jpg")
+
+    # a MISSING windows-absolute row re-anchors under the active root at its
+    # data anchor — the exact cloud scenario (simulated via a scratch root)
+    saved = os.environ.get("SSC_DATA_ROOT")
+    os.environ["SSC_DATA_ROOT"] = str(Path(tempfile.gettempdir()) / "smk290_flavor_root")
+    try:
+        missing = r"C:\no\such\host\data_room\field_photos\PC\cd34\full.jpg"
+        got = ssc_paths.resolve_data_path(missing)
+        want = ssc_paths.under_root("data_room", "field_photos", "PC", "cd34", "full.jpg")
+        ok("290 missing windows row re-anchors under the root", got == want,
+           f"got {got}")
+        rel = ssc_paths.resolve_data_path("data_room/field_photos/PC/ef56/full.jpg")
+        ok("290 relative row anchors under the root",
+           rel == ssc_paths.under_root("data_room", "field_photos", "PC", "ef56", "full.jpg"))
+        ok("290 store_rel anchors a foreign windows row",
+           ssc_paths.store_rel(missing) == "data_room/field_photos/PC/cd34/full.jpg")
+    finally:
+        if saved is None:
+            os.environ.pop("SSC_DATA_ROOT", None)
+        else:
+            os.environ["SSC_DATA_ROOT"] = saved
+
+    # no-anchor absolute rows still pass through untouched (caller containment
+    # decides) — on the row's NATIVE flavor the exact old behavior
+    ok("290 anchorless windows row passes through",
+       str(ssc_paths.resolve_data_path(r"C:\Windows\notepad.exe")) ==
+       str(Path(r"C:\Windows\notepad.exe")))
+
+
 def main():
     print(f"== #287 guard: SSC_DATA_ROOT containment ==  port={PORT}")
+    check_cross_flavor_resolution()
     db_url = (os.environ.get("SSC_DB_URL") or "").strip()
     print(f"   backend={'postgres' if db_layer.is_postgres() else 'sqlite'}  "
           f"SSC_DB_URL={'(set)' if db_url else '(unset)'}")

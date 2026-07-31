@@ -174,26 +174,76 @@ def seed_fixtures(project_code):
 
 
 def cleanup_fixtures():
+    """Remove the battery fixtures AND their audit droppings from the cloud DB.
+
+    PG-safe (the 2026-07-30 rehearsal lesson): on Postgres a failed statement
+    poisons the open transaction — every later statement raises
+    InFailedSqlTransaction until a rollback. The original swallow-and-continue
+    loop therefore no-opped the whole cleanup the moment the users DELETE hit
+    the login_audit/audit_log FK refs the fixtures acquired by logging in.
+    Now: dependents first, per-statement commit, rollback on each failure, and
+    a loud leftover count at the end instead of silent success."""
     try:
         conn = cloud_db()
-    except Exception:
+    except Exception as e:
+        print(f"  [cleanup SKIPPED — no cloud DB reachable: {e}]")
         return
-    try:
-        for email in (ADMIN_EMAIL, CLIENT_EMAIL):
-            row = conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
-            if not row:
-                continue
-            uid = row[0]
-            for sql in ("DELETE FROM client_section_grant WHERE user_id=?",
-                        "DELETE FROM pm_project_assignment WHERE user_id=?",
-                        "DELETE FROM sessions WHERE user_id=?",
-                        "DELETE FROM users WHERE id=?"):
+
+    def run(sql, params) -> bool:
+        try:
+            conn.execute(sql, params)
+            conn.commit()
+            return True
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            return False
+
+    def fetch_uid(email):
+        for _ in range(2):                      # retry once after a rollback
+            try:
+                row = conn.execute("SELECT id FROM users WHERE email=?",
+                                   (email,)).fetchone()
+                return row[0] if row else None
+            except Exception:
                 try:
-                    conn.execute(sql, (uid,))
+                    conn.rollback()
                 except Exception:
                     pass
-        conn.commit()
-        print("  [fixtures cleaned]")
+        return None
+
+    try:
+        for email in (ADMIN_EMAIL, CLIENT_EMAIL):
+            uid = fetch_uid(email)
+            if uid is None:
+                continue
+            for sql in (
+                "DELETE FROM client_section_grant WHERE user_id=?",
+                "DELETE FROM pm_project_assignment WHERE user_id=?",
+                "DELETE FROM sessions WHERE user_id=?",
+                "DELETE FROM login_audit WHERE user_id=?",
+                "DELETE FROM role_change_audit WHERE user_id=?",
+                "DELETE FROM visibility_audit WHERE actor_id=?",
+                # audit rows KEEP their content, only the synthetic actor ref is
+                # NULLed — the exact shape clean_user_orphans leaves behind.
+                "UPDATE audit_log SET actor_user_id=NULL WHERE actor_user_id=?",
+                "DELETE FROM users WHERE id=?",
+            ):
+                run(sql, (uid,))
+        left = None
+        try:
+            row = conn.execute("SELECT COUNT(*) FROM users WHERE email IN (?, ?)",
+                               (ADMIN_EMAIL, CLIENT_EMAIL)).fetchone()
+            left = row[0] if row else None
+        except Exception:
+            pass
+        if left == 0:
+            print("  [fixtures cleaned — 0 battery users remain]")
+        else:
+            print(f"  [CLEANUP INCOMPLETE — {left} battery user(s) still present; "
+                  "re-run with --phase cleanup]")
     finally:
         conn.close()
 
@@ -341,13 +391,19 @@ def p_photo_serves(base, project, admin):
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("base", help="https://<service>.onrender.com")
-    ap.add_argument("--phase", choices=("pre", "full"), default="pre")
+    ap.add_argument("--phase", choices=("pre", "full", "cleanup"), default="pre")
     ap.add_argument("--project", default="FR-BX-001")
     args = ap.parse_args()
     base = args.base.rstrip("/")
     if not base.startswith("https://"):
         print("refusing: base URL must be https")
         return 2
+
+    if args.phase == "cleanup":
+        # fixture purge only — for recovering from an interrupted/failed run
+        print("=== M4 battery — CLEANUP ONLY ===")
+        cleanup_fixtures()
+        return 0
 
     print(f"=== M4 acceptance battery — {args.phase.upper()} phase against "
           f"{urlparse(base).hostname} ===")

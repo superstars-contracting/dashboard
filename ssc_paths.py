@@ -33,7 +33,8 @@ remember the other's answer.
 from __future__ import annotations
 
 import os
-from pathlib import Path
+import re
+from pathlib import Path, PureWindowsPath
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -73,22 +74,43 @@ def server_log_path() -> Path:
     return under_root("server.log")
 
 
+def _stored_parts(stored) -> tuple[tuple[str, ...], bool]:
+    """(parts, is_absolute) for a STORED path string, split with the flavor it
+    was WRITTEN in — not the flavor of the host reading it.
+
+    #290: every pre-#287 row is an absolute WINDOWS path. On the Linux cloud
+    host, PosixPath("C:\\Users\\...") is neither absolute nor splittable on
+    its backslashes — one giant component, so the anchor re-anchoring below
+    never fired and every pre-#287 row 404'd. Windows-looking strings (a
+    drive letter or any backslash) are therefore parsed with PureWindowsPath
+    on EVERY platform; on Windows itself that is exactly what Path() already
+    did, so workstation behavior is byte-identical."""
+    s = str(stored)
+    if "\\" in s or re.match(r"^[A-Za-z]:", s):
+        wp = PureWindowsPath(s)
+        return wp.parts, bool(wp.drive) or wp.is_absolute()
+    p = Path(s)
+    return p.parts, p.is_absolute()
+
+
 def resolve_data_path(stored) -> Path:
     """A path READ from the database (or any stored reference) -> the real file.
 
     relative                  -> under the active root (portable rows, #287+)
     absolute, still exists    -> as-is (pre-#287 Windows rows on the workstation)
     absolute, missing         -> re-anchored under the active root at its data
-                                 anchor (the same row after the tree moved)
+                                 anchor (the same row after the tree moved —
+                                 including a Windows-absolute row read on the
+                                 Linux cloud host, #290)
     absolute, no anchor       -> as-is (not a data path; caller's containment
                                  checks decide, exactly as they always have)
     """
+    parts, is_abs = _stored_parts(stored)
+    if not is_abs:
+        return under_root(*parts)
     p = Path(str(stored))
-    if not p.is_absolute():
-        return under_root(*p.parts)
     if p.exists():
         return p
-    parts = p.parts
     for anchor in DATA_ANCHORS:
         if anchor in parts:
             idx = parts.index(anchor)
@@ -100,12 +122,11 @@ def store_rel(p) -> str:
     """The canonical STORED form for a data file: its path relative to the active
     root, POSIX separators. Falls back to the absolute string only for a path
     outside every anchor (which should not be a data file in the first place)."""
-    p = Path(str(p))
+    parts, _is_abs = _stored_parts(p)
     try:
-        return p.resolve().relative_to(data_root().resolve()).as_posix()
-    except ValueError:
-        parts = p.parts
+        return Path(str(p)).resolve().relative_to(data_root().resolve()).as_posix()
+    except (ValueError, OSError):
         for anchor in DATA_ANCHORS:
             if anchor in parts:
-                return Path(*parts[parts.index(anchor):]).as_posix()
+                return "/".join(parts[parts.index(anchor):])
         return str(p)
