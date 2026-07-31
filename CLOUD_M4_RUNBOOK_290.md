@@ -1,5 +1,9 @@
 # Cloud M4 runbook (#290) — bring-up on Render, rehearsal, and the M5 final-sync procedure
 
+> **Live service hostname (assigned at creation, 2026-07-30):**
+> `https://ssc-dashboard-go4h.onrender.com` — every `<service>.onrender.com`
+> placeholder below means this URL.
+
 What #290 shipped: `render.yaml` + `Dockerfile` (+`.dockerignore`) — the committed
 service blueprint; `ssc_tz.py` SSC_TZ enforcement at boot (+ PG session TimeZone in
 `db_layer`) with gate suite `tests/smoke_tz_290.py`; the Linux sweep
@@ -165,7 +169,7 @@ the first invoice confirms actuals.
 Google Cloud Console → APIs & Services → Credentials → the dashboard's OAuth
 2.0 Client → **Authorized redirect URIs** → add BOTH:
 
-- `https://<service>.onrender.com/auth/google/callback`
+- `https://ssc-dashboard-go4h.onrender.com/auth/google/callback`
 - `https://app.superstarscontracting.com/auth/google/callback`
 
 (Keep the existing tailnet redirect URI until the workstation parachute is

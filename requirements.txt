@@ -69,7 +69,6 @@ pypdf>=6.0
 # pdfplumber>=0.11         # for extracting text from existing roster PDFs
 # pdf2image>=1.17          # PDF → image conversion for debugging
 # Pillow>=10.0             # general image processing
-# anthropic>=0.40          # Anthropic API client when AI features added
 # python-dotenv>=1.0       # load .env file (if we switch from os.environ direct)
 # pysqlcipher3>=1.2        # encrypted SQLite (Tier 1 security upgrade)
 psycopg[binary]>=3.1  # #259 � Postgres driver (dev/optional; SQLite remains default)
@@ -79,3 +78,19 @@ psycopg[binary]>=3.1  # #259 � Postgres driver (dev/optional; SQLite remains d
 # check; already a transitive dep of pandas, pinned here explicitly so a
 # lean install can never lose it.
 tzdata>=2024.1
+
+# AI extraction (cert cards, document scanner, expense scanner). The LIBRARY
+# is required at import time — cert_extractor is imported by server.py at
+# boot, so the app cannot start without it (the 2026-07-30 Render deploy
+# failure). The API KEY stays optional: absent -> clean 503 "AI disabled".
+# Hand-installed on the workstation long ago; declared as of #290.
+anthropic>=0.100
+
+# Direct jinja2 imports exist (server.py signage routes,
+# generate_credentials_batch). Flask already ships Jinja2, so this never
+# crashed — pinned explicitly because we import it by name, not by luck.
+jinja2>=3.1
+
+# NOT declared on purpose: zxing-cpp (import zxingcpp) — used only by
+# decode_qrs.py, a standalone workstation QR-audit CLI that nothing in the
+# server imports. Hand-install if you need that tool: pip install zxing-cpp
