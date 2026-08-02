@@ -611,18 +611,23 @@ restore from CSV).
 
 ---
 
-*Last updated: 2026-07-30 #290 session — **M4 COMPLETE**. The cloud instance
-is LIVE at https://ssc-dashboard-go4h.onrender.com (region virginia, docker/
-chromium image, disk at /var/data): FULL acceptance battery 22/22 (chromium
-PDF, DCR client render, photo-from-disk, containment probes, Eastern-today
-on the UTC host), rehearsal data verified (104-table migrate, 2,293-file
-media tree count+hash-matched). Production code is at dc905a5 on BOTH hosts;
-en route #290 also fixed: anthropic/jinja2 never declared in requirements
-(cloud boot crash), the ssc_paths Windows-path-on-POSIX resolver bug (every
-pre-#287 stored row), and _fp_serve's missing resolver adoption. Workstation
-remains the production of record until M5; cloud tracks main by auto-deploy.
-Gate is 36 suites, green both backends. Flip rollback = revert 2c4fb4a +
-#244 restart. Next: operator tasks (Google OAuth redirect URIs for both new
-addresses, #289 2FA/device enrollment = the hard pre-M5 gate, subscriptions
-true-up), M4.5 Cloudflare flip-week steps, then the M5 final-sync runbook in
-CLOUD_M4_RUNBOOK_290.md §4.*
+*Last updated: 2026-08-02 — **M5 CUTOVER COMPLETE. PRODUCTION IS THE CLOUD:
+https://app.superstarscontracting.com** (Cloudflare proxied Full-strict ->
+Render ssc-dashboard-go4h -> waitress -> managed Postgres -> /var/data;
+SSC_TRUSTED_PROXY=2). Final battery 22/22 ON THE APP DOMAIN; final sync =
+ssc_m5_final.db (104 tables, known-orphan delta only) + media ALL GREEN.
+WORKER DOOR SEALED on both hosts (worker_device_enforcement=1, zero devices
+provisioned — operator's explicit order): every PIN attempt 403s
+device_required until phones are provisioned. The workstation is the
+PARACHUTE: scheduled task STOPPED but registered, DB frozen at the
+Wednesday-evening state; rollback = Start-ScheduledTask (+ point Cloudflare
+app CNAME back if DNS-level rollback is needed). OPEN ITEMS: (1) Wix site
+404s — the NS-method connection broke when nameservers left Wix; operator
+must switch the Wix panel to the "Pointing" method; (2) the workstation's
+2026-07-30 20:49 exit-code-1 crash is undiagnosed (traceback in
+server-2026-07-30.log); (3) Google DKIM "Start authentication" click in
+Google Admin now that NS propagated; (4) 2-day burn-in, then decide the
+snapshot cron + tailnet/funnel retirement; (5) staff 2FA enrollment + 8
+phone provisionings, THEN unseal the worker door; (6) true-up the Render
+subscriptions row (58.55 estimated) against the first invoice. Gate is 36
+suites, green both backends, at 963783e.*
