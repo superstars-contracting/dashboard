@@ -57,5 +57,9 @@ COPY . .
 EXPOSE 10000
 
 # exec so waitress is PID 1 and receives Render's stop signals directly.
-# --threads=8 matches the workstation waitress config (run_server.ps1).
-CMD ["sh", "-c", "exec python -m waitress --host=0.0.0.0 --port=${PORT:-10000} --threads=8 server:app"]
+# WAITRESS_THREADS (render.yaml, default 16): the workload is I/O-heavy —
+# photo bursts + per-request PG round trips park threads on sockets, so
+# 16 threads on 1 vCPU is headroom, not oversubscription (#290 hotfix:
+# a 20-thumb burst queued 20-deep on 8 threads). Tune in the dashboard
+# without an image rebuild.
+CMD ["sh", "-c", "exec python -m waitress --host=0.0.0.0 --port=${PORT:-10000} --threads=${WAITRESS_THREADS:-16} server:app"]

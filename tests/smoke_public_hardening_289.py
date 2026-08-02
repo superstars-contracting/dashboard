@@ -59,10 +59,24 @@ def ok(name, cond, note=""):
     return bool(cond)
 
 
+_FLAG_BEFORE = None   # snapshot's worker_device_enforcement at seed time
+
+
 def seed():
+    global _FLAG_BEFORE
     conn = db_layer.connect(pragma_fk=True)
     try:
         ensure_hardening_schema(conn)
+        # #290 — ESTABLISH the grace baseline instead of inheriting it: since
+        # the 2026-08-02 records op, LIVE runs worker_device_enforcement=1, so
+        # any fresh snapshot arrives with the door sealed and the suite's
+        # first PIN check (enforcement-off contract) would 403. Capture the
+        # snapshot's value here, force 0 for the suite, restore in cleanup.
+        row = conn.execute("SELECT value FROM app_settings "
+                           "WHERE key='worker_device_enforcement'").fetchone()
+        _FLAG_BEFORE = row[0] if row else None
+        conn.execute("UPDATE app_settings SET value='0' "
+                     "WHERE key='worker_device_enforcement'")
         for email, role, gsub in ((EMAIL_STAFF, "pm", None),
                                   (EMAIL_SSO, "admin", None)):
             conn.execute("DELETE FROM users WHERE email=?", (email,))
@@ -108,8 +122,12 @@ def cleanup():
             conn.execute("DELETE FROM worker_device WHERE employee_id=?", (emp,))
             conn.execute("DELETE FROM sign_in_log WHERE employee_id=?", (emp,))
             conn.execute("DELETE FROM employees WHERE employee_id=?", (emp,))
-        # restore enforcement OFF (its shipped default)
-        conn.execute("UPDATE app_settings SET value='0' WHERE key='worker_device_enforcement'")
+        # restore the flag to what the snapshot arrived with (#290 — LIVE runs
+        # 1 since the door-seal records op; hardcoding 0 here would leave an
+        # isolated copy claiming grace when its source asserted enforcement)
+        if _FLAG_BEFORE is not None:
+            conn.execute("UPDATE app_settings SET value=? "
+                         "WHERE key='worker_device_enforcement'", (_FLAG_BEFORE,))
         # scrub the anonymous pin_fail/lockout rows this suite generated (user_id NULL)
         try:
             conn.execute("DELETE FROM login_audit WHERE event IN "

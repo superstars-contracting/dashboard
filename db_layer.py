@@ -159,6 +159,17 @@ class _PgCursor:
         return iter(self._cur)
 
 
+# #290 hotfix — the pk map is a property of the DATABASE SCHEMA, not the
+# connection, yet it was recomputed (a pg_catalog join) on EVERY connect().
+# The app opens a connection per request, so on the cloud every request paid
+# a needless catalog query on top of the TCP+auth handshake (~hundreds of ms
+# across a console page's API fan-out). Cache per (url) per process. Schema
+# changes only happen at boot/deploy in this app (ensure-at-boot migrations),
+# so a stale entry cannot occur within a process lifetime; a table created
+# mid-process would merely lack transparent lastrowid until restart.
+_PKMAP_CACHE: dict = {}
+
+
 def _pk_map(conn) -> dict:
     """table(lower) -> single-column integer PK name, for transparent lastrowid via
     RETURNING. Composite/no-PK tables are absent (lastrowid stays None there)."""
@@ -235,7 +246,11 @@ class _PgConn:
         self._conn = psycopg.connect(url, autocommit=False, row_factory=_hybrid_row_factory,
                                      **kwargs)
         self.row_factory = None       # assignment accepted + ignored (always hybrid Row)
-        self._pkmap = _pk_map(self._conn)
+        pk = _PKMAP_CACHE.get(url)
+        if pk is None:
+            pk = _pk_map(self._conn)
+            _PKMAP_CACHE[url] = pk
+        self._pkmap = pk
 
     def execute(self, sql, params=()):
         return _exec(self._conn.cursor(), sql, params, self._pkmap)

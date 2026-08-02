@@ -86,6 +86,10 @@ try:
         _hc.commit()
     finally:
         _hc.close()
+    # #290 hotfix — the ensure above may have CREATED tables on a fresh DB
+    # after the first connect populated the per-process pk-map cache; drop the
+    # cache so those tables get transparent lastrowid too.
+    db_layer._PKMAP_CACHE.clear()
 except Exception as _e:
     logging.warning(f"#289 hardening schema ensure skipped: {_e}")
 import auth_hardening

@@ -59,6 +59,8 @@ services:
         value: "1"                # #289 — peel 1 XFF hop (Render's proxy). M5: set to "2" once Cloudflare proxying is ON in front of Render.
       - key: GOOGLE_OAUTH_ALLOWED_DOMAIN
         value: superstarscontracting.com
+      - key: WAITRESS_THREADS
+        value: "16"               # #290 hotfix — I/O-heavy workload; see Dockerfile CMD note
 
       # ---- operator-supplied during the blueprint-creation flow -------
       # (values from 1Password "Dashboard Secrets"; names per
