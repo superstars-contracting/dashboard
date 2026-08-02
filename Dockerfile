@@ -36,6 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         rsync \
         gzip \
+        tini \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONUNBUFFERED=1 \
@@ -56,10 +57,14 @@ COPY . .
 # Render routes to $PORT (default 10000). EXPOSE is documentation only.
 EXPOSE 10000
 
-# exec so waitress is PID 1 and receives Render's stop signals directly.
+# tini is PID 1: chromium's helper processes orphan-reparent to PID 1, and a
+# bare python never reaps them — the container accumulated <defunct> zombies
+# with every PDF render (observed live 2026-08-02). tini reaps; python still
+# gets Render's stop signals via tini's forwarding.
 # WAITRESS_THREADS (render.yaml, default 16): the workload is I/O-heavy —
 # photo bursts + per-request PG round trips park threads on sockets, so
 # 16 threads on 1 vCPU is headroom, not oversubscription (#290 hotfix:
 # a 20-thumb burst queued 20-deep on 8 threads). Tune in the dashboard
 # without an image rebuild.
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["sh", "-c", "exec python -m waitress --host=0.0.0.0 --port=${PORT:-10000} --threads=${WAITRESS_THREADS:-16} server:app"]
