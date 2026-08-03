@@ -84,6 +84,36 @@ def to_pg_sql(sql: str) -> str:
 # Postgres path (lazy import of psycopg so SQLite-only installs never need it)
 # =====================================================================
 
+# #292 — per-(url, SSC_TZ) connection pools. Keyed by tz as well as url so the
+# env-read-per-call doctrine holds: a caller that sets SSC_TZ (the tz gate
+# suite; the cloud process after ssc_tz.enforce) draws connections whose
+# session TimeZone matches, and a caller without it never receives one that
+# has it. Pools are process-lived; min_size=0 means an import alone never
+# opens a socket.
+import threading as _threading
+
+_POOLS: dict = {}
+_POOLS_LOCK = _threading.Lock()
+
+
+def _pool_for(url):
+    tz = (os.environ.get("SSC_TZ") or "").strip()
+    key = (url, tz)
+    pool = _POOLS.get(key)
+    if pool is not None:
+        return pool
+    with _POOLS_LOCK:
+        pool = _POOLS.get(key)
+        if pool is None:
+            from psycopg_pool import ConnectionPool
+            kwargs = {"autocommit": False, "row_factory": _hybrid_row_factory}
+            if tz:
+                kwargs["options"] = f"-c TimeZone={tz}"   # #290 — rides per connection
+            pool = ConnectionPool(url, min_size=0, max_size=12, max_idle=300.0,
+                                  timeout=30.0, kwargs=kwargs, open=True)
+            _POOLS[key] = pool
+    return pool
+
 class Row(dict):
     """sqlite3.Row work-alike over a Postgres tuple: supports BOTH row["col"] and
     row[0], iterates VALUES (so `a, b = row` and `list(row)` match sqlite), and is a
@@ -232,19 +262,13 @@ class _PgConn:
     """psycopg connection wrapped to mimic sqlite3.Connection for the app's idioms."""
 
     def __init__(self, url):
-        import psycopg
-        # #290 (Cloud M4) — when SSC_TZ is set, open the session with that
-        # TimeZone (libpq startup option — connection-scoped, unlike a SET
-        # inside a transaction, which a rollback would undo). Keeps the few
-        # SQL-side CURRENT_TIMESTAMP audit stamps in the same zone the app
-        # writes on a UTC cloud PG, matching the workstation's dev PG (which
-        # inherits Eastern from the OS). Read per call, like ssc_paths.
-        kwargs = {}
-        tz = (os.environ.get("SSC_TZ") or "").strip()
-        if tz:
-            kwargs["options"] = f"-c TimeZone={tz}"
-        self._conn = psycopg.connect(url, autocommit=False, row_factory=_hybrid_row_factory,
-                                     **kwargs)
+        # #292 — connections come from a per-URL POOL: a fresh network+TLS+auth
+        # handshake cost ~100-200ms on the cloud and every request (and every
+        # PARALLEL aggregate part) was paying it. The pool hands back a warm
+        # connection; _PgConn.close() RETURNS it (rollback first) instead of
+        # closing. #290's TimeZone startup option rides in the pool's conninfo.
+        self._pool = _pool_for(url)     # held so putconn targets the SAME pool
+        self._conn = self._pool.getconn()
         self.row_factory = None       # assignment accepted + ignored (always hybrid Row)
         pk = _PKMAP_CACHE.get(url)
         if pk is None:
@@ -276,7 +300,23 @@ class _PgConn:
         self._conn.rollback()
 
     def close(self):
-        self._conn.close()
+        # #292 — return to the pool, never actually close. Rollback first so a
+        # borrowed connection can never carry uncommitted work (byte-equivalent
+        # to what a real close did to uncommitted state).
+        if self._conn is None:
+            return
+        c, self._conn = self._conn, None
+        try:
+            c.rollback()
+        except Exception:
+            pass
+        try:
+            self._pool.putconn(c)
+        except Exception:
+            try:
+                c.close()
+            except Exception:
+                pass
 
     def __enter__(self):
         return self

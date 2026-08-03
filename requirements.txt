@@ -94,3 +94,8 @@ jinja2>=3.1
 # NOT declared on purpose: zxing-cpp (import zxingcpp) — used only by
 # decode_qrs.py, a standalone workstation QR-audit CLI that nothing in the
 # server imports. Hand-install if you need that tool: pip install zxing-cpp
+
+# #292 — Postgres connection POOL (warm connections; per-request connects were
+# ~100-200ms each on the cloud and the parallel aggregates paid one PER PART).
+# PG-path only; SQLite untouched.
+psycopg-pool>=3.2
