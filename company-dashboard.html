@@ -4633,15 +4633,21 @@ applyLanguage();
 
   async function load(){
     const t=todayLocal();
+    // #291 — ONE bootstrap round trip replaces the 8-call fan-out. Fallback is
+    // per-part: any key the aggregate omits (older server, part gated) is
+    // fetched from its individual endpoint exactly as before.
+    let bd={};
+    try{ const B=await jget(`/api/console/bootstrap?project=${encodeURIComponent(PROJECT)}&date=${t}&limit=12`); bd=(B&&B.data)||{}; }catch(e){ bd={}; }
+    const g=(k,url)=>(bd[k]!==undefined?Promise.resolve({data:bd[k]}):jget(url));
     const [summary,projects,rollup,drops,onSite,compliance,activity,matAlerts]=await Promise.all([
-      jget('/api/company/summary'),
-      jget('/api/projects'),
-      jget(`/api/dropplan/projects/${PROJECT}/rollup`),
-      jget(`/api/dropplan/projects/${PROJECT}/drops`),
-      jget(`/api/projects/${PROJECT}/on-site?date=${t}`),
-      jget('/api/compliance/summary'),
-      jget('/api/activity/recent?limit=12'),
-      jget('/api/company/material-alerts'),
+      g('summary','/api/company/summary'),
+      g('projects','/api/projects'),
+      g('rollup',`/api/dropplan/projects/${PROJECT}/rollup`),
+      g('drops',`/api/dropplan/projects/${PROJECT}/drops`),
+      g('on_site',`/api/projects/${PROJECT}/on-site?date=${t}`),
+      g('compliance','/api/compliance/summary'),
+      g('activity','/api/activity/recent?limit=12'),
+      g('material_alerts','/api/company/material-alerts'),
     ]);
     const S=(summary&&summary.data)||{}, D=(drops&&drops.data)||[], R=(rollup&&rollup.data)||{};
     try{ renderKpis(S,D,R); }catch(e){ console.warn('[CC] kpis',e); }

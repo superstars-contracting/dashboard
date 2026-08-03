@@ -9901,7 +9901,14 @@ def _fp_serve(photo_id, col):
             return jsonify({"error": "not found"}), 404
     except (OSError, ValueError):
         return jsonify({"error": "not found"}), 404
-    return send_file(str(p), mimetype=(r["mime"] or "image/jpeg"), conditional=True)
+    resp = send_file(str(p), mimetype=(r["mime"] or "image/jpeg"), conditional=True)
+    # #291 — a photo id's bytes never change (replacement = new id), so the
+    # BROWSER may cache forever. `private` is load-bearing: these are
+    # auth-gated field photos and Cloudflare's shared edge cache must never
+    # hold them (CF does not cache `private` responses; guard-asserted, and
+    # cf-cache-status stays DYNAMIC in production).
+    resp.headers["Cache-Control"] = "private, max-age=31536000, immutable"
+    return resp
 
 
 @app.route('/api/field-photos/<int:photo_id>/thumb', methods=['GET'])
@@ -11028,6 +11035,86 @@ def api_expense_scan():
 
 
 # ============= ERROR HANDLERS =============
+
+# ============= #291 — PAGE BOOTSTRAP AGGREGATES (performance) =============
+# One round trip instead of the page's parallel API fan-out. DISCIPLINE: an
+# aggregate is a MIRROR, never a door — each part is produced by calling the
+# EXACT view function Flask has registered for that endpoint (decorators and
+# all), inside this same request context (auth gate, pm scoping and client/
+# architect containment already ran). A part whose own gates refuse this
+# caller is simply OMITTED from the payload; the page falls back to the
+# individual endpoint, which refuses identically. Guard:
+# tests/smoke_perf_291.py asserts key-for-key payload parity per role.
+
+from werkzeug.exceptions import HTTPException as _AggHTTPException
+
+
+def _agg_part(endpoint_name, *args, **kwargs):
+    """Invoke the registered view function for `endpoint_name` and unwrap its
+    JSON data payload. None (omitted) when the view's own gates refuse the
+    caller or the view errors — the aggregate never converts a part failure
+    into a page failure."""
+    view = app.view_functions.get(endpoint_name)
+    if view is None:
+        return None
+    try:
+        resp = view(*args, **kwargs)
+        body = resp[0] if isinstance(resp, tuple) else resp
+        status = resp[1] if isinstance(resp, tuple) and len(resp) > 1 else getattr(body, "status_code", 200)
+        if status != 200:
+            return None
+        j = body.get_json(silent=True)
+        if j is None:
+            return None
+        return j.get("data", j)
+    except _AggHTTPException:
+        return None
+    except Exception as e:
+        logging.warning(f"#291 aggregate part {endpoint_name} failed: {e}")
+        return None
+
+
+@app.route('/api/console/bootstrap', methods=['GET'])
+@requires_company   # the console page itself is admin/c_suite-only (#263)
+def api_console_bootstrap():
+    """#291 — the company console's load() fan-out in ONE response.
+    Query args ride through to the parts that read them (?project=, ?date=,
+    ?limit=). Keys mirror the page's Promise.all order; a missing key means
+    "fetch it individually" (and that fetch will gate identically)."""
+    project = (request.args.get('project') or '').strip()
+    if not project:
+        conn = db()
+        row = conn.execute("SELECT project_code FROM projects WHERE status='active' "
+                           "ORDER BY project_code LIMIT 1").fetchone()
+        conn.close()
+        project = row["project_code"] if row else ""
+    parts = {
+        "summary": _agg_part("api_company_summary"),
+        "projects": _agg_part("get_projects"),
+        "compliance": _agg_part("api_compliance_summary"),
+        "activity": _agg_part("api_activity_recent"),
+        "material_alerts": _agg_part("materials_company_alerts"),
+    }
+    if project:
+        parts["rollup"] = _agg_part("api_dropplan_rollup", project)
+        parts["drops"] = _agg_part("api_dropplan_drops", project)
+        parts["on_site"] = _agg_part("api_project_on_site", project)
+    return response_wrapper({k: v for k, v in parts.items() if v is not None})
+
+
+@app.route('/api/projects/<project_code>/bootstrap', methods=['GET'])
+def api_project_bootstrap(project_code):
+    """#291 — the project dashboard's Project Health load() in ONE response.
+    Reached through the same /api/projects/<code>/ path the #263 scoping hook
+    guards; every part re-runs its own endpoint's gates."""
+    parts = {
+        "rollup": _agg_part("api_dropplan_rollup", project_code),
+        "drops": _agg_part("api_dropplan_drops", project_code),
+        "on_site": _agg_part("api_project_on_site", project_code),
+        "workers": _agg_part("api_project_workers", project_code),
+    }
+    return response_wrapper({k: v for k, v in parts.items() if v is not None})
+
 
 @app.errorhandler(404)
 def not_found(error):

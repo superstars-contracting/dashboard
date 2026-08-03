@@ -3282,7 +3282,7 @@
               const safeDesc = esc(p.description || '');
               tile.innerHTML =
                 '<div style="aspect-ratio:1;background:#F1EEE8;display:block;cursor:zoom-in;">' +
-                  '<img src="' + safeUrl + '" data-zoom-src="' + safeUrl + '" style="width:100%;height:100%;object-fit:cover;display:block;" alt="">' +
+                  '<img loading="lazy" decoding="async" src="' + safeUrl + '" data-zoom-src="' + safeUrl + '" style="width:100%;height:100%;object-fit:cover;display:block;" alt="">' +
                 '</div>' +
                 '<div style="padding:8px;font-size:11px;display:flex;flex-direction:column;gap:6px;">' +
                   (safeLoc ? '<div style="font-weight:600;color:#14161C;">' + safeLoc + '</div>' : '') +
@@ -6511,11 +6511,17 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
 
   async function load(){
     const t=todayLocal();
+    // #291 — ONE bootstrap round trip replaces the 4-call fan-out; per-part
+    // fallback keeps behavior identical when a key is absent (older server,
+    // part gated for this role — the individual endpoint refuses identically).
+    let bd={};
+    try{ const B=await jget(`/api/projects/${encodeURIComponent(PROJECT)}/bootstrap?date=${t}`); bd=(B&&B.data)||{}; }catch(e){ bd={}; }
+    const g=(k,url)=>(bd[k]!==undefined?Promise.resolve({data:bd[k]}):jget(url));
     const [rollup,drops,onSite,workers]=await Promise.all([
-      jget(`/api/dropplan/projects/${encodeURIComponent(PROJECT)}/rollup`),
-      jget(`/api/dropplan/projects/${encodeURIComponent(PROJECT)}/drops`),
-      jget(`/api/projects/${encodeURIComponent(PROJECT)}/on-site?date=${t}`),
-      jget(`/api/projects/${encodeURIComponent(PROJECT)}/workers`),
+      g('rollup',`/api/dropplan/projects/${encodeURIComponent(PROJECT)}/rollup`),
+      g('drops',`/api/dropplan/projects/${encodeURIComponent(PROJECT)}/drops`),
+      g('on_site',`/api/projects/${encodeURIComponent(PROJECT)}/on-site?date=${t}`),
+      g('workers',`/api/projects/${encodeURIComponent(PROJECT)}/workers`),
     ]);
     const D=(drops&&drops.data)||[], R=(rollup&&rollup.data)||{};
     try{ renderKpis(R,D,onSite,workers); }catch(e){ console.warn('[PH] kpis',e); }
