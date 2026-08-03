@@ -333,6 +333,50 @@
       return r.json();
     });
   }
+
+  // #291 — INSTANT PAINT. getJSON becomes write-through-cached (sessionStorage,
+  // per-URL; the URL embeds the project code). The first show() of a view whose
+  // payload is cached runs its loader TWICE: once synchronously against the
+  // cache (~0ms paint; a cache miss returns a never-resolving promise so
+  // nothing renders), then once live, updating in place — every loader is an
+  // idempotent DOM replace. Preview sessions (?preview_client) bypass the
+  // cache entirely: an admin preview must always show the live truth.
+  var _netGetJSON = getJSON;
+  var _cacheOnlyPass = false;
+  getJSON = function (url) {
+    if (PREVIEW_ID) return _netGetJSON(url);
+    var ck = 'ssc.boot.portal.' + url;
+    if (_cacheOnlyPass) {
+      try {
+        var env = JSON.parse(sessionStorage.getItem(ck) || 'null');
+        if (env && env.j) return Promise.resolve(env.j);
+      } catch (e) { }
+      return new Promise(function () { });   // miss: paint nothing, wait for live
+    }
+    return _netGetJSON(url).then(function (j) {
+      try {
+        var uid = (window.__PORTAL_UID != null) ? window.__PORTAL_UID : null;
+        sessionStorage.setItem(ck, JSON.stringify({ j: j, uid: uid }));
+      } catch (e) { }
+      return j;
+    });
+  };
+  function _bootPurge(all) {
+    try {
+      for (var i = sessionStorage.length - 1; i >= 0; i--) {
+        var k = sessionStorage.key(i);
+        if (!k || k.indexOf('ssc.boot.') !== 0) continue;
+        if (all) { sessionStorage.removeItem(k); continue; }
+        var env = JSON.parse(sessionStorage.getItem(k) || 'null');
+        if (env && env.uid != null && env.uid !== window.__PORTAL_UID) {
+          sessionStorage.removeItem(k);            // another user's cache
+        } else if (env && env.uid == null && window.__PORTAL_UID != null) {
+          env.uid = window.__PORTAL_UID;           // stamp this session's writes
+          sessionStorage.setItem(k, JSON.stringify(env));
+        }
+      }
+    } catch (e) { }
+  }
   // local-date weekday from a YYYY-MM-DD string (never new Date('YYYY-MM-DD'),
   // which parses UTC — the CLAUDE.md dates rule).
   function weekdayOf(iso) {
@@ -371,6 +415,8 @@
   fetch('/api/auth/me', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
     .then(function (j) {
       var me = (j && j.user) || {};   // /api/auth/me wraps as {user:{...}}
+      window.__PORTAL_UID = (me.id != null) ? me.id : null;   // #291
+      _bootPurge(false);                                       // #291 uid guard
       var nameEl = document.getElementById('acct-name');
       var roleEl = document.getElementById('acct-role');
       if (nameEl) nameEl.textContent = me.display_name || me.full_name || me.email || '';
@@ -383,6 +429,7 @@
     }).catch(function () { /* chip stays blank; the page itself is already authed */ });
 
   document.getElementById('signout').onclick = function () {
+    _bootPurge(true);   // #291 — the boot cache dies with the session, pre-network
     fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
       .then(function () { location.href = '/login'; });
   };
@@ -396,7 +443,13 @@
     document.querySelectorAll('[data-portal-nav]').forEach(function (n) {
       n.classList.toggle('active', n.getAttribute('data-portal-nav') === key);
     });
-    if (!loaded[key]) { loaded[key] = true; (LOADERS[key] || function () {})(); }
+    if (!loaded[key]) {
+      loaded[key] = true;
+      var L = LOADERS[key] || function () { };
+      // #291 — cache-paint pass (sync, ~0ms when cached), then the live pass
+      _cacheOnlyPass = true; try { L(); } finally { _cacheOnlyPass = false; }
+      L();
+    }
   }
   document.querySelectorAll('[data-portal-nav]').forEach(function (n) {
     n.addEventListener('click', function () { show(n.getAttribute('data-portal-nav')); });

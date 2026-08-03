@@ -226,6 +226,32 @@ def main() -> int:
         r = anon.get(f"{BASE}/api/field-photos/{ids['photo']}/thumb", timeout=15)
         ok("photo_thumb_anon_401", r.status_code == 401, f"{r.status_code}")
 
+        # ---- 4b. static bundle: bounded freshness + validator (#291 close) ----
+        r = admin.get(f"{BASE}/files/static/js/dash_layout.js", timeout=15)
+        ok("static_js_cacheable", r.status_code == 200 and
+           r.headers.get("Cache-Control") == "public, max-age=600",
+           f"got {r.headers.get('Cache-Control')!r}")
+        ok("static_js_has_validator", bool(r.headers.get("ETag") or r.headers.get("Last-Modified")))
+        # pages stay no-store (the #205 Safari-PWA lesson is scoped, not lost)
+        r = admin.get(f"{BASE}/", timeout=15)
+        ok("page_html_still_no_store", "no-store" in (r.headers.get("Cache-Control") or ""))
+
+        # ---- 4c. instant-paint cache: logout purge + uid guard (source) ----
+        amjs = (SCRIPT_DIR / "static" / "js" / "auth_menu.js").read_text(encoding="utf-8",
+                                                                         errors="replace")
+        logout_block = amjs[amjs.index("au-logout"):amjs.index("window.location.href = '/login'")]
+        ok("logout_purges_boot_cache", "SSC_BOOT.purge()" in logout_block)
+        ok("user_mismatch_guard_wired", "guardUser" in amjs)
+        shell = (SCRIPT_DIR / "portal_shell.html").read_text(encoding="utf-8", errors="replace")
+        so = shell[shell.index("getElementById('signout')"):]
+        ok("portal_logout_purges_cache", "_bootPurge(true)" in so.split("};")[0])
+        ok("portal_preview_bypasses_cache", "if (PREVIEW_ID) return _netGetJSON(url);" in shell)
+        for page, marker in (("company-dashboard.html", "SSC_BOOT.read('console')"),
+                             ("dashboard-static.html", "SSC_BOOT.read('project.'+PROJECT)")):
+            src_pg = (SCRIPT_DIR / page).read_text(encoding="utf-8", errors="replace")
+            ok(f"instant_paint_wired_{page.split('-')[0]}", marker in src_pg
+               and "SSC_BOOT.write(" in src_pg)
+
         # ---- 5. lazy grid (source-level) ----
         src = (SCRIPT_DIR / "dashboard-static.html").read_text(encoding="utf-8", errors="replace")
         fp_lazy = src.count("<img loading=\"lazy\"") + src.count("'<img loading=\"lazy\"")

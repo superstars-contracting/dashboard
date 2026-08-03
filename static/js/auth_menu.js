@@ -24,6 +24,48 @@
 
   function $(id) { return document.getElementById(id); }
 
+  // #291 — instant-paint boot cache (sessionStorage). Pages render their last
+  // bootstrap payload in ~0ms on back-navigation, then refresh in place.
+  // Session-scoped (dies with the tab), purged on Sign out (guard-asserted)
+  // and on any cached-uid/live-uid mismatch (shared-device belt-and-braces).
+  window.SSC_BOOT = {
+    _key: function (page) { return 'ssc.boot.' + page; },
+    read: function (page) {
+      try {
+        var j = JSON.parse(sessionStorage.getItem(this._key(page)) || 'null');
+        return (j && j.bd) ? j : null;
+      } catch (e) { return null; }
+    },
+    write: function (page, bd) {
+      try {
+        var uid = (window.__SSC_USER && window.__SSC_USER.id) || null;
+        sessionStorage.setItem(this._key(page),
+          JSON.stringify({ bd: bd, uid: uid, at: Date.now() }));
+      } catch (e) { /* quota/serialization — cache is optional */ }
+    },
+    purge: function () {
+      try {
+        var ks = [];
+        for (var i = 0; i < sessionStorage.length; i++) {
+          var k = sessionStorage.key(i);
+          if (k && k.indexOf('ssc.boot.') === 0) ks.push(k);
+        }
+        ks.forEach(function (k) { sessionStorage.removeItem(k); });
+      } catch (e) { }
+    },
+    guardUser: function (user) {
+      // purge every cached page whose writer wasn't THIS user
+      try {
+        for (var i = sessionStorage.length - 1; i >= 0; i--) {
+          var k = sessionStorage.key(i);
+          if (!k || k.indexOf('ssc.boot.') !== 0) continue;
+          var j = JSON.parse(sessionStorage.getItem(k) || 'null');
+          if (j && j.uid != null && user && j.uid !== user.id) sessionStorage.removeItem(k);
+        }
+      } catch (e) { }
+    }
+  };
+
   function escapeHtml(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;')
@@ -78,6 +120,9 @@
     btn.addEventListener('click', function () {
       btn.disabled = true;
       btn.textContent = 'Signing out…';
+      // #291 — the boot cache dies WITH the session, before the network call
+      // (logout must clear it even if the logout request itself fails)
+      if (window.SSC_BOOT) window.SSC_BOOT.purge();
       fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'same-origin',
@@ -113,6 +158,7 @@
         // hide controls a non-admin shouldn't see). The server-side gating
         // remains the real authority — this is UX, not security.
         window.__SSC_USER = body.user;
+        if (window.SSC_BOOT) window.SSC_BOOT.guardUser(body.user);  // #291
         render(host, body.user);
         document.dispatchEvent(new CustomEvent('ssc:user-loaded', { detail: body.user }));
       }

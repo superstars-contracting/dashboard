@@ -4631,6 +4631,20 @@ applyLanguage();
   function statusOf(d){const lc=(d.lifecycle||'');if(lc==='not_started')return 'not_started';const pct=(d.progress&&d.progress.pct)||0;if(pct>=100||/complete|closed|done/.test(lc))return 'complete';return 'active';}
   const jget=(u)=>fetch(u,{credentials:'include'}).then(r=>r.ok?r.json():null).catch(()=>null);
 
+  // #291 — render the whole console from one bootstrap-shaped map. Wrapper
+  // shapes reproduce EXACTLY what the pre-#291 Promise.all handed each
+  // renderer, so render logic stays byte-identical.
+  function renderAll(bd){
+    const wrap=k=>(bd[k]!==undefined?{data:bd[k]}:null);
+    const S=bd.summary||{}, D=bd.drops||[], R=bd.rollup||{};
+    try{ renderKpis(S,D,R); }catch(e){ console.warn('[CC] kpis',e); }
+    try{ renderActiveProject(wrap('projects'),R,D); }catch(e){ console.warn('[CC] active',e); }
+    try{ renderCompliance(S,wrap('compliance')); }catch(e){ console.warn('[CC] compliance',e); }
+    try{ renderOnSite(wrap('on_site')); }catch(e){ console.warn('[CC] onsite',e); }
+    try{ renderActivity(wrap('activity')); }catch(e){ console.warn('[CC] activity',e); }
+    try{ renderMaterialAlerts(wrap('material_alerts')); }catch(e){ console.warn('[CC] materials',e); }
+  }
+
   async function load(){
     const t=todayLocal();
     // #291 — ONE bootstrap round trip replaces the 8-call fan-out. Fallback is
@@ -4638,24 +4652,14 @@ applyLanguage();
     // fetched from its individual endpoint exactly as before.
     let bd={};
     try{ const B=await jget(`/api/console/bootstrap?project=${encodeURIComponent(PROJECT)}&date=${t}&limit=12`); bd=(B&&B.data)||{}; }catch(e){ bd={}; }
-    const g=(k,url)=>(bd[k]!==undefined?Promise.resolve({data:bd[k]}):jget(url));
-    const [summary,projects,rollup,drops,onSite,compliance,activity,matAlerts]=await Promise.all([
-      g('summary','/api/company/summary'),
-      g('projects','/api/projects'),
-      g('rollup',`/api/dropplan/projects/${PROJECT}/rollup`),
-      g('drops',`/api/dropplan/projects/${PROJECT}/drops`),
-      g('on_site',`/api/projects/${PROJECT}/on-site?date=${t}`),
-      g('compliance','/api/compliance/summary'),
-      g('activity','/api/activity/recent?limit=12'),
-      g('material_alerts','/api/company/material-alerts'),
-    ]);
-    const S=(summary&&summary.data)||{}, D=(drops&&drops.data)||[], R=(rollup&&rollup.data)||{};
-    try{ renderKpis(S,D,R); }catch(e){ console.warn('[CC] kpis',e); }
-    try{ renderActiveProject(projects,R,D); }catch(e){ console.warn('[CC] active',e); }
-    try{ renderCompliance(S,compliance); }catch(e){ console.warn('[CC] compliance',e); }
-    try{ renderOnSite(onSite); }catch(e){ console.warn('[CC] onsite',e); }
-    try{ renderActivity(activity); }catch(e){ console.warn('[CC] activity',e); }
-    try{ renderMaterialAlerts(matAlerts); }catch(e){ console.warn('[CC] materials',e); }
+    const FALLBACK={summary:'/api/company/summary',projects:'/api/projects',
+      rollup:`/api/dropplan/projects/${PROJECT}/rollup`,drops:`/api/dropplan/projects/${PROJECT}/drops`,
+      on_site:`/api/projects/${PROJECT}/on-site?date=${t}`,compliance:'/api/compliance/summary',
+      activity:'/api/activity/recent?limit=12',material_alerts:'/api/company/material-alerts'};
+    await Promise.all(Object.keys(FALLBACK).filter(k=>bd[k]===undefined).map(k=>
+      jget(FALLBACK[k]).then(r=>{ if(r&&r.data!==undefined)bd[k]=r.data; }).catch(()=>{})));
+    renderAll(bd);
+    if(window.SSC_BOOT) SSC_BOOT.write('console', bd);   // #291 instant paint on return
   }
 
   // #272b — every project's order-now / order-by materials in one glance. Rows exist
@@ -4752,8 +4756,31 @@ applyLanguage();
     }).join('')+'</div>';
   }
 
+  // #291 — subtle "Updating…" chip, shown ONLY when the background refresh
+  // outlives 1s after an instant cache paint (blank-then-wait is the enemy;
+  // a silent sub-second refresh needs no chrome at all).
+  function _tickEl(){
+    let el=$('cc-updating');
+    if(!el){
+      el=document.createElement('div'); el.id='cc-updating';
+      el.textContent='Updating…';
+      el.style.cssText='display:none;position:fixed;right:14px;bottom:14px;z-index:60;'
+        +'font:600 11px Inter,sans-serif;color:#76777E;background:#FFFFFFE6;'
+        +'border:1px solid #E8E4DD;border-radius:99px;padding:5px 12px;'
+        +'box-shadow:0 2px 10px rgba(0,0,0,.06);';
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+
   function boot(){
-    load();
+    // #291 — INSTANT PAINT: render the last bootstrap payload from
+    // sessionStorage (per-user; purged on logout / user change), then refresh
+    // in place. First-ever visit behaves exactly as before.
+    const cached = window.SSC_BOOT && SSC_BOOT.read('console');
+    if(cached){ try{ renderAll(cached.bd); }catch(e){ console.warn('[CC] cache paint',e); } }
+    const tickT=setTimeout(()=>{ _tickEl().style.display='inline-block'; },1000);
+    load().finally(()=>{ clearTimeout(tickT); const el=$('cc-updating'); if(el)el.style.display='none'; });
     // "Workforce" quick action → switch to the existing Workforce tab (same page)
     const wf=$('cc-act-workforce');
     if(wf) wf.addEventListener('click',(e)=>{ e.preventDefault(); const tab=document.querySelector('.nav-tab[data-panel="workforce"]'); if(tab){ tab.click(); tab.scrollIntoView({behavior:'smooth',block:'start'}); } });

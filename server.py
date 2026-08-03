@@ -4,6 +4,7 @@
 import ssc_tz
 ssc_tz.enforce()
 
+import flask
 from flask import Flask, jsonify, request, send_from_directory, send_file, Response, redirect
 from flask_cors import CORS
 import sqlite3
@@ -713,11 +714,69 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
+class _ReqConn:
+    """#291 — request-scoped connection PROXY. db() hands every caller in one
+    request the SAME underlying connection; a handler's .close() must not kill
+    it for the next caller (handlers close 'their' connection everywhere), so
+    close() ROLLS BACK instead — byte-equivalent to what a real close did to
+    uncommitted work (sqlite discards on close) while keeping the connection
+    alive. Everything else delegates to the real connection; the real close
+    happens in _close_req_conn at request teardown."""
+
+    __slots__ = ("_c",)
+
+    def __init__(self, c):
+        object.__setattr__(self, "_c", c)
+
+    def close(self):
+        try:
+            self._c.rollback()
+        except Exception:
+            pass
+
+    def __getattr__(self, name):
+        return getattr(self._c, name)
+
+    def __setattr__(self, name, value):
+        setattr(self._c, name, value)
+
+    def __enter__(self):
+        return self._c.__enter__()
+
+    def __exit__(self, *a):
+        return self._c.__exit__(*a)
+
+
 def db():
     # #259 — routed through the env-driven layer (SSC_DB_URL). SQLite is the DEFAULT
     # and returns the SAME native sqlite3 connection as before (60s timeout, Row,
     # WAL + busy_timeout); a postgres:// URL returns the psycopg-backed wrapper.
-    return db_layer.connect()
+    # #291 — ONE connection per request, cached on g: the app opened a fresh
+    # connection per db() call (several per request; the console bootstrap paid
+    # EIGHT network handshakes on cloud Postgres). Outside a request context
+    # (CLI scripts importing server helpers) behavior is unchanged per-call.
+    if not flask.has_request_context():
+        return db_layer.connect()
+    c = getattr(flask.g, "_ssc_req_conn", None)
+    if c is None:
+        c = db_layer.connect()
+        flask.g._ssc_req_conn = c
+    return _ReqConn(c)
+
+
+@app.teardown_request
+def _close_req_conn(exc):
+    """#291 — the request-scoped connection's REAL close. Exception -> roll
+    back first so a half-done write never lingers into the pool of one."""
+    c = getattr(flask.g, "_ssc_req_conn", None)
+    if c is not None:
+        flask.g._ssc_req_conn = None
+        try:
+            if exc is not None:
+                c.rollback()
+            c.close()
+        except Exception:
+            pass
 
 def rows_to_dicts(rows):
     return [dict(row) for row in rows]
@@ -10274,6 +10333,16 @@ def add_no_cache_headers(response):
     Without this, Safari aggressively caches PWA assets and edits never reach the device.
     """
     path = request.path or ''
+    # #291 — the vendored static bundle (/files/static/*) gets BOUNDED freshness
+    # instead of no-store: 10 min browser+edge (Cloudflare caches it; repeats are
+    # edge HITs) with Flask's ETag/conditional revalidation after. Deploys are
+    # fully fresh within the window. The Safari-PWA no-store lesson (#205) stays
+    # scoped to PAGES and the worker-app shell below — those still never cache.
+    if path.startswith('/files/static/'):
+        response.headers['Cache-Control'] = 'public, max-age=600'
+        response.headers.pop('Pragma', None)
+        response.headers.pop('Expires', None)
+        return response
     if path.endswith('.html') or path.endswith('.js') or path.endswith('-sw.js') or path == '/' or path.startswith('/worker-app'):
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
         response.headers['Pragma'] = 'no-cache'
