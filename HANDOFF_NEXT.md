@@ -611,23 +611,17 @@ restore from CSV).
 
 ---
 
-*Last updated: 2026-08-02 — **M5 CUTOVER COMPLETE. PRODUCTION IS THE CLOUD:
-https://app.superstarscontracting.com** (Cloudflare proxied Full-strict ->
-Render ssc-dashboard-go4h -> waitress -> managed Postgres -> /var/data;
-SSC_TRUSTED_PROXY=2). Final battery 22/22 ON THE APP DOMAIN; final sync =
-ssc_m5_final.db (104 tables, known-orphan delta only) + media ALL GREEN.
-WORKER DOOR SEALED on both hosts (worker_device_enforcement=1, zero devices
-provisioned — operator's explicit order): every PIN attempt 403s
-device_required until phones are provisioned. The workstation is the
-PARACHUTE: scheduled task STOPPED but registered, DB frozen at the
-Wednesday-evening state; rollback = Start-ScheduledTask (+ point Cloudflare
-app CNAME back if DNS-level rollback is needed). OPEN ITEMS: (1) Wix site
-404s — the NS-method connection broke when nameservers left Wix; operator
-must switch the Wix panel to the "Pointing" method; (2) the workstation's
-2026-07-30 20:49 exit-code-1 crash is undiagnosed (traceback in
-server-2026-07-30.log); (3) Google DKIM "Start authentication" click in
-Google Admin now that NS propagated; (4) 2-day burn-in, then decide the
-snapshot cron + tailnet/funnel retirement; (5) staff 2FA enrollment + 8
-phone provisionings, THEN unseal the worker door; (6) true-up the Render
-subscriptions row (58.55 estimated) against the first invoice. Gate is 36
-suites, green both backends, at 963783e.*
+*Last updated: 2026-08-03 — #291 SHIPPED (edc0a55): bootstrap aggregates
+(mirror-not-door, guard #37), request-scoped db connection, instant-paint
+sessionStorage cache (logout-purged, uid-guarded, preview-bypassed),
+immutable private thumbs, edge-cached statics, lazy tiles. Measured: console
+interactive halved (3.3s -> 1.59s p50 warm; target 1.0-1.5s NEAR-MISSED —
+named offender: bootstrap's 8 parts run serially, next lever is
+intra-aggregate parallelism); dashboard 2.5 -> 1.6s; repeat photo grids are
+zero-request. Production = app.superstarscontracting.com (CF proxied),
+workstation = parachute + dev. Gate is 37 suites both backends. PART B
+hardening (Render PG credential rotation + external-access IP allowlist) is
+operator-driven — walkthrough in the #291 close report; rotation invalidates
+the terminal env + 1Password external-URL item until re-pasted. Standing
+opens: Wix re-point, DKIM start-auth, staff 2FA + phone provisioning before
+unsealing the worker door, Wed-crash diagnosis, first-invoice true-up.*
