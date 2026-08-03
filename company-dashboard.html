@@ -4708,7 +4708,7 @@ applyLanguage();
         <div class="cc-active-client">Compass Point, LLC</div>
         <div class="cc-active-sub">${esc(p.address||'890 E 135th Street')} · ${esc(PROJECT)}</div>
         <div class="cc-active-sub"><b>${dropsN}</b> drops · <b>${active}</b> active</div>
-        <a class="cc-open" href="/projects/${encodeURIComponent(PROJECT)}">Open project →</a>
+        <a class="cc-open" href="/projects/${encodeURIComponent(PROJECT)}" data-prefetch="/api/projects/${encodeURIComponent(PROJECT)}/bootstrap?date=${todayLocal()}#project.${PROJECT}">Open project →</a>
       </div></div>`;
   }
 
@@ -4779,6 +4779,12 @@ applyLanguage();
     // in place. First-ever visit behaves exactly as before.
     const cached = window.SSC_BOOT && SSC_BOOT.read('console');
     if(cached){ try{ renderAll(cached.bd); }catch(e){ console.warn('[CC] cache paint',e); } }
+    else if(window.SSC_PERF){
+      // #292 — cold first visit: oat-soft skeletons instead of blank widgets
+      ['cc-active-body','cc-compliance-body','cc-onsite-body','cc-activity-body',
+       'cc-materials-body'].forEach(id=>SSC_PERF.skeleton($(id),3));
+    }
+    if(window.SSC_PERF) SSC_PERF.prefetchWire();   // #292 — staff intent prefetch
     const tickT=setTimeout(()=>{ _tickEl().style.display='inline-block'; },1000);
     load().finally(()=>{ clearTimeout(tickT); const el=$('cc-updating'); if(el)el.style.display='none'; });
     // "Workforce" quick action → switch to the existing Workforce tab (same page)

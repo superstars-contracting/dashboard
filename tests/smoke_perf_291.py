@@ -252,6 +252,31 @@ def main() -> int:
             ok(f"instant_paint_wired_{page.split('-')[0]}", marker in src_pg
                and "SSC_BOOT.write(" in src_pg)
 
+        # ---- 4d. #292 shared layer (source-level) ----
+        amjs2 = (SCRIPT_DIR / "static" / "js" / "auth_menu.js").read_text(encoding="utf-8",
+                                                                          errors="replace")
+        boot_block = amjs2[amjs2.index("window.SSC_BOOT"):amjs2.index("window.SSC_PERF")]
+        ok("292_staff_cache_is_localstorage", "localStorage.getItem" in boot_block
+           and "BOOT_TTL_MS" in amjs2)
+        ok("292_purge_covers_both_stores",
+           "[localStorage, sessionStorage].forEach" in boot_block)
+        srv = (SCRIPT_DIR / "server.py").read_text(encoding="utf-8", errors="replace")
+        ok("292_aggregates_run_parallel", "_agg_parallel(" in srv
+           and "copy_current_request_context" in srv)
+        for page in ("company-dashboard.html", "dashboard-static.html"):
+            src_pg2 = (SCRIPT_DIR / page).read_text(encoding="utf-8", errors="replace")
+            tag = page.split('-')[0]
+            ok(f"292_skeletons_wired_{tag}", "SSC_PERF.skeleton(" in src_pg2)
+            ok(f"292_prefetch_wired_{tag}", "SSC_PERF.prefetchWire()" in src_pg2
+               and "data-prefetch=" in src_pg2)
+        # portal + worker shells must NEVER get the staff perf chrome: no
+        # localStorage boot cache, no prefetch (shared/borrowed devices)
+        for ext_page in ("portal_shell.html", "worker-app.html"):
+            src_ext = (SCRIPT_DIR / ext_page).read_text(encoding="utf-8", errors="replace")
+            ok(f"292_no_staff_chrome_{ext_page.split('.')[0].split('_')[0].split('-')[0]}",
+               "auth_menu.js" not in src_ext and "prefetchWire" not in src_ext
+               and "localStorage.setItem('ssc.boot" not in src_ext)
+
         # ---- 5. lazy grid (source-level) ----
         src = (SCRIPT_DIR / "dashboard-static.html").read_text(encoding="utf-8", errors="replace")
         fp_lazy = src.count("<img loading=\"lazy\"") + src.count("'<img loading=\"lazy\"")

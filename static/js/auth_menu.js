@@ -24,45 +24,110 @@
 
   function $(id) { return document.getElementById(id); }
 
-  // #291 — instant-paint boot cache (sessionStorage). Pages render their last
-  // bootstrap payload in ~0ms on back-navigation, then refresh in place.
-  // Session-scoped (dies with the tab), purged on Sign out (guard-asserted)
-  // and on any cached-uid/live-uid mismatch (shared-device belt-and-braces).
+  // #291/#292 — instant-paint boot cache. STAFF surfaces use localStorage
+  // (survives the browser restart: the FIRST page of the day paints warm)
+  // with a 24h TTL; per-user key material, purged on Sign out
+  // (guard-asserted) and on any cached-uid/live-uid mismatch. Portal + worker
+  // surfaces keep their own sessionStorage caches (shared/borrowed devices
+  // must never carry a payload across sessions).
+  var BOOT_TTL_MS = 24 * 60 * 60 * 1000;
   window.SSC_BOOT = {
     _key: function (page) { return 'ssc.boot.' + page; },
     read: function (page) {
       try {
-        var j = JSON.parse(sessionStorage.getItem(this._key(page)) || 'null');
-        return (j && j.bd) ? j : null;
+        var j = JSON.parse(localStorage.getItem(this._key(page)) || 'null');
+        if (!j || !j.bd) return null;
+        if (j.at && (Date.now() - j.at) > BOOT_TTL_MS) {         // stale day-old
+          localStorage.removeItem(this._key(page));
+          return null;
+        }
+        return j;
       } catch (e) { return null; }
     },
     write: function (page, bd) {
       try {
         var uid = (window.__SSC_USER && window.__SSC_USER.id) || null;
-        sessionStorage.setItem(this._key(page),
+        localStorage.setItem(this._key(page),
           JSON.stringify({ bd: bd, uid: uid, at: Date.now() }));
       } catch (e) { /* quota/serialization — cache is optional */ }
     },
     purge: function () {
       try {
-        var ks = [];
-        for (var i = 0; i < sessionStorage.length; i++) {
-          var k = sessionStorage.key(i);
-          if (k && k.indexOf('ssc.boot.') === 0) ks.push(k);
-        }
-        ks.forEach(function (k) { sessionStorage.removeItem(k); });
+        [localStorage, sessionStorage].forEach(function (store) {
+          var ks = [];
+          for (var i = 0; i < store.length; i++) {
+            var k = store.key(i);
+            if (k && k.indexOf('ssc.boot.') === 0) ks.push(k);
+          }
+          ks.forEach(function (k) { store.removeItem(k); });
+        });
       } catch (e) { }
     },
     guardUser: function (user) {
       // purge every cached page whose writer wasn't THIS user
       try {
-        for (var i = sessionStorage.length - 1; i >= 0; i--) {
-          var k = sessionStorage.key(i);
-          if (!k || k.indexOf('ssc.boot.') !== 0) continue;
-          var j = JSON.parse(sessionStorage.getItem(k) || 'null');
-          if (j && j.uid != null && user && j.uid !== user.id) sessionStorage.removeItem(k);
-        }
+        [localStorage, sessionStorage].forEach(function (store) {
+          for (var i = store.length - 1; i >= 0; i--) {
+            var k = store.key(i);
+            if (!k || k.indexOf('ssc.boot.') !== 0) continue;
+            var j = JSON.parse(store.getItem(k) || 'null');
+            if (j && j.uid != null && user && j.uid !== user.id) store.removeItem(k);
+          }
+        });
       } catch (e) { }
+    }
+  };
+
+  // #292 — SHARED perf chrome: skeleton frames + intent prefetch.
+  window.SSC_PERF = {
+    // House-style oat-soft skeleton blocks: structure visible instantly,
+    // never blank white, never a spinner. el gets n shimmer rows until the
+    // first real render replaces its innerHTML.
+    skeleton: function (el, n) {
+      if (!el || el.childElementCount) return;
+      if (!document.getElementById('ssc-skel-style')) {
+        var st = document.createElement('style');
+        st.id = 'ssc-skel-style';
+        st.textContent =
+          '.ssc-skel{display:block;border-radius:8px;background:linear-gradient(90deg,' +
+          '#F1EEE8 25%,#E8E4DD 37%,#F1EEE8 63%);background-size:400% 100%;' +
+          'animation:sscskel 1.2s ease infinite;height:16px;margin:10px 0;}' +
+          '@keyframes sscskel{0%{background-position:100% 0}100%{background-position:0 0}}';
+        document.head.appendChild(st);
+      }
+      var frag = document.createDocumentFragment();
+      for (var i = 0; i < (n || 3); i++) {
+        var d = document.createElement('span');
+        d.className = 'ssc-skel';
+        if (i === 0) d.style.width = '60%';
+        frag.appendChild(d);
+      }
+      el.appendChild(frag);
+    },
+    // Hover/intent prefetch (STAFF surfaces only — never wired on portal or
+    // worker shells): an element with data-prefetch="/api/...&page=<key>"
+    // warms the SSC_BOOT cache for its target page on first hover, at most
+    // once per key per 30s.
+    _pf: {},
+    prefetchWire: function (root) {
+      var self = this;
+      (root || document).addEventListener('mouseover', function (e) {
+        var a = e.target && e.target.closest && e.target.closest('[data-prefetch]');
+        if (!a) return;
+        var spec = a.getAttribute('data-prefetch') || '';
+        var cut = spec.lastIndexOf('#');
+        if (cut < 0) return;
+        var url = spec.slice(0, cut), page = spec.slice(cut + 1);
+        if (!url || !page) return;
+        var now = Date.now();
+        if (self._pf[page] && (now - self._pf[page]) < 30000) return;
+        self._pf[page] = now;
+        fetch(url, { credentials: 'same-origin' }).then(function (r) {
+          return r.ok ? r.json() : null;
+        }).then(function (j) {
+          if (j && j.data && window.SSC_BOOT) window.SSC_BOOT.write(page, j.data);
+        }).catch(function () { });
+      }, { passive: true });
     }
   };
 

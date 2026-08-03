@@ -866,7 +866,7 @@
          a pm keeps the projects link (to /projects, their assigned list). A pm is never
          served a path to the company console (which 403s for them anyway). -->
     <!-- BACKLINK_COMPANY:start -->
-    <a href="/" style="display:flex;align-items:center;gap:8px;padding:10px 18px;color:#76777E;font-size:12px;text-decoration:none;border-bottom:1px solid #E8E4DD;letter-spacing:0.5px;text-transform:uppercase;font-weight:600;transition:color 0.15s;" onmouseover="this.style.color='#B11E2E'" onmouseout="this.style.color='#76777E'">
+    <a href="/" data-prefetch="/api/console/bootstrap#console" style="display:flex;align-items:center;gap:8px;padding:10px 18px;color:#76777E;font-size:12px;text-decoration:none;border-bottom:1px solid #E8E4DD;letter-spacing:0.5px;text-transform:uppercase;font-weight:600;transition:color 0.15s;" onmouseover="this.style.color='#B11E2E'" onmouseout="this.style.color='#76777E'">
       ← Back to Company
     </a>
     <!-- BACKLINK_COMPANY:end -->
@@ -6663,6 +6663,11 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     // "Updating…" chip appears only if the refresh outlives 1s.
     const cached = window.SSC_BOOT && SSC_BOOT.read('project.'+PROJECT);
     if(cached){ try{ renderAll(cached.bd); }catch(e){ console.warn('[PH] cache paint',e); } }
+    else if(window.SSC_PERF){
+      // #292 — cold first visit: skeleton frames, never blank widgets
+      ['ph-active-body','ph-roster-body','ph-certs-body'].forEach(id=>SSC_PERF.skeleton($(id),3));
+    }
+    if(window.SSC_PERF) SSC_PERF.prefetchWire();   // #292 — staff intent prefetch
     let tick=$('ph-updating');
     if(!tick){
       tick=document.createElement('div'); tick.id='ph-updating'; tick.textContent='Updating…';

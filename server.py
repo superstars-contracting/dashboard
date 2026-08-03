@@ -11143,13 +11143,48 @@ def _agg_part(endpoint_name, *args, **kwargs):
         return None
 
 
+def _agg_parallel(specs, workers=4):
+    """#292 — run aggregate parts CONCURRENTLY. specs: {key: (endpoint, args)}.
+
+    Each part executes on a worker thread inside a COPY of the current request
+    context (built in the PARENT thread, where the context is active). The
+    copy pushes a fresh app context, so the parent's authenticated user is
+    seeded into the thread's g (current_user reads g.auth_user, which the
+    before_request gate set only on the parent). db() inside the thread sees
+    the fresh g too — each part gets ITS OWN connection, and the context pop
+    fires teardown_request in-thread, closing it. The parts remain the exact
+    registered gated view functions: mirror-not-door is unchanged, and the
+    #37 parity guard proves it stays that way."""
+    from concurrent.futures import ThreadPoolExecutor
+    parent_user = current_user()
+
+    def make(ep, args):
+        @flask.copy_current_request_context
+        def _inner():
+            flask.g.auth_user = parent_user
+            return _agg_part(ep, *args)
+        return _inner
+
+    jobs = {k: make(ep, args) for k, (ep, args) in specs.items()}
+    out = {}
+    with ThreadPoolExecutor(max_workers=min(workers, max(1, len(jobs)))) as ex:
+        futs = {k: ex.submit(fn) for k, fn in jobs.items()}
+        for k, f in futs.items():
+            try:
+                out[k] = f.result()
+            except Exception as e:
+                logging.warning(f"#292 parallel aggregate part {k} failed: {e}")
+                out[k] = None
+    return out
+
+
 @app.route('/api/console/bootstrap', methods=['GET'])
 @requires_company   # the console page itself is admin/c_suite-only (#263)
 def api_console_bootstrap():
-    """#291 — the company console's load() fan-out in ONE response.
-    Query args ride through to the parts that read them (?project=, ?date=,
-    ?limit=). Keys mirror the page's Promise.all order; a missing key means
-    "fetch it individually" (and that fetch will gate identically)."""
+    """#291/#292 — the company console's load() fan-out in ONE response,
+    parts executed in parallel. Query args ride through to the parts that
+    read them (?project=, ?date=, ?limit=). A missing key means "fetch it
+    individually" (and that fetch will gate identically)."""
     project = (request.args.get('project') or '').strip()
     if not project:
         conn = db()
@@ -11157,31 +11192,32 @@ def api_console_bootstrap():
                            "ORDER BY project_code LIMIT 1").fetchone()
         conn.close()
         project = row["project_code"] if row else ""
-    parts = {
-        "summary": _agg_part("api_company_summary"),
-        "projects": _agg_part("get_projects"),
-        "compliance": _agg_part("api_compliance_summary"),
-        "activity": _agg_part("api_activity_recent"),
-        "material_alerts": _agg_part("materials_company_alerts"),
+    specs = {
+        "summary": ("api_company_summary", ()),
+        "projects": ("get_projects", ()),
+        "compliance": ("api_compliance_summary", ()),
+        "activity": ("api_activity_recent", ()),
+        "material_alerts": ("materials_company_alerts", ()),
     }
     if project:
-        parts["rollup"] = _agg_part("api_dropplan_rollup", project)
-        parts["drops"] = _agg_part("api_dropplan_drops", project)
-        parts["on_site"] = _agg_part("api_project_on_site", project)
+        specs["rollup"] = ("api_dropplan_rollup", (project,))
+        specs["drops"] = ("api_dropplan_drops", (project,))
+        specs["on_site"] = ("api_project_on_site", (project,))
+    parts = _agg_parallel(specs)
     return response_wrapper({k: v for k, v in parts.items() if v is not None})
 
 
 @app.route('/api/projects/<project_code>/bootstrap', methods=['GET'])
 def api_project_bootstrap(project_code):
-    """#291 — the project dashboard's Project Health load() in ONE response.
-    Reached through the same /api/projects/<code>/ path the #263 scoping hook
-    guards; every part re-runs its own endpoint's gates."""
-    parts = {
-        "rollup": _agg_part("api_dropplan_rollup", project_code),
-        "drops": _agg_part("api_dropplan_drops", project_code),
-        "on_site": _agg_part("api_project_on_site", project_code),
-        "workers": _agg_part("api_project_workers", project_code),
-    }
+    """#291/#292 — the project dashboard's Project Health load() in ONE
+    response, parts in parallel. Reached through the same /api/projects/<code>/
+    path the #263 scoping hook guards; every part re-runs its own gates."""
+    parts = _agg_parallel({
+        "rollup": ("api_dropplan_rollup", (project_code,)),
+        "drops": ("api_dropplan_drops", (project_code,)),
+        "on_site": ("api_project_on_site", (project_code,)),
+        "workers": ("api_project_workers", (project_code,)),
+    })
     return response_wrapper({k: v for k, v in parts.items() if v is not None})
 
 
