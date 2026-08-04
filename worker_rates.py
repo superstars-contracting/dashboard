@@ -231,6 +231,11 @@ def set_rate(
         conn.rollback()
         raise
 
+    # #292 — rates are per-worker and cross projects: bump the labor_cost
+    # DOMAIN (root), invalidating every project's memoized labor engine.
+    import ssc_memo
+    ssc_memo.bump('labor_cost')
+
     # Re-fetch the new row for the caller
     new_row = conn.execute(
         "SELECT id, employee_id, hourly_rate, effective_from, effective_to, "
@@ -312,6 +317,11 @@ def bridge_approved_rate(
         after={"id": new_id, "hourly_rate": rate_val, "effective_from": effective_from},
         note=notes or "PM-approved rate change (bridge)",
     )
+    # #292 — domain bump (rates cross projects). Fires pre-commit in the
+    # caller's transaction: over-invalidation on a rollback is SAFE (one
+    # spurious recompute); under-invalidation is the bug class ssc_memo bans.
+    import ssc_memo
+    ssc_memo.bump('labor_cost')
     return new_id
 
 

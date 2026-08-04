@@ -2416,9 +2416,17 @@ def _mark_dcr_stale(conn, project_code, report_date):
     edited labor on a day that was never issued — nothing to mark).
     Re-running on an already-stale row is also a no-op (the WHERE
     clause matches but the UPDATE is idempotent).
+
+    #292 — this is ALSO the labor-cost invalidation choke-point: every
+    sign_in_log mutation path already routes here by doctrine, so the
+    memoized labor engine (ssc_memo 'labor_cost') is bumped exactly where
+    labor truth changes. A future sign-in write that skips this helper
+    breaks the stale-flag AND the memo guard — two red gates, not one.
     """
     if not project_code or not report_date:
         return
+    import ssc_memo
+    ssc_memo.bump('labor_cost', project_code)
     conn.execute(
         "UPDATE report_index SET stale = 1, stale_marked_at = CURRENT_TIMESTAMP "
         "WHERE project_code = ? AND report_date = ? "

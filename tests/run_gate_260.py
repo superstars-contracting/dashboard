@@ -68,6 +68,7 @@ GATE = [
     "smoke_public_hardening_289.py",  # #289 guard — login backoff/no-enum, TOTP, force_sso, worker device binding, session flags
     "smoke_tz_290.py",            # #290 guard — SSC_TZ enforcement: Eastern today on a UTC host; planted 23:30 boundary; Windows no-op
     "smoke_perf_291.py",          # #291 guard — bootstrap aggregates mirror-not-door (parity, subset, containment) + thumb cache headers + lazy grid
+    "smoke_memo_292.py",          # #292 guard — ssc_memo: planted-write invalidation per type (stale serve = red), two-role boundary, single-flight, deep-copy serves
     "smoke_dropplan_api.py",
     "smoke_worker_lifecycle.py",
     "smoke_dcr214_lifecycle.py",

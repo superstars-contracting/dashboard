@@ -151,7 +151,15 @@ def expense_sums(conn, project_code) -> dict:
 def widget_payload(conn, project_code, today=None) -> dict:
     """The full widget payload for ONE project (caller enforces the role gate)."""
     today = today or date.today()
-    lab = labor_breakdown(conn, project_code, today)
+    # #292 — the LABOR ENGINE (per-row worked-hours × day-effective rates) is
+    # the expensive NEUTRAL compute; it memoizes via ssc_memo, invalidated by
+    # sign-in writes / rate changes / expense writes (see the domain registry).
+    # The date rides IN the key: a new day is a new key by construction, never
+    # a TTL guess. Everything below — expense sums (cheap, live), shaping,
+    # rounding, role-gated serving — stays per-request ABOVE the cache.
+    import ssc_memo
+    lab = ssc_memo.memoize(("labor_cost", project_code, today.isoformat()),
+                           lambda: labor_breakdown(conn, project_code, today))
     exp = expense_sums(conn, project_code)
     total = lab["total"] + exp["total"]
 
@@ -288,6 +296,10 @@ def _api_expense_create(project_code):
             (project_code, ed, (d.get("vendor") or "").strip() or None, cat, float(amt),
              (d.get("note") or "").strip() or None, _uid(), _now()))
         conn.commit()
+        # #292 — expenses live-compute above the cached labor engine today; the
+        # bump is defense-in-depth for any future whole-widget caching.
+        import ssc_memo
+        ssc_memo.bump('labor_cost', project_code)
         rid = conn.execute("SELECT MAX(id) AS m FROM project_expense").fetchone()["m"]
         return jsonify({"data": {"id": rid, "amount": float(amt), "category": cat}}), 201
     finally:
@@ -301,7 +313,7 @@ def _api_expense_void(expense_id):
     d = request.get_json(silent=True) or {}
     conn = _db()
     try:
-        r = conn.execute("SELECT id, voided_at FROM project_expense WHERE id=?",
+        r = conn.execute("SELECT id, voided_at, project_code FROM project_expense WHERE id=?",
                          (expense_id,)).fetchone()
         if not r:
             return jsonify({"error": "not found"}), 404
@@ -314,6 +326,8 @@ def _api_expense_void(expense_id):
             "UPDATE project_expense SET voided_at=?, voided_by_uid=?, void_note=? WHERE id=?",
             (_now(), _uid(), note, expense_id))
         conn.commit()
+        import ssc_memo
+        ssc_memo.bump('labor_cost', r["project_code"])   # #292 — see create
         return jsonify({"data": {"id": expense_id, "voided": True}})
     finally:
         conn.close()

@@ -260,6 +260,23 @@ commit, nothing else.** Guarded by `tests/smoke_portal_flip_284.py` (56
 checks, planted-failure-proven) + the updated landing contracts in
 smoke_portal_shell_281 / smoke_client_grants_269.
 
+### The memo doctrine (#292 — permanent)
+
+Expensive reads are memoized via ssc_memo with write-invalidation. TTL
+freshness-guessing is banned. Every memoized payload ships with a
+planted-write invalidation guard: each invalidating write type must provably
+change the served payload, and a stale serve is a red gate.
+
+Mechanics: `ssc_memo.memoize(scope, fn)` caches the RAW role-NEUTRAL
+aggregation only — gating/curation/shaping stay per-request ABOVE the cache
+(two-role probe in the guard). Time-dependent computes put the date IN the
+scope key (a new day is a new key by construction). Domain writes bump at
+their choke-points: sign-in writes ride `_mark_dcr_stale` (every labor
+mutation already routes there); rate changes ride worker_rates.set_rate +
+bridge_approved_rate (domain-wide — rates cross projects); expense
+create/void bump per project. Serves are deep copies; single-flight per
+scope. Guard: tests/smoke_memo_292.py (gate #39).
+
 ### Two invariants that are load-bearing
 
 **DCR numbers are immutable.** A DCR's number is its identity (report_id,
