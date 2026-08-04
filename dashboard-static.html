@@ -1001,7 +1001,7 @@
          and the sidebar-footer account block consume them); its Sign out action
          is reused by the account block. -->
     <span id="user-menu" style="display:none" aria-hidden="true"></span>
-    <script src="/files/static/js/auth_menu.js" defer></script>
+    <script src="/files/static/js/auth_menu.js?v=292" defer></script>
     <div class="content-corner"><span class="cc-live"><span class="cc-dot"></span>Live · <span id="live-date">—</span></span></div>
     <script>
       // #193 — reveal the Labor Rate Tracker entry surfaces (nav link
@@ -6630,18 +6630,40 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   function hint(t){ const h=$('ph-layout-hint'); if(h)h.textContent=t; }
   function resizeCharts(){ try{ if(donut)donut.resize(); if(bar)bar.resize(); }catch(e){} }
   function serializeLayout(){ return grid.save(false).map(n=>({id:n.id,x:n.x,y:n.y,w:n.w,h:n.h})); }
+  // #292 — layout cache (rides SSC_BOOT: localStorage, TTL, logout purge, uid guard)
+  function readCachedLayout(){
+    try{ const env=window.SSC_BOOT&&SSC_BOOT.read('layout.'+PAGE_KEY); return env&&env.bd; }catch(e){ return null; }
+  }
+  function writeCachedLayout(l){ try{ if(window.SSC_BOOT)SSC_BOOT.write('layout.'+PAGE_KEY,l); }catch(e){} }
+
   async function saveLayout(){
     try{
-      await fetch('/api/dashboard/layout',{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({page_key:PAGE_KEY,layout:serializeLayout()})});
+      const snap=serializeLayout();
+      writeCachedLayout(snap);   // #292 — write-through on every persist
+      await fetch('/api/dashboard/layout',{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({page_key:PAGE_KEY,layout:snap})});
       hint('Layout saved · '+fmtMDY(todayLocal()));
     }catch(e){ hint('Save failed — will retry on next move'); }
   }
   function scheduleSave(){ if(suppressSave)return; clearTimeout(saveTimer); saveTimer=setTimeout(saveLayout,500); }
   function applyLayout(layout){ suppressSave=true; grid.load(layout); setTimeout(()=>{suppressSave=false; resizeCharts();},60); }
-  async function loadSavedLayout(){
+  async function loadSavedLayout(paintedJson){
+    // #292 — DEMOTED to background reconciliation: apply only on a genuine
+    // difference from what the first frame already painted, never animated.
     const j=await fetch('/api/dashboard/layout?page_key='+PAGE_KEY,{credentials:'include'}).then(r=>r.ok?r.json():null).catch(()=>null);
     const layout=j&&j.data&&j.data.layout;
-    if(Array.isArray(layout)&&layout.length){ applyLayout(layout); hint('Your saved layout restored'); return true; }
+    if(Array.isArray(layout)&&layout.length){
+      if(paintedJson!==null&&JSON.stringify(layout)===paintedJson){ hint('Your saved layout restored'); return true; }
+      try{ grid.setAnimation(false); }catch(e){}
+      applyLayout(layout);
+      writeCachedLayout(layout);
+      setTimeout(()=>{ try{ grid.setAnimation(true); }catch(e){} },80);
+      hint('Your saved layout restored'); return true;
+    }
+    if(paintedJson!==null){
+      try{ grid.setAnimation(false); }catch(e){}
+      applyLayout(DEFAULT_LAYOUT);
+      setTimeout(()=>{ try{ grid.setAnimation(true); }catch(e){} },80);
+    }
     hint('Default layout'); return false;
   }
   async function resetLayout(){
@@ -6650,10 +6672,23 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   }
   function initGrid(){
     if(typeof GridStack==='undefined'){ hint('Drag library unavailable — layout is fixed'); return; }
-    grid=GridStack.init({column:12,cellHeight:88,margin:8,handle:'.ph-grip',draggable:{handle:'.ph-grip'},resizable:{handles:'e,se,s,sw,w'},float:false});
+    // #292 — animate:false at init so the synchronous cache-apply lands in the
+    // FIRST painted frame (no tween from markup positions); re-enabled after.
+    grid=GridStack.init({column:12,cellHeight:88,margin:8,handle:'.ph-grip',draggable:{handle:'.ph-grip'},resizable:{handles:'e,se,s,sw,w'},float:false,animate:false});
     grid.on('change',()=>{ scheduleSave(); resizeCharts(); });
     const rb=$('ph-reset-layout'); if(rb)rb.addEventListener('click',resetLayout);
-    loadSavedLayout();
+    // #292 — FIRST FRAME: cached layout applied synchronously, same task as
+    // init. MUST precede the (now background) server fetch.
+    const cached=readCachedLayout();
+    let painted=null;
+    if(Array.isArray(cached)&&cached.length){
+      applyLayout(cached);
+      painted=JSON.stringify(cached);
+      hint('Your saved layout');
+      try{ performance.mark('ssc-layout-cache-applied'); }catch(e){}
+    }
+    try{ grid.setAnimation(true); }catch(e){}
+    loadSavedLayout(painted);
   }
 
   function boot(){

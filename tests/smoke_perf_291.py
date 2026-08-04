@@ -277,6 +277,35 @@ def main() -> int:
                "auth_menu.js" not in src_ext and "prefetchWire" not in src_ext
                and "localStorage.setItem('ssc.boot" not in src_ext)
 
+        # ---- 4e. #292 S2.0 — zero layout shift (source-level ordering) ----
+        dl = (SCRIPT_DIR / "static" / "js" / "dash_layout.js").read_text(encoding="utf-8",
+                                                                         errors="replace")
+        ok("s20_shared_init_animate_off", "animate: false" in dl)
+        sync_at = dl.find("FIRST FRAME")
+        get_at = dl.find("api('GET'")
+        ok("s20_shared_cache_apply_before_server_fetch", 0 <= sync_at < get_at)
+        ok("s20_shared_reconcile_unanimated", "applySilent" in dl
+           and "setAnimation(false)" in dl)
+        ok("s20_shared_writethrough_on_save", "writeCachedLayout(PAGE_KEY, snap)" in dl)
+        ok("s20_shared_portal_sessionstorage_fallback",
+           "sessionStorage.setItem('ssc.boot.layout." in dl.replace('" + ', "'"))
+        ph = (SCRIPT_DIR / "dashboard-static.html").read_text(encoding="utf-8",
+                                                              errors="replace")
+        ok("s20_ph_init_animate_off", "float:false,animate:false" in ph)
+        ph_sync = ph.find("const cached=readCachedLayout()")
+        ph_fetch = ph.find("loadSavedLayout(painted)")
+        ok("s20_ph_cache_apply_before_server_fetch", 0 <= ph_sync < ph_fetch)
+        ok("s20_ph_reconcile_unanimated", "grid.setAnimation(false)" in ph)
+        # the first-frame evidence mark is part of the contract (preview
+        # verification reads it: mark.startTime <= DOMContentLoaded)
+        ok("s20_first_frame_mark_present",
+           dl.count("ssc-layout-cache-applied") >= 1 and ph.count("ssc-layout-cache-applied") >= 1)
+        # v=292 stamps: this deploy's pages atomically load this deploy's JS
+        cc = (SCRIPT_DIR / "company-dashboard.html").read_text(encoding="utf-8", errors="replace")
+        ok("s20_versioned_script_urls",
+           "dash_layout.js?v=292" in cc and "auth_menu.js?v=292" in cc
+           and "dash_layout.js?v=292" in shell)
+
         # ---- 5. lazy grid (source-level) ----
         src = (SCRIPT_DIR / "dashboard-static.html").read_text(encoding="utf-8", errors="replace")
         fp_lazy = src.count("<img loading=\"lazy\"") + src.count("'<img loading=\"lazy\"")
