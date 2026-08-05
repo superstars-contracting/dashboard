@@ -149,6 +149,20 @@ re-entering the burn-in window's data.
 
 ---
 
+## 4b. DB access control (post-#291 PART B — rotated + locked 2026-08-05)
+
+The ssc-dashboard-db credential was rotated and its Access Control allowlist
+now holds ONLY the workstation's IP (/32). The app uses the INTERNAL URL and
+is unaffected by the allowlist.
+
+**T-Mobile drifts the workstation IP.** When a DB-side op (final-sync-style
+migrate, battery FULL phase) fails to connect, the 30-second fix:
+1. whatsmyip from the workstation (e.g. `curl ifconfig.me`).
+2. Render dashboard -> ssc-dashboard-db -> Access Control -> replace the
+   stale entry with the new IP + `/32` -> Save.
+No restarts, no redeploys; takes effect immediately. Never widen to
+0.0.0.0/0 again.
+
 ## 5. Costs to record in the subscriptions ledger (true-up after moment 1)
 
 | Item | Expected |
