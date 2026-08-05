@@ -303,8 +303,16 @@ def main() -> int:
         # v=292 stamps: this deploy's pages atomically load this deploy's JS
         cc = (SCRIPT_DIR / "company-dashboard.html").read_text(encoding="utf-8", errors="replace")
         ok("s20_versioned_script_urls",
-           "dash_layout.js?v=292" in cc and "auth_menu.js?v=292" in cc
+           "dash_layout.js?v=292" in cc and "auth_menu.js?v=292b" in cc
            and "dash_layout.js?v=292" in shell)
+
+        # ---- 4f. flag-#5 — redraw diff: identical data = zero render work ----
+        ok("f5_render_diff_helper", "renderIfChanged" in amjs2 and "_rc" in amjs2)
+        ok("f5_console_widgets_diffed", "renderIfChanged('cc.'+k" in cc)
+        dsh = (SCRIPT_DIR / "dashboard-static.html").read_text(encoding="utf-8", errors="replace")
+        ok("f5_dashboard_widgets_diffed", "renderIfChanged('ph.'+k" in dsh)
+        ok("f5_portal_identical_skip", "_cachePainted" in shell
+           and "painted === s" in shell)
 
         # ---- 5. lazy grid (source-level) ----
         src = (SCRIPT_DIR / "dashboard-static.html").read_text(encoding="utf-8", errors="replace")

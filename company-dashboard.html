@@ -404,7 +404,7 @@
     <span id="user-menu" aria-live="polite"></span>
   </div>
 </div>
-<script src="/files/static/js/auth_menu.js?v=292" defer></script>
+<script src="/files/static/js/auth_menu.js?v=292b" defer></script>
 
 <div class="container">
 
@@ -4637,12 +4637,16 @@ applyLanguage();
   function renderAll(bd){
     const wrap=k=>(bd[k]!==undefined?{data:bd[k]}:null);
     const S=bd.summary||{}, D=bd.drops||[], R=bd.rollup||{};
-    try{ renderKpis(S,D,R); }catch(e){ console.warn('[CC] kpis',e); }
-    try{ renderActiveProject(wrap('projects'),R,D); }catch(e){ console.warn('[CC] active',e); }
-    try{ renderCompliance(S,wrap('compliance')); }catch(e){ console.warn('[CC] compliance',e); }
-    try{ renderOnSite(wrap('on_site')); }catch(e){ console.warn('[CC] onsite',e); }
-    try{ renderActivity(wrap('activity')); }catch(e){ console.warn('[CC] activity',e); }
-    try{ renderMaterialAlerts(wrap('material_alerts')); }catch(e){ console.warn('[CC] materials',e); }
+    // #292 flag-#5 — per-widget content diff: identical data touches NOTHING
+    // (a background refresh or idle poll with unchanged truth is invisible);
+    // a change re-renders exactly the affected widget, in place.
+    const rw=(k,slice,fn)=>{ if(window.SSC_PERF){ SSC_PERF.renderIfChanged('cc.'+k,slice,fn); } else { fn(); } };
+    rw('kpis',[S,D,R],()=>{ try{ renderKpis(S,D,R); }catch(e){ console.warn('[CC] kpis',e); } });
+    rw('active',[bd.projects,R,D],()=>{ try{ renderActiveProject(wrap('projects'),R,D); }catch(e){ console.warn('[CC] active',e); } });
+    rw('compliance',[S,bd.compliance],()=>{ try{ renderCompliance(S,wrap('compliance')); }catch(e){ console.warn('[CC] compliance',e); } });
+    rw('onsite',[bd.on_site],()=>{ try{ renderOnSite(wrap('on_site')); }catch(e){ console.warn('[CC] onsite',e); } });
+    rw('activity',[bd.activity],()=>{ try{ renderActivity(wrap('activity')); }catch(e){ console.warn('[CC] activity',e); } });
+    rw('materials',[bd.material_alerts],()=>{ try{ renderMaterialAlerts(wrap('material_alerts')); }catch(e){ console.warn('[CC] materials',e); } });
   }
 
   async function load(){

@@ -1001,7 +1001,7 @@
          and the sidebar-footer account block consume them); its Sign out action
          is reused by the account block. -->
     <span id="user-menu" style="display:none" aria-hidden="true"></span>
-    <script src="/files/static/js/auth_menu.js?v=292" defer></script>
+    <script src="/files/static/js/auth_menu.js?v=292b" defer></script>
     <div class="content-corner"><span class="cc-live"><span class="cc-dot"></span>Live · <span id="live-date">—</span></span></div>
     <script>
       // #193 — reveal the Labor Rate Tracker entry surfaces (nav link
@@ -6515,12 +6515,15 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   function renderAll(bd){
     const wrap=k=>(bd[k]!==undefined?{data:bd[k]}:null);
     const D=bd.drops||[], R=bd.rollup||{};
-    try{ renderKpis(R,D,wrap('on_site'),wrap('workers')); }catch(e){ console.warn('[PH] kpis',e); }
-    try{ renderActive(D); }catch(e){ console.warn('[PH] active',e); }
-    try{ renderDonut(D); }catch(e){ console.warn('[PH] donut',e); }
-    try{ renderBar(D); }catch(e){ console.warn('[PH] bar',e); }
-    try{ renderRoster(wrap('on_site')); }catch(e){ console.warn('[PH] roster',e); }
-    try{ renderCerts(wrap('workers')); }catch(e){ console.warn('[PH] certs',e); }
+    // #292 flag-#5 — per-widget content diff (the pie + elevation bars were
+    // the observed churners): unchanged data = zero DOM/chart work.
+    const rw=(k,slice,fn)=>{ if(window.SSC_PERF){ SSC_PERF.renderIfChanged('ph.'+k,slice,fn); } else { fn(); } };
+    rw('kpis',[R,D,bd.on_site,bd.workers],()=>{ try{ renderKpis(R,D,wrap('on_site'),wrap('workers')); }catch(e){ console.warn('[PH] kpis',e); } });
+    rw('active',[D],()=>{ try{ renderActive(D); }catch(e){ console.warn('[PH] active',e); } });
+    rw('donut',[D],()=>{ try{ renderDonut(D); }catch(e){ console.warn('[PH] donut',e); } });
+    rw('bar',[D],()=>{ try{ renderBar(D); }catch(e){ console.warn('[PH] bar',e); } });
+    rw('roster',[bd.on_site],()=>{ try{ renderRoster(wrap('on_site')); }catch(e){ console.warn('[PH] roster',e); } });
+    rw('certs',[bd.workers],()=>{ try{ renderCerts(wrap('workers')); }catch(e){ console.warn('[PH] certs',e); } });
   }
 
   async function load(){

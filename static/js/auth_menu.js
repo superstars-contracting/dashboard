@@ -78,8 +78,25 @@
     }
   };
 
-  // #292 — SHARED perf chrome: skeleton frames + intent prefetch.
+  // #292 — SHARED perf chrome: skeleton frames + intent prefetch + the
+  // flag-#5 REDRAW DIFF: renderIfChanged(key, slice, fn) content-hashes the
+  // widget's input slice and runs fn ONLY when the data actually moved —
+  // identical background refreshes and idle polls touch nothing (zero DOM,
+  // zero chart re-init); a change re-renders exactly the affected widget.
+  // _rc render counters are the guard's evidence (planted identical payload
+  // must not bump; planted change bumps only its widget).
   window.SSC_PERF = {
+    _rh: {},   // widgetKey -> content hash of the last-rendered slice
+    _rc: {},   // widgetKey -> render count (diagnosis + guard)
+    renderIfChanged: function (widgetKey, payloadSlice, renderFn) {
+      var h;
+      try { h = JSON.stringify(payloadSlice); } catch (e) { h = null; }
+      if (h !== null && this._rh[widgetKey] === h) return false;  // identical
+      if (h !== null) this._rh[widgetKey] = h;
+      this._rc[widgetKey] = (this._rc[widgetKey] || 0) + 1;
+      renderFn();
+      return true;
+    },
     // House-style oat-soft skeleton blocks: structure visible instantly,
     // never blank white, never a spinner. el gets n shimmer rows until the
     // first real render replaces its innerHTML.
