@@ -573,8 +573,10 @@ relevant suite red, and the code restores clean.
   granted.
 - REMAINING: weekly / materials portal payloads (catalogued, unserved);
   the fancy sections (weather, drops-by-status, progress-by-elevation)
-  through the registry; S/E/W elevation tracing; architect grant
-  machinery if the architect ever gets shell sections.
+  through the registry; architect grant machinery if the architect ever
+  gets shell sections. (S/E/W elevation tracing is UNBLOCKED by #293 —
+  the operator authors them from the uploaded set on /drawing-author;
+  no more hand-seeding scripts.)
 
 ### Field-blocking before tomorrow's site test
 
@@ -694,7 +696,16 @@ restore from CSV).
 
 ---
 
-*Last updated: 2026-08-03 — #291 SHIPPED (edc0a55): bootstrap aggregates
+*Last updated: 2026-08-06 — #293 S1 SHIPPED (b8f61c0): authorable elevations
+(drawing sets + sheet picker + text-layer naming + AI-proposed trace + manual
+authoring + draft/confirm). Gate is 40 suites, 40/40 green on BOTH backends.
+Deployed via push; Render health-gates the swap (a #293 boot failure keeps the
+old build serving — glance at the Render dashboard "Live" event for b8f61c0).
+SESSION 2 NEXT: drop assignment onto authored grids, cell-level activation,
+change-order items. The live architect still has no pm_project_assignment row.
+Prior entry follows.*
+
+*2026-08-03 — #291 SHIPPED (edc0a55): bootstrap aggregates
 (mirror-not-door, guard #37), request-scoped db connection, instant-paint
 sessionStorage cache (logout-purged, uid-guarded, preview-bypassed),
 immutable private thumbs, edge-cached statics, lazy tiles. Measured: console
