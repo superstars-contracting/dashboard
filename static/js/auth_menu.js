@@ -121,6 +121,29 @@
       }
       el.appendChild(frag);
     },
+    // #292 close — the generic cache-first loader: paint the cached payload
+    // immediately (when present), fetch live, write through, and re-render
+    // ONLY if the live payload differs (flag-#5 diff built in). Returns the
+    // live payload promise. NOT for comp-data surfaces (labor rates) — those
+    // never persist payloads at rest.
+    cacheFirstJSON: function (cacheKey, url, render) {
+      var env = window.SSC_BOOT && window.SSC_BOOT.read(cacheKey);
+      var paintedHash = null;
+      if (env && env.bd !== undefined) {
+        try { render(env.bd); paintedHash = JSON.stringify(env.bd); } catch (e) { }
+      }
+      return fetch(url, { credentials: 'same-origin' })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (j) {
+          var d = (j && j.data !== undefined) ? j.data : j;
+          if (window.SSC_BOOT) window.SSC_BOOT.write(cacheKey, d);
+          var s = null;
+          try { s = JSON.stringify(d); } catch (e) { }
+          if (s !== null && s === paintedHash) return d;   // identical: zero re-render
+          render(d);
+          return d;
+        });
+    },
     // Hover/intent prefetch (STAFF surfaces only — never wired on portal or
     // worker shells): an element with data-prefetch="/api/...&page=<key>"
     // warms the SSC_BOOT cache for its target page on first hover, at most

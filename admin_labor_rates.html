@@ -236,13 +236,36 @@
     const s=$('lr-search'); if(s) s.addEventListener('input',renderTables);
   }
 
+  // #292 — COMP-CONSERVATIVE cache-first: sessionStorage ONLY (rates never
+  // persist at rest; the cache dies with the tab), painted on return, live
+  // refresh diff-skips when identical. A 401 on the live fetch purges every
+  // ssc.boot.* key and bounces to /login — a dead session must never
+  // ghost-paint comp data on a shared machine.
+  function ssPurgeBoot(){ try{ for(let i=sessionStorage.length-1;i>=0;i--){ const k=sessionStorage.key(i); if(k&&k.indexOf('ssc.boot.')===0) sessionStorage.removeItem(k); } }catch(e){} }
+  async function ssCacheFirst(key, url, render){
+    let painted=null;
+    try{ const env=JSON.parse(sessionStorage.getItem('ssc.boot.'+key)||'null');
+      if(env&&env.j!==undefined){ render(env.j); painted=JSON.stringify(env.j); } }catch(e){}
+    const r=await fetch(url,{credentials:'same-origin'});
+    if(r.status===401){ ssPurgeBoot(); location.href='/login'; throw new Error('401'); }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const j=await r.json();
+    try{ sessionStorage.setItem('ssc.boot.'+key, JSON.stringify({j:j})); }catch(e){}
+    let s=null; try{ s=JSON.stringify(j); }catch(e){}
+    if(s!==null&&s===painted) return j;   // identical: zero re-render
+    render(j);
+    return j;
+  }
+
+  function renderRoster(j){
+    ROSTER=j.data; const k=j.kpis||{};
+    $('lr-kpi-total').textContent=k.total; $('lr-kpi-active').textContent=k.active;
+    $('lr-kpi-inactive').textContent=k.inactive; $('lr-kpi-pending').textContent=k.pending;
+    renderTables();
+  }
   async function loadRoster(){
-    try{
-      const j=await jget('/api/labor-rates/roster'); ROSTER=j.data; const k=j.kpis||{};
-      $('lr-kpi-total').textContent=k.total; $('lr-kpi-active').textContent=k.active;
-      $('lr-kpi-inactive').textContent=k.inactive; $('lr-kpi-pending').textContent=k.pending;
-      renderTables();
-    }catch(e){ $('lr-active-tbody').innerHTML='<tr><td colspan="6" class="empty" style="color:#C8102E">Could not load roster.</td></tr>'; }
+    try{ await ssCacheFirst('lr.roster','/api/labor-rates/roster',renderRoster); }
+    catch(e){ if(String(e.message)!=='401') $('lr-active-tbody').innerHTML='<tr><td colspan="6" class="empty" style="color:#C8102E">Could not load roster.</td></tr>'; }
   }
   function filt(list){
     const q=(($('lr-search')||{}).value||'').trim().toLowerCase();
@@ -310,10 +333,17 @@
     if(r.ok){ toast('Submitted for PM approval'); loadRoster(); loadPending(); } else { toast('Submit failed'); renderTables(); }
   }
 
+  function renderPending(j){
+    const rows=j.data||[];
+    $('lr-pending-count').textContent=rows.length;
+    _renderPendingRows(rows);
+  }
   async function loadPending(){
-    try{
-      const j=await jget('/api/labor-rates/pending'); const rows=j.data||[];
-      $('lr-pending-count').textContent=rows.length;
+    try{ await ssCacheFirst('lr.pending','/api/labor-rates/pending',renderPending); }
+    catch(e){ if(String(e.message)!=='401') $('lr-pending-tbody').innerHTML='<tr><td colspan="6" class="empty" style="color:#C8102E">Could not load queue.</td></tr>'; }
+  }
+  function _renderPendingRows(rows){
+    {
       $('lr-pending-tbody').innerHTML=rows.length?rows.map(p=>{
         const isDeact=p.change_type==='deactivate';
         const detail=isDeact?'<strong style="color:var(--amber)">Deactivate worker</strong>':(money(p.old_rate)+' → <strong>'+money(p.new_rate)+'</strong>');
@@ -325,7 +355,7 @@
         +'<td class="muted">'+esc((p.submitted_by_role||'—').toUpperCase())+'</td>'
         +'<td><div class="acts"><button class="appbtn ok" data-approve="'+p.id+'">Approve</button><button class="appbtn no" data-reject="'+p.id+'">Reject</button></div></td></tr>';
       }).join(''):'<tr><td colspan="6" class="empty">No pending changes.</td></tr>';
-    }catch(e){ $('lr-pending-tbody').innerHTML='<tr><td colspan="6" class="empty" style="color:#C8102E">Could not load queue.</td></tr>'; }
+    }
   }
   async function decide(cid,action){
     const r=await jpost('/api/labor-rates/changes/'+cid+'/'+action,{});

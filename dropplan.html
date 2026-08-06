@@ -141,6 +141,7 @@
   .err.ok { color:var(--ok); }
   .brand-mark,.mark{object-fit:contain;}  /* #265 swap-safe logo */
 </style>
+<script src="/files/static/js/auth_menu.js?v=292c" defer></script><!-- #292 — SSC_BOOT/SSC_PERF chrome (no #user-menu here: its me-fetch no-ops) -->
 </head>
 <body>
   <div class="header">
@@ -206,8 +207,12 @@
     }catch(e){}
   }
   async function loadSov(){
-    try{ const j=await (await fetch(`/api/dropplan/projects/${encodeURIComponent(PROJECT)}/sov-lines`,{credentials:'include'})).json();
-      SOV=(j&&j.data)||[]; PATCH_SOV = SOV.find(s=>s.unit==='CF') || SOV[0] || null; }catch(e){}
+    // #292 — cache-first (paint from last visit, live refresh diff-skips)
+    const apply=d=>{ SOV=d||[]; PATCH_SOV = SOV.find(s=>s.unit==='CF') || SOV[0] || null; };
+    try{
+      if(window.SSC_PERF&&SSC_PERF.cacheFirstJSON&&window.SSC_BOOT){ await SSC_PERF.cacheFirstJSON('dropplan.sov.'+PROJECT, `/api/dropplan/projects/${encodeURIComponent(PROJECT)}/sov-lines`, apply); }
+      else{ const j=await (await fetch(`/api/dropplan/projects/${encodeURIComponent(PROJECT)}/sov-lines`,{credentials:'include'})).json(); apply((j&&j.data)||[]); }
+    }catch(e){}
   }
 
   function lifecyclePill(lc){ return `<span class="pill sm pill-${esc(lc)}">${esc((lc||'').replace(/_/g,' '))}</span>`; }
@@ -242,26 +247,47 @@
     }catch(e){}
   }
 
+  function renderBoard(data){
+    const board=$('board');
+    DROPS=data||[];
+    collapseDrop();   // rebuilding the board wipes any open panel — reset accordion state
+    let html='';
+    for(const e of ELEVS){ const ds=DROPS.filter(d=>d.elevation===e); if(!ds.length) continue;
+      html+=`<div class="elev-section"><div class="elev-head"><h2>${esc(e)}</h2><span class="cnt">${ds.length} drops</span></div><div class="board">${ds.map(cardHtml).join('')}</div></div>`; }
+    board.innerHTML=html||'<div style="color:var(--mute);">No drops.</div>';
+  }
   async function loadBoard(){
     const board=$('board');
     try{
+      // #292 — cache-first: last visit's board paints instantly; the live
+      // fetch re-renders ONLY if drops changed (flag-#5 diff inside).
+      if(window.SSC_PERF&&SSC_PERF.cacheFirstJSON&&window.SSC_BOOT){
+        await SSC_PERF.cacheFirstJSON('dropplan.board.'+PROJECT,
+          `/api/dropplan/projects/${encodeURIComponent(PROJECT)}/drops`, renderBoard);
+        return;
+      }
       const r=await fetch(`/api/dropplan/projects/${encodeURIComponent(PROJECT)}/drops`,{credentials:'include'});
       if(r.status===401){ location.href='/login?next=/dropplan'; return; }
       if(r.status===403){ board.innerHTML='<div style="color:var(--brand-red);">Forbidden — your role cannot view the drop plan.</div>'; return; }
-      DROPS=((await r.json()).data)||[];
-      collapseDrop();   // rebuilding the board wipes any open panel — reset accordion state
-      let html='';
-      for(const e of ELEVS){ const ds=DROPS.filter(d=>d.elevation===e); if(!ds.length) continue;
-        html+=`<div class="elev-section"><div class="elev-head"><h2>${esc(e)}</h2><span class="cnt">${ds.length} drops</span></div><div class="board">${ds.map(cardHtml).join('')}</div></div>`; }
-      board.innerHTML=html||'<div style="color:var(--mute);">No drops.</div>';
+      renderBoard(((await r.json()).data)||[]);
     }catch(e){ board.innerHTML='<div style="color:var(--brand-red);">Network error — retry.</div>'; }
   }
+  function renderRollup(d){
+    d=d||{};
+    $('kpi-progress').textContent=(d.overall_progress_pct!=null?d.overall_progress_pct:0)+'%';
+    $('kpi-drops').textContent=d.drop_count!=null?d.drop_count:'—';
+    // Cost / spend deliberately NOT shown on this page (#205): drops + quantities
+    // only. Cost lives in the future Spend module; the API still omits it for pm/super.
+  }
   async function loadRollup(){
-    try{ const d=((await (await fetch(`/api/dropplan/projects/${encodeURIComponent(PROJECT)}/rollup`,{credentials:'include'})).json()).data)||{};
-      $('kpi-progress').textContent=(d.overall_progress_pct!=null?d.overall_progress_pct:0)+'%';
-      $('kpi-drops').textContent=d.drop_count!=null?d.drop_count:'—';
-      // Cost / spend deliberately NOT shown on this page (#205): drops + quantities
-      // only. Cost lives in the future Spend module; the API still omits it for pm/super.
+    try{
+      if(window.SSC_PERF&&SSC_PERF.cacheFirstJSON&&window.SSC_BOOT){
+        await SSC_PERF.cacheFirstJSON('dropplan.rollup.'+PROJECT,
+          `/api/dropplan/projects/${encodeURIComponent(PROJECT)}/rollup`, renderRollup);
+        return;
+      }
+      const d=((await (await fetch(`/api/dropplan/projects/${encodeURIComponent(PROJECT)}/rollup`,{credentials:'include'})).json()).data)||{};
+      renderRollup(d);
     }catch(e){}
   }
 

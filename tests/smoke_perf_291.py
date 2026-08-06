@@ -302,9 +302,24 @@ def main() -> int:
            dl.count("ssc-layout-cache-applied") >= 1 and ph.count("ssc-layout-cache-applied") >= 1)
         # v=292 stamps: this deploy's pages atomically load this deploy's JS
         cc = (SCRIPT_DIR / "company-dashboard.html").read_text(encoding="utf-8", errors="replace")
+        # version-AGNOSTIC: the contract is "every chrome <script> carries a
+        # ?v= stamp, and all pages agree on it" — pinning a literal made a
+        # routine stamp bump fail the gate for no safety gain (caught 2026-08-05).
+        stamps = {}
+        for fn in ("company-dashboard.html", "dashboard-static.html",
+                   "projects.html", "dropplan.html", "portal_shell.html"):
+            src_v = (SCRIPT_DIR / fn).read_text(encoding="utf-8", errors="replace")
+            for m in re.finditer(r"(auth_menu|dash_layout)\.js\?v=([A-Za-z0-9._-]+)", src_v):
+                stamps.setdefault(m.group(1), set()).add(m.group(2))
+        # scoped to real src= attributes — a prose mention of the filename in a
+        # comment is not a script tag (caught itself 2026-08-05)
+        unstamped = re.search(r"src=[\"'][^\"']*(auth_menu|dash_layout)\.js(?!\?v=)", cc)
         ok("s20_versioned_script_urls",
-           "dash_layout.js?v=292" in cc and "auth_menu.js?v=292b" in cc
-           and "dash_layout.js?v=292" in shell)
+           stamps.get("auth_menu") and stamps.get("dash_layout") and not unstamped,
+           f"stamps={ {k: sorted(v) for k, v in stamps.items()} }")
+        ok("s20_stamps_agree_across_pages",
+           all(len(v) == 1 for v in stamps.values()),
+           f"disagreement: { {k: sorted(v) for k, v in stamps.items() if len(v) > 1} }")
 
         # ---- 4f. flag-#5 — redraw diff: identical data = zero render work ----
         ok("f5_render_diff_helper", "renderIfChanged" in amjs2 and "_rc" in amjs2)
