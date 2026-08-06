@@ -260,6 +260,19 @@ commit, nothing else.** Guarded by `tests/smoke_portal_flip_284.py` (56
 checks, planted-failure-proven) + the updated landing contracts in
 smoke_portal_shell_281 / smoke_client_grants_269.
 
+### The performance budget (#292 — permanent, gate #39)
+
+`tests/smoke_perf_budget_292.py` holds a per-surface REQUEST-COUNT and
+PAYLOAD-BYTES ceiling for every served surface (census numbers + slack). A
+build that makes any page chatty again fails the gate until it adopts the
+shared layer: bootstrap aggregate (`_agg_parallel`), cache-first paint
+(`SSC_PERF.cacheFirstJSON` / `SSC_BOOT`), or `ssc_memo`. The declared
+load-time endpoint set per surface is part of the contract — add a load-time
+fetch, re-run the browser census, and update BUDGETS in the SAME commit.
+Raising a ceiling is legitimate when the surface genuinely grows (e.g. #293
+makes drawing markup authorable) — it must be deliberate and measured, never
+a silent edit.
+
 ### The memo doctrine (#292 — permanent)
 
 Expensive reads are memoized via ssc_memo with write-invalidation. TTL
