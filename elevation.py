@@ -255,8 +255,9 @@ def _api_get_elevation(elev_id):
     conn = _db()
     try:
         row = conn.execute(
-            "SELECT id, project_code, face, name, source_sheet, sheet_date, dob_job, "
-            "       scale_note, geometry_json FROM elevation WHERE id=?", (elev_id,)).fetchone()
+            "SELECT id, project_code, face, face_label, name, status, source_sheet, "
+            "       sheet_date, dob_job, scale_note, geometry_json "
+            "FROM elevation WHERE id=?", (elev_id,)).fetchone()
         if row is None:
             return _err("not found", 404)
         blocked = _require_project(conn, row["project_code"])
@@ -264,6 +265,12 @@ def _api_get_elevation(elev_id):
             return blocked
 
         aud = audience()
+        # #293 — DRAFTS ARE INTERNAL-ONLY. An unconfirmed grid is a proposal in
+        # authoring, not a record; to an external audience it does not exist
+        # (404, never 403 — a 403 would confirm the id is real).
+        status = row["status"] or "confirmed"
+        if status != "confirmed" and aud != "internal":
+            return _err("not found", 404)
         meta = _status_meta(conn)
         drops = [{"id": d["id"], "idx": d["idx"], "grid_from": d["grid_from"],
                   "grid_to": d["grid_to"], "x0": d["x0"], "x1": d["x1"],
@@ -325,6 +332,8 @@ def _api_get_elevation(elev_id):
             "updated_at": (upd["m"] if upd else None),
             "last_marked_at": (last_marked["m"] if last_marked else None),
             "face": row["face"],
+            "face_label": row["face_label"] or row["face"],
+            "status": status,
             "name": row["name"],
             "source_sheet": row["source_sheet"],
             "sheet_date": row["sheet_date"],
@@ -337,6 +346,7 @@ def _api_get_elevation(elev_id):
             "audience": aud,
             "can_paint": _role() in PAINT_ROLES,
             "can_collaborate": _role() in COLLAB_WRITE_ROLES,
+            "can_author": is_internal(),
         }})
     finally:
         conn.close()
@@ -556,10 +566,16 @@ def _api_my_elevations():
     """GET /api/elevations — the elevation picker, and the check that an architect sees
     ONLY assigned projects.
 
-    Returns the FULL canonical face list per project, not just the rows that exist. An
-    untraced elevation comes back with id=None and traced=False so the picker can grey it
-    out as "not traced yet" — absent would read as "this building has no south side",
-    which is wrong and quietly hides the roadmap."""
+    #293 — elevations are AUTHORABLE: a project holds many real rows (free-text
+    faces included: SE, NW, ...), each draft or confirmed. The listing serves:
+      * every REAL row the audience may know about — internal sees drafts
+        (status carried so the picker can grey them as "in authoring"),
+        external sees CONFIRMED rows only (a draft does not exist to them);
+      * canonical N/S/E/W/ALL placeholders (id=None, traced=False) for faces
+        with no visible row — absent would read as "this building has no south
+        side". A face whose only row is a draft still placeholders for an
+        external viewer, by the same rule.
+    "traced" still means there is geometry to draw, not merely that a row exists."""
     conn = _db()
     try:
         user = current_user()
@@ -568,34 +584,57 @@ def _api_my_elevations():
             return jsonify({"data": []})
         marks = ",".join("?" for _ in codes)
         rows = conn.execute(
-            f"SELECT e.id, e.project_code, e.face, e.name, e.geometry_json, "
-            f"       p.name AS project_name "
+            f"SELECT e.id, e.project_code, e.face, e.face_label, e.name, e.status, "
+            f"       e.geometry_json, p.name AS project_name "
             f"FROM elevation e LEFT JOIN projects p ON p.project_code = e.project_code "
-            f"WHERE e.project_code IN ({marks})", tuple(codes)).fetchall()
+            f"WHERE e.project_code IN ({marks}) ORDER BY e.id", tuple(codes)).fetchall()
         if not rows:
             return jsonify({"data": []})
 
-        by_project = {}
+        internal = is_internal()
+        by_project, pnames = {}, {}
         for r in rows:
-            by_project.setdefault(r["project_code"], {})[r["face"]] = r
-        pnames = {r["project_code"]: r["project_name"] for r in rows}
+            pnames[r["project_code"]] = r["project_name"]
+            if (r["status"] or "confirmed") != "confirmed" and not internal:
+                continue
+            by_project.setdefault(r["project_code"], []).append(r)
+        canon = {f for f, _ in FACES}
+
+        def entry(r):
+            traced = bool((r["geometry_json"] or "").strip() not in ("", "{}"))
+            label = r["face_label"] or dict(FACES).get(r["face"], r["face"])
+            return {
+                "id": r["id"],
+                "project_code": r["project_code"],
+                "project_name": pnames.get(r["project_code"]),
+                "face": r["face"],
+                "label": label,
+                "name": r["name"] or label,
+                "status": r["status"] or "confirmed",
+                "traced": traced,
+            }
 
         out = []
-        for code in sorted(by_project):
-            existing = by_project[code]
+        for code in sorted(pnames):
+            visible = by_project.get(code, [])
+            by_face = {}
+            for r in visible:
+                by_face.setdefault(r["face"], []).append(r)
+            # canonical faces first, in header order: real rows, else a placeholder
             for face, label in FACES:
-                r = existing.get(face)
-                # "traced" means there is geometry to draw, not merely that a row exists.
-                traced = bool(r and (r["geometry_json"] or "").strip() not in ("", "{}"))
-                out.append({
-                    "id": (r["id"] if r else None),
-                    "project_code": code,
-                    "project_name": pnames.get(code),
-                    "face": face,
-                    "label": label,
-                    "name": (r["name"] if r else label),
-                    "traced": traced,
-                })
+                if by_face.get(face):
+                    out.extend(entry(r) for r in by_face[face])
+                else:
+                    out.append({
+                        "id": None, "project_code": code,
+                        "project_name": pnames.get(code), "face": face,
+                        "label": label, "name": label, "status": "confirmed",
+                        "traced": False,
+                    })
+            # then the authored non-canonical faces (SE, NW, free text), by id
+            for r in visible:
+                if r["face"] not in canon:
+                    out.append(entry(r))
         return jsonify({"data": out})
     finally:
         conn.close()

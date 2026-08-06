@@ -83,10 +83,32 @@ BUDGETS = {
         # load, so it is deliberately absent from the load-time contract.
         "apis": ["/api/elevations", "/api/elevation/<ELEV_ID>",
                  "/api/rfis?elevation_id=<ELEV_ID>"],
-        "reqs": 7, "kb": 80,
-        "note": "#293 will make this AUTHORABLE (PDF upload, drawn drop bars, generated "
-                "cells) — the elevation payload grows; re-measure and RAISE this budget "
-                "deliberately in that build, never silently",
+        "reqs": 7, "kb": 100,
+        # #293 RE-MEASURE (the deliberate raise this slot's old note demanded):
+        # the surface is AUTHORABLE now. Load-time request COUNT is unchanged
+        # (no new fetch on the markup page). Payload grew two ways: the
+        # /api/elevations listing carries REAL rows + status alongside the
+        # canonical placeholders, and /api/elevation/<id> gains
+        # face_label/status/can_author. 890-snapshot census 2026-08-06 measured
+        # ~64 KB summed; ceiling 80 -> 100 covers it plus authored siblings
+        # appearing in the listing. KNOWN SCALE NOTE: an authored 80-floor x
+        # 12-bay tower serves ~162 KB on its OWN /api/elevation/<id> (960
+        # cells, measured in smoke_drawing_author_293) — the gate measures the
+        # snapshot's 890 North; if a tower ever becomes this project's first
+        # traced elevation, re-measure and raise HERE, deliberately.
+        "note": "#293 authorable: listing carries real rows+status; by-id gains "
+                "face_label/status; ceiling re-measured 2026-08-06",
+    },
+    "drawing_author": {
+        # #293 — the authoring surface (internal-only). Load-time set: the
+        # context (projects + their elevations incl. drafts) and the default
+        # project's drawing-set listing. Thumbs are lazy per-sheet IMMUTABLE
+        # image fetches, deliberately outside the load-time contract; the AI
+        # propose call is operator-initiated, never load-time.
+        "page": "/drawing-author",
+        "apis": ["/api/author/context", "/api/projects/" + P + "/drawing-sets"],
+        "reqs": 5, "kb": 40,
+        "note": "#293 new surface: context + set listing; sheet thumbs lazy+immutable",
     },
     "estimating": {
         "page": "/estimating",

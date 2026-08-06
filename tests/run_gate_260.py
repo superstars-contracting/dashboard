@@ -69,6 +69,7 @@ GATE = [
     "smoke_tz_290.py",            # #290 guard — SSC_TZ enforcement: Eastern today on a UTC host; planted 23:30 boundary; Windows no-op
     "smoke_perf_291.py",          # #291 guard — bootstrap aggregates mirror-not-door (parity, subset, containment) + thumb cache headers + lazy grid
     "smoke_memo_292.py",          # #292 guard — ssc_memo: planted-write invalidation per type (stale serve = red), two-role boundary, single-flight, deep-copy serves
+    "smoke_drawing_author_293.py",  # #293 guard — drawing sets/naming vs the real fixture, AI seam + no-key degrade (own servers), draft/confirm machine, 890 backfill, isolation
     "smoke_perf_budget_292.py",   # #292 THE BUDGET GATE — per-surface request-count + payload ceilings over the whole census; a page that goes chatty again fails here
     "smoke_dropplan_api.py",
     "smoke_worker_lifecycle.py",

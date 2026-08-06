@@ -41,6 +41,59 @@ gate runs green in all four backend×root configs. NOT yet cloud: M2 = PDF on
 Linux, M3 = public-door hardening, M4 = bring-up (see the operator's
 CLOUD_MIGRATION_BLUEPRINT.md).
 
+### #293 S1 — AUTHORABLE elevations (drawing set -> sheet picker -> AI trace -> confirm)
+
+The #280 markup surface is authorable for ANY project and ANY elevation.
+Operator flow: upload the engineer's multi-page PDF on **/drawing-author**
+(internal-only) -> page thumbnails render; each sheet's label / sheet number /
+is_elevation flag pre-fills from the PDF **text layer** (never OCR — the
+title-block parser anchors on `SHEET NO.`, and face captions on
+`(EXISTING|PROPOSED) <FACE> ELEVATION`; a scanned set degrades to blank
+pre-fill) -> pick the sheet, drag a region or click an AI-suggested one
+(every elevation sheet carries an EXISTING and a PROPOSED drawing — the
+operator picks the subject, never the machine) -> **Propose with AI** (Tier
+B: claude-opus-5 via `SSC_TRACE_MODEL`, structured-output grid: bays, floors,
+proportions, irregularities; keyless server -> clean 503 and the manual tools
+are the whole story) -> adjust with the always-available manual tools
+(numeric bays x floors, divider drag, split/delete bay, add/remove floor) ->
+Save draft -> **Confirm** generates one `elevation_cell` per bay per floor
+and the elevation goes live on /drawing-markup.
+
+Pieces: `apply_drawing_author_293.py` (drawing_set + drawing_sheet +
+elevation gains face_label/source_sheet_id/region_json/**status**; ensured at
+BOOT per the #289 pattern — production self-migrates; 890 North backfills to
+face_label='North', status='confirmed', geometry untouched: 12 drops/60 cells
+verified through the live API). `drawing_sets.py` (upload/parse/render/serve
++ authoring endpoints on `/api/drawing-sets` + `/api/author/*` — prefixes NO
+external gate opens, AND every handler re-checks internal role; sheet
+renders + the set PDF serve IMMUTABLE, #291 header). `elevation.py` listing
+serves REAL rows (free-text faces, drafts internal-only) + the canonical
+placeholders; by-id 404s drafts to external audiences. Markup page: elevation
+selector with draft/untraced greying, zoom for tall buildings (80 floors =
+960 cells verified, level ids ZERO-PADDED L01..L80 so string sorts hold),
+authored geometry renders through the SAME renderer (features {} tolerated,
+nominal feet labels suppressed via `geometry.authored`).
+
+**STATE MACHINE:** draft -> confirmed, one-way. Drafts: editable, deletable,
+invisible outside (by-id 404, absent from external pickers). Confirmed: grid
+LOCKED (geometry PUT / re-confirm / delete -> 409) — the team's marks sit on
+those cells. `elevation.status` DEFAULTS to 'confirmed' so every pre-#293 row
+and every out-of-flow INSERT keeps pre-#293 visibility; only the authoring
+flow writes 'draft'.
+
+Fixture: `tests/fixtures/890E135_prefiled_plans_2022.pdf` (12.8 MB,
+gitignored; committed README has provenance + the STO caveat: GEOMETRY
+REFERENCE ONLY, its insulation scope was removed from the real job). Guard:
+`tests/smoke_drawing_author_293.py` — 89 checks, own two servers (fake-seam
+`SSC_TRACE_FAKE` + keyless degrade), wired into the gate. Budget re-measured
+DELIBERATELY: drawing_markup kb 80 -> 100 (census note in BUDGETS), new
+drawing_author surface 5 reqs / 40 KB; an authored 80-floor tower serves
+~162 KB on its own by-id — recorded in the BUDGETS note against the day a
+tower is a project's first elevation.
+
+NOT in this session (session 2): drop assignment onto authored grids,
+cell-level activation, change-order items.
+
 ### Cloud M4 (#290) — bring-up artifacts (blueprint + tz + battery)
 
 The repo now carries the full Render bring-up kit — see

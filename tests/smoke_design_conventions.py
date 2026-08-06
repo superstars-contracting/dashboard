@@ -538,7 +538,8 @@ def main():
     # sweep. drawing-markup is served from templates/v2 (the #279 v2 tree), so the
     # root glob above cannot see it; registering it by path keeps the "guard never
     # looked here" gap closed for the v2 tree too.
-    REGISTERED_PATHS = {"templates/v2/drawing-markup.html"}   # #280 drawing markup
+    REGISTERED_PATHS = {"templates/v2/drawing-markup.html",   # #280 drawing markup
+                        "templates/v2/drawing-author.html"}   # #293 drawing author
     EXEMPT = {"facade-dashboard.html", "facade-dashboard-presentation.html"}  # pre-rebuild legacy
     unregistered = []
     for page in sorted(root_dir.glob("*.html")):

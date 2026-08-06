@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<!-- DRAWING AUTHOR (#293) — upload the engineer's drawing set, pick the elevation
+     sheets, and author the traced grid per elevation.
+
+     INTERNAL ONLY. The route carries its own role check server-side; this page is
+     never served to an architect or client, and nothing here is a visibility rule.
+
+     Tier B: the AI PROPOSES a facade grid from the chosen sheet region; a HUMAN
+     CONFIRMS. Every elevation stays `draft` — invisible to external audiences —
+     until the Confirm button generates its cells. The manual tools (numeric
+     bays x floors, divider drag, add/remove bay/floor) are always available and
+     work with no API key at all. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drawing Author · Superstars Contracting</title>
+<link rel="stylesheet" href="/files/static/v2/v2.css">
+<style>
+  .wrap { max-width: 1500px; margin: 0 auto; padding: var(--v2-s-5) var(--v2-s-4) 64px; }
+  header.top { display:flex; align-items:center; gap:var(--v2-s-3); flex-wrap:wrap;
+               margin-bottom:var(--v2-s-4); }
+  h1 { font-size:var(--v2-t-title); font-weight:700; margin:0; letter-spacing:-.2px; }
+  h2 { font-size:var(--v2-t-lead); font-weight:700; margin:0 0 var(--v2-s-2); }
+  .sub { color:var(--v2-ink-mute); font-size:var(--v2-t-small); margin:2px 0 0; }
+  select, input[type=text], input[type=number] {
+    font:inherit; font-size:var(--v2-t-small); padding:6px 9px;
+    border:1px solid var(--v2-hairline); border-radius:var(--v2-r-ctl);
+    background:var(--v2-surface); color:var(--v2-ink); }
+  input[type=number] { width:64px; }
+  .cols { display:grid; grid-template-columns:340px minmax(0,1fr); gap:var(--v2-s-4);
+          align-items:start; }
+  .cols > * { min-width:0; }
+  @media (max-width: 1100px) { .cols { grid-template-columns:minmax(0,1fr); } }
+
+  /* sheet rail */
+  .setblock { margin-bottom:var(--v2-s-4); }
+  .setname { font-size:var(--v2-t-micro); color:var(--v2-ink-mute); margin-bottom:6px;
+             display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .setname b { color:var(--v2-ink-soft); font-weight:600; word-break:break-all; }
+  .sheetgrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .sheet { border:1px solid var(--v2-hairline); border-radius:var(--v2-r-ctl);
+           background:var(--v2-surface); padding:7px; cursor:pointer; }
+  .sheet:hover { border-color:var(--v2-accent-edge); }
+  .sheet[aria-selected="true"] { border-color:var(--v2-accent); box-shadow:0 0 0 1px var(--v2-accent); }
+  .sheet img { width:100%; height:auto; display:block; border-radius:4px;
+               background:#f4f1ea; }
+  .sheet .sn { font-size:10.5px; font-weight:700; color:var(--v2-accent-ink); margin-top:5px; }
+  .sheet .sl { font-size:10.5px; color:var(--v2-ink-soft); line-height:1.35;
+               word-break:break-word; }
+  .sheet .badges { margin-top:4px; display:flex; gap:4px; flex-wrap:wrap; }
+  .mini { font-size:9.5px; padding:1px 6px; border-radius:999px; font-weight:600; }
+  .mini.elev { background:var(--v2-accent-chip); color:var(--v2-accent-ink); }
+  .mini.plain { background:var(--v2-hairline); color:var(--v2-ink-mute); }
+  .upl { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:var(--v2-s-3); }
+  .hint { font-size:var(--v2-t-micro); color:var(--v2-ink-mute); line-height:1.5; }
+  .err { color:var(--v2-coral-ink); font-size:var(--v2-t-micro); margin-top:6px; }
+  .okmsg { color:var(--v2-green-ink); font-size:var(--v2-t-micro); margin-top:6px; }
+
+  /* elevations list */
+  ul.elist { list-style:none; margin:0 0 var(--v2-s-3); padding:0; }
+  ul.elist li { display:flex; align-items:center; gap:8px; padding:7px 0;
+                border-top:1px solid var(--v2-hairline); font-size:var(--v2-t-small); }
+  ul.elist li:first-child { border-top:0; }
+  ul.elist .nm { flex:1 1 auto; min-width:0; font-weight:600; }
+  .linkbtn { background:none; border:none; padding:0; font:inherit; font-size:var(--v2-t-micro);
+             font-weight:600; color:var(--v2-accent); cursor:pointer; }
+  .linkbtn:hover { text-decoration:underline; }
+  .linkbtn.danger { color:var(--v2-coral-ink); }
+
+  /* canvas */
+  .canvasbox { position:relative; user-select:none; -webkit-user-select:none;
+               background:#f4f1ea; border:1px solid var(--v2-hairline);
+               border-radius:var(--v2-r-ctl); overflow:hidden; }
+  .canvasbox img { width:100%; height:auto; display:block; pointer-events:none; }
+  .canvasbox svg.ovl { position:absolute; inset:0; width:100%; height:100%; }
+  .canvasbox.noimg { aspect-ratio: 3 / 2; }
+  .toolrow { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:var(--v2-s-3) 0; }
+  .toolrow .spacer { flex:1 1 auto; }
+  .fld { display:flex; align-items:center; gap:5px; font-size:var(--v2-t-micro);
+         font-weight:600; color:var(--v2-ink-soft); }
+  .seg { display:inline-flex; border:1px solid var(--v2-hairline); border-radius:var(--v2-r-ctl);
+         overflow:hidden; }
+  .seg button { font:inherit; font-size:var(--v2-t-micro); font-weight:600; padding:5px 10px;
+                border:none; background:var(--v2-surface); color:var(--v2-ink-soft); cursor:pointer; }
+  .seg button[aria-pressed="true"] { background:var(--v2-accent-chip); color:var(--v2-accent-ink); }
+  .proposal { border:1px solid var(--v2-hairline); border-radius:var(--v2-r-ctl);
+              background:var(--v2-surface); padding:10px 12px; margin-top:var(--v2-s-3);
+              font-size:var(--v2-t-small); }
+  .proposal ul { margin:6px 0 0; padding-left:18px; }
+  .proposal li { font-size:var(--v2-t-micro); color:var(--v2-ink-soft); }
+  dialog.cfm { border:1px solid var(--v2-hairline); border-radius:var(--v2-r-card);
+               padding:var(--v2-s-4); max-width:440px; width:92vw; font-family:var(--v2-font); }
+  dialog.cfm::backdrop { background:rgba(35,33,29,.35); }
+  dialog.cfm h3 { margin:0 0 6px; font-size:var(--v2-t-lead); }
+  dialog.cfm p { margin:0 0 var(--v2-s-3); color:var(--v2-ink-mute); font-size:var(--v2-t-small); }
+</style>
+</head>
+<body class="v2">
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Drawing Author</h1>
+      <p class="sub">Upload the drawing set · pick the elevation sheets · trace the grid · confirm.</p>
+    </div>
+    <div class="spacer" style="flex:1 1 auto"></div>
+    <label class="fld" for="projpick">Project</label>
+    <select id="projpick" aria-label="Project"></select>
+    <a class="v2-btn-ghost" href="/drawing-markup" style="text-decoration:none">Open markup</a>
+  </header>
+
+  <div class="cols">
+    <!-- ================= LEFT RAIL: sets + sheets + elevations ============ -->
+    <div>
+      <div class="v2-card" style="margin-bottom:var(--v2-s-4)">
+        <h2>Drawing sets</h2>
+        <div class="upl">
+          <input type="file" id="pdffile" accept="application/pdf">
+          <button type="button" class="v2-btn" id="uploadbtn">Upload</button>
+        </div>
+        <p class="hint">One multi-page PDF per set. Page names and elevation flags
+          pre-fill from the PDF text layer — confirm or override below.</p>
+        <div class="err" id="uplerr" hidden></div>
+        <div id="setlist"></div>
+      </div>
+
+      <div class="v2-card">
+        <h2>Elevations</h2>
+        <p class="hint" style="margin-bottom:8px">Drafts are visible only inside the
+          company until confirmed.</p>
+        <ul class="elist" id="elist"></ul>
+        <div class="toolrow" style="margin:0">
+          <input type="text" id="newface" placeholder="Face — North, SE, …" maxlength="60"
+                 style="flex:1 1 auto; min-width:0">
+          <button type="button" class="v2-btn" id="newdraft">New draft</button>
+        </div>
+        <div class="err" id="eerr" hidden></div>
+      </div>
+    </div>
+
+    <!-- ================= MAIN: authoring canvas =========================== -->
+    <div class="v2-card">
+      <h2 id="a-title">Author</h2>
+      <p class="sub" id="a-sub">Pick or create a draft on the left, then choose a sheet.</p>
+
+      <div class="toolrow">
+        <span class="fld">Mode</span>
+        <div class="seg" role="group" aria-label="Pointer mode">
+          <button type="button" id="m-grid" aria-pressed="true">Adjust grid</button>
+          <button type="button" id="m-crop" aria-pressed="false">Select region</button>
+        </div>
+        <button type="button" class="v2-btn-ghost" id="wholepage">Whole page</button>
+        <span class="spacer"></span>
+        <button type="button" class="v2-btn-ghost" id="aibtn">Propose with AI</button>
+      </div>
+
+      <div class="toolrow">
+        <label class="fld" for="baysN">Bays <input type="number" id="baysN" min="1" max="80" value="6"></label>
+        <label class="fld" for="floorsN">Floors <input type="number" id="floorsN" min="1" max="120" value="4"></label>
+        <button type="button" class="v2-btn-ghost" id="applyN">Apply</button>
+        <span class="fld" style="border-left:1px solid var(--v2-hairline); padding-left:10px">Bay</span>
+        <button type="button" class="v2-btn-ghost" id="baysplit">Split</button>
+        <button type="button" class="v2-btn-ghost" id="baydel">Delete</button>
+        <span class="fld">Floor</span>
+        <button type="button" class="v2-btn-ghost" id="flooradd">Add</button>
+        <button type="button" class="v2-btn-ghost" id="floordel">Remove</button>
+        <span class="spacer"></span>
+        <button type="button" class="v2-btn-ghost" id="savedraft">Save draft</button>
+        <button type="button" class="v2-btn" id="confirmbtn">Confirm…</button>
+      </div>
+      <p class="hint">Drag a grid line to resize a bay or stretch a floor (the ground
+        floor is the bottom row). Click a bay to select it. Region mode: drag a box
+        around the drawing that is the subject — every sheet carries an EXISTING and
+        a PROPOSED view.</p>
+
+      <div class="canvasbox noimg" id="canvas">
+        <img id="sheetimg" alt="" hidden>
+        <svg class="ovl" id="ovl"></svg>
+      </div>
+
+      <div class="proposal" id="propbox" hidden></div>
+      <div class="err" id="aerr" hidden></div>
+      <div class="okmsg" id="aok" hidden></div>
+    </div>
+  </div>
+</div>
+
+<dialog class="cfm" id="cfmDlg">
+  <h3>Confirm this elevation?</h3>
+  <p id="cfm-p">Confirming generates the working cells (one per bay per floor) and makes
+     this elevation live on the markup page — including for the architect and client
+     once granted. The grid locks on confirm.</p>
+  <div style="display:flex;gap:8px;justify-content:flex-end">
+    <button type="button" class="v2-btn-ghost" id="cfm-cancel">Cancel</button>
+    <button type="button" class="v2-btn" id="cfm-ok">Confirm elevation</button>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var SVGNS = 'http://www.w3.org/2000/svg';
+
+  var S = {
+    projects: [], code: null,
+    sets: [], sheetId: null, sheetMeta: null,
+    elevId: null, elevStatus: null, faceLabel: null,
+    region: null,                       // {x0,y0,x1,y1} fractions of the page image
+    spec: null,                         // {cols:[], rows:[]} rows BOTTOM-first
+    selBay: -1, mode: 'grid',
+    suggestions: [],                    // AI per-drawing regions
+    dirty: false,
+  };
+
+  function esc(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
+  function el(tag, attrs, text) {
+    var n = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) if (attrs[k] !== null && attrs[k] !== undefined) n.setAttribute(k, attrs[k]);
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function jfetch(url, opts) {
+    opts = opts || {}; opts.credentials = 'same-origin';
+    if (opts.body && !(opts.body instanceof FormData)) {
+      opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+      opts.body = JSON.stringify(opts.body);
+    }
+    return fetch(url, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        return { ok: r.ok, status: r.status, j: j };
+      });
+    });
+  }
+  function note(id, msg) { var n = $(id); n.textContent = msg || ''; n.hidden = !msg; }
+
+  // ---------- context ------------------------------------------------------
+  function loadContext(keepProject) {
+    return jfetch('/api/author/context').then(function (res) {
+      if (!res.ok) { note('aerr', 'Could not load.'); return; }
+      S.projects = (res.j.data || {}).projects || [];
+      var pick = $('projpick'); pick.innerHTML = '';
+      S.projects.forEach(function (p) {
+        var o = document.createElement('option');
+        o.value = p.code; o.textContent = p.code + (p.name ? ' — ' + p.name : '');
+        pick.appendChild(o);
+      });
+      var want = keepProject || S.code
+        || new URLSearchParams(location.search).get('project');
+      if (want && S.projects.some(function (p) { return p.code === want; })) pick.value = want;
+      S.code = pick.value || null;
+      renderElevations(); loadSets();
+    });
+  }
+
+  function project() {
+    for (var i = 0; i < S.projects.length; i++)
+      if (S.projects[i].code === S.code) return S.projects[i];
+    return null;
+  }
+
+  $('projpick').addEventListener('change', function () {
+    S.code = this.value; S.elevId = null; S.spec = null; S.sheetId = null;
+    S.region = null; S.suggestions = [];
+    renderElevations(); loadSets(); paintHeader(); render();
+  });
+
+  // ---------- sets + sheets ------------------------------------------------
+  function loadSets() {
+    if (!S.code) { $('setlist').innerHTML = ''; return; }
+    jfetch('/api/projects/' + encodeURIComponent(S.code) + '/drawing-sets')
+      .then(function (res) {
+        S.sets = res.ok ? (res.j.data || []) : [];
+        renderSets();
+      });
+  }
+
+  function renderSets() {
+    var box = $('setlist'); box.innerHTML = '';
+    S.sets.forEach(function (st) {
+      var blk = document.createElement('div'); blk.className = 'setblock';
+      var head = document.createElement('div'); head.className = 'setname';
+      head.innerHTML = '<b>' + esc(st.filename || ('Set ' + st.id)) + '</b>' +
+        '<span>' + st.page_count + ' pages</span>';
+      blk.appendChild(head);
+      var grid = document.createElement('div'); grid.className = 'sheetgrid';
+      st.sheets.forEach(function (sh) {
+        var d = document.createElement('div'); d.className = 'sheet';
+        d.setAttribute('aria-selected', String(S.sheetId === sh.id));
+        d.innerHTML =
+          '<img loading="lazy" src="/api/drawing-sheets/' + sh.id + '/thumb" alt="">' +
+          '<div class="sn">' + esc(sh.sheet_number || ('p' + sh.page_no)) + '</div>' +
+          '<div class="sl">' + esc(sh.label || '—') + '</div>' +
+          '<div class="badges">' +
+            (sh.is_elevation ? '<span class="mini elev">Elevation</span>'
+                             : '<span class="mini plain">Not elevation</span>') +
+            (sh.has_existing && sh.has_proposed
+              ? '<span class="mini plain">Existing + Proposed</span>' : '') +
+          '</div>';
+        d.addEventListener('click', function () { pickSheet(sh, st); });
+        d.addEventListener('dblclick', function () { editSheetMeta(sh); });
+        grid.appendChild(d);
+      });
+      blk.appendChild(grid);
+      box.appendChild(blk);
+    });
+    if (!S.sets.length) {
+      box.innerHTML = '<p class="hint">No drawing sets yet — upload the engineer’s PDF.</p>';
+    }
+  }
+
+  function editSheetMeta(sh) {
+    var label = window.prompt('Sheet label', sh.label || '');
+    if (label === null) return;
+    var isElev = window.confirm('Is this an ELEVATION sheet?\nOK = yes, Cancel = no');
+    jfetch('/api/drawing-sheets/' + sh.id, { method: 'PATCH',
+      body: { label: label, is_elevation: isElev } })
+      .then(function (res) {
+        if (!res.ok) { note('uplerr', (res.j && res.j.error) || 'Could not save.'); return; }
+        loadSets();
+      });
+  }
+
+  function pickSheet(sh, st) {
+    S.sheetId = sh.id; S.sheetMeta = sh; S.region = null; S.suggestions = [];
+    S.dirty = true;
+    var img = $('sheetimg');
+    img.hidden = false;
+    $('canvas').classList.remove('noimg');
+    img.src = '/api/drawing-sheets/' + sh.id + '/image';
+    img.onload = render;
+    if (!S.faceLabel && sh.faces && sh.faces.length === 1) $('newface').value = sh.faces[0];
+    renderSets(); paintHeader(); render();
+  }
+
+  $('uploadbtn').addEventListener('click', function () {
+    var f = $('pdffile').files[0];
+    if (!f) { note('uplerr', 'Choose a PDF first.'); return; }
+    if (!S.code) { note('uplerr', 'Pick a project first.'); return; }
+    note('uplerr', ''); this.disabled = true; this.textContent = 'Uploading…';
+    var fd = new FormData(); fd.append('file', f);
+    var btn = this;
+    jfetch('/api/projects/' + encodeURIComponent(S.code) + '/drawing-sets',
+           { method: 'POST', body: fd })
+      .then(function (res) {
+        btn.disabled = false; btn.textContent = 'Upload';
+        if (!res.ok) { note('uplerr', (res.j && res.j.error) || 'Upload failed.'); return; }
+        $('pdffile').value = '';
+        loadSets();
+      });
+  });
+
+  // ---------- elevations list ---------------------------------------------
+  function renderElevations() {
+    var p = project(); var box = $('elist'); box.innerHTML = '';
+    if (!p) return;
+    p.elevations.forEach(function (e) {
+      var li = document.createElement('li');
+      var chip = e.status === 'draft'
+        ? '<span class="mini plain">Draft</span>'
+        : '<span class="mini elev">Confirmed</span>';
+      li.innerHTML = '<span class="nm">' + esc(e.face_label || e.face) + '</span>' + chip;
+      var act = document.createElement('span');
+      if (e.status === 'draft') {
+        var res = document.createElement('button');
+        res.type = 'button'; res.className = 'linkbtn'; res.textContent = 'Resume';
+        res.addEventListener('click', function () { resumeDraft(e.id); });
+        act.appendChild(res);
+        act.appendChild(document.createTextNode(' · '));
+        var del = document.createElement('button');
+        del.type = 'button'; del.className = 'linkbtn danger'; del.textContent = 'Delete';
+        del.addEventListener('click', function () { deleteDraft(e.id, e.face_label); });
+        act.appendChild(del);
+      } else if (e.traced) {
+        var open = document.createElement('a');
+        open.className = 'linkbtn'; open.textContent = 'Open';
+        open.href = '/drawing-markup/' + e.id;
+        act.appendChild(open);
+      }
+      li.appendChild(act);
+      box.appendChild(li);
+    });
+    if (!p.elevations.length) box.innerHTML = '<li><span class="hint">None yet.</span></li>';
+  }
+
+  $('newdraft').addEventListener('click', function () {
+    var face = ($('newface').value || '').trim();
+    if (!face) { note('eerr', 'Give the face a name — North, SE, …'); return; }
+    if (!S.code) { note('eerr', 'Pick a project first.'); return; }
+    note('eerr', '');
+    jfetch('/api/author/elevations', { method: 'POST', body: {
+      project_code: S.code, face_label: face,
+      source_sheet_id: S.sheetId || null,
+      region: S.region || null,
+    }}).then(function (res) {
+      if (!res.ok) { note('eerr', (res.j && res.j.error) || 'Could not create.'); return; }
+      S.elevId = res.j.data.id; S.elevStatus = 'draft'; S.faceLabel = face;
+      S.spec = S.spec || { cols: uniform(6), rows: uniform(4) };
+      S.dirty = true;
+      loadContext(S.code).then(paintHeader);
+      render();
+    });
+  });
+
+  function resumeDraft(id) {
+    jfetch('/api/author/elevations/' + id).then(function (res) {
+      if (!res.ok) { note('eerr', 'Could not load the draft.'); return; }
+      var d = res.j.data;
+      S.elevId = d.id; S.elevStatus = d.status; S.faceLabel = d.face_label;
+      S.region = d.region || null;
+      S.spec = d.author_spec ? { cols: d.author_spec.cols.slice(),
+                                 rows: d.author_spec.rows.slice() }
+                             : { cols: uniform(6), rows: uniform(4) };
+      S.dirty = false;
+      $('baysN').value = S.spec.cols.length;
+      $('floorsN').value = S.spec.rows.length;
+      if (d.source_sheet_id) {
+        var found = null;
+        S.sets.forEach(function (st) { st.sheets.forEach(function (sh) {
+          if (sh.id === d.source_sheet_id) found = sh; }); });
+        if (found) { pickSheet(found); S.region = d.region || null; }
+      }
+      paintHeader(); render();
+    });
+  }
+
+  function deleteDraft(id, label) {
+    if (!window.confirm('Delete the draft "' + (label || id) + '"? This cannot be undone.')) return;
+    jfetch('/api/author/elevations/' + id, { method: 'DELETE' }).then(function (res) {
+      if (!res.ok) { note('eerr', (res.j && res.j.error) || 'Could not delete.'); return; }
+      if (S.elevId === id) { S.elevId = null; S.spec = null; }
+      loadContext(S.code); paintHeader(); render();
+    });
+  }
+
+  function paintHeader() {
+    $('a-title').textContent = S.elevId
+      ? ((S.faceLabel || 'Elevation') + ' — ' + (S.elevStatus === 'draft' ? 'draft' : 'confirmed'))
+      : 'Author';
+    var bits = [];
+    if (S.sheetMeta) bits.push('Sheet ' + (S.sheetMeta.sheet_number || 'p' + S.sheetMeta.page_no));
+    if (S.region) bits.push('region selected');
+    if (S.spec) bits.push(S.spec.cols.length + ' bays × ' + S.spec.rows.length + ' floors');
+    $('a-sub').textContent = bits.length ? bits.join(' · ')
+      : 'Pick or create a draft on the left, then choose a sheet.';
+  }
+
+  // ---------- spec helpers -------------------------------------------------
+  function uniform(n) { var v = []; for (var i = 0; i < n; i++) v.push(1 / n); return v; }
+  function normalize(a) {
+    var t = 0, i; for (i = 0; i < a.length; i++) t += a[i];
+    for (i = 0; i < a.length; i++) a[i] = a[i] / t;
+    return a;
+  }
+  function ensureSpec() {
+    if (!S.spec) {
+      S.spec = { cols: uniform(parseInt($('baysN').value, 10) || 6),
+                 rows: uniform(parseInt($('floorsN').value, 10) || 4) };
+    }
+    return S.spec;
+  }
+
+  $('applyN').addEventListener('click', function () {
+    var b = Math.max(1, Math.min(80, parseInt($('baysN').value, 10) || 1));
+    var f = Math.max(1, Math.min(120, parseInt($('floorsN').value, 10) || 1));
+    ensureSpec();
+    if (b !== S.spec.cols.length) S.spec.cols = uniform(b);
+    if (f !== S.spec.rows.length) S.spec.rows = uniform(f);
+    S.selBay = -1; S.dirty = true; paintHeader(); render();
+  });
+  $('baysplit').addEventListener('click', function () {
+    ensureSpec();
+    if (S.spec.cols.length >= 80) return;
+    var i = S.selBay >= 0 ? S.selBay : S.spec.cols.length - 1;
+    var half = S.spec.cols[i] / 2;
+    S.spec.cols.splice(i, 1, half, half);
+    $('baysN').value = S.spec.cols.length;
+    S.dirty = true; paintHeader(); render();
+  });
+  $('baydel').addEventListener('click', function () {
+    ensureSpec();
+    if (S.spec.cols.length <= 1) return;
+    var i = S.selBay >= 0 ? S.selBay : S.spec.cols.length - 1;
+    S.spec.cols.splice(i, 1); normalize(S.spec.cols);
+    S.selBay = -1;
+    $('baysN').value = S.spec.cols.length;
+    S.dirty = true; paintHeader(); render();
+  });
+  $('flooradd').addEventListener('click', function () {
+    ensureSpec();
+    if (S.spec.rows.length >= 120) return;
+    S.spec.rows.push(S.spec.rows[S.spec.rows.length - 1]); normalize(S.spec.rows);
+    $('floorsN').value = S.spec.rows.length;
+    S.dirty = true; paintHeader(); render();
+  });
+  $('floordel').addEventListener('click', function () {
+    ensureSpec();
+    if (S.spec.rows.length <= 1) return;
+    S.spec.rows.pop(); normalize(S.spec.rows);
+    $('floorsN').value = S.spec.rows.length;
+    S.dirty = true; paintHeader(); render();
+  });
+
+  // ---------- modes --------------------------------------------------------
+  function setMode(m) {
+    S.mode = m;
+    $('m-grid').setAttribute('aria-pressed', String(m === 'grid'));
+    $('m-crop').setAttribute('aria-pressed', String(m === 'crop'));
+  }
+  $('m-grid').addEventListener('click', function () { setMode('grid'); });
+  $('m-crop').addEventListener('click', function () { setMode('crop'); });
+  $('wholepage').addEventListener('click', function () {
+    S.region = null; S.dirty = true; paintHeader(); render();
+  });
+
+  // ---------- canvas rendering --------------------------------------------
+  // Overlay coordinates are FRACTIONS of the displayed image (viewBox 0..1 in
+  // x, 0..ih/iw in y so strokes stay square). The region rect maps the page;
+  // the grid lives inside the region (or the whole page when none).
+  function ovlBox() {
+    var img = $('sheetimg');
+    if (!img.hidden && img.naturalWidth) {
+      return { w: 1, h: img.naturalHeight / img.naturalWidth };
+    }
+    var c = $('canvas');
+    return { w: 1, h: c.clientHeight / Math.max(c.clientWidth, 1) };
+  }
+
+  function regionBox() {
+    var b = ovlBox();
+    var r = S.region || { x0: 0, y0: 0, x1: 1, y1: 1 };
+    return { x: r.x0 * b.w, y: r.y0 * b.h,
+             w: (r.x1 - r.x0) * b.w, h: (r.y1 - r.y0) * b.h };
+  }
+
+  function render() {
+    var svg = $('ovl'); svg.innerHTML = '';
+    var b = ovlBox();
+    svg.setAttribute('viewBox', '0 0 ' + b.w + ' ' + b.h);
+    svg.setAttribute('preserveAspectRatio', 'none');
+    var img = $('sheetimg');
+    var hasImg = !img.hidden && !!img.naturalWidth;
+    $('canvas').classList.toggle('noimg', !hasImg);
+
+    // AI region suggestions (existing / proposed) — click one to adopt it
+    S.suggestions.forEach(function (d) {
+      var g = el('g', { class: 'suggest', style: 'cursor:pointer' });
+      g.appendChild(el('rect', { x: d.x0 * b.w, y: d.y0 * b.h,
+        width: (d.x1 - d.x0) * b.w, height: (d.y1 - d.y0) * b.h,
+        fill: 'rgba(177,30,46,.06)', stroke: 'var(--v2-accent)',
+        'stroke-width': 1.5, 'vector-effect': 'non-scaling-stroke',
+        'stroke-dasharray': '6 4' }));
+      g.appendChild(el('text', { x: d.x0 * b.w + 0.008, y: d.y0 * b.h + 0.022,
+        'font-size': 0.018, fill: 'var(--v2-accent-ink)', 'font-weight': 700 },
+        (d.kind || 'drawing').toUpperCase()));
+      g.addEventListener('click', function () {
+        S.region = { x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1 };
+        S.suggestions = []; S.dirty = true;
+        paintHeader(); render();
+      });
+      svg.appendChild(g);
+    });
+
+    // the active region
+    var rb = regionBox();
+    if (S.region) {
+      svg.appendChild(el('rect', { x: rb.x, y: rb.y, width: rb.w, height: rb.h,
+        fill: 'none', stroke: 'var(--v2-accent)', 'stroke-width': 2,
+        'vector-effect': 'non-scaling-stroke' }));
+    }
+
+    // the grid
+    if (S.spec) drawGrid(svg, rb);
+
+    // crop-drag surface
+    svg.style.cursor = S.mode === 'crop' ? 'crosshair' : 'default';
+  }
+
+  function cum(a) {
+    var out = [0], t = 0;
+    for (var i = 0; i < a.length; i++) { t += a[i]; out.push(t); }
+    out[out.length - 1] = 1;
+    return out;
+  }
+
+  function drawGrid(svg, rb) {
+    var cols = cum(S.spec.cols);          // 0..1 left->right
+    var rows = cum(S.spec.rows);          // 0..1 BOTTOM->top
+    var i;
+
+    // bay fills (selection) + click-to-select
+    for (i = 0; i < S.spec.cols.length; i++) {
+      var x = rb.x + cols[i] * rb.w, w = (cols[i + 1] - cols[i]) * rb.w;
+      var r = el('rect', { x: x, y: rb.y, width: w, height: rb.h,
+        fill: i === S.selBay ? 'rgba(177,30,46,.14)' : 'transparent',
+        stroke: 'none', 'data-bay': i, style: 'cursor:pointer' });
+      (function (idx) {
+        r.addEventListener('click', function (ev) {
+          if (S.mode !== 'grid') return;
+          ev.stopPropagation();
+          S.selBay = (S.selBay === idx) ? -1 : idx;
+          render();
+        });
+      })(i);
+      svg.appendChild(r);
+    }
+
+    // frame
+    svg.appendChild(el('rect', { x: rb.x, y: rb.y, width: rb.w, height: rb.h,
+      fill: 'none', stroke: '#1d6ed8', 'stroke-width': 2,
+      'vector-effect': 'non-scaling-stroke' }));
+
+    // interior vertical dividers (draggable)
+    for (i = 1; i < cols.length - 1; i++) {
+      var vx = rb.x + cols[i] * rb.w;
+      svg.appendChild(el('line', { x1: vx, y1: rb.y, x2: vx, y2: rb.y + rb.h,
+        stroke: '#1d6ed8', 'stroke-width': 1.2, 'vector-effect': 'non-scaling-stroke' }));
+      var hit = el('line', { x1: vx, y1: rb.y, x2: vx, y2: rb.y + rb.h,
+        stroke: 'transparent', 'stroke-width': 10, 'vector-effect': 'non-scaling-stroke',
+        style: 'cursor:col-resize', 'data-vdiv': i });
+      svg.appendChild(hit);
+    }
+    // interior horizontal dividers — rows are BOTTOM-first, y flips
+    for (i = 1; i < rows.length - 1; i++) {
+      var vy = rb.y + (1 - rows[i]) * rb.h;
+      svg.appendChild(el('line', { x1: rb.x, y1: vy, x2: rb.x + rb.w, y2: vy,
+        stroke: '#1d6ed8', 'stroke-width': 1.2, 'vector-effect': 'non-scaling-stroke' }));
+      var hhit = el('line', { x1: rb.x, y1: vy, x2: rb.x + rb.w, y2: vy,
+        stroke: 'transparent', 'stroke-width': 10, 'vector-effect': 'non-scaling-stroke',
+        style: 'cursor:row-resize', 'data-hdiv': i });
+      svg.appendChild(hhit);
+    }
+    // bay numbers along the top edge
+    if (rb.w / S.spec.cols.length > 0.03) {
+      for (i = 0; i < S.spec.cols.length; i++) {
+        svg.appendChild(el('text', {
+          x: rb.x + (cols[i] + cols[i + 1]) / 2 * rb.w, y: rb.y + 0.02,
+          'text-anchor': 'middle', 'font-size': 0.016, 'font-weight': 700,
+          fill: '#1d6ed8' }, String(i + 1)));
+      }
+    }
+  }
+
+  // ---------- pointer interactions ----------------------------------------
+  var drag = null;   // {kind:'crop'|'v'|'h', ...}
+
+  function evFrac(ev) {
+    var rect = $('ovl').getBoundingClientRect();
+    var b = ovlBox();
+    return { x: Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width)) * b.w,
+             y: Math.max(0, Math.min(1, (ev.clientY - rect.top) / rect.height)) * b.h,
+             b: b };
+  }
+
+  $('ovl').addEventListener('pointerdown', function (ev) {
+    var t = ev.target;
+    if (S.mode === 'grid' && t.getAttribute) {
+      var v = t.getAttribute('data-vdiv'), h = t.getAttribute('data-hdiv');
+      if (v !== null && v !== undefined && v !== '') {
+        drag = { kind: 'v', i: parseInt(v, 10) };
+        $('ovl').setPointerCapture(ev.pointerId);
+        return;
+      }
+      if (h !== null && h !== undefined && h !== '') {
+        drag = { kind: 'h', i: parseInt(h, 10) };
+        $('ovl').setPointerCapture(ev.pointerId);
+        return;
+      }
+    }
+    if (S.mode === 'crop') {
+      var p = evFrac(ev);
+      drag = { kind: 'crop', x0: p.x / p.b.w, y0: p.y / p.b.h };
+      $('ovl').setPointerCapture(ev.pointerId);
+    }
+  });
+
+  $('ovl').addEventListener('pointermove', function (ev) {
+    if (!drag || !S.spec && drag.kind !== 'crop') return;
+    var p = evFrac(ev);
+    if (drag.kind === 'crop') {
+      var b = p.b;
+      var x1 = p.x / b.w, y1 = p.y / b.h;
+      S.region = { x0: Math.min(drag.x0, x1), y0: Math.min(drag.y0, y1),
+                   x1: Math.max(drag.x0, x1), y1: Math.max(drag.y0, y1) };
+      render();
+      return;
+    }
+    var rb = regionBox();
+    if (drag.kind === 'v') {
+      var fx = (p.x - rb.x) / Math.max(rb.w, 1e-6);
+      moveDivider(S.spec.cols, drag.i, fx);
+    } else if (drag.kind === 'h') {
+      var fy = 1 - (p.y - rb.y) / Math.max(rb.h, 1e-6);   // rows are bottom-first
+      moveDivider(S.spec.rows, drag.i, fy);
+    }
+    S.dirty = true;
+    render();
+  });
+
+  function endDrag() {
+    if (drag && drag.kind === 'crop' && S.region &&
+        (S.region.x1 - S.region.x0 < 0.03 || S.region.y1 - S.region.y0 < 0.03)) {
+      S.region = null;    // a click, not a box
+    }
+    if (drag) { paintHeader(); render(); }
+    drag = null;
+  }
+  $('ovl').addEventListener('pointerup', endDrag);
+  $('ovl').addEventListener('pointercancel', endDrag);
+
+  function moveDivider(fracs, i, pos) {
+    // divider i sits at cum(fracs)[i]; it may move between its neighbors
+    var c = cum(fracs);
+    var lo = c[i - 1] + 0.01, hi = c[i + 1] - 0.01;
+    var np = Math.max(lo, Math.min(hi, pos));
+    fracs[i - 1] = np - c[i - 1];
+    fracs[i] = c[i + 1] - np;
+  }
+
+  // ---------- AI propose ---------------------------------------------------
+  $('aibtn').addEventListener('click', function () {
+    note('aerr', ''); note('aok', '');
+    $('propbox').hidden = true;
+    if (!S.sheetMeta) { note('aerr', 'Pick a sheet first.'); return; }
+    var setId = null;
+    S.sets.forEach(function (st) { st.sheets.forEach(function (sh) {
+      if (sh.id === S.sheetId) setId = st.id; }); });
+    if (!setId) { note('aerr', 'Pick a sheet first.'); return; }
+    var btn = this; btn.disabled = true; btn.textContent = 'Analyzing…';
+    jfetch('/api/drawing-sets/' + setId + '/propose', { method: 'POST', body: {
+      page_no: S.sheetMeta.page_no, region: S.region || null,
+    }}).then(function (res) {
+      btn.disabled = false; btn.textContent = 'Propose with AI';
+      if (res.status === 503) {
+        note('aerr', 'AI trace unavailable on this server — author the grid manually.');
+        return;
+      }
+      if (!res.ok) { note('aerr', (res.j && res.j.error) || 'AI trace failed.'); return; }
+      applyProposal(res.j.data || {});
+    });
+  });
+
+  function applyProposal(p) {
+    var box = $('propbox'); var bits = [];
+    if (!p.subject_found) {
+      note('aerr', 'No elevation drawing found in that region — adjust the region.');
+      return;
+    }
+    if (p.multiple_drawings && !S.region && (p.drawings || []).length > 1) {
+      // The page holds several drawings — the OPERATOR picks the subject.
+      S.suggestions = p.drawings;
+      box.hidden = false;
+      box.innerHTML = '<b>This sheet holds ' + p.drawings.length + ' drawings ' +
+        '(existing + proposed).</b> Click the one that is the subject on the canvas — ' +
+        'the AI proposal will re-run inside it.';
+      render();
+      return;
+    }
+    if (p.bays && p.floors) {
+      ensureSpec();
+      S.spec.cols = p.col_fractions.slice();
+      S.spec.rows = p.row_fractions.slice();
+      $('baysN').value = p.bays; $('floorsN').value = p.floors;
+      S.selBay = -1; S.dirty = true;
+      bits.push('<b>Proposed: ' + p.bays + ' bays × ' + p.floors + ' floors</b> ' +
+                '(confidence ' + Math.round((p.confidence || 0) * 100) + '%).' +
+                ' Adjust below, then Save + Confirm — nothing is live until you confirm.');
+    } else {
+      bits.push('<b>The AI could not settle a grid.</b> Set bays × floors manually.');
+    }
+    var notes = (p.irregularities || []).concat(p.warnings || []);
+    if (notes.length) {
+      bits.push('<ul>' + notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul>');
+    }
+    box.hidden = false; box.innerHTML = bits.join('');
+    paintHeader(); render();
+  }
+
+  // ---------- save + confirm ----------------------------------------------
+  function saveDraft() {
+    if (!S.elevId) { note('aerr', 'Create or resume a draft first.'); return Promise.reject(); }
+    if (!S.spec) { note('aerr', 'Set the grid first.'); return Promise.reject(); }
+    return jfetch('/api/author/elevations/' + S.elevId + '/geometry', {
+      method: 'PUT', body: {
+        cols: S.spec.cols, rows: S.spec.rows,
+        face_label: S.faceLabel || undefined,
+        source_sheet_id: S.sheetId || null,
+        region: S.region || null,
+      },
+    }).then(function (res) {
+      if (!res.ok) {
+        note('aerr', (res.j && res.j.error) || 'Could not save.');
+        return Promise.reject();
+      }
+      S.dirty = false;
+      note('aok', 'Draft saved — ' + res.j.data.bays + ' bays × ' +
+           res.j.data.floors + ' floors.');
+      return res.j.data;
+    });
+  }
+
+  $('savedraft').addEventListener('click', function () {
+    note('aerr', ''); note('aok', '');
+    saveDraft().catch(function () {});
+  });
+
+  $('confirmbtn').addEventListener('click', function () {
+    note('aerr', ''); note('aok', '');
+    if (!S.elevId) { note('aerr', 'Create or resume a draft first.'); return; }
+    if (S.elevStatus !== 'draft') { note('aerr', 'Already confirmed.'); return; }
+    if (!S.spec) { note('aerr', 'Set the grid first.'); return; }
+    $('cfm-p').textContent = 'Confirming "' + (S.faceLabel || 'this elevation') + '" generates ' +
+      S.spec.cols.length * S.spec.rows.length + ' working cells (' + S.spec.cols.length +
+      ' bays × ' + S.spec.rows.length + ' floors) and makes it live on the markup ' +
+      'page. The grid locks on confirm.';
+    $('cfmDlg').showModal();
+  });
+  $('cfm-cancel').addEventListener('click', function () { $('cfmDlg').close(); });
+  $('cfm-ok').addEventListener('click', function () {
+    $('cfmDlg').close();
+    saveDraft().then(function () {
+      return jfetch('/api/author/elevations/' + S.elevId + '/confirm', { method: 'POST' });
+    }).then(function (res) {
+      if (!res) return;
+      if (!res.ok) { note('aerr', (res.j && res.j.error) || 'Could not confirm.'); return; }
+      S.elevStatus = 'confirmed';
+      note('aok', 'Confirmed — ' + res.j.data.cells + ' cells generated. Opening the drawing…');
+      loadContext(S.code);
+      setTimeout(function () { location.href = '/drawing-markup/' + S.elevId; }, 900);
+    }).catch(function () {});
+  });
+
+  // ---------- boot ---------------------------------------------------------
+  loadContext().then(function () { paintHeader(); render(); });
+  window.addEventListener('resize', render);
+})();
+</script>
+</body>
+</html>

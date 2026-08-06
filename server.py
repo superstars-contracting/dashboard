@@ -167,6 +167,27 @@ walkthroughs.register(app)
 import elevation  # noqa: E402
 elevation.register(app)
 
+# #293 — AUTHORABLE elevations: drawing-set upload + sheet picker + AI-proposed
+# trace + manual authoring + the draft/confirm state machine. Schema ensured at
+# boot (idempotent, dual-backend) per the #289 pattern — a fresh deploy needs no
+# manual migration step, and the 890 North row backfills to face_label='North' /
+# status='confirmed' on first boot. Routes carry their OWN internal-role checks:
+# the client gate and architect allowlist never open /drawing-author or
+# /api/drawing-sets, and must not.
+import apply_drawing_author_293 as _author_schema  # noqa: E402
+try:
+    _ac = db_layer.connect(pragma_fk=True)
+    try:
+        _author_schema.ensure_all(_ac)
+        _ac.commit()
+    finally:
+        _ac.close()
+    db_layer._PKMAP_CACHE.clear()   # same #290 fresh-DB pk-map note as #289 above
+except Exception as _e:
+    logging.warning(f"#293 drawing-author schema ensure skipped: {_e}")
+import drawing_sets  # noqa: E402
+drawing_sets.register(app)
+
 # #278 — Project Cost "Spent to Date" (C-Suite) + the project expense ledger.
 # Comp data: every endpoint admin/c_suite; cost keys OMITTED for every other role
 # (403, never zeroed payloads); company console only — no field-reachable surface.

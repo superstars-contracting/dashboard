@@ -197,6 +197,11 @@ MIGRATION_REPORT.txt
 # Uncomment to exclude if it gets sensitive enough:
 # subscriptions_ledger.csv
 
-# #259 dev-only local Postgres (binaries + data) — never commit
+# #259 dev-only local Postgres (binaries + data) ï¿½ never commit
 .pgdev/
 .dev_db_url
+
+# ===== TEST FIXTURES (#293) - large binaries stay out of git =====
+# The drawing-set fixture (~12.8 MB PDF) lives here on the workstation;
+# provenance + re-copy instructions in tests/fixtures/README.md (committed).
+tests/fixtures/*.pdf
