@@ -4338,7 +4338,10 @@ def api_project_crew_compliance(project_code):
             fp = e["face_image_path"]
             if fp:
                 try:
-                    p = Path(fp)
+                    # #294 S3 — through THE resolver (the _fp_serve #290 lesson, again):
+                    # pre-#287 rows are Windows-absolute; raw Path() can never sit
+                    # under a Linux root, so has_photo read false on the cloud host.
+                    p = ssc_paths.resolve_data_path(fp)
                     has_photo = (p.suffix.lower() in renderable
                                  and p.resolve().is_relative_to(base) and p.exists())
                 except (OSError, ValueError):
@@ -5735,7 +5738,8 @@ def api_lr_worker_card(worker_id):
         has_photo = False
         if emp and emp['face_image_path']:
             try:
-                p = Path(emp['face_image_path'])
+                # #294 S3 — resolver first (pre-#287 rows are Windows-absolute)
+                p = ssc_paths.resolve_data_path(emp['face_image_path'])
                 base = ssc_paths.under_root("worker_records").resolve()   # #287
                 has_photo = p.resolve().is_relative_to(base) and p.exists()
             except Exception:
@@ -5760,7 +5764,8 @@ def api_lr_worker_photo(worker_id):
         emp = conn.execute("SELECT face_image_path FROM employees WHERE worker_id=?", (worker_id,)).fetchone()
         if not emp or not emp['face_image_path']:
             return jsonify({"error": "no photo"}), 404
-        p = Path(emp['face_image_path'])
+        # #294 S3 — resolver first (pre-#287 rows are Windows-absolute)
+        p = ssc_paths.resolve_data_path(emp['face_image_path'])
         base = ssc_paths.under_root("worker_records").resolve()   # #287
         if not (p.resolve().is_relative_to(base) and p.exists()):
             return jsonify({"error": "photo missing"}), 404
@@ -7811,7 +7816,10 @@ def api_employee_face_photo_get(employee_id):
                            (employee_id,)).fetchone()
         if not emp or not emp["face_image_path"]:
             return jsonify({"error": "no photo"}), 404
-        p = Path(emp["face_image_path"])
+        # #294 S3 — resolver first (the _fp_serve #290 lesson): pre-#287 rows are
+        # Windows-absolute and can never resolve raw on the Linux root — this
+        # route 404'd every pre-#287 headshot on the cloud host.
+        p = ssc_paths.resolve_data_path(emp["face_image_path"])
         ext = p.suffix.lower()
         if ext not in ('.jpg', '.jpeg', '.png'):
             return jsonify({"error": "unsupported"}), 404
@@ -8139,9 +8147,10 @@ def serve_card_live(emp_id, cred_type):
         photo_url = ''
         face_path = emp.get('face_image_path')
         if face_path:
-            fp = Path(face_path)
-            if not fp.is_absolute():
-                fp = ssc_paths.resolve_data_path(fp)   # #287
+            # #294 S3 — unconditional resolver: the old `if not is_absolute()` gate
+            # skipped it for pre-#287 Windows-absolute rows, defeating the
+            # re-anchoring the resolver exists to do on a rooted host.
+            fp = ssc_paths.resolve_data_path(face_path)
             if fp.exists():
                 try:
                     rel = fp.resolve().relative_to(WORKER_RECORDS_DIR.resolve())
@@ -11039,14 +11048,18 @@ def _exp_store_receipt_pages(project_code, files):
 
 
 def _exp_page_paths(first_path, page_count):
-    """Ordered page paths for a (possibly multi-page) receipt."""
+    """Ordered page paths for a (possibly multi-page) receipt.
+    #294 S3 — resolve the stored path first: a pre-#287 Windows-absolute row has
+    no parent to glob on a rooted Linux host (today's one caller passes a
+    fresh-stored path, where resolving is a no-op — this is for stored-row reuse)."""
     if not first_path:
         return []
-    parent = Path(first_path).parent
+    resolved = ssc_paths.resolve_data_path(first_path)
+    parent = resolved.parent
     if parent.name.startswith('scan_'):
         pages = sorted(parent.glob('page_*'))
-        return [str(x) for x in pages] or [first_path]
-    return [first_path]
+        return [str(x) for x in pages] or [str(resolved)]
+    return [str(resolved)]
 
 
 def _exp_alias_lookup(conn, vendor):

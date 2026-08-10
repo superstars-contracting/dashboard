@@ -256,6 +256,68 @@ def check_cross_flavor_resolution():
        str(Path(r"C:\Windows\notepad.exe")))
 
 
+def check_worker_face_cross_flavor(scratch, sessions):
+    """#294 S3 — the worker-photo FAMILY must push stored rows through the
+    resolver (the #290 _fp_serve lesson swept to worker faces): a pre-#287
+    WINDOWS-ABSOLUTE face_image_path whose file lives under the active root at
+    its anchor must (a) flag has_photo on crew-compliance and the labor-rates
+    card, and (b) serve bytes from BOTH gated photo routes. Raw Path(stored)
+    fails all four on a rooted/POSIX host — exactly the cloud symptom (workforce
+    headshots blank on Render, fine on the workstation)."""
+    import base64
+    emp_id, wid = "E-90287", "W-9287"
+    fdir = scratch / "worker_records" / f"{emp_id}_SMK287_Face"
+    fdir.mkdir(parents=True, exist_ok=True)
+    png = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+    (fdir / "face.png").write_bytes(png)
+    win_row = rf"C:\no\such\host\worker_records\{emp_id}_SMK287_Face\face.png"
+    conn = db_layer.connect()
+    try:
+        conn.execute("DELETE FROM project_assignments WHERE employee_id=?", (emp_id,))
+        conn.execute("DELETE FROM employees WHERE employee_id=?", (emp_id,))
+        conn.execute(
+            "INSERT INTO employees (employee_id, name, trade, worker_id, face_image_path, "
+            "intake_status) VALUES (?,?,?,?,?, 'complete')",
+            (emp_id, "SMK287 Face", "laborer", wid, win_row))
+        conn.execute(
+            "INSERT INTO project_assignments (project_code, employee_id, status) "
+            "VALUES (?,?, 'active')", (PC, emp_id))
+        conn.commit()
+    finally:
+        conn.close()
+    try:
+        s = requests.Session()
+        s.cookies.set("ssc_session", sessions["admin"])
+        r = s.get(f"{BASE}/api/employees/{emp_id}/face-photo", timeout=15)
+        ok("294S3 employees face-photo serves the windows row from the root",
+           r.status_code == 200 and r.content[:8] == b"\x89PNG\r\n\x1a\n",
+           f"status={r.status_code}")
+        r = s.get(f"{BASE}/api/labor-rates/worker-photo/{wid}", timeout=15)
+        ok("294S3 labor-rates worker-photo serves the windows row",
+           r.status_code == 200 and r.content[:8] == b"\x89PNG\r\n\x1a\n",
+           f"status={r.status_code}")
+        r = s.get(f"{BASE}/api/labor-rates/worker-card/{wid}", timeout=15)
+        card = ((r.json() or {}).get("data") or {}) if r.status_code == 200 else {}
+        ok("294S3 labor-rates card has_photo true", card.get("has_photo") is True,
+           f"status={r.status_code}")
+        r = s.get(f"{BASE}/api/projects/{PC}/crew-compliance?include_archived=true", timeout=15)
+        rows = (((r.json() or {}).get("data") or {}).get("workers")
+                or []) if r.status_code == 200 else []
+        mine = [w for w in rows if w.get("employee_id") == emp_id]
+        ok("294S3 crew-compliance has_photo true for the windows row",
+           bool(mine) and mine[0].get("has_photo") is True,
+           f"status={r.status_code} rows={len(rows)}")
+    finally:
+        conn = db_layer.connect()
+        try:
+            conn.execute("DELETE FROM project_assignments WHERE employee_id=?", (emp_id,))
+            conn.execute("DELETE FROM employees WHERE employee_id=?", (emp_id,))
+            conn.commit()
+        finally:
+            conn.close()
+
+
 def main():
     print(f"== #287 guard: SSC_DATA_ROOT containment ==  port={PORT}")
     check_cross_flavor_resolution()
@@ -290,6 +352,7 @@ def main():
         users, sessions = seed()
         try:
             run(scratch, sessions, users)
+            check_worker_face_cross_flavor(scratch, sessions)   # #294 S3
         finally:
             cleanup()
     finally:

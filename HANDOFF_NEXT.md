@@ -123,6 +123,36 @@ whole-batch moves took N precise clicks; circles invisible on tablets.
   now defers to the marker (its last-resort pin moved 273 -> 278), and
   snapshots/ssc_dev_278.db was refreshed from live. Gate 41/41 both backends.
 
+### #294 S3 — worker headshots blank on cloud: the raw-path family swept
+
+Operator report: workforce/project-dashboard headshots render on the
+workstation, NOT on production; field photos fine. Root cause = the #290
+`_fp_serve` defect, still present in the WORKER-FACE family: all 14
+employees.face_image_path rows are pre-#287 WINDOWS-ABSOLUTE; raw
+`Path(stored)` can never sit under the Linux root, so `has_photo` computed
+false (the `<img>` never rendered — not even a 404) and both photo serve
+routes 404'd. FILES WERE PRESENT on the cloud disk all along (workstation
+worker_records: 19 files / 15 face.*, ZERO modified after the 2026-08-02
+migration; tree was in the sha256-verified M4 tar) — route bug, not
+missing media.
+
+- Fixed through `ssc_paths.resolve_data_path` (containment checks
+  unchanged): crew-compliance has_photo, labor-rates worker-card
+  has_photo, labor-rates worker-photo serve, employees face-photo serve.
+- Normalized two adjacent sites: the worker-app photo_url builder's
+  `if not is_absolute()` gate (it SKIPPED the resolver for exactly the
+  rows that need re-anchoring; accidentally worked on Linux because a
+  Windows string is not POSIX-absolute) and `_exp_page_paths` (receipt
+  page glob now resolves first; today's one caller passes fresh paths —
+  future-proofing only).
+- Guard: `check_worker_face_cross_flavor` in tests/smoke_data_root_287.py
+  — seeds an employee whose face_image_path is Windows-absolute with the
+  file under the scratch root, asserts has_photo on both APIs + 200 PNG
+  bytes from both serve routes (all four FAIL on the pre-fix code).
+- STILL OPEN (chip filed): the worker-record WRITE flows (cert/doc/face
+  upload, rename, delete) still raw-Path stored folder_path — they 400
+  fail-closed on cloud for pre-#287 workers.
+
 ### #293 S1 — AUTHORABLE elevations (drawing set -> sheet picker -> AI trace -> confirm)
 
 The #280 markup surface is authorable for ANY project and ANY elevation.
