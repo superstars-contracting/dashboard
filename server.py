@@ -17,6 +17,22 @@ import re
 import time
 import uuid
 
+# #273 DEV-ONLY isolation marker — must sit ABOVE the db_layer import and every
+# #289-pattern boot ensure below, because those connect at IMPORT time and read
+# SSC_DB_URL then. When `python server.py` (this __main__ dev path — production
+# waitress imports server:app and never triggers it) starts with no SSC_DB_URL,
+# a gitignored `.dev_db_url` file redirects the dev server to an ISOLATED DB
+# copy so browser preview sessions can never touch the live superstars.db
+# (CLAUDE.md isolation rule). Loud banner when active; delete the file to point
+# a manual dev run back at live.
+if __name__ == '__main__':
+    _dev_marker = Path(__file__).resolve().parent / '.dev_db_url'
+    if not os.environ.get('SSC_DB_URL') and _dev_marker.exists():
+        _dev_url = _dev_marker.read_text(encoding='utf-8').strip()
+        if _dev_url:
+            os.environ['SSC_DB_URL'] = _dev_url
+            print("\n  *** DEV DB OVERRIDE (.dev_db_url) — ISOLATED COPY, NOT LIVE ***", flush=True)
+
 # #259 — env-driven DB layer (SSC_DB_URL): SQLite default (unchanged) or Postgres.
 import db_layer
 
@@ -11308,18 +11324,9 @@ def internal_error(error):
 
 if __name__ == '__main__':
     import sys
-    # #273 — DEV-ONLY isolation marker: when `python server.py` (this __main__ dev
-    # path — production waitress imports server:app and NEVER runs it) starts with
-    # no SSC_DB_URL, a gitignored `.dev_db_url` file redirects the dev server to an
-    # ISOLATED DB copy so browser preview sessions can never write the live
-    # superstars.db (CLAUDE.md isolation rule). Loud banner when active; delete the
-    # file to point a manual dev run back at live.
-    _dev_marker = SCRIPT_DIR / '.dev_db_url'
-    if not os.environ.get('SSC_DB_URL') and _dev_marker.exists():
-        _dev_url = _dev_marker.read_text(encoding='utf-8').strip()
-        if _dev_url:
-            os.environ['SSC_DB_URL'] = _dev_url
-            print("\n  *** DEV DB OVERRIDE (.dev_db_url) — ISOLATED COPY, NOT LIVE ***", flush=True)
+    # The #273 dev-isolation marker (.dev_db_url) is applied at the TOP of this
+    # file, before the db_layer import — the import-time boot ensures must see
+    # the override, so it cannot live down here.
     print("\n" + "=" * 60, flush=True)
     print("  Server starting...", flush=True)
     print("  Try in browser: http://127.0.0.1:5050", flush=True)

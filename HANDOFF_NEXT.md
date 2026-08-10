@@ -115,10 +115,13 @@ whole-batch moves took N precise clicks; circles invisible on tablets.
   backend FLAVOR ("postgres"/"sqlite" via db_layer), never a filename — and
   doubles as the public deploy fingerprint (frontend-only deploys are
   otherwise unverifiable without auth; see OPTIONS-Allow note in memory).
-- Dev-preview footnote: `.dev_db_url` override applies AFTER import-time
-  boot-ensures (they run against the DEFAULT db on dev boots; the isolated
-  copy stays unmigrated -> photos 500). Chip filed; ssc_dev_278.db manually
-  ensured to #294 this session.
+- Dev-preview footnote — FIXED 2026-08-10: the `.dev_db_url` override is now
+  applied at the TOP of server.py (before the db_layer import), so the
+  import-time boot-ensures run against the ISOLATED copy, never the default
+  live db (previously they ran against live on every dev boot while the
+  isolated copy stayed unmigrated -> photos 500). preview_dev_isolated.ps1
+  now defers to the marker (its last-resort pin moved 273 -> 278), and
+  snapshots/ssc_dev_278.db was refreshed from live. Gate 41/41 both backends.
 
 ### #293 S1 — AUTHORABLE elevations (drawing set -> sheet picker -> AI trace -> confirm)
 
