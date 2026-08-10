@@ -4545,6 +4545,23 @@
           #fp-groups .fp-photo .fp-check{opacity:0;transition:opacity .12s}
           #fp-groups .fp-photo:hover .fp-check,#fp-groups .fp-photo.fp-sel .fp-check,
           #fp-groups.fp-anysel .fp-photo .fp-check{opacity:1}
+          /* #294 S2 — the check MUST out-stack the #264 .fp-vis hover overlay
+             (inset:0, z-index:3, pointer-events:auto): anything lower is
+             unreachable by a real mouse — every click fell through to the card
+             and opened the lightbox. z-index:4 + a corner hit zone (~44x38 via
+             ::after) make the circle a reliable target; the vis buttons sit
+             center-card, below the zone on all but the narrowest cards. */
+          #fp-groups .fp-photo .fp-check{width:24px;height:24px;z-index:4}
+          #fp-groups .fp-photo .fp-check svg{width:14px;height:14px}
+          #fp-groups .fp-photo .fp-check::after{content:"";position:absolute;top:-6px;left:-6px;right:-14px;bottom:-8px;border-radius:10px}
+          /* no hover, no reveal — tablets/iPads get the affordance at rest
+             (.fp-sel / .fp-anysel rules above still win to full opacity) */
+          @media (hover: none){#fp-groups .fp-photo .fp-check{opacity:.92}}
+          /* per-group select-all (batch = one click, not N circle-clicks) */
+          .fp-gsel{margin-left:auto;font:inherit;font-size:11px;font-weight:700;color:#54505A;background:#fff;border:1px solid #E8E4DD;border-radius:7px;padding:3px 10px;cursor:pointer;line-height:1.5;flex:none}
+          .fp-gsel:hover{border-color:var(--fp-accent);color:var(--fp-accent-ink)}
+          .fp-gsel.on{background:var(--fp-accent);border-color:var(--fp-accent);color:#fff}
+          .fp-gsel:disabled{opacity:.6;cursor:default}
           .fp-reassigned{position:absolute;top:6px;right:6px;z-index:2;width:20px;height:20px;border-radius:50%;background:#E8ECF4;color:#2E4B7A;border:1.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
           .fp-bar-reason{border:1px solid #3c414d;background:#262a33;color:#e8eaf0;border-radius:8px;padding:7px 10px;font-size:12.5px;width:180px}
           .fp-bar-reason::placeholder{color:#8c92a0}
@@ -8157,7 +8174,8 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   var EL={North:'#6f8bb5',West:'#4f9a92',South:'#8a7fb8',East:'#6b78b0'};
   var ICCHK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg>';
   var FP={mode:'gallery',group:'drop',drop:'',worker:'',photos:[],byId:{},offset:0,total:0,hasMore:false,
-          drops:[],stats:{},selected:new Set(),clusters:[],by:'time',files:[],wired:false,loading:false,lbId:null};
+          drops:[],stats:{},selected:new Set(),clusters:[],by:'time',files:[],wired:false,loading:false,lbId:null,
+          gGroups:[],gselBusy:null};   // #294 S2 — rendered gallery groups + in-flight group select
 
   function mdyShort(iso){var m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?(m[2]+'/'+m[3]):'—';}
   function mdy(iso){var m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?(m[2]+'/'+m[3]+'/'+m[1]):(iso||'—');}
@@ -8281,17 +8299,52 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     if(!FP.photos.length){host.innerHTML='';$('fp-gallery-empty').classList.remove('fp-hide');return;}
     $('fp-gallery-empty').classList.add('fp-hide');
     var groups=[],map={};
-    function add(key,label,color,p){if(!map[key]){map[key]={label:label,color:color,photos:[]};groups.push(map[key]);}map[key].photos.push(p);}
+    function add(key,label,color,p){if(!map[key]){map[key]={key:key,label:label,color:color,photos:[]};groups.push(map[key]);}map[key].photos.push(p);}
     FP.photos.forEach(function(p){
       if(FP.group==='all'){add('all','All photos','#9aa0a8',p);}
       else if(FP.group==='date'){var k=String(p.taken_at||'').slice(0,10)||'undated';add(k,mdy(p.taken_at),'#9aa0a8',p);}
       else {var k=p.drop_id||'__un';add(k,p.drop_label||'— Unassigned —',p.drop_id?dropColor(p.drop_id):'#cabfad',p);}
     });
+    FP.gGroups=groups;   // #294 S2 — group select-all reads membership from here
     host.innerHTML=groups.map(function(g){
-      var head=FP.group==='all'?('<div class="fp-ghead">All photos <span class="fp-cnt">· '+g.photos.length+'</span></div>')
-        :('<div class="fp-ghead"><span class="fp-elbadge" style="background:'+g.color+'"></span>'+esc(g.label)+' <span class="fp-cnt">· '+g.photos.length+' photo'+(g.photos.length===1?'':'s')+'</span></div>');
+      var head=FP.group==='all'?('<div class="fp-ghead">All photos <span class="fp-cnt">· '+g.photos.length+'</span>'+gselBtn(g)+'</div>')
+        :('<div class="fp-ghead"><span class="fp-elbadge" style="background:'+g.color+'"></span>'+esc(g.label)+' <span class="fp-cnt">· '+g.photos.length+' photo'+(g.photos.length===1?'':'s')+'</span>'+gselBtn(g)+'</div>');
       return '<div class="fp-grp">'+head+'<div class="fp-gallery">'+g.photos.map(photoCard).join('')+'</div></div>';
     }).join('');
+  }
+  // #294 S2 — one click selects (or unselects) a whole group: the mislabeled-
+  // batch fix becomes select-group -> Move. Count is shown only when the
+  // gallery is fully loaded — a partial count on the button would lie.
+  function gselBtn(g){
+    if(FP.gselBusy===g.key)return '<button class="fp-gsel" disabled>Loading…</button>';
+    var all=g.photos.length>0&&g.photos.every(function(p){return FP.selected.has(p.id);});
+    return '<button class="fp-gsel'+(all?' on':'')+'" data-gsel="'+esc(String(g.key))+'" title="'
+      +(all?'Unselect every photo in this group':'Select every photo in this group'
+        +(FP.hasMore?' (loads the rest of the gallery first)':''))+'">'
+      +(all?'Unselect all':'Select all'+(FP.hasMore?'':' · '+g.photos.length))+'</button>';
+  }
+  async function gselToggle(key){
+    function find(){var g=null;(FP.gGroups||[]).forEach(function(x){if(String(x.key)===String(key))g=x;});return g;}
+    var g=find(); if(!g||FP.gselBusy)return;
+    var all=g.photos.length>0&&g.photos.every(function(p){return FP.selected.has(p.id);});
+    if(all){g.photos.forEach(function(p){FP.selected.delete(p.id);});reflectSel();return;}
+    if(FP.hasMore){
+      // an incomplete gallery would silently select PART of the drop — load the
+      // rest first so "all in this group" is the whole truth. Bounded: past the
+      // cap we select what's loaded and say so in the console (no silent cap).
+      FP.gselBusy=key;renderGroups();
+      var guard=0;
+      while(FP.hasMore&&guard<40){
+        guard++;
+        if(FP.loading){await new Promise(function(r){setTimeout(r,120);});continue;}
+        await loadGallery(false);
+      }
+      if(FP.hasMore)console.warn('[fp] group select: gallery cap reached at '+FP.photos.length+' of '+FP.total+' photos — selection covers the loaded set');
+      FP.gselBusy=null;renderGroups();
+      g=find(); if(!g)return;
+    }
+    g.photos.forEach(function(p){FP.selected.add(p.id);});
+    reflectSel();
   }
 
   // ---------- sort tray ----------
@@ -8330,6 +8383,14 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     // while a batch move is being composed.
     $('fp-groups').querySelectorAll('[data-pid]').forEach(function(el){el.classList.toggle('fp-sel',FP.selected.has(+el.getAttribute('data-pid')));});
     $('fp-groups').classList.toggle('fp-anysel',FP.selected.size>0);
+    // #294 S2 — group buttons track membership without a full re-render
+    var gm={};(FP.gGroups||[]).forEach(function(g){gm[String(g.key)]=g;});
+    $('fp-groups').querySelectorAll('[data-gsel]').forEach(function(b){
+      var g=gm[b.getAttribute('data-gsel')];if(!g)return;
+      var all=g.photos.length>0&&g.photos.every(function(p){return FP.selected.has(p.id);});
+      b.classList.toggle('on',all);
+      b.textContent=all?'Unselect all':('Select all'+(FP.hasMore?'':' · '+g.photos.length));
+    });
     updateBar();
   }
   function selectGroup(idx){ (FP.clusters[idx].photos||[]).forEach(function(p){FP.selected.add(p.id);}); reflectSel(); }
@@ -8484,6 +8545,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
       var sb=e.target.closest('[data-fp-share]'); if(sb){e.stopPropagation();fpShare(+sb.getAttribute('data-fp-share'));return;}   // #264 share toggle
       var fb=e.target.closest('[data-fp-flag]');  if(fb){e.stopPropagation();fpFlag(+fb.getAttribute('data-fp-flag'));return;}     // #264 red-flag
       var gs=e.target.closest('[data-fp-sel]');   if(gs){e.stopPropagation();toggleSel(+gs.getAttribute('data-fp-sel'));return;}   // #294 batch-move select
+      var ga=e.target.closest('[data-gsel]');     if(ga){e.stopPropagation();gselToggle(ga.getAttribute('data-gsel'));return;}     // #294 S2 group select-all
       var c=e.target.closest('[data-pid]');if(c)openLightbox(+c.getAttribute('data-pid'));
     });
     // sort click -> select; select-group

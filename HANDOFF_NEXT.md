@@ -84,8 +84,41 @@ the ONE existing assignment door:
   snapshot taken after real corrections exist must not fail the suite.
 - Guard: `tests/smoke_photo_reassign_294.py` (44 checks) in the gate.
   Punchlist items NOT in this session: "Users"->"Directory" rename, color
-  corrections (operator to enumerate), portal preview double-fetch, health
-  payload db label.
+  corrections (operator to enumerate), portal preview double-fetch.
+
+### #294 S2 — selection UX (the batch case was too fiddly) + health db label
+
+Operator report: select circles missed clicks (opened the lightbox instead);
+whole-batch moves took N precise clicks; circles invisible on tablets.
+
+- **ROOT CAUSE of "missed" clicks — found in browser hit-testing, not the
+  delegation:** the #264 `.fp-vis` share/flag overlay covers the WHOLE card on
+  hover (`inset:0`, z-index:3, pointer-events:auto) while the check sat at
+  z-index:2 — a real mouse could NEVER hit the circle (elementFromPoint A/B
+  proved it: old stacking resolves the circle's own pixels to the overlay ->
+  lightbox). Harness clicks dispatch directly on the node (no hit-testing),
+  which is why #294 S1's browser pass missed it. Fix: gallery check z-index:4
+  (+24px visual, ::after corner hit zone ~44x38). Vis buttons sit center-card
+  — reachable as before; a corner sliver may overlap the zone only on the
+  narrowest cards (selection wins there — visible + reversible).
+- **Per-group "Select all"** button in every gallery group header (drop /
+  date / all groupings — so it follows the active filter for free). Selecting
+  with pages unloaded LOADS THE REST FIRST (bounded ~40 pages; console-warns
+  if capped — no silent partial "all"); count on the button only when the
+  gallery is fully loaded (a partial count would lie). Toggles to "Unselect
+  all". Verified in preview at real scale: 20-of-99 loaded -> click -> 99
+  selected -> Move wrote 99 history rows (whole_batch + dcr_amended + reason
+  all correct) -> moved back, net-zero on the dev snapshot.
+- **Touch:** `@media (hover: none)` shows the circles at rest (.92) on
+  tablets/iPads; select/anysel still go full. Tap-to-open untouched.
+- **Health db label (S1 punchlist item):** /api/health `db` now reports the
+  backend FLAVOR ("postgres"/"sqlite" via db_layer), never a filename — and
+  doubles as the public deploy fingerprint (frontend-only deploys are
+  otherwise unverifiable without auth; see OPTIONS-Allow note in memory).
+- Dev-preview footnote: `.dev_db_url` override applies AFTER import-time
+  boot-ensures (they run against the DEFAULT db on dev boots; the isolated
+  copy stays unmigrated -> photos 500). Chip filed; ssc_dev_278.db manually
+  ensured to #294 this session.
 
 ### #293 S1 — AUTHORABLE elevations (drawing set -> sheet picker -> AI trace -> confirm)
 

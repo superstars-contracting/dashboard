@@ -929,9 +929,11 @@ def log_response(response):
 
 @app.route('/api/health', methods=['GET'])
 def health():
+    # #294 S2 — the punchlist "health db label" fix: the payload said
+    # "superstars.db" even on Postgres. Backend FLAVOR only — never the URL.
     return response_wrapper({
         "status": "ok",
-        "db": "superstars.db",
+        "db": "postgres" if db_layer.is_postgres() else "sqlite",
         "timestamp": datetime.now().isoformat()
     })
 
