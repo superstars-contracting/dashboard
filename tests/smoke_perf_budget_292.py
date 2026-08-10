@@ -48,9 +48,17 @@ BUDGETS = {
     "console": {
         "page": "/",
         "apis": ["/api/console/bootstrap?project=" + P, "/api/dashboard/layout?page_key=company_console",
-                 "/api/auth/me", "/api/admin/2fa-status", "/api/costs/widget?project=" + P],
+                 "/api/auth/me", "/api/admin/2fa-status", "/api/costs/widget?project=" + P,
+                 "/api/admin/photo-edit-alerts"],
+        # #294 — photo edit-rate banner joins the load-time set (the #289 2fa-
+        # banner pattern: tiny admin-only aggregate, fetched once on load).
+        # 1 + 6 + 1 = 8 requests — INSIDE the existing ceiling of 10; payload is
+        # a few hundred bytes against 120 KB. Declared here in the same commit
+        # per the census contract; the pattern DETAIL view is click-time, not
+        # load-time, so it stays out of this set deliberately.
         "reqs": 10, "kb": 120,
-        "note": "8-call fan-out -> bootstrap (#291); costs widget memoized (#292 S2.1)",
+        "note": "8-call fan-out -> bootstrap (#291); costs widget memoized (#292 S2.1); "
+                "photo edit alerts (#294)",
     },
     "project_dashboard": {
         "page": "/projects/" + P,

@@ -41,6 +41,52 @@ gate runs green in all four backend×root configs. NOT yet cloud: M2 = PDF on
 Linux, M3 = public-door hardening, M4 = bring-up (see the operator's
 CLOUD_MIGRATION_BLUEPRINT.md).
 
+### #294 S1 — field photo reassignment + edit tracking (punchlist anchor item)
+
+Origin: a super uploaded a batch labeled Drop 7 that belonged to Drop 8.
+AMEND-NEVER-ERASE (the DCR-immutability posture applied to photos), riding
+the ONE existing assignment door:
+
+- **/api/field-photos/assign** (unchanged URL) now records a
+  `field_photo_reassign` history row per changed photo IN-TRANSACTION
+  (from -> to, actor, optional `reason`, batch key, SECONDS-SINCE-UPLOAD),
+  detects WHOLE-BATCH corrections (the moved set covers an entire
+  (uploader, uploaded_at) upload group), and — when a correction touches a
+  day with an ISSUED DCR — sets `report_index.photo_amended(+at)`, writes an
+  `audit_log` row (`fp_reassign_after_issue`), and returns the amendment in
+  the response. Tray assignment (NULL -> drop) is logged for the trail but
+  NEVER counts as a correction: the sort-tray workflow is intended use, not
+  a mistake signal.
+- **UI (dashboard-static Field Photos)**: gallery cards are now selectable
+  (hover check; sort-tray behavior unchanged) — the floating bar switches to
+  "Move to" + an optional reason in gallery mode, so the whole-mislabeled-
+  upload fix is a ~10-second self-service act for _FP_ROLES
+  (admin/c_suite/pm/super — operator-approved lean; oversight = visibility,
+  not gatekeeping). Corrected photos carry a ↻ marker; the lightbox shows
+  the full trail (from -> to, who, when, reason, whole-upload + after-issue
+  chips) via /api/field-photos/<id>/history. The DCR archive shows an
+  "↻ photos amended" pill on flagged rows.
+- **Edit tracking (edit-rate = feedback about the SOFTWARE)**:
+  /api/admin/photo-edit-patterns (admin/c_suite) — per-user corrections with
+  TIMING BUCKETS (<=15 min = the upload UI lets the wrong drop through;
+  <=48 h = workflow lag; longer = field labeling habits) + whole-batch +
+  after-issue counts + concentration share (>=80% one person = training).
+  /api/admin/photo-edit-alerts feeds a console banner (the #289 2fa-banner
+  pattern; DECLARED in the console budget same-commit, 8 <= 10 reqs): fires
+  past a SETTABLE threshold (app_settings `fp_reassign_alert_threshold`,
+  default 5/user/rolling-7d, POST .../threshold to change) AND on any
+  whole-batch correction; every alert carries the dominant bucket READING,
+  never a bare count. uid / W-#### in alert text — names never.
+- **CASE TRAP fixed en route**: report_index rows carry `report_type='DCR'`
+  (uppercase) on live; the amend query matches UPPER(report_type) and the
+  guard seeds mirror the real casing. Alert/pattern assertions in the guard
+  are SCOPED TO THE SUITE'S OWN UIDS — the feed is global, and a gate
+  snapshot taken after real corrections exist must not fail the suite.
+- Guard: `tests/smoke_photo_reassign_294.py` (44 checks) in the gate.
+  Punchlist items NOT in this session: "Users"->"Directory" rename, color
+  corrections (operator to enumerate), portal preview double-fetch, health
+  payload db label.
+
 ### #293 S1 — AUTHORABLE elevations (drawing set -> sheet picker -> AI trace -> confirm)
 
 The #280 markup surface is authorable for ANY project and ANY elevation.

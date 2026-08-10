@@ -70,6 +70,7 @@ GATE = [
     "smoke_perf_291.py",          # #291 guard — bootstrap aggregates mirror-not-door (parity, subset, containment) + thumb cache headers + lazy grid
     "smoke_memo_292.py",          # #292 guard — ssc_memo: planted-write invalidation per type (stale serve = red), two-role boundary, single-flight, deep-copy serves
     "smoke_drawing_author_293.py",  # #293 guard — drawing sets/naming vs the real fixture, AI seam + no-key degrade (own servers), draft/confirm machine, 890 backfill, isolation
+    "smoke_photo_reassign_294.py",  # #294 guard — reassign history (single/batch), same-project guard, DCR amend flag+audit, self-service perms, timing buckets, settable alert threshold
     "smoke_perf_budget_292.py",   # #292 THE BUDGET GATE — per-surface request-count + payload ceilings over the whole census; a page that goes chatty again fails here
     "smoke_dropplan_api.py",
     "smoke_worker_lifecycle.py",

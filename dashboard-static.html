@@ -3107,6 +3107,9 @@
             const pillClass = (r.status === 'issued') ? 'dcr-pill' : 'dcr-pill na';
             const statusPill = '<span class="' + pillClass + '">' + esc(r.status || '—') + '</span>';
             const stalePill = r.stale ? '<span class="dcr-stale" title="sign_in_log changed after this DCR was issued — re-issue to refresh the rendered report">&#9888; stale</span>' : '';
+            // #294 — the honest paper-trail marker: a photo's drop assignment
+            // was corrected AFTER this report was issued (allowed + audited).
+            const amendPill = r.photo_amended ? '<span class="dcr-amend" title="Photo drop assignment amended after issue' + (r.photo_amended_at ? ' (' + esc(_fmt(r.photo_amended_at)) + ')' : '') + ' — the photo history carries the details">&#8635; photos amended</span>' : '';
             // View (eye, blue) opens the rendered report; Edit (pencil) reopens the entry
             // view scoped to this date (re-issue preserves number+date); Delete (trash,
             // red) hits /by-sequence. Same data-* hooks the existing tbody delegation routes.
@@ -3122,7 +3125,7 @@
             return '<tr' + (r.stale ? ' class="dcr-stale-row"' : '') + '>' +
               '<td class="dcr-id">' + esc(displayId) + '</td>' +
               '<td>' + esc(dateDisp) + '</td>' +
-              '<td>' + statusPill + stalePill + '</td>' +
+              '<td>' + statusPill + stalePill + amendPill + '</td>' +
               '<td class="dcr-muted">' + esc(issuedAtDisp) + '</td>' +
               '<td><div class="dcr-acts">' + viewBtn + editBtn + deleteBtn + '</div></td>' +
             '</tr>';
@@ -4536,6 +4539,20 @@
           .fp-check{position:absolute;top:6px;left:6px;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.85);border:1.5px solid #fff;display:flex;align-items:center;justify-content:center;z-index:2}
           .fp-photo.fp-sel .fp-check{background:var(--fp-accent);border-color:#fff}
           .fp-check svg{width:12px;height:12px;color:#fff;opacity:0}.fp-photo.fp-sel .fp-check svg{opacity:1}
+          /* #294 — gallery cards select too (batch MOVE). The check stays out of
+             the way until hover / an active selection, so tap-to-open is
+             untouched; sort-tray cards keep their always-on check via .fp-selbl. */
+          #fp-groups .fp-photo .fp-check{opacity:0;transition:opacity .12s}
+          #fp-groups .fp-photo:hover .fp-check,#fp-groups .fp-photo.fp-sel .fp-check,
+          #fp-groups.fp-anysel .fp-photo .fp-check{opacity:1}
+          .fp-reassigned{position:absolute;top:6px;right:6px;z-index:2;width:20px;height:20px;border-radius:50%;background:#E8ECF4;color:#2E4B7A;border:1.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+          .fp-bar-reason{border:1px solid #3c414d;background:#262a33;color:#e8eaf0;border-radius:8px;padding:7px 10px;font-size:12.5px;width:180px}
+          .fp-bar-reason::placeholder{color:#8c92a0}
+          .fp-hist{margin-top:10px;border-top:1px solid #e6e9ef;padding-top:8px}
+          .fp-hist-row{font-size:12px;color:#4a4f59;padding:3px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
+          .fp-hist-row b{color:#23262e}
+          .fp-hist-note{font-size:10.5px;color:#7A2E1B;background:#FFE8D6;border-radius:6px;padding:1px 7px;font-weight:600}
+          .dcr-amend{margin-left:6px;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:#E8ECF4;color:#2E4B7A;border:1px solid #9FB2D8}
           .fp-photo .fp-time{position:absolute;left:0;right:0;bottom:0;padding:14px 7px 5px;background:linear-gradient(transparent,rgba(20,22,30,.55));color:#fff;font-size:10px;font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,.4)}
           /* floating assign bar */
           .fp-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:#1b1f29;color:#fff;border-radius:14px;box-shadow:0 16px 40px rgba(15,18,28,.35);padding:12px 16px;display:flex;align-items:center;gap:13px;z-index:1300;flex-wrap:wrap}
@@ -4612,11 +4629,16 @@
             <div id="fp-sort-empty" class="fp-empty fp-hide">Nothing to sort — every photo is filed to a drop. 🎉</div>
           </div>
         </div>
-        <!-- floating assign bar (sort mode) -->
+        <!-- floating assign bar — sort mode ASSIGNS from the tray; gallery mode
+             MOVES already-filed photos (#294: amendment with history, the whole-
+             batch mislabel fix in one act). Reason is optional and rides the
+             history rows. -->
         <div class="fp-bar fp-hide" id="fp-bar">
           <span class="fp-bar-n" id="fp-bar-n">0 selected</span>
-          <span class="fp-bar-lbl">Assign to</span>
+          <span class="fp-bar-lbl" id="fp-bar-lbl">Assign to</span>
           <select id="fp-bar-drop"><option value="">Drop…</option></select>
+          <input type="text" class="fp-bar-reason" id="fp-bar-reason" maxlength="200"
+                 placeholder="Reason (optional)">
           <button class="fp-bar-assign" id="fp-bar-assign" disabled>Assign<svg class="fp-ic"><use href="#i-chev"/></svg></button>
           <button class="fp-bar-clear" id="fp-bar-clearbar">Clear</button>
         </div>
@@ -8220,8 +8242,11 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   function photoCard(p){
     var cap=p.caption?String(p.caption):'';
     var capShort=cap.length>34?cap.slice(0,32)+'…':cap;
-    return '<div class="fp-photo" data-pid="'+p.id+'">'
+    var sel=FP.selected.has(p.id)?' fp-sel':'';
+    return '<div class="fp-photo'+sel+'" data-pid="'+p.id+'">'
       +'<img loading="lazy" src="'+esc(p.thumb_url)+'" alt="">'
+      +'<span class="fp-check" data-fp-sel="'+p.id+'" title="Select for batch move">'+ICCHK+'</span>'
+      +(p.reassigned?'<span class="fp-reassigned" title="Drop reassigned'+(p.reassign_count>1?' ×'+p.reassign_count:'')+' — open for the history">&#8635;</span>':'')
       +(p.taken_at_estimated?'<span class="fp-est" title="No capture time in the photo — showing when it was uploaded">upload time</span>':'')
       +fpVis(p)
       +'<div class="fp-grad"></div><div class="fp-meta"><span>'+mdyShort(p.taken_at)+'</span>'
@@ -8301,23 +8326,50 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
   function toggleSel(id){ if(FP.selected.has(id))FP.selected.delete(id); else FP.selected.add(id); reflectSel(); }
   function reflectSel(){
     $('fp-clusters').querySelectorAll('[data-spid]').forEach(function(el){el.classList.toggle('fp-sel',FP.selected.has(+el.getAttribute('data-spid')));});
+    // #294 — gallery cards select too; .fp-anysel keeps every check visible
+    // while a batch move is being composed.
+    $('fp-groups').querySelectorAll('[data-pid]').forEach(function(el){el.classList.toggle('fp-sel',FP.selected.has(+el.getAttribute('data-pid')));});
+    $('fp-groups').classList.toggle('fp-anysel',FP.selected.size>0);
     updateBar();
   }
   function selectGroup(idx){ (FP.clusters[idx].photos||[]).forEach(function(p){FP.selected.add(p.id);}); reflectSel(); }
   function selectAll(){ FP.clusters.forEach(function(c){c.photos.forEach(function(p){FP.selected.add(p.id);});}); reflectSel(); }
   function clearSel(){ FP.selected.clear(); reflectSel(); }
   function updateBar(){
+    // #294 — the bar serves BOTH modes now: Assign from the tray, Move in the
+    // gallery (amendment with history — the ~10-second whole-batch fix).
     var n=FP.selected.size,bar=$('fp-bar');
-    if(n>0&&FP.mode==='sort'){bar.classList.remove('fp-hide');$('fp-bar-n').textContent=n+' selected';$('fp-bar-assign').disabled=!$('fp-bar-drop').value;}
+    if(n>0){
+      bar.classList.remove('fp-hide');
+      $('fp-bar-n').textContent=n+' selected';
+      var moving=FP.mode!=='sort';
+      $('fp-bar-lbl').textContent=moving?'Move to':'Assign to';
+      $('fp-bar-assign').firstChild.textContent=moving?'Move':'Assign';
+      $('fp-bar-reason').style.display=moving?'':'none';
+      $('fp-bar-assign').disabled=!$('fp-bar-drop').value;
+    }
     else bar.classList.add('fp-hide');
   }
   async function assignSelected(){
     var drop=$('fp-bar-drop').value;if(!drop||!FP.selected.size)return;
     var ids=Array.from(FP.selected);
+    var reason=($('fp-bar-reason').value||'').trim();
     $('fp-bar-assign').disabled=true;
     try{
-      var r=await fetch('/api/field-photos/assign',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({photo_ids:ids,drop_id:drop})});
-      if(r.ok){FP.selected.clear();FP.drops._rendered=false;await loadUnassigned();loadGallery(true);}
+      var r=await fetch('/api/field-photos/assign',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({photo_ids:ids,drop_id:drop,reason:reason||undefined})});
+      if(r.ok){
+        var j=await r.json();var d=(j&&j.data)||{};
+        // #294 — the paper-trail notice: an already-issued day was amended.
+        if(d.dcr_amended&&d.dcr_amended.length){
+          alert('Moved '+(d.changed||ids.length)+' photo(s). Note: '+d.dcr_amended.length
+            +' issued DCR day'+(d.dcr_amended.length===1?'':'s')+' now carr'+(d.dcr_amended.length===1?'ies':'y')
+            +' the "photos amended after issue" marker in the archive.');
+        }
+        FP.selected.clear();$('fp-bar-reason').value='';FP.drops._rendered=false;
+        reflectSel();   // hide the bar NOW — the gallery re-render below doesn't call updateBar
+        if(FP.mode==='sort')await loadUnassigned();
+        loadGallery(true);
+      }
     }catch(e){}
     $('fp-bar-assign').disabled=false;
   }
@@ -8328,14 +8380,37 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     $('fp-lb-img').src=p.file_url;
     var tags=[];tags.push('<span class="fp-lb-tag">'+(p.drop_label?esc(p.drop_label):'Unassigned')+'</span>');
     tags.push('<span class="fp-lb-tag">'+dtLabel(p.taken_at)+(p.taken_at_estimated?' (est)':'')+'</span>');
+    if(p.reassigned)tags.push('<span class="fp-lb-tag" style="background:#E8ECF4;color:#2E4B7A">&#8635; Reassigned'+(p.reassign_count>1?' ×'+p.reassign_count:'')+'</span>');
     $('fp-lb-meta').innerHTML='<div class="fp-lb-row">'+tags.join('')+'</div>'
       +'<textarea class="fp-lb-cap" id="fp-lb-cap" rows="2" placeholder="Description — area, work done, who…">'+esc(p.caption||'')+'</textarea>'
       +'<div class="fp-lb-acts"><button class="fp-lb-save" id="fp-lb-save">Save description</button>'
       +'<button class="fp-lb-del" id="fp-lb-del"><svg class="fp-ic"><use href="#i-trash"/></svg>Delete</button>'
-      +'<span style="font-size:11px;color:#8c92a0;align-self:center">'+esc(p.file_name||'')+' · '+p.width+'×'+p.height+(p.orientation_applied?' · rotated upright':'')+'</span></div>';
+      +'<span style="font-size:11px;color:#8c92a0;align-self:center">'+esc(p.file_name||'')+' · '+p.width+'×'+p.height+(p.orientation_applied?' · rotated upright':'')+'</span></div>'
+      +'<div id="fp-lb-hist"></div>';
     $('fp-lightbox').classList.add('show');
     $('fp-lb-save').addEventListener('click',function(){saveCaption(id);});
     $('fp-lb-del').addEventListener('click',function(){delPhoto(id);});
+    if(p.reassigned)loadHistory(id);
+  }
+  // #294 — the amendment trail, loaded on open (per-photo, never load-time).
+  async function loadHistory(id){
+    var box=$('fp-lb-hist');if(!box)return;
+    try{
+      var r=await fetch('/api/field-photos/'+id+'/history',{credentials:'include'});
+      if(!r.ok)return;
+      var rows=((await r.json())||{}).data||[];
+      if(!rows.length)return;
+      box.innerHTML='<div class="fp-hist">'+rows.map(function(h){
+        var from=h.from_label||(h.from_drop_id?esc(h.from_drop_id):'Unassigned');
+        var to=h.to_label||(h.to_drop_id?esc(h.to_drop_id):'Unassigned');
+        return '<div class="fp-hist-row"><b>'+esc(from)+' &rarr; '+esc(to)+'</b>'
+          +'<span>'+esc(h.actor||'—')+'</span><span>'+dtLabel(h.at)+'</span>'
+          +(h.reason?'<span>“'+esc(h.reason)+'”</span>':'')
+          +(h.dcr_amended?'<span class="fp-hist-note">amended an issued DCR day</span>':'')
+          +(h.whole_batch?'<span class="fp-hist-note" style="background:#E8ECF4;color:#2E4B7A">whole upload moved</span>':'')
+          +'</div>';
+      }).join('')+'</div>';
+    }catch(e){}
   }
   function closeLightbox(){$('fp-lightbox').classList.remove('show');FP.lbId=null;}
   async function saveCaption(id){
@@ -8408,6 +8483,7 @@ document.querySelectorAll('button[data-link]').forEach(btn => {
     $('fp-groups').addEventListener('click',function(e){
       var sb=e.target.closest('[data-fp-share]'); if(sb){e.stopPropagation();fpShare(+sb.getAttribute('data-fp-share'));return;}   // #264 share toggle
       var fb=e.target.closest('[data-fp-flag]');  if(fb){e.stopPropagation();fpFlag(+fb.getAttribute('data-fp-flag'));return;}     // #264 red-flag
+      var gs=e.target.closest('[data-fp-sel]');   if(gs){e.stopPropagation();toggleSel(+gs.getAttribute('data-fp-sel'));return;}   // #294 batch-move select
       var c=e.target.closest('[data-pid]');if(c)openLightbox(+c.getAttribute('data-pid'));
     });
     // sort click -> select; select-group

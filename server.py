@@ -188,6 +188,25 @@ except Exception as _e:
 import drawing_sets  # noqa: E402
 drawing_sets.register(app)
 
+# #294 — field photo reassignment history + edit tracking. AMEND-NEVER-ERASE on
+# the one assignment door (/api/field-photos/assign hooks record_reassignments
+# in-transaction); admin/c_suite pattern view + threshold alerts read the trail.
+# Schema ensured at boot (#289 pattern) — the threshold seed + report_index
+# photo_amended columns land on first boot with no manual step.
+import apply_photo_reassign_294 as _reassign_schema  # noqa: E402
+try:
+    _rc = db_layer.connect(pragma_fk=True)
+    try:
+        _reassign_schema.ensure_reassign_schema(_rc)
+        _rc.commit()
+    finally:
+        _rc.close()
+    db_layer._PKMAP_CACHE.clear()   # #290 fresh-DB pk-map note, as above
+except Exception as _e:
+    logging.warning(f"#294 photo-reassign schema ensure skipped: {_e}")
+import photo_reassign  # noqa: E402
+photo_reassign.register(app)
+
 # #278 — Project Cost "Spent to Date" (C-Suite) + the project expense ledger.
 # Comp data: every endpoint admin/c_suite; cost keys OMITTED for every other role
 # (403, never zeroed payloads); company console only — no field-reachable surface.
@@ -9622,7 +9641,9 @@ def dropplan_page():
 # bytes. GPS/EXIF is stripped on processing; dates are LOCAL. All four project
 # roles can view + upload.
 # ===========================================================================
-_FP_ROLES = ('admin', 'c_suite', 'pm', 'super')
+# #294 — the self-service field-photo editor set lives in photo_reassign (one
+# source; the reassignment endpoints gate on the SAME roles, so they can't drift).
+_FP_ROLES = photo_reassign.FP_EDIT_ROLES
 _FP_BASE = ssc_paths.under_root('data_room', 'field_photos')   # #287
 _FP_EXT = {'.jpg', '.jpeg', '.png', '.heic', '.heif', '.webp'}
 _FP_MAX_FILES = 60            # per single POST (the UI chunks bigger batches)
@@ -9884,12 +9905,18 @@ def api_field_photos_list(project_code):
         # #264 — annotate each photo with its client-visibility state (one batched pair of
         # queries) so the Field Photos UI can render the Share-with-client + Red-flag toggles.
         vis = visibility.photo_states(conn, project_code)
+        # #294 — one batched query for the page's amendment markers (the
+        # visibility.photo_states shape): corrections only, so tray
+        # assignments never read as mistakes.
+        reassigns = photo_reassign.reassign_states(conn, [r["id"] for r in rows])
         photos = []
         for r in rows:
             d = _fieldphoto_public(r, label_map)
             st = vis.get(r["id"], {"shared_client": False, "flagged": False})
             d["shared_client"] = st["shared_client"]
             d["flagged"] = st["flagged"]
+            d["reassign_count"] = reassigns.get(r["id"], 0)
+            d["reassigned"] = r["id"] in reassigns
             photos.append(d)
         out = {
             "photos": photos,
@@ -9957,6 +9984,17 @@ def api_field_photos_assign():
         if drop_id and not conn.execute("SELECT 1 FROM drops WHERE drop_id=? AND project_code=?",
                                         (drop_id, pcode)).fetchone():
             return jsonify({"error": "drop not found for this project"}), 400
+        # #294 — AMEND, NEVER ERASE. Before the move, the history rows ride the
+        # SAME transaction: from->to per photo, timing-since-upload, whole-batch
+        # detection, and the issued-DCR photo_amended flag + audit where a
+        # correction touches an already-issued day. The tray flow (NULL->drop)
+        # is logged too but never counts as a "correction" in the analytics.
+        pre_rows = conn.execute(
+            f"SELECT id, project_code, drop_id, uploaded_at, uploaded_by_uid, taken_at "
+            f"FROM field_photos WHERE id IN ({qm})", ids).fetchall()
+        reassign_summary = photo_reassign.record_reassignments(
+            conn, (current_user() or {}).get('id'), pre_rows, drop_id,
+            reason=(str(body.get('reason') or '').strip() or None))
         sets, sp = ["drop_id = ?"], [drop_id]
         if stage is not None:
             sets.append("stage = ?")
@@ -9966,7 +10004,13 @@ def api_field_photos_assign():
             sp.append(worker)
         n = conn.execute(f"UPDATE field_photos SET {', '.join(sets)} WHERE id IN ({qm})", sp + ids).rowcount
         conn.commit()
-        return _fp_no_store(response_wrapper({"assigned": n, "drop_id": drop_id, "project_code": pcode}))
+        return _fp_no_store(response_wrapper({
+            "assigned": n, "drop_id": drop_id, "project_code": pcode,
+            "changed": reassign_summary["changed"],
+            "corrections": reassign_summary["corrections"],
+            "whole_batch": reassign_summary["whole_batch_batches"] > 0,
+            "dcr_amended": reassign_summary["dcr_amended"],
+        }))
     finally:
         conn.close()
 
