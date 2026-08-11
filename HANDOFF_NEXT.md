@@ -149,9 +149,41 @@ missing media.
   — seeds an employee whose face_image_path is Windows-absolute with the
   file under the scratch root, asserts has_photo on both APIs + 200 PNG
   bytes from both serve routes (all four FAIL on the pre-fix code).
-- STILL OPEN (chip filed): the worker-record WRITE flows (cert/doc/face
-  upload, rename, delete) still raw-Path stored folder_path — they 400
-  fail-closed on cloud for pre-#287 workers.
+- ~~STILL OPEN (chip filed): the worker-record WRITE flows~~ **CLOSED in
+  S4 (2026-08-11), next section.**
+
+### #294 S4 — worker-record WRITE flows: resolver on read, store_rel on write
+
+The S3 counterpart: uploads (cert scan, documents, face photo), the
+name-change folder rename, and deletes still built raw Path() from stored
+folder_path/file_path — 400 "invalid folder path" fail-closed on cloud
+for all pre-#287 workers.
+
+- `_worker_folder_resolve()` (server.py, next to WORKER_RECORDS_DIR) is
+  THE way write flows turn employees.folder_path into an on-disk folder:
+  stored rows go through resolve_data_path; an empty row mints the
+  standard layout and stores it PORTABLE (store_rel). Existing absolute
+  rows are left untouched (#287 zero-mutation) — the resolver handles
+  them forever.
+- NEW rows now stored PORTABLE everywhere: minted folder_path,
+  worker_documents.file_path, employees.face_image_path (upload +
+  rename). We stopped minting Windows-absolute rows entirely.
+- Containment checks modernized `startswith` -> `is_relative_to` (the
+  prefix-collision footgun: /root/worker_records2 passed startswith).
+- Latent bug fixed en route: the name-change folder rename never
+  re-pointed face_image_path (embeds the slug) — headshot went dark
+  after any rename, on ANY host. Now re-pointed (portable) in the same
+  transaction, only when the folder actually moves.
+- Doc-list file_url builder (S3's one missed sibling): resolver first —
+  pre-#287 doc rows raised ValueError -> file_url None -> dead thumbnails
+  on cloud.
+- Guard (#287 suite, same seeded pre-#287 worker, now with
+  Windows-absolute folder_path too): face/doc/cert uploads land under
+  the scratch root, rows stored PORTABLE (worker_records/... prefix,
+  no drive letter), serve-back works from the new rows, face DELETE
+  unlinks via the resolver. Suite standalone 32/32. The suite's server
+  env strips ANTHROPIC_API_KEY so the cert probe hits the deterministic
+  keyless branch.
 
 ### #293 S1 — AUTHORABLE elevations (drawing set -> sheet picker -> AI trace -> confirm)
 

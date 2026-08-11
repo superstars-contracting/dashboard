@@ -3262,14 +3262,23 @@ def update_employee(emp_id):
             new_folder = WORKER_RECORDS_DIR / f"{emp_id}_{new_slug}"
             current_folder_path = current['folder_path']
             if current_folder_path:
-                current_folder = Path(current_folder_path)
+                # #294 S4 — stored rows resolve through THE resolver (pre-#287
+                # rows are Windows-absolute); new rows are stored PORTABLE.
+                current_folder = ssc_paths.resolve_data_path(current_folder_path)
                 if current_folder.resolve() != new_folder.resolve():
                     if current_folder.exists():
                         rename_from = current_folder
                         rename_to = new_folder
-                    updates['folder_path'] = str(new_folder)
+                    updates['folder_path'] = ssc_paths.store_rel(new_folder)
             else:
-                updates['folder_path'] = str(new_folder)
+                updates['folder_path'] = ssc_paths.store_rel(new_folder)
+            # #294 S4 — face_image_path embeds the folder slug: when the folder
+            # actually moves, re-point the row at the renamed location (same
+            # filename, portable form) or the headshot goes dark after a rename.
+            if rename_from is not None and current['face_image_path']:
+                face_name = str(current['face_image_path']).replace('\\', '/').rsplit('/', 1)[-1]
+                if face_name:
+                    updates['face_image_path'] = ssc_paths.store_rel(new_folder / face_name)
 
         # ----- UPDATE row -----
         set_clauses = [f"{k} = ?" for k in updates] + ["updated_at = CURRENT_TIMESTAMP"]
@@ -3289,7 +3298,9 @@ def update_employee(emp_id):
                 return jsonify({"error": f"folder rename failed: {e}"}), 500
         elif 'folder_path' in updates:
             try:
-                Path(updates['folder_path']).mkdir(parents=True, exist_ok=True)
+                # #294 S4 — the stored value is PORTABLE (relative); mkdir the
+                # resolved on-disk location, never the raw row value.
+                ssc_paths.resolve_data_path(updates['folder_path']).mkdir(parents=True, exist_ok=True)
             except OSError as e:
                 conn.rollback()
                 conn.close()
@@ -6823,6 +6834,20 @@ WORKER_RECORDS_DIR = ssc_paths.under_root("worker_records")   # #287
 WORKER_RECORDS_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _worker_folder_resolve(stored, employee_id, name):
+    """#294 S4 — the ONE way worker-record WRITE flows turn employees.folder_path
+    into an on-disk folder. Stored rows go through THE resolver (pre-#287 rows
+    are Windows-absolute and can never sit under a Linux root raw); an empty row
+    mints the standard layout under the active root. Returns
+    (folder: Path, store_value: str | None) — store_value is the PORTABLE
+    relative row to write back, set ONLY when the row was empty (existing rows
+    stay untouched per the #287 zero-mutation posture)."""
+    if stored:
+        return ssc_paths.resolve_data_path(stored), None
+    folder = WORKER_RECORDS_DIR / f"{employee_id}_{slugify_name(name or employee_id)}"
+    return folder, ssc_paths.store_rel(folder)
+
+
 def slugify_name(name):
     """Convert worker name to safe folder name. 'José Vargas' -> 'Jose_Vargas'."""
     if not name:
@@ -7025,7 +7050,9 @@ def api_worker_get(employee_id):
             fp = dd.get('file_path')
             if fp:
                 try:
-                    rel = Path(fp).resolve().relative_to(WORKER_RECORDS_DIR.resolve())
+                    # #294 S4 — resolver first: pre-#287 rows are Windows-absolute
+                    # (relative_to raised on Linux -> file_url None -> dead thumbs).
+                    rel = ssc_paths.resolve_data_path(fp).resolve().relative_to(WORKER_RECORDS_DIR.resolve())
                     dd['file_url'] = "/worker-files/" + str(rel).replace("\\", "/")
                 except (ValueError, OSError):
                     dd['file_url'] = None
@@ -7090,18 +7117,18 @@ def api_worker_upload(employee_id):
             conn.close()
             return jsonify({"error": "employee not found"}), 404
 
-        folder_path = emp["folder_path"]
-        if not folder_path:
-            folder_slug = slugify_name(emp["name"])
-            folder_path = str(WORKER_RECORDS_DIR / f"{employee_id}_{folder_slug}")
+        # #294 S4 — stored rows resolve through THE resolver; an empty row mints
+        # the standard layout and stores it PORTABLE (relative).
+        folder, _store = _worker_folder_resolve(emp["folder_path"], employee_id, emp["name"])
+        if _store:
             conn.execute(
                 "UPDATE employees SET folder_path = ? WHERE employee_id = ?",
-                (folder_path, employee_id)
+                (_store, employee_id)
             )
 
         # ----- SECURITY: path traversal proof -----
-        folder = Path(folder_path).resolve()
-        if not str(folder).startswith(str(WORKER_RECORDS_DIR.resolve())):
+        folder = folder.resolve()
+        if not folder.is_relative_to(WORKER_RECORDS_DIR.resolve()):
             conn.close()
             return jsonify({"error": "invalid folder path"}), 400
 
@@ -7129,7 +7156,7 @@ def api_worker_upload(employee_id):
         target_path = (subfolder / target_filename).resolve()
 
         # Final path-traversal check after resolve()
-        if not str(target_path).startswith(str(WORKER_RECORDS_DIR.resolve())):
+        if not target_path.is_relative_to(WORKER_RECORDS_DIR.resolve()):
             conn.close()
             return jsonify({"error": "path traversal blocked"}), 400
 
@@ -7137,12 +7164,13 @@ def api_worker_upload(employee_id):
         size = target_path.stat().st_size
 
         # Record in DB. Original filename is what the user uploaded; for audit only — never re-used as a path.
+        # #294 S4 — the stored row is PORTABLE (store_rel), never a host-absolute path.
         cur = conn.execute(
             """INSERT INTO worker_documents
                (employee_id, doc_type, doc_label, file_path, original_filename,
                 mime_type, file_size_bytes, related_cert_id)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (employee_id, doc_type, doc_label, str(target_path), f.filename[:255],
+            (employee_id, doc_type, doc_label, ssc_paths.store_rel(target_path), f.filename[:255],
              f.mimetype, size, related_cert_id)
         )
         doc_id = cur.lastrowid
@@ -7182,8 +7210,9 @@ def api_worker_delete_document(employee_id, doc_id):
 
         # Security: only delete files inside worker_records dir
         try:
-            target = Path(row["file_path"]).resolve()
-            if not str(target).startswith(str(WORKER_RECORDS_DIR.resolve())):
+            # #294 S4 — resolver first (stored rows may be pre-#287 absolute or portable)
+            target = ssc_paths.resolve_data_path(row["file_path"]).resolve()
+            if not target.is_relative_to(WORKER_RECORDS_DIR.resolve()):
                 conn.close()
                 return jsonify({"error": "invalid file path"}), 400
             if target.exists():
@@ -7360,18 +7389,17 @@ def api_certification_extract(employee_id):
             return jsonify({"error": "employee not found"}), 404
 
         # Back-fill folder_path if the row predates the standardized layout.
-        folder_path = emp["folder_path"]
-        if not folder_path:
-            folder_slug = slugify_name(emp["name"])
-            folder_path = str(WORKER_RECORDS_DIR / f"{employee_id}_{folder_slug}")
+        # #294 S4 — stored rows resolve through THE resolver; minted rows are PORTABLE.
+        folder, _store = _worker_folder_resolve(emp["folder_path"], employee_id, emp["name"])
+        if _store:
             conn.execute(
                 "UPDATE employees SET folder_path = ? WHERE employee_id = ?",
-                (folder_path, employee_id)
+                (_store, employee_id)
             )
             conn.commit()
 
-        folder = Path(folder_path).resolve()
-        if not str(folder).startswith(str(WORKER_RECORDS_DIR.resolve())):
+        folder = folder.resolve()
+        if not folder.is_relative_to(WORKER_RECORDS_DIR.resolve()):
             conn.close()
             return jsonify({"error": "invalid folder path"}), 400
 
@@ -7386,7 +7414,7 @@ def api_certification_extract(employee_id):
                 existing_nums.append(int(m.group(1)))
         next_n = (max(existing_nums) + 1) if existing_nums else 1
         target_path = (certs_dir / f"cert_{next_n}{ext}").resolve()
-        if not str(target_path).startswith(str(WORKER_RECORDS_DIR.resolve())):
+        if not target_path.is_relative_to(WORKER_RECORDS_DIR.resolve()):
             conn.close()
             return jsonify({"error": "path traversal blocked"}), 400
 
@@ -7650,18 +7678,17 @@ def api_employee_face_photo(employee_id):
             conn.close()
             return jsonify({"error": "employee not found"}), 404
 
-        folder_path = emp["folder_path"]
-        if not folder_path:
-            folder_slug = slugify_name(emp["name"])
-            folder_path = str(WORKER_RECORDS_DIR / f"{employee_id}_{folder_slug}")
+        # #294 S4 — stored rows resolve through THE resolver; minted rows are PORTABLE.
+        folder, _store = _worker_folder_resolve(emp["folder_path"], employee_id, emp["name"])
+        if _store:
             conn.execute(
                 "UPDATE employees SET folder_path = ? WHERE employee_id = ?",
-                (folder_path, employee_id)
+                (_store, employee_id)
             )
             conn.commit()
 
-        folder = Path(folder_path).resolve()
-        if not str(folder).startswith(str(WORKER_RECORDS_DIR.resolve())):
+        folder = folder.resolve()
+        if not folder.is_relative_to(WORKER_RECORDS_DIR.resolve()):
             conn.close()
             return jsonify({"error": "invalid folder path"}), 400
 
@@ -7676,7 +7703,7 @@ def api_employee_face_photo(employee_id):
                 app.logger.warning(f"could not remove old face file {old}: {e}")
 
         target_path = (folder / f"face{ext}").resolve()
-        if not str(target_path).startswith(str(WORKER_RECORDS_DIR.resolve())):
+        if not target_path.is_relative_to(WORKER_RECORDS_DIR.resolve()):
             conn.close()
             return jsonify({"error": "path traversal blocked"}), 400
 
@@ -7710,10 +7737,11 @@ def api_employee_face_photo(employee_id):
                 # Fall through: face_image_path still points at the HEIC. The
                 # UI will fail to render it but the record + file are intact.
 
+        # #294 S4 — the stored row is PORTABLE (store_rel), never host-absolute.
         conn.execute(
             "UPDATE employees SET face_image_path = ?, updated_at = CURRENT_TIMESTAMP "
             "WHERE employee_id = ?",
-            (str(displayable_path), employee_id)
+            (ssc_paths.store_rel(displayable_path), employee_id)
         )
         conn.commit()
         conn.close()
@@ -7772,8 +7800,9 @@ def api_employee_face_photo_delete(employee_id):
         folder = emp["folder_path"]
         if folder:
             try:
-                fp = Path(folder).resolve()
-                if str(fp).startswith(str(WORKER_RECORDS_DIR.resolve())):
+                # #294 S4 — resolver first (pre-#287 rows are Windows-absolute)
+                fp = ssc_paths.resolve_data_path(folder).resolve()
+                if fp.is_relative_to(WORKER_RECORDS_DIR.resolve()):
                     for old in fp.glob("face.*"):
                         try:
                             old.unlink()

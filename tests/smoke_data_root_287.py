@@ -272,14 +272,16 @@ def check_worker_face_cross_flavor(scratch, sessions):
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
     (fdir / "face.png").write_bytes(png)
     win_row = rf"C:\no\such\host\worker_records\{emp_id}_SMK287_Face\face.png"
+    win_folder = rf"C:\no\such\host\worker_records\{emp_id}_SMK287_Face"
     conn = db_layer.connect()
     try:
+        conn.execute("DELETE FROM worker_documents WHERE employee_id=?", (emp_id,))
         conn.execute("DELETE FROM project_assignments WHERE employee_id=?", (emp_id,))
         conn.execute("DELETE FROM employees WHERE employee_id=?", (emp_id,))
         conn.execute(
             "INSERT INTO employees (employee_id, name, trade, worker_id, face_image_path, "
-            "intake_status) VALUES (?,?,?,?,?, 'complete')",
-            (emp_id, "SMK287 Face", "laborer", wid, win_row))
+            "folder_path, intake_status) VALUES (?,?,?,?,?,?, 'complete')",
+            (emp_id, "SMK287 Face", "laborer", wid, win_row, win_folder))
         conn.execute(
             "INSERT INTO project_assignments (project_code, employee_id, status) "
             "VALUES (?,?, 'active')", (PC, emp_id))
@@ -308,9 +310,67 @@ def check_worker_face_cross_flavor(scratch, sessions):
         ok("294S3 crew-compliance has_photo true for the windows row",
            bool(mine) and mine[0].get("has_photo") is True,
            f"status={r.status_code} rows={len(rows)}")
+
+        # ---- #294 S4 — WRITE flows against the SAME pre-#287 worker: the
+        # stored WINDOWS-ABSOLUTE folder_path must resolve under the root for
+        # every upload, and every NEW row must be stored PORTABLE (relative).
+        # Pre-fix code 400'd all of these ("invalid folder path") on a rooted host.
+        r = s.post(f"{BASE}/api/employees/{emp_id}/face-photo",
+                   files={"file": ("face.png", png, "image/png")}, timeout=30)
+        ok("294S4 face upload resolves the windows folder row",
+           r.status_code == 200, f"status={r.status_code}")
+        ok("294S4 face file landed under the root", (fdir / "face.png").exists())
+        conn = db_layer.connect()
+        try:
+            row = conn.execute("SELECT face_image_path FROM employees WHERE employee_id=?",
+                               (emp_id,)).fetchone()
+        finally:
+            conn.close()
+        fv = str((row and row["face_image_path"]) or "")
+        ok("294S4 face row stored PORTABLE",
+           fv.startswith("worker_records/") and ":" not in fv)
+        r = s.get(f"{BASE}/api/employees/{emp_id}/face-photo", timeout=15)
+        ok("294S4 face serves back from the PORTABLE row",
+           r.status_code == 200 and r.content[:8] == b"\x89PNG\r\n\x1a\n",
+           f"status={r.status_code}")
+
+        r = s.post(f"{BASE}/api/workers/{emp_id}/upload",
+                   data={"doc_type": "other", "doc_label": "smk294s4"},
+                   files={"file": ("doc.png", png, "image/png")}, timeout=30)
+        ok("294S4 doc upload resolves the windows folder row",
+           r.status_code == 200, f"status={r.status_code}")
+        durl = (((r.json() or {}).get("data") or {}).get("file_url") or "") if r.status_code == 200 else ""
+        ok("294S4 doc file_url gated", durl.startswith("/worker-files/"))
+        rr = s.get(f"{BASE}{durl}", timeout=15) if durl else None
+        ok("294S4 doc serves back via /worker-files/",
+           bool(rr) and rr.status_code == 200, f"status={(rr.status_code if rr else 'n/a')}")
+        conn = db_layer.connect()
+        try:
+            dv = conn.execute("SELECT file_path FROM worker_documents WHERE employee_id=? "
+                              "ORDER BY id DESC", (emp_id,)).fetchone()
+        finally:
+            conn.close()
+        ok("294S4 doc row stored PORTABLE",
+           dv is not None and str(dv["file_path"]).startswith("worker_records/"))
+
+        r = s.post(f"{BASE}/api/employees/{emp_id}/certifications/extract",
+                   files={"file": ("cert.png", png, "image/png")}, timeout=30)
+        certs_dir = fdir / "certs"
+        ok("294S4 cert scan lands the file (200 or keyless 503)",
+           r.status_code in (200, 503), f"status={r.status_code}")
+        ok("294S4 cert file landed under the root",
+           certs_dir.exists() and any(certs_dir.glob("cert_*")))
+
+        r = s.delete(f"{BASE}/api/employees/{emp_id}/face-photo", timeout=15)
+        jd = (((r.json() or {}).get("data")) or {}) if r.status_code == 200 else {}
+        ok("294S4 face delete unlinks via the resolved folder",
+           r.status_code == 200 and jd.get("files_unlinked", 0) >= 1,
+           f"status={r.status_code} unlinked={jd.get('files_unlinked')}")
     finally:
         conn = db_layer.connect()
         try:
+            conn.execute("DELETE FROM worker_documents WHERE employee_id=?", (emp_id,))
+            conn.execute("DELETE FROM certifications WHERE employee_id=?", (emp_id,))
             conn.execute("DELETE FROM project_assignments WHERE employee_id=?", (emp_id,))
             conn.execute("DELETE FROM employees WHERE employee_id=?", (emp_id,))
             conn.commit()
@@ -330,6 +390,9 @@ def main():
         return 2
     scratch = Path(tempfile.mkdtemp(prefix="ssc_root_287_"))
     env = {**os.environ, "SSC_DATA_ROOT": str(scratch)}
+    # #294 S4 — the cert-scan write probe must hit the deterministic keyless
+    # branch (file saved + 503), never a real vision call from the gate.
+    env.pop("ANTHROPIC_API_KEY", None)
     logf = open(SCRIPT_DIR / "tests" / "_287_srv.log", "w", encoding="utf-8")
     srv = subprocess.Popen(
         [str(SCRIPT_DIR / "venv" / "Scripts" / "python.exe"), "-m", "waitress",
