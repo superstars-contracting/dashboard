@@ -254,6 +254,16 @@ def cleanup_marker():
                  )""",
             (PROJECT, D_EARLY, D_MID, D_LATE),
         )
+        # #295 — correction-trail residue from an ABORTED earlier run (the
+        # staling arc's own teardown handles the normal path): history +
+        # amend-audit rows on the smoke's synthetic 2030-03 date family.
+        try:
+            cur.execute("DELETE FROM sign_in_edit WHERE employee_id LIKE 'SMK-%' "
+                        "OR date LIKE '2030-03-%'")
+            cur.execute("DELETE FROM audit_log WHERE action='hours_edit_after_issue' "
+                        "AND note LIKE '%2030-03-%'")
+        except Exception:
+            pass   # pre-#295 schema — nothing to sweep
         conn.commit()
     finally:
         conn.close()
@@ -1071,6 +1081,7 @@ def test_dcr_staling_lifecycle():
         add_note(r, "synth worker create failed")
         return r
     issued_seq = None
+    syn_id_b = None   # #295 — step-3b addition-door worker
     try:
         # Step 1 — seed: post a sign-in for the synthetic worker on
         # the synthetic date via the API so the standard mutation
@@ -1127,26 +1138,56 @@ def test_dcr_staling_lifecycle():
             and (row_client["stale"] or 0) == 0
         )
 
-        # Step 3 — mutate sign_in_log via the API (PUT changes times).
-        # This should fire _mark_dcr_stale; verify both audience rows
-        # flip to stale=1.
+        # Step 3a — CORRECTION door (#295): a PUT on an issued day is an
+        # amendment — it records history, flags hours_amended, and AUTO
+        # RE-RENDERS both audiences, so stale SELF-HEALS to 0. The old
+        # assertion (stale=1 after PUT) described pre-#295 behavior.
         mu = requests.put(f"{BASE}/api/sign-ins/{seed_sign_in_id}",
                           json={"time_in": "08:00", "time_out": "14:00"},
-                          timeout=10)
+                          timeout=120)
+        mu_body = (mu.json() or {}).get("data") or {} if mu.status_code == 200 else {}
+        mu_am = mu_body.get("dcr_amended") or {}
         conn = db()
         try:
             after_mut = conn.execute(
+                "SELECT report_id, stale, hours_amended FROM report_index "
+                "WHERE project_code = ? AND report_date = ?",
+                (PROJECT_CODE, SYN_DATE)
+            ).fetchall()
+        finally:
+            conn.close()
+        healed = (len(after_mut) >= 2
+                  and all((a["stale"] or 0) == 0 for a in after_mut)
+                  and all((a["hours_amended"] or 0) == 1 for a in after_mut))
+        step3a = (mu.status_code == 200 and mu_am.get("rerendered") is True and healed)
+        if not step3a:
+            add_note(r, f"amend self-heal: status={mu.status_code} am={mu_am} "
+                        f"rows={[(a['report_id'], a['stale'], a['hours_amended']) for a in after_mut]}")
+
+        # Step 3b — ADDITION door (the #196 staling lifecycle lives on):
+        # POSTing a NEW sign-in is not a correction (no history, no
+        # re-render by design) — it must still flip both rows stale=1.
+        syn_id_b = _synth_worker("StaleLifeB")
+        add_cr = requests.post(f"{BASE}/api/sign-ins", json={
+            "employee_id": syn_id_b, "project_code": PROJECT_CODE,
+            "date": SYN_DATE, "time_in": "07:00", "time_out": "15:30",
+        }, timeout=10) if syn_id_b else None
+        conn = db()
+        try:
+            after_add = conn.execute(
                 "SELECT report_id, stale FROM report_index "
                 "WHERE project_code = ? AND report_date = ?",
                 (PROJECT_CODE, SYN_DATE)
             ).fetchall()
         finally:
             conn.close()
-        all_stale = all((a["stale"] or 0) == 1 for a in after_mut)
-        r.edit = (mu.status_code == 200 and len(after_mut) >= 2 and all_stale)
-        if not r.edit:
-            stales = [(a["report_id"], a["stale"]) for a in after_mut]
-            add_note(r, f"post-mutate state: {stales}  mut_status={mu.status_code}")
+        step3b = (add_cr is not None and add_cr.status_code in (200, 201)
+                  and len(after_add) >= 2
+                  and all((a["stale"] or 0) == 1 for a in after_add))
+        if not step3b:
+            stales = [(a["report_id"], a["stale"]) for a in after_add]
+            add_note(r, f"post-add staling: {stales}  add_status={getattr(add_cr, 'status_code', 'n/a')}")
+        r.edit = bool(step3a and step3b)
 
         # Step 4 — re-issue. Should clear stale on BOTH rows.
         # roster_skip again for the same reason as Step 2.
@@ -1174,7 +1215,11 @@ def test_dcr_staling_lifecycle():
         r.shows = bool(r.create and r.edit and r.delete)
     finally:
         # Teardown — remove the synthetic DCR rows, the synthetic
-        # artifact directory, the sign_in_log row, then the worker.
+        # artifact directory, the sign_in_log rows, then the workers.
+        # #295 — ALSO the correction residue this arc now legitimately
+        # creates: sign_in_edit history + hours_edit_after_issue audit
+        # rows (numeric report_index targets defeat the corruption
+        # suite's prefix filter, so leaving them false-flags pollution).
         conn = db()
         try:
             conn.execute(
@@ -1184,9 +1229,16 @@ def test_dcr_staling_lifecycle():
             )
             conn.execute(
                 "DELETE FROM sign_in_log "
-                "WHERE project_code = ? AND date = ? AND employee_id = ?",
-                (PROJECT_CODE, SYN_DATE, syn_id)
+                "WHERE project_code = ? AND date = ?",
+                (PROJECT_CODE, SYN_DATE)
             )
+            try:
+                conn.execute("DELETE FROM sign_in_edit WHERE project_code = ? AND date = ?",
+                             (PROJECT_CODE, SYN_DATE))
+                conn.execute("DELETE FROM audit_log WHERE action='hours_edit_after_issue' "
+                             "AND note LIKE ?", (f"%{SYN_DATE}%",))
+            except Exception:
+                pass   # pre-#295 schema — nothing to sweep
             conn.commit()
         finally:
             conn.close()
@@ -1202,6 +1254,8 @@ def test_dcr_staling_lifecycle():
             except Exception:
                 pass
         _synth_teardown(syn_id)
+        if syn_id_b:
+            _synth_teardown(syn_id_b)
     return r
 
 

@@ -123,6 +123,62 @@ whole-batch moves took N precise clicks; circles invisible on tablets.
   now defers to the marker (its last-resort pin moved 273 -> 278), and
   snapshots/ssc_dev_278.db was refreshed from live. Gate 41/41 both backends.
 
+### #295 — daily hours correction: sign-in edit flow (amend-never-erase)
+
+Origin: Aug-12 hours entered wrong on production; Cancel didn't "clear"
+them. DIAGNOSIS: Cancel was working as designed — it discards unsaved
+drafts and rolls back SAME-SESSION manual adds; rows saved in EARLIER
+sessions are records, and no edit path existed for them. Built the edit
+flow on the EXISTING sign-in doors (PUT/PATCH/DELETE /api/sign-ins/<id> —
+the Weekly Hours Log has used them for months, silently):
+
+- **History** (`sign_in_edit`, boot-ensured via apply_hours_edit_295):
+  every operator correction writes action/from→to/actor/reason
+  in-transaction; DELETE preserves the erased times. Worker-app self
+  sign-in/out deliberately does NOT write history (original record, not
+  a correction). Weekly Hours Log edits now leave a trail for free.
+- **Issued-day arc**: correction ALLOWED; report_index.hours_amended(+at)
+  set, audit_log 'hours_edit_after_issue' row, history row flagged, and
+  BOTH audiences AUTO RE-RENDER via _issue_one_dcr with the preserved
+  sequence (#282 immutability). Re-render runs POST-COMMIT by design: the
+  DB correction is truth; a render failure degrades to the stale-flag
+  manual re-issue path (response carries rerendered:false). Stale ends
+  CLEARED on success (artifact matches live). Archive shows a
+  "⏲ hours amended" pill (same family as #294's photo pill; list_reports
+  SELECT * carries the new columns automatically).
+- **Roster edit UI** (entry view): every saved row gets ✎ (inline
+  time-in/out + optional reason + row Save/Cancel) and 🗑 (confirm +
+  optional reason). Summary labels rows "saved records"; on an issued day
+  the summary + button titles warn the correction is logged and the
+  report re-renders. The daily GET now returns `issued` for this.
+- **Cancel semantics**: unchanged mechanics (discard drafts + roll back
+  session adds — those deletes now self-label 'entry cancelled before
+  issue' in the trail) + the confirm copy states saved sign-ins are kept
+  and corrected via ✎/🗑.
+- **Derived data**: nothing stored to recompute — worked hours/weekly log
+  compute on read; the #292 memo choke-point (_mark_dcr_stale →
+  ssc_memo.bump) fires on all three doors (guard-asserted end-to-end:
+  cost-widget total MOVES on edit and on remove).
+- Guard: tests/smoke_hours_edit_295.py (40 checks) in the gate — history
+  arcs, cancel-label, anon 401s, issued arc re-render VERIFIED BY CONTENT
+  (internal artifact carries the corrected time, drops the old one, keeps
+  the control row; client artifact is curated — bytes-changed check),
+  archive flag, memo movement, structural UI markers.
+- NOTE: client-audience DCRs carry no per-worker times (portal parity) —
+  content checks against the client artifact must assert bytes-changed,
+  not time strings.
+- **Gate fallout fixed en route**: the #196 DcrStalingLifecycle section in
+  smoke_crud_data_integrity asserted stale=1 after a PUT — pre-#295
+  semantics (the correction door now SELF-HEALS: re-render clears stale).
+  Rewritten: step 3a asserts the amend arc (rerendered:true, stale stays
+  0, hours_amended=1); step 3b keeps #196 coverage via the ADDITION door
+  (POST still stales; re-issue clears). Its teardown + the smoke's main
+  sweep now clean the correction residue (sign_in_edit + amend-audit
+  rows — numeric report_index targets defeat the corruption suite's
+  prefix filter). CAUGHT BY the no-production-corruption tripwire, NOT
+  the suite itself: smoke_crud_data_integrity's main() always exits 0
+  (sections can fail silently) — chip filed to fix its rc semantics.
+
 ### #294 S3 — worker headshots blank on cloud: the raw-path family swept
 
 Operator report: workforce/project-dashboard headshots render on the

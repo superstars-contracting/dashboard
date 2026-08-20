@@ -223,6 +223,22 @@ except Exception as _e:
 import photo_reassign  # noqa: E402
 photo_reassign.register(app)
 
+# #295 — sign-in hours edit history + the DCR hours-amended flag. AMEND-NEVER-
+# ERASE on the EXISTING sign-in doors (PUT/PATCH/DELETE on /api/sign-ins/<id>);
+# corrections write sign_in_edit rows in-transaction, an issued day gets
+# hours_amended(+at) + an audit row + an AUTO re-render of both audiences.
+import apply_hours_edit_295 as _hours_edit_schema  # noqa: E402
+try:
+    _hc = db_layer.connect(pragma_fk=True)
+    try:
+        _hours_edit_schema.ensure_hours_edit_schema(_hc)
+        _hc.commit()
+    finally:
+        _hc.close()
+    db_layer._PKMAP_CACHE.clear()   # #290 fresh-DB pk-map note, as above
+except Exception as _e:
+    logging.warning(f"#295 hours-edit schema ensure skipped: {_e}")
+
 # #278 — Project Cost "Spent to Date" (C-Suite) + the project expense ledger.
 # Comp data: every endpoint admin/c_suite; cost keys OMITTED for every other role
 # (403, never zeroed payloads); company console only — no field-reachable surface.
@@ -1074,27 +1090,42 @@ def create_sign_in():
 
 @app.route('/api/sign-ins/<int:sign_in_id>', methods=['PATCH'])
 def update_sign_in(sign_in_id):
-    """Update sign-out time"""
+    """Update sign-out time. #295 — a correction through this door writes a
+    sign_in_edit history row; an issued day gets the hours_amended flag,
+    audit row, and an auto re-render of the issued artifact(s)."""
     try:
         data = request.get_json()
         time_out = data.get('time_out')
+        reason = (data.get('reason') or '').strip()[:200] or None
 
         conn = db()
-        existing = conn.execute(
-            "SELECT project_code, date FROM sign_in_log WHERE id = ?", (sign_in_id,)
+        before = conn.execute(
+            "SELECT * FROM sign_in_log WHERE id = ?", (sign_in_id,)
         ).fetchone()
+        if not before:
+            conn.close()
+            return jsonify({"error": "sign_in_log row not found"}), 404
         conn.execute(
             "UPDATE sign_in_log SET time_out = ?, updated_at = ? WHERE id = ?",
             (time_out, datetime.now().isoformat(), sign_in_id)
         )
-        if existing:
-            _mark_dcr_stale(conn, existing["project_code"], existing["date"])
+        edit_id = _record_sign_in_edit(conn, before, 'edit', before["time_in"], time_out, reason)
+        _mark_dcr_stale(conn, before["project_code"], before["date"])
+        amended = _amend_issued_dcr_hours(
+            conn, before["project_code"], before["date"], edit_id,
+            "sign-out corrected after issue")
         conn.commit()
 
         row = conn.execute("SELECT * FROM sign_in_log WHERE id = ?", (sign_in_id,)).fetchone()
         conn.close()
-
-        return response_wrapper(dict(row)), 200
+        out = dict(row)
+        if amended:
+            rr = _rerender_amended_dcr(before["project_code"], before["date"],
+                                       amended["sequence"], amended["audiences"])
+            out["dcr_amended"] = {"display_id": amended["display_id"],
+                                  "rerendered": rr.get("ok", False),
+                                  "rerender_error": rr.get("error")}
+        return response_wrapper(out), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1120,22 +1151,37 @@ def replace_sign_in(sign_in_id):
         if time_out < time_in:
             return jsonify({"error": f"time_out ({time_out}) is before time_in ({time_in})"}), 400
 
+        reason = (data.get('reason') or '').strip()[:200] or None
         conn = db()
-        existing = conn.execute(
-            "SELECT project_code, date FROM sign_in_log WHERE id = ?", (sign_in_id,)
+        before = conn.execute(
+            "SELECT * FROM sign_in_log WHERE id = ?", (sign_in_id,)
         ).fetchone()
-        if not existing:
+        if not before:
             conn.close()
             return jsonify({"error": "sign_in_log row not found"}), 404
         conn.execute(
             "UPDATE sign_in_log SET time_in = ?, time_out = ?, updated_at = ? WHERE id = ?",
             (time_in, time_out, datetime.now().isoformat(), sign_in_id)
         )
-        _mark_dcr_stale(conn, existing["project_code"], existing["date"])
+        # #295 — the correction trail + issued-day amendment, in-transaction.
+        edit_id = _record_sign_in_edit(conn, before, 'edit', time_in, time_out, reason)
+        _mark_dcr_stale(conn, before["project_code"], before["date"])
+        amended = _amend_issued_dcr_hours(
+            conn, before["project_code"], before["date"], edit_id,
+            "hours corrected after issue")
         conn.commit()
         row = conn.execute("SELECT * FROM sign_in_log WHERE id = ?", (sign_in_id,)).fetchone()
         conn.close()
-        return response_wrapper(dict(row)), 200
+        out = dict(row)
+        if amended:
+            # Post-commit by design: the DB correction is the truth; a render
+            # failure degrades to the stale-flag manual path, never a rollback.
+            rr = _rerender_amended_dcr(before["project_code"], before["date"],
+                                       amended["sequence"], amended["audiences"])
+            out["dcr_amended"] = {"display_id": amended["display_id"],
+                                  "rerendered": rr.get("ok", False),
+                                  "rerender_error": rr.get("error")}
+        return response_wrapper(out), 200
     except Exception as e:
         logging.error(f"PUT /api/sign-ins/{sign_in_id}: {str(e)}")
         return jsonify({"error": str(e)}), 500
@@ -1150,20 +1196,35 @@ def delete_sign_in(sign_in_id):
     Returns 404 if the id doesn't exist so the caller can distinguish
     'already gone' from 'never existed' if needed."""
     try:
+        # #295 — reason rides the query string (DELETE bodies are unreliable
+        # across proxies); cancel-rollback deletes label themselves with it.
+        reason = (request.args.get('reason') or '').strip()[:200] or None
         conn = db()
-        # Read (project_code, date) BEFORE deleting so we can mark the
-        # corresponding DCR stale once the row is gone.
-        existing = conn.execute(
-            "SELECT project_code, date FROM sign_in_log WHERE id = ?", (sign_in_id,)
+        # Read the FULL row BEFORE deleting — the history row preserves the
+        # removed times (amend-never-erase: the delete erases the row, the
+        # trail keeps what it said).
+        before = conn.execute(
+            "SELECT * FROM sign_in_log WHERE id = ?", (sign_in_id,)
         ).fetchone()
-        if not existing:
+        if not before:
             conn.close()
             return jsonify({"error": "sign_in_log row not found"}), 404
         conn.execute("DELETE FROM sign_in_log WHERE id = ?", (sign_in_id,))
-        _mark_dcr_stale(conn, existing["project_code"], existing["date"])
+        edit_id = _record_sign_in_edit(conn, before, 'remove', None, None, reason)
+        _mark_dcr_stale(conn, before["project_code"], before["date"])
+        amended = _amend_issued_dcr_hours(
+            conn, before["project_code"], before["date"], edit_id,
+            "sign-in removed after issue")
         conn.commit()
         conn.close()
-        return jsonify({"deleted": True, "id": sign_in_id}), 200
+        out = {"deleted": True, "id": sign_in_id}
+        if amended:
+            rr = _rerender_amended_dcr(before["project_code"], before["date"],
+                                       amended["sequence"], amended["audiences"])
+            out["dcr_amended"] = {"display_id": amended["display_id"],
+                                  "rerendered": rr.get("ok", False),
+                                  "rerender_error": rr.get("error")}
+        return jsonify(out), 200
     except Exception as e:
         logging.error(f"DELETE /api/sign-ins/{sign_in_id}: {str(e)}")
         return jsonify({"error": str(e)}), 500
@@ -2455,6 +2516,17 @@ def get_dcr_daily(project_code, report_date):
             dcr['stale_marked_at'] = stale_row['stale_marked_at']
         else:
             dcr['stale'] = 0
+        # #295 — the entry view warns BEFORE an hours edit on an issued day
+        # (the correction is allowed; the warning says it will be recorded
+        # and the report re-rendered). stale_row's WHERE already scopes to
+        # status='issued'; surface existence separately from staleness.
+        conn = db()
+        issued_row = conn.execute(
+            "SELECT 1 FROM report_index WHERE project_code = ? AND report_date = ? "
+            "AND UPPER(report_type)='DCR' AND status = 'issued' LIMIT 1",
+            (project_code, report_date)).fetchone()
+        conn.close()
+        dcr['issued'] = 1 if issued_row else 0
         return response_wrapper(dcr)
     except (KeyError, ValueError) as e:
         return jsonify({"error": str(e)}), 400
@@ -2492,6 +2564,108 @@ def _mark_dcr_stale(conn, project_code, report_date):
         "AND (stale IS NULL OR stale = 0)",
         (project_code, report_date),
     )
+
+
+def _record_sign_in_edit(conn, before, action, to_in, to_out, reason):
+    """#295 — the labor paper trail (AMEND-NEVER-ERASE, the #294 posture).
+    One history row per operator correction through the sign-in doors:
+    action 'edit' (from -> to times) or 'remove' (to_* NULL). `before` is the
+    sign_in_log row BEFORE the mutation. Returns the history row id so the
+    caller can mark dcr_amended once the issued-day check runs. Worker-app
+    self sign-in/out never routes here — the original record is not an edit."""
+    try:
+        from auth import current_user
+        user = current_user() or {}
+    except Exception:
+        user = {}
+    cur = conn.execute(
+        "INSERT INTO sign_in_edit (sign_in_id, employee_id, project_code, date, "
+        "action, from_time_in, from_time_out, to_time_in, to_time_out, "
+        "actor_uid, actor_role, reason, created_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (before["id"], before["employee_id"], before["project_code"], before["date"],
+         action, before["time_in"], before["time_out"], to_in, to_out,
+         user.get("id"), user.get("role"), (reason or None),
+         datetime.now().isoformat()))
+    return cur.lastrowid
+
+
+def _amend_issued_dcr_hours(conn, project_code, report_date, edit_id, note):
+    """#295 — when the corrected day has an ISSUED DCR: set the honest marker
+    (report_index.hours_amended + at), write the audit row, mark the history
+    row dcr_amended, and return {sequence, audiences, display_id} so the
+    caller can re-render. Returns None when the day has no issued DCR.
+    Callable transaction-side with no Flask context (tests, CLI)."""
+    issued = conn.execute(
+        "SELECT id, report_id, dcr_sequence FROM report_index "
+        "WHERE project_code = ? AND report_date = ? "
+        "AND UPPER(report_type) = 'DCR' AND status = 'issued'",
+        (project_code, report_date)).fetchall()
+    if not issued:
+        return None
+    now = datetime.now().isoformat()
+    # The note names the project + day — an audit row must be attributable
+    # without joining anything (and synthetic-project rows self-identify).
+    note = f"{project_code} {report_date}: {note}"
+    hist = conn.execute("SELECT actor_uid, actor_role FROM sign_in_edit WHERE id = ?",
+                        (edit_id,)).fetchone()
+    audiences = []
+    seq = None
+    for d in issued:
+        if d["dcr_sequence"] is not None:
+            seq = d["dcr_sequence"]
+        rid = str(d["report_id"] or "")
+        if rid.endswith("-internal"):
+            audiences.append("internal")
+        elif rid.endswith("-client"):
+            audiences.append("client")
+        conn.execute(
+            "UPDATE report_index SET hours_amended=1, "
+            "hours_amended_at=COALESCE(hours_amended_at, ?) WHERE id=?",
+            (now, d["id"]))
+        conn.execute(
+            "INSERT INTO audit_log (action, actor_user_id, actor_role, target_type, "
+            "target_id, before_json, after_json, note, created_at) "
+            "VALUES ('hours_edit_after_issue', ?,?,?,?,?,?,?,?)",
+            ((hist["actor_uid"] if hist else None), (hist["actor_role"] if hist else None),
+             "report_index", str(d["id"]),
+             json.dumps({"sign_in_edit_id": edit_id}), None, note, now))
+    conn.execute("UPDATE sign_in_edit SET dcr_amended=1 WHERE id=?", (edit_id,))
+    display_id = f"DCR-{project_code}-{seq:03d}" if seq is not None else None
+    return {"sequence": seq, "audiences": sorted(set(audiences)) or ["internal"],
+            "display_id": display_id}
+
+
+def _rerender_amended_dcr(project_code, report_date, seq, audiences):
+    """#295 — regenerate the issued artifact(s) so the served report matches
+    the corrected labor. Runs AFTER the edit transaction committed: the DB
+    correction is the truth and must never be rolled back because a render
+    failed — on failure the day simply stays stale-flagged (the pre-#295
+    manual re-issue path). Returns {'ok': bool, 'audiences': [...], 'error'}."""
+    if seq is None:
+        return {"ok": False, "error": "no sequence on the issued row"}
+    conn = db()
+    written = []
+    try:
+        for aud in audiences:
+            res = _issue_one_dcr(conn, project_code, report_date, aud, seq)
+            written.append(res["html_path"])
+        conn.commit()
+        return {"ok": True, "audiences": audiences}
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        for f in written:
+            try:
+                Path(f).unlink()
+            except OSError:
+                pass
+        logging.warning(f"#295 re-render failed for {project_code} {report_date}: {e}")
+        return {"ok": False, "error": str(e)}
+    finally:
+        conn.close()
 
 
 def lookup_existing_dcr_sequence(conn, project_code, report_date):

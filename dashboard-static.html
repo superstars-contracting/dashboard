@@ -2041,7 +2041,7 @@
             <div class="table-wrapper">
               <table>
                 <thead>
-                  <tr><th>#</th><th>Worker</th><th>Trade</th><th>Time In</th><th>Time Out</th><th>Hours</th></tr>
+                  <tr><th>#</th><th>Worker</th><th>Trade</th><th>Time In</th><th>Time Out</th><th>Hours</th><th></th></tr>
                 </thead>
                 <tbody id="dcr-labor-tbody"></tbody>
               </table>
@@ -2204,6 +2204,23 @@
           // populateLaborAddDropdown re-includes that worker automatically.
           let currentLaborEmployeeIds = new Set();
 
+          // #295 — the canonical currently-loaded entry date (same resolution
+          // initDcrForm's closure uses: dataset.iso via SSCDatePicker, else value).
+          function currentDcrDateISO() {
+            const el = document.getElementById('dcr-date');
+            if (!el) return todayLocal();
+            return (window.SSCDatePicker ? SSCDatePicker.getISO(el) : el.value) || todayLocal();
+          }
+
+          // #295 — the day currently loaded has an issued DCR (set by loadDcr).
+          // Edits are ALLOWED on issued days; the affordances warn that the
+          // correction is recorded and the report re-rendered.
+          let _dcrIssued = false;
+          // sign_in_id currently in inline-edit, or null. One row at a time —
+          // the second Edit click closes the first (unsaved edits discarded,
+          // which is what an explicit switch means).
+          let _laborEditSid = null;
+
           function renderLabor(labor) {
             const summary = document.getElementById('dcr-labor-summary');
             const tbody = document.getElementById('dcr-labor-tbody');
@@ -2214,23 +2231,109 @@
             currentLaborEmployeeIds = new Set(rows.map(r => r.employee_id).filter(Boolean));
             if (!rows.length) {
               summary.textContent = '';
-              tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:#76777E;">No sign-ins recorded for this date. Workers must sign in via the worker app for their hours to land here.</td></tr>';
+              tbody.innerHTML = '<tr><td colspan="7" style="padding:24px;text-align:center;color:#76777E;">No sign-ins recorded for this date. Workers must sign in via the worker app for their hours to land here.</td></tr>';
             } else {
-              summary.innerHTML = '<strong style="color:#14161C;">' + labor.headcount + '</strong> worker(s) · <strong style="color:#14161C;">' + labor.total_hours + '</strong> total hours';
-              tbody.innerHTML = rows.map(r =>
-                '<tr>' +
+              // #295 — these are SAVED records (sign_in_log rows), not form
+              // state: say so, and give each row its correction affordances.
+              summary.innerHTML = '<strong style="color:#14161C;">' + labor.headcount + '</strong> worker(s) · <strong style="color:#14161C;">' + labor.total_hours + '</strong> total hours'
+                + ' <span style="font-size:11px;color:#76777E;">· saved records — use ✎ to correct a row'
+                + (_dcrIssued ? ' (this day’s DCR is issued: corrections are logged and the report re-renders)' : '') + '</span>';
+              tbody.innerHTML = rows.map(r => {
+                const sid = r.sign_in_id;
+                if (sid != null && _laborEditSid === sid) {
+                  // Inline edit state — time inputs + optional reason + row Save/Cancel.
+                  return '<tr data-sid="' + sid + '" style="background:#FBF7EE;">' +
+                    '<td>' + r.n + '</td>' +
+                    '<td>' + (esc(r.name) || '—') + ' <span style="color:#76777E;font-size:11px;">' + (esc(r.worker_id) || '') + '</span></td>' +
+                    '<td>' + (esc(r.trade) || '—') + '</td>' +
+                    '<td><input type="time" data-led-in value="' + esc(r.time_in || '') + '" style="padding:4px 6px;border:1px solid #E8E4DD;border-radius:4px;font-size:12px;font-family:inherit;"></td>' +
+                    '<td><input type="time" data-led-out value="' + esc(r.time_out || '') + '" style="padding:4px 6px;border:1px solid #E8E4DD;border-radius:4px;font-size:12px;font-family:inherit;"></td>' +
+                    '<td colspan="2" style="white-space:nowrap;">' +
+                      '<input type="text" data-led-reason maxlength="200" placeholder="Reason (optional)" style="width:150px;padding:4px 8px;border:1px solid #E8E4DD;border-radius:4px;font-size:12px;font-family:inherit;margin-right:6px;">' +
+                      '<button type="button" data-led-save="' + sid + '" style="font-size:10px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 10px;border:none;border-radius:3px;background:#14161C;color:white;cursor:pointer;margin-right:4px;">Save</button>' +
+                      '<button type="button" data-led-cancel style="font-size:10px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;padding:5px 10px;border:1px solid #E8E4DD;border-radius:3px;background:white;color:#76777E;cursor:pointer;">Cancel</button>' +
+                    '</td>' +
+                  '</tr>';
+                }
+                return '<tr' + (sid != null ? ' data-sid="' + sid + '"' : '') + '>' +
                   '<td>' + r.n + '</td>' +
                   '<td>' + (esc(r.name) || '—') + ' <span style="color:#76777E;font-size:11px;">' + (esc(r.worker_id) || '') + '</span></td>' +
                   '<td>' + (esc(r.trade) || '—') + '</td>' +
                   '<td>' + (esc(r.time_in) || '—') + '</td>' +
                   '<td>' + (esc(r.time_out) || '—') + '</td>' +
                   '<td>' + (r.hours != null ? r.hours : '—') + '</td>' +
-                '</tr>'
-              ).join('');
+                  '<td style="white-space:nowrap;text-align:right;">' + (sid != null ?
+                    '<button type="button" data-led-edit="' + sid + '" title="Correct this row’s times (logged' + (_dcrIssued ? '; the issued DCR re-renders' : '') + ')" style="border:none;background:none;cursor:pointer;color:#76777E;font-size:14px;padding:2px 6px;">&#9998;</button>' +
+                    '<button type="button" data-led-remove="' + sid + '" title="Remove this sign-in (logged' + (_dcrIssued ? '; the issued DCR re-renders' : '') + ')" style="border:none;background:none;cursor:pointer;color:#B11E2E;font-size:13px;padding:2px 6px;">&#128465;</button>'
+                    : '') + '</td>' +
+                '</tr>';
+              }).join('');
             }
             // Re-populate the add-dropdown so already-added workers are
             // filtered out, and any that have since been removed reappear.
             populateLaborAddDropdown();
+          }
+
+          // #295 — correction actions. Delegated once; renderLabor re-renders
+          // rows freely without re-wiring. Every path refreshes via loadDcr so
+          // hours/summary/stale/amended state all re-derive server-side.
+          function wireLaborEdits() {
+            const tbody = document.getElementById('dcr-labor-tbody');
+            if (!tbody || tbody._ledWired) return;
+            tbody._ledWired = true;
+            tbody.addEventListener('click', async (e) => {
+              const editBtn = e.target.closest('[data-led-edit]');
+              if (editBtn) { _laborEditSid = +editBtn.getAttribute('data-led-edit'); loadDcr(currentDcrDateISO()); return; }
+              const cancelBtn = e.target.closest('[data-led-cancel]');
+              if (cancelBtn) { _laborEditSid = null; loadDcr(currentDcrDateISO()); return; }
+              const saveBtn = e.target.closest('[data-led-save]');
+              if (saveBtn) {
+                const sid = +saveBtn.getAttribute('data-led-save');
+                const tr = saveBtn.closest('tr');
+                const tIn = (tr.querySelector('[data-led-in]') || {}).value;
+                const tOut = (tr.querySelector('[data-led-out]') || {}).value;
+                const reason = ((tr.querySelector('[data-led-reason]') || {}).value || '').trim();
+                if (!tIn || !tOut) { setStatus('Time in and time out are both required', '#B11E2E'); return; }
+                saveBtn.disabled = true;
+                try {
+                  const resp = await fetch('/api/sign-ins/' + sid, {
+                    method: 'PUT', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({time_in: tIn, time_out: tOut, reason: reason || undefined})
+                  });
+                  const json = await resp.json().catch(() => ({}));
+                  if (!resp.ok) { setStatus('Correction failed: ' + (json.error || ('HTTP ' + resp.status)), '#B11E2E'); saveBtn.disabled = false; return; }
+                  _laborEditSid = null;
+                  notifyHoursAmended((json.data || {}).dcr_amended);
+                  setStatus('Correction saved', '#2F7C57');
+                  loadDcr(currentDcrDateISO());
+                } catch (err) { setStatus('Network error', '#B11E2E'); saveBtn.disabled = false; }
+                return;
+              }
+              const rmBtn = e.target.closest('[data-led-remove]');
+              if (rmBtn) {
+                const sid = +rmBtn.getAttribute('data-led-remove');
+                const warn = 'Remove this sign-in? The removal is logged (who/when/original times)'
+                  + (_dcrIssued ? ', the issued DCR is flagged “hours amended” and re-rendered' : '') + '.';
+                if (!confirm(warn)) return;
+                const reason = prompt('Reason (optional):', '') || '';
+                try {
+                  const resp = await fetch('/api/sign-ins/' + sid + (reason.trim() ? ('?reason=' + encodeURIComponent(reason.trim().slice(0, 200))) : ''), {method: 'DELETE'});
+                  const json = await resp.json().catch(() => ({}));
+                  if (!resp.ok) { setStatus('Remove failed: ' + (json.error || ('HTTP ' + resp.status)), '#B11E2E'); return; }
+                  _laborEditSid = null;
+                  notifyHoursAmended(json.dcr_amended);
+                  setStatus('Sign-in removed (logged)', '#2F7C57');
+                  loadDcr(currentDcrDateISO());
+                } catch (err) { setStatus('Network error', '#B11E2E'); }
+              }
+            });
+          }
+
+          function notifyHoursAmended(am) {
+            if (!am) return;
+            alert('This day’s DCR (' + (am.display_id || '') + ') was already issued. The correction is recorded, the report is flagged “hours amended”, and '
+              + (am.rerendered ? 'both report copies were re-rendered to match.' :
+                 'automatic re-render did not complete — the archive shows the day as stale; re-issue it from the entry view.'));
           }
 
           // DCR-5/6: race-guard counter. Every loadDcr call bumps
@@ -2272,6 +2375,7 @@
               }
               renderProjectInfo(dcr.project);
               renderWeather(dcr.weather);
+              _dcrIssued = !!dcr.issued;   // #295 — before renderLabor (it reads this)
               renderLabor(dcr.labor);
               renderNoWorkBanner(dcr);
               renderStaleBanner(dcr);
@@ -3110,6 +3214,8 @@
             // #294 — the honest paper-trail marker: a photo's drop assignment
             // was corrected AFTER this report was issued (allowed + audited).
             const amendPill = r.photo_amended ? '<span class="dcr-amend" title="Photo drop assignment amended after issue' + (r.photo_amended_at ? ' (' + esc(_fmt(r.photo_amended_at)) + ')' : '') + ' — the photo history carries the details">&#8635; photos amended</span>' : '';
+            // #295 — same honest-trail pill for labor corrections after issue.
+            const hoursPill = r.hours_amended ? '<span class="dcr-amend" title="Hours corrected after issue' + (r.hours_amended_at ? ' (' + esc(_fmt(r.hours_amended_at)) + ')' : '') + ' — the sign-in correction log carries the details; the report was re-rendered">&#8986; hours amended</span>' : '';
             // View (eye, blue) opens the rendered report; Edit (pencil) reopens the entry
             // view scoped to this date (re-issue preserves number+date); Delete (trash,
             // red) hits /by-sequence. Same data-* hooks the existing tbody delegation routes.
@@ -3125,7 +3231,7 @@
             return '<tr' + (r.stale ? ' class="dcr-stale-row"' : '') + '>' +
               '<td class="dcr-id">' + esc(displayId) + '</td>' +
               '<td>' + esc(dateDisp) + '</td>' +
-              '<td>' + statusPill + stalePill + amendPill + '</td>' +
+              '<td>' + statusPill + stalePill + amendPill + hoursPill + '</td>' +
               '<td class="dcr-muted">' + esc(issuedAtDisp) + '</td>' +
               '<td><div class="dcr-acts">' + viewBtn + editBtn + deleteBtn + '</div></td>' +
             '</tr>';
@@ -3667,7 +3773,11 @@
             if (unsavedRows.length) partsToWarn.push(unsavedRows.length + ' unsaved row(s)');
             if (manualSignInCount) partsToWarn.push(manualSignInCount + ' manual sign-in(s) added this session');
             if (partsToWarn.length) {
-              if (!confirm('Discard ' + partsToWarn.join(' and ') + '?')) return;
+              // #295 — say exactly what Cancel does and does NOT do: unsaved
+              // work is discarded; already-saved sign-ins are records and are
+              // corrected via ✎/🗑 on the roster, never silently dropped here.
+              if (!confirm('Discard ' + partsToWarn.join(' and ') + '?\n\n'
+                + 'Saved sign-ins stay on record — use the roster row ✎ (edit) or 🗑 (remove) to correct those.')) return;
             }
             // Roll back operator manual sign-ins — these were persisted to
             // sign_in_log on Add but were never committed to an issued DCR;
@@ -3680,7 +3790,10 @@
             if (manualSignInCount) {
               const ids = Array.from(_sessionAddedSignInIds);
               const results = await Promise.allSettled(
-                ids.map(id => fetch('/api/sign-ins/' + encodeURIComponent(id), {method: 'DELETE'}))
+                // #295 — label the rollback in the correction trail: these are
+                // same-session adds discarded before issue, not corrections.
+                ids.map(id => fetch('/api/sign-ins/' + encodeURIComponent(id)
+                  + '?reason=' + encodeURIComponent('entry cancelled before issue'), {method: 'DELETE'}))
               );
               const failed = results.filter(r => r.status === 'rejected'
                 || (r.value && !r.value.ok && r.value.status !== 404)).length;
@@ -3721,6 +3834,7 @@
               if (cancelBtn) cancelBtn.addEventListener('click', () => cancelDcr());
             }
             setupOperatorSections();
+            wireLaborEdits();   // #295 — roster correction delegation (once)
             setupPhotos();
             setupIssueButtons();
             setupArchiveControls();
