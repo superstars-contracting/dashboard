@@ -4309,7 +4309,13 @@ def upload_photo():
         file_path = photo_dir / filename
         photo_file.save(str(file_path))
 
-        rel = file_path.relative_to(SCRIPT_DIR).as_posix()
+        # #295 S2 — rel against the ACTIVE DATA ROOT (what /project-files
+        # resolves from), never the code dir: on the cloud the file lands
+        # under /var/data while SCRIPT_DIR is /app — relative_to raised and
+        # every DCR photo upload 500'd. The two only coincide on an unrooted
+        # workstation. Stored row is PORTABLE (store_rel) per the #287 write
+        # doctrine.
+        rel = file_path.resolve().relative_to(ssc_paths.data_root().resolve()).as_posix()
         url = f"/project-files/{rel}"
 
         conn = db()
@@ -4317,7 +4323,7 @@ def upload_photo():
             conn.execute(
                 "INSERT INTO photos (date, project_code, file_path, filename, url, "
                 "location, description, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (date_str, project_code, str(file_path), filename, url,
+                (date_str, project_code, ssc_paths.store_rel(file_path), filename, url,
                  location, description, uploaded_by)
             )
             conn.commit()
@@ -5319,7 +5325,9 @@ def api_credentials_batch_print():
                             "status": (result or {}).get("status")
                                       if isinstance(result, dict) else str(result)}), 500
         output = result["output_path"]
-        rel = output.relative_to(SCRIPT_DIR).as_posix()
+        # #295 S2 — data-root anchor (containment-anchor family): the batch PDF
+        # lives under the renders root, which is /var/data on the cloud.
+        rel = output.resolve().relative_to(ssc_paths.data_root().resolve()).as_posix()
         friendly_filename = f"SuperstarsContracting-AllIDs-{today}.pdf"
         logging.info(
             f"credentials batch-print served: status={result['status']} "
@@ -8582,7 +8590,9 @@ def issue_employee_credential(emp_id):
         html_dir.mkdir(parents=True, exist_ok=True)
         html_file = html_dir / f"{emp_id}.html"
         html_file.write_text(html_out, encoding='utf-8')
-        html_rel = html_file.relative_to(SCRIPT_DIR).as_posix()
+        # #295 S2 — data-root anchor (containment-anchor family): store_rel is
+        # exactly the /project-files rel form AND the portable stored row.
+        html_rel = ssc_paths.store_rel(html_file)
         conn = db()
         if cred_type == 'cof':
             conn.execute(

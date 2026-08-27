@@ -179,6 +179,31 @@ the Weekly Hours Log has used them for months, silently):
   the suite itself: smoke_crud_data_integrity's main() always exits 0
   (sections can fail silently) — chip filed to fix its rc semantics.
 
+### #295 S2 — the containment-anchor family (rel/URL math vs the data root)
+
+Production: DCR photo upload 500'd ("/var/data/... is not in the subpath
+of '/app'"). The write landed correctly under the root; the rel/URL math
+anchored to SCRIPT_DIR — the two coincide ONLY on an unrooted
+workstation, so this whole class worked locally and broke on cloud. The
+path-family trilogy: S3 = reads through the resolver, S4 = writes
+store_rel, S2 = rel/containment ANCHORS against data_root().
+
+Swept every relative_to / is_relative_to / startswith in the runtime:
+- FIXED: /api/photos/upload (reported break; row now store_rel);
+  credentials batch-print (Print All IDs was broken on cloud,
+  undiagnosed); credential issue html_export_path/html_url; cof_issuer +
+  company_id_issuer photo snapshots (BOTH silently issued cards with no
+  photo on cloud — best-effort except swallowed the raise; both also had
+  the is_absolute-gate-defeats-the-resolver bug from S3).
+- CORRECT, left alone: /project-files + the catch-all (data_root;
+  dual-base by design), materials slips, receipts, portal renders,
+  preview routes (SCRIPT_DIR is RIGHT there — code templates).
+- Guard: check_dcr_photo_upload_rooted in smoke_data_root_287 (upload
+  lands under scratch root + portable row + serves back + out-of-root
+  location refused). Caveat documented: a shallow '../..' location
+  misfiles WITHIN the photos base and is permitted today (pre-existing;
+  authed operators only).
+
 ### #294 S3 — worker headshots blank on cloud: the raw-path family swept
 
 Operator report: workforce/project-dashboard headshots render on the

@@ -451,16 +451,19 @@ def issue_cof(employee_id, rigger_id=None, project_code=None, today_override=Non
         # falls back to its 'PHOTO' placeholder).
         photo_snapshot = None
         if face_src_path:
-            src = Path(face_src_path)
-            if not src.is_absolute():
-                src = SCRIPT_DIR / src
+            # #295 S2 — THE resolver for the stored row (pre-#287 rows are
+            # Windows-absolute; the old is_absolute gate skipped exactly the
+            # rows that need re-anchoring), and the snapshot rel anchors to the
+            # DATA ROOT — on the cloud SCRIPT_DIR is /app and relative_to
+            # raised, so cards silently issued with no photo.
+            src = ssc_paths.resolve_data_path(face_src_path)
             if src.exists():
                 CREDENTIALS_DIR.mkdir(parents=True, exist_ok=True)
                 ext = src.suffix.lower() or ".jpg"
                 dest = CREDENTIALS_DIR / f"{employee_id}_v{revision}{ext}"
                 try:
                     shutil.copy2(str(src), str(dest))
-                    photo_snapshot = dest.relative_to(SCRIPT_DIR).as_posix()
+                    photo_snapshot = ssc_paths.store_rel(dest)
                 except Exception as e:
                     print(f"[cof_issuer] photo snapshot failed: {e}", file=sys.stderr)
 

@@ -136,9 +136,11 @@ def _snapshot_photo(employee_id, revision, source_path):
     /files), or None if no source file available."""
     if not source_path:
         return None
-    src = Path(source_path)
-    if not src.is_absolute():
-        src = ssc_paths.resolve_data_path(src)   # #287
+    # #295 S2 — resolver UNCONDITIONALLY (the is_absolute gate skipped exactly
+    # the pre-#287 Windows-absolute rows that need re-anchoring), and the
+    # returned rel anchors to the DATA ROOT, not the code dir — on the cloud
+    # relative_to(SCRIPT_DIR) raised and cards silently lost their photo.
+    src = ssc_paths.resolve_data_path(source_path)
     if not src.exists():
         return None
     CREDENTIALS_DIR.mkdir(parents=True, exist_ok=True)
@@ -149,7 +151,7 @@ def _snapshot_photo(employee_id, revision, source_path):
     except Exception as e:
         print(f"[company_id_issuer] photo snapshot failed: {e}", file=sys.stderr)
         return None
-    return dest.relative_to(SCRIPT_DIR).as_posix()
+    return ssc_paths.store_rel(dest)
 
 
 # =====================================================================

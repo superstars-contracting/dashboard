@@ -117,6 +117,7 @@ def cleanup():
             conn.execute(f"DELETE FROM users WHERE id IN ({ph})", tuple(IDS["users"]))
         conn.execute("DELETE FROM report_index WHERE project_code=?", (PC,))
         conn.execute("DELETE FROM sign_in_log WHERE project_code=?", (PC,))
+        conn.execute("DELETE FROM photos WHERE project_code=?", (PC,))   # #295 S2 probe rows
         conn.execute("DELETE FROM projects WHERE project_code=?", (PC,))
         conn.commit()
         print("  [cleanup] synthetic rows removed (scoped to SMK287 ids)")
@@ -378,6 +379,55 @@ def check_worker_face_cross_flavor(scratch, sessions):
             conn.close()
 
 
+def check_dcr_photo_upload_rooted(scratch, sessions):
+    """#295 S2 — the containment-anchor family: the DCR photo upload wrote the
+    file under the ACTIVE ROOT correctly, then built its rel/URL against
+    SCRIPT_DIR — on a rooted host (the cloud) relative_to raised and every
+    upload 500'd ("... is not in the subpath of '/app'"). Assert against THIS
+    suite's rooted server: upload lands under the root, the stored row is
+    PORTABLE, the returned /project-files URL serves the bytes back, and a
+    traversal location is still refused (containment stays real — anchored
+    right)."""
+    import base64
+    s = requests.Session()
+    s.cookies.set("ssc_session", sessions["admin"])
+    png = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+    r = s.post(f"{BASE}/api/photos/upload",
+               data={"project_code": PC, "date": "2026-07-29", "location": "North"},
+               files={"photo": ("smk287.png", png, "image/png")}, timeout=30)
+    ok("295S2 dcr-photo upload 201 on rooted host", r.status_code == 201,
+       f"status={r.status_code} body={r.text[:120]}")
+    d = ((r.json() or {}).get("data") or {}) if r.status_code == 201 else {}
+    url = d.get("url") or ""
+    ok("295S2 upload url is gated project-files", url.startswith("/project-files/data_room/photos/"))
+    rr = s.get(f"{BASE}{url}", timeout=15) if url else None
+    ok("295S2 uploaded photo serves back from the root",
+       bool(rr) and rr.status_code == 200 and rr.content[:8] == b"\x89PNG\r\n\x1a\n",
+       f"status={(rr.status_code if rr else 'n/a')}")
+    under = scratch / "data_room" / "photos" / PC
+    ok("295S2 file landed under the scratch root",
+       under.exists() and any(under.rglob("*.png")))
+    conn = db_layer.connect()
+    try:
+        row = conn.execute("SELECT file_path FROM photos WHERE project_code=? "
+                           "ORDER BY id DESC", (PC,)).fetchone()
+    finally:
+        conn.close()
+    fv = str((row and row["file_path"]) or "")
+    ok("295S2 photos row stored PORTABLE",
+       fv.startswith("data_room/photos/") and ":" not in fv)
+    # a location that resolves OUTSIDE the photos base entirely (a shallow
+    # '../..' only misfiles within the base, which containment permits) —
+    # the out-of-root escape is what must stay refused.
+    r = s.post(f"{BASE}/api/photos/upload",
+               data={"project_code": PC, "date": "2026-07-29",
+                     "location": "../" * 12 + "escape"},
+               files={"photo": ("smk287b.png", png, "image/png")}, timeout=30)
+    ok("295S2 out-of-root location still refused", r.status_code == 400,
+       f"status={r.status_code}")
+
+
 def main():
     print(f"== #287 guard: SSC_DATA_ROOT containment ==  port={PORT}")
     check_cross_flavor_resolution()
@@ -416,6 +466,7 @@ def main():
         try:
             run(scratch, sessions, users)
             check_worker_face_cross_flavor(scratch, sessions)   # #294 S3
+            check_dcr_photo_upload_rooted(scratch, sessions)    # #295 S2
         finally:
             cleanup()
     finally:
